@@ -110,7 +110,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         </Link>
 
         <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
-          {navItems.map((item) => (
+          {navItems.filter(item => canAccess(item.path)).map((item) => (
             <Link
               key={item.path}
               to={item.path}
