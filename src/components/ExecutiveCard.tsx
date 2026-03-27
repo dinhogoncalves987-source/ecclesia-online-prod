@@ -11,6 +11,8 @@ interface ExecutiveCardProps {
 }
 
 export function ExecutiveCard({ title, value, trend, trendLabel, icon: Icon, index = 0 }: ExecutiveCardProps) {
+  const isNegative = trend?.startsWith("-");
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -29,7 +31,7 @@ export function ExecutiveCard({ title, value, trend, trendLabel, icon: Icon, ind
       </div>
       {trend && (
         <div className="mt-3 flex items-center gap-1.5 text-sm">
-          <span className="font-medium text-success">{trend}</span>
+          <span className={`font-medium ${isNegative ? "text-destructive" : "text-success"}`}>{trend}</span>
           <span className="text-muted-foreground text-xs">{trendLabel || "vs. mês anterior"}</span>
         </div>
       )}

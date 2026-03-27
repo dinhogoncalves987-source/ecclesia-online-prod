@@ -1,8 +1,8 @@
 import { AdminLayout } from "@/components/AdminLayout";
 import { ExecutiveCard } from "@/components/ExecutiveCard";
-import { Wallet, TrendingUp, TrendingDown, PiggyBank, Plus, Download, Filter, X, Search } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { Wallet, TrendingUp, TrendingDown, PiggyBank, Plus, Download, X, Search } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useState, useMemo } from "react";
 
 type Transaction = {
   id: number;
@@ -27,12 +27,8 @@ const initialTransactions: Transaction[] = [
   { id: 9, date: "06/03", desc: "Ofertas — Culto da Juventude", type: "Entrada", value: "R$ 1.950", amount: 1950, status: "Confirmado", category: "Ofertas" },
 ];
 
-const summary = [
-  { title: "Receita Total", value: "R$ 60.900", trend: "+10,8%", icon: TrendingUp },
-  { title: "Despesas Totais", value: "R$ 28.450", trend: "-3,2%", trendLabel: "redução", icon: TrendingDown },
-  { title: "Saldo Atual", value: "R$ 32.450", icon: Wallet },
-  { title: "Reserva", value: "R$ 85.200", icon: PiggyBank },
-];
+const formatCurrency = (v: number) =>
+  `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
 export default function Financeiro() {
   const [transactions, setTransactions] = useState(initialTransactions);
@@ -47,15 +43,29 @@ export default function Financeiro() {
     return true;
   });
 
+  const summary = useMemo(() => {
+    const totalReceita = transactions.filter(t => t.type === "Entrada").reduce((s, t) => s + t.amount, 0);
+    const totalDespesa = transactions.filter(t => t.type === "Saída").reduce((s, t) => s + t.amount, 0);
+    const saldo = totalReceita - totalDespesa;
+    return [
+      { title: "Receita Total", value: formatCurrency(totalReceita), trend: "+10,8%", icon: TrendingUp },
+      { title: "Despesas Totais", value: formatCurrency(totalDespesa), trend: "-3,2%", trendLabel: "redução", icon: TrendingDown },
+      { title: "Saldo Atual", value: formatCurrency(saldo), icon: Wallet },
+      { title: "Reserva", value: "R$ 85.200", icon: PiggyBank },
+    ];
+  }, [transactions]);
+
   const addTransaction = () => {
     if (!newTx.desc || !newTx.value) return;
-    const amount = parseFloat(newTx.value.replace(/\D/g, "")) / 100;
+    const raw = newTx.value.replace(/[^\d,\.]/g, "").replace(",", ".");
+    const amount = parseFloat(raw) || 0;
+    if (amount <= 0) return;
     const tx: Transaction = {
       id: Date.now(),
       date: new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
       desc: newTx.desc,
       type: newTx.type,
-      value: `R$ ${amount.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}`,
+      value: formatCurrency(amount),
       amount,
       status: "Pendente",
       category: newTx.category || "Geral",
@@ -63,6 +73,10 @@ export default function Financeiro() {
     setTransactions([tx, ...transactions]);
     setNewTx({ desc: "", type: "Entrada", value: "", category: "" });
     setShowForm(false);
+  };
+
+  const handleFormKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") { e.preventDefault(); addTransaction(); }
   };
 
   return (
@@ -103,7 +117,7 @@ export default function Financeiro() {
                     <X size={16} strokeWidth={1.5} />
                   </button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" onKeyDown={handleFormKeyDown}>
                   <input placeholder="Descrição" value={newTx.desc} onChange={(e) => setNewTx({ ...newTx, desc: e.target.value })}
                     className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
                   <input placeholder="Valor (ex: 1500)" value={newTx.value} onChange={(e) => setNewTx({ ...newTx, value: e.target.value })}

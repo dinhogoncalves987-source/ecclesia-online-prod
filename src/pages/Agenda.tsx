@@ -1,31 +1,25 @@
 import { AdminLayout } from "@/components/AdminLayout";
-import { Calendar as CalIcon, Clock, MapPin, Plus, ChevronLeft, ChevronRight, X, Trash2 } from "lucide-react";
+import { Clock, MapPin, Plus, ChevronLeft, ChevronRight, X, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 type Event = {
   id: number;
   day: number;
+  month: number;
+  year: number;
   title: string;
   time: string;
   location: string;
   color: string;
 };
 
-const initialEvents: Event[] = [
-  { id: 1, day: 16, title: "Culto de Adoração", time: "09:00 - 11:00", location: "Templo Principal", color: "bg-accent" },
-  { id: 2, day: 16, title: "Escola Dominical", time: "11:15 - 12:00", location: "Salas de Aula", color: "bg-primary" },
-  { id: 3, day: 18, title: "Reunião de Líderes", time: "19:30 - 21:00", location: "Sala de Reuniões", color: "bg-success" },
-  { id: 4, day: 19, title: "Estudo Bíblico", time: "20:00 - 21:30", location: "Templo Principal", color: "bg-accent" },
-  { id: 5, day: 21, title: "Ensaio do Louvor", time: "19:00 - 21:00", location: "Salão", color: "bg-primary" },
-  { id: 6, day: 22, title: "Encontro de Jovens", time: "19:00 - 21:00", location: "Salão Social", color: "bg-accent" },
-  { id: 7, day: 23, title: "Culto Dominical", time: "09:00 - 11:00", location: "Templo Principal", color: "bg-accent" },
-  { id: 8, day: 25, title: "Oração Intercessória", time: "06:00 - 07:00", location: "Capela", color: "bg-success" },
-  { id: 9, day: 28, title: "Culto de Sexta", time: "19:30 - 21:00", location: "Templo Principal", color: "bg-primary" },
+const monthNames = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ];
 
-const daysInMonth = 31;
-const firstDayOffset = 6;
+const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 const colorOptions = [
   { label: "Dourado", value: "bg-accent" },
@@ -33,26 +27,77 @@ const colorOptions = [
   { label: "Verde", value: "bg-success" },
 ];
 
+const initialEvents: Event[] = [
+  { id: 1, day: 16, month: 2, year: 2026, title: "Culto de Adoração", time: "09:00 - 11:00", location: "Templo Principal", color: "bg-accent" },
+  { id: 2, day: 16, month: 2, year: 2026, title: "Escola Dominical", time: "11:15 - 12:00", location: "Salas de Aula", color: "bg-primary" },
+  { id: 3, day: 18, month: 2, year: 2026, title: "Reunião de Líderes", time: "19:30 - 21:00", location: "Sala de Reuniões", color: "bg-success" },
+  { id: 4, day: 19, month: 2, year: 2026, title: "Estudo Bíblico", time: "20:00 - 21:30", location: "Templo Principal", color: "bg-accent" },
+  { id: 5, day: 21, month: 2, year: 2026, title: "Ensaio do Louvor", time: "19:00 - 21:00", location: "Salão", color: "bg-primary" },
+  { id: 6, day: 22, month: 2, year: 2026, title: "Encontro de Jovens", time: "19:00 - 21:00", location: "Salão Social", color: "bg-accent" },
+  { id: 7, day: 23, month: 2, year: 2026, title: "Culto Dominical", time: "09:00 - 11:00", location: "Templo Principal", color: "bg-accent" },
+  { id: 8, day: 25, month: 2, year: 2026, title: "Oração Intercessória", time: "06:00 - 07:00", location: "Capela", color: "bg-success" },
+  { id: 9, day: 28, month: 2, year: 2026, title: "Culto de Sexta", time: "19:30 - 21:00", location: "Templo Principal", color: "bg-primary" },
+];
+
+function getDaysInMonth(month: number, year: number) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+function getFirstDayOfWeek(month: number, year: number) {
+  return new Date(year, month, 1).getDay();
+}
+
 export default function Agenda() {
+  const now = new Date();
   const [events, setEvents] = useState(initialEvents);
   const [view, setView] = useState<"calendar" | "list">("list");
   const [showForm, setShowForm] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [currentMonth, setCurrentMonth] = useState(2); // March (0-indexed)
+  const [currentYear, setCurrentYear] = useState(2026);
   const [newEvent, setNewEvent] = useState({ title: "", time: "", location: "", color: "bg-accent" });
 
-  const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-  const today = 21;
+  const todayDay = now.getDate();
+  const todayMonth = now.getMonth();
+  const todayYear = now.getFullYear();
+  const isCurrentMonth = currentMonth === todayMonth && currentYear === todayYear;
 
-  const sortedEvents = [...events].sort((a, b) => a.day - b.day);
-  const upcomingEvents = sortedEvents.filter(e => e.day >= today);
-  const pastEvents = sortedEvents.filter(e => e.day < today);
-  const displayEvents = view === "list" ? [...upcomingEvents, ...pastEvents] : events;
+  const daysInMonth = getDaysInMonth(currentMonth, currentYear);
+  const firstDayOffset = getFirstDayOfWeek(currentMonth, currentYear);
+
+  const monthEvents = useMemo(() =>
+    events.filter(e => e.month === currentMonth && e.year === currentYear),
+    [events, currentMonth, currentYear]
+  );
+
+  const sortedEvents = [...monthEvents].sort((a, b) => a.day - b.day);
+  const upcomingEvents = isCurrentMonth
+    ? sortedEvents.filter(e => e.day >= todayDay)
+    : sortedEvents;
+  const pastEvents = isCurrentMonth
+    ? sortedEvents.filter(e => e.day < todayDay)
+    : [];
+  const displayEvents = view === "list" ? [...upcomingEvents, ...pastEvents] : monthEvents;
+
+  const prevMonth = () => {
+    if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(currentYear - 1); }
+    else setCurrentMonth(currentMonth - 1);
+    setSelectedDay(null);
+  };
+
+  const nextMonth = () => {
+    if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear(currentYear + 1); }
+    else setCurrentMonth(currentMonth + 1);
+    setSelectedDay(null);
+  };
 
   const addEvent = () => {
     if (!newEvent.title || !newEvent.time) return;
     const event: Event = {
       id: Date.now(),
-      day: selectedDay || today,
+      day: selectedDay || (isCurrentMonth ? todayDay : 1),
+      month: currentMonth,
+      year: currentYear,
       title: newEvent.title,
       time: newEvent.time,
       location: newEvent.location || "A definir",
@@ -73,13 +118,26 @@ export default function Agenda() {
     setShowForm(true);
   };
 
+  const handleFormKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") { e.preventDefault(); addEvent(); }
+  };
+
+  const isToday = (day: number) => isCurrentMonth && day === todayDay;
+  const isPast = (day: number) => {
+    const d = new Date(currentYear, currentMonth, day);
+    const today = new Date(todayYear, todayMonth, todayDay);
+    return d < today;
+  };
+
   return (
     <AdminLayout>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">Agenda</h1>
-            <p className="text-sm text-muted-foreground mt-1">Março 2026 · {events.length} eventos</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {monthNames[currentMonth]} {currentYear} · {monthEvents.length} evento{monthEvents.length !== 1 ? "s" : ""}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex bg-secondary/50 rounded-lg p-0.5">
@@ -97,7 +155,7 @@ export default function Agenda() {
               >Calendário</button>
             </div>
             <button
-              onClick={() => { setSelectedDay(today); setShowForm(true); }}
+              onClick={() => { setSelectedDay(isCurrentMonth ? todayDay : 1); setShowForm(true); }}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
             >
               <Plus size={16} strokeWidth={1.5} /> Evento
@@ -105,20 +163,33 @@ export default function Agenda() {
           </div>
         </div>
 
+        {/* Month navigation (list view) */}
+        {view === "list" && (
+          <div className="flex items-center justify-between">
+            <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
+              <ChevronLeft size={18} strokeWidth={1.5} />
+            </button>
+            <h2 className="font-serif text-lg">{monthNames[currentMonth]} {currentYear}</h2>
+            <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
+              <ChevronRight size={18} strokeWidth={1.5} />
+            </button>
+          </div>
+        )}
+
         {/* New event form */}
         <AnimatePresence>
           {showForm && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
               <div className="bg-card rounded-xl shadow-executive p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="font-serif text-base">Novo Evento — {selectedDay} de Março</h3>
-                  </div>
+                  <h3 className="font-serif text-base">
+                    Novo Evento — {selectedDay} de {monthNames[currentMonth]}
+                  </h3>
                   <button onClick={() => { setShowForm(false); setSelectedDay(null); }} className="p-1.5 rounded-lg hover:bg-secondary">
                     <X size={16} strokeWidth={1.5} />
                   </button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" onKeyDown={handleFormKeyDown}>
                   <input placeholder="Título do evento" value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
                     className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
                   <input placeholder="Horário (ex: 09:00 - 11:00)" value={newEvent.time} onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
@@ -143,13 +214,14 @@ export default function Agenda() {
         {view === "list" ? (
           <div className="space-y-2">
             {displayEvents.map((e) => (
-              <div key={e.id} className="flex items-center gap-3 p-4 bg-card rounded-xl shadow-executive hover:shadow-executive-hover transition-shadow">
+              <div key={e.id} className={`flex items-center gap-3 p-4 bg-card rounded-xl shadow-executive hover:shadow-executive-hover transition-shadow ${isPast(e.day) ? "opacity-60" : ""}`}>
                 <div className={`w-1 h-12 ${e.color} rounded-full flex-shrink-0`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-sm font-medium">{e.title}</p>
                     <span className="text-xs text-muted-foreground flex-shrink-0">
-                      {e.day} de Março {e.day === today ? "(Hoje)" : e.day < today ? "(Passado)" : ""}
+                      {e.day} de {monthNames[currentMonth]}
+                      {isToday(e.day) ? " (Hoje)" : isPast(e.day) ? " (Passado)" : ""}
                     </span>
                   </div>
                   <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
@@ -163,15 +235,19 @@ export default function Agenda() {
               </div>
             ))}
             {displayEvents.length === 0 && (
-              <p className="text-center text-sm text-muted-foreground py-8">Nenhum evento cadastrado.</p>
+              <p className="text-center text-sm text-muted-foreground py-8">Nenhum evento neste mês.</p>
             )}
           </div>
         ) : (
           <div className="bg-card rounded-xl shadow-executive p-5">
             <div className="flex items-center justify-between mb-4">
-              <button className="p-1.5 rounded-lg hover:bg-secondary"><ChevronLeft size={18} strokeWidth={1.5} /></button>
-              <h2 className="font-serif text-lg">Março 2026</h2>
-              <button className="p-1.5 rounded-lg hover:bg-secondary"><ChevronRight size={18} strokeWidth={1.5} /></button>
+              <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
+                <ChevronLeft size={18} strokeWidth={1.5} />
+              </button>
+              <h2 className="font-serif text-lg">{monthNames[currentMonth]} {currentYear}</h2>
+              <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
+                <ChevronRight size={18} strokeWidth={1.5} />
+              </button>
             </div>
             <div className="grid grid-cols-7 gap-1">
               {dayNames.map((d) => (
@@ -182,15 +258,14 @@ export default function Agenda() {
               ))}
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const day = i + 1;
-                const dayEvents = events.filter((e) => e.day === day);
-                const isToday = day === today;
+                const dayEvents = monthEvents.filter((e) => e.day === day);
                 return (
                   <button
                     key={day}
-                    onClick={() => openFormForDay(day)}
+                    onClick={() => { setSelectedDay(day); }}
                     className={`aspect-square p-1 rounded-lg text-center relative hover:bg-secondary/50 transition-colors text-sm ${
-                      isToday ? "bg-primary/5 ring-1 ring-accent" : ""
-                    }`}
+                      isToday(day) ? "bg-primary/5 ring-1 ring-accent font-bold" : ""
+                    } ${isPast(day) ? "text-muted-foreground" : ""} ${selectedDay === day ? "bg-accent/10 ring-1 ring-accent" : ""}`}
                   >
                     {day}
                     {dayEvents.length > 0 && (
@@ -205,20 +280,36 @@ export default function Agenda() {
               })}
             </div>
 
+            {/* Day detail */}
             {selectedDay && (
               <div className="mt-4 pt-4 border-t border-border">
-                <h3 className="text-sm font-medium mb-2">Eventos em {selectedDay} de Março</h3>
-                {events.filter(e => e.day === selectedDay).length === 0 ? (
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium">
+                    Eventos em {selectedDay} de {monthNames[currentMonth]}
+                  </h3>
+                  <button
+                    onClick={() => openFormForDay(selectedDay)}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    + Adicionar
+                  </button>
+                </div>
+                {monthEvents.filter(e => e.day === selectedDay).length === 0 ? (
                   <p className="text-xs text-muted-foreground">Nenhum evento neste dia.</p>
                 ) : (
                   <div className="space-y-2">
-                    {events.filter(e => e.day === selectedDay).map(e => (
-                      <div key={e.id} className="flex items-center gap-2 p-2 rounded-lg bg-secondary/30">
-                        <div className={`w-1 h-8 ${e.color} rounded-full`} />
-                        <div>
-                          <p className="text-sm font-medium">{e.title}</p>
-                          <p className="text-xs text-muted-foreground">{e.time} · {e.location}</p>
+                    {monthEvents.filter(e => e.day === selectedDay).map(e => (
+                      <div key={e.id} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-secondary/30">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-1 h-8 ${e.color} rounded-full`} />
+                          <div>
+                            <p className="text-sm font-medium">{e.title}</p>
+                            <p className="text-xs text-muted-foreground">{e.time} · {e.location}</p>
+                          </div>
                         </div>
+                        <button onClick={() => removeEvent(e.id)} className="p-1 rounded hover:bg-destructive/10">
+                          <Trash2 size={12} className="text-muted-foreground" />
+                        </button>
                       </div>
                     ))}
                   </div>
