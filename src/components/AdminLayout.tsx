@@ -153,13 +153,6 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={toggleFullscreen}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors text-sm font-semibold"
-            >
-              {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
-              <span className="hidden sm:inline">{isFullscreen ? t("SAIR TELA CHEIA") : t("VER EM TELA CHEIA")}</span>
-            </button>
             {/* Language selector */}
             <div className="relative">
               <button
@@ -199,6 +192,17 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </header>
+
+        {/* Fullscreen button below header */}
+        <div className="flex justify-end px-4 lg:px-8 pt-2">
+          <button
+            onClick={toggleFullscreen}
+            className="p-2 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors"
+            title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+          >
+            {isFullscreen ? <Minimize size={18} className="text-foreground" /> : <Maximize size={18} className="text-foreground" />}
+          </button>
+        </div>
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">
