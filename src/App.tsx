@@ -22,6 +22,8 @@ import Grupos from "./pages/Grupos";
 import Documentos from "./pages/Documentos";
 import Relatorios from "./pages/Relatorios";
 import Escalas from "./pages/Escalas";
+import Perfil from "./pages/Perfil";
+import GerenciarAcessos from "./pages/GerenciarAcessos";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -51,6 +53,8 @@ const App = () => (
             <Route path="/admin/documentos" element={<ProtectedRoute><Documentos /></ProtectedRoute>} />
             <Route path="/admin/relatorios" element={<ProtectedRoute><Relatorios /></ProtectedRoute>} />
             <Route path="/admin/escalas" element={<ProtectedRoute><Escalas /></ProtectedRoute>} />
+            <Route path="/admin/perfil" element={<ProtectedRoute><Perfil /></ProtectedRoute>} />
+            <Route path="/admin/gerenciar-acessos" element={<ProtectedRoute><GerenciarAcessos /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

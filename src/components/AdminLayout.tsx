@@ -3,12 +3,14 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Wallet, Users, Calendar, BookOpen, FileText,
   Heart, MessageSquare, UsersRound, Archive, BarChart3, Menu, X,
-  Bell, ChevronLeft, Settings, LogOut, Maximize, Minimize, Globe
+  Bell, ChevronLeft, Settings, LogOut, Maximize, Minimize, Globe,
+  Shield, User
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useRole } from "@/hooks/useRole";
 import { supabase } from "@/integrations/supabase/client";
 import flagBR from "@/assets/flag-br.png";
 import flagUS from "@/assets/flag-us.png";
@@ -28,6 +30,7 @@ const navItems = [
   { icon: Archive, label: "Documentos", path: "/admin/documentos" },
   { icon: BarChart3, label: "Relatórios", path: "/admin/relatorios" },
   { icon: FileText, label: "Escalas", path: "/admin/escalas" },
+  { icon: Shield, label: "Gerenciar Acessos", path: "/admin/gerenciar-acessos" },
 ];
 
 const mobileNavItems = [
@@ -43,11 +46,14 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { t, lang, setLang } = useLanguage();
+  const { canAccess, isAdmin } = useRole();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileName, setProfileName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   const toggleFullscreen = useCallback(async () => {
     if (!document.fullscreenElement) {
@@ -67,11 +73,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     if (!user) return;
     supabase
       .from("profiles")
-      .select("full_name")
+      .select("full_name, avatar_url")
       .eq("user_id", user.id)
       .single()
       .then(({ data }) => {
         if (data?.full_name) setProfileName(data.full_name);
+        if (data?.avatar_url) setAvatarUrl(data.avatar_url);
       });
   }, [user]);
 
@@ -103,7 +110,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         </Link>
 
         <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
-          {navItems.map((item) => (
+          {navItems.filter(item => canAccess(item.path)).map((item) => (
             <Link
               key={item.path}
               to={item.path}
@@ -189,8 +196,48 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               <Bell size={18} strokeWidth={1.5} />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent rounded-full" />
             </button>
-            <div className="w-9 h-9 rounded-full bg-accent/20 border-2 border-accent/40 ml-1 flex items-center justify-center text-xs font-medium text-accent">
-              {initials}
+            {/* Profile avatar with dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                className="w-9 h-9 rounded-full overflow-hidden border-2 border-accent/40 ml-1 flex items-center justify-center text-xs font-medium text-accent bg-accent/20 hover:border-accent transition-colors"
+              >
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  initials
+                )}
+              </button>
+              {profileMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setProfileMenuOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-xl z-50 py-1 min-w-[180px]">
+                    <Link
+                      to="/admin/perfil"
+                      onClick={() => setProfileMenuOpen(false)}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-secondary transition-colors"
+                    >
+                      <User size={16} /> {t("Meu Perfil")}
+                    </Link>
+                    {isAdmin && (
+                      <Link
+                        to="/admin/gerenciar-acessos"
+                        onClick={() => setProfileMenuOpen(false)}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-secondary transition-colors"
+                      >
+                        <Shield size={16} /> {t("Gerenciar Acessos")}
+                      </Link>
+                    )}
+                    <hr className="my-1 border-border" />
+                    <button
+                      onClick={() => { setProfileMenuOpen(false); handleSignOut(); }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-secondary transition-colors text-destructive"
+                    >
+                      <LogOut size={16} /> {t("Sair")}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </header>
@@ -245,7 +292,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               </div>
 
               <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
-                {navItems.map((item) => (
+                {navItems.filter(item => canAccess(item.path)).map((item) => (
                   <Link
                     key={item.path}
                     to={item.path}
