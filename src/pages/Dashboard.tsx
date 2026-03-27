@@ -1,5 +1,6 @@
 import { AdminLayout } from "@/components/AdminLayout";
 import { ExecutiveCard } from "@/components/ExecutiveCard";
+import { motion } from "framer-motion";
 import { Wallet, Users, TrendingUp, Calendar, Clock, Bell, Plus, ChevronRight, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
@@ -159,16 +160,26 @@ export default function Dashboard() {
 
             <div>
               <h2 className="font-serif text-lg mb-3">Acesso Rápido</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                  { label: "Financeiro", path: "/admin/financeiro", icon: Wallet },
-                  { label: "Membros", path: "/admin/membros", icon: Users },
-                  { label: "Agenda", path: "/admin/agenda", icon: Calendar },
-                  { label: "Bíblia", path: "/admin/biblia", icon: TrendingUp },
-                ].map(item => (
-                  <Link key={item.path} to={item.path} className="flex flex-col items-center gap-2 p-4 bg-card rounded-xl shadow-executive hover:shadow-executive-hover transition-shadow">
-                    <item.icon size={24} strokeWidth={1.5} className="text-primary" />
-                    <span className="text-sm font-medium">{item.label}</span>
+                  { label: "Financeiro", desc: "Controle financeiro e relatórios", path: "/admin/financeiro", icon: Wallet },
+                  { label: "Membros", desc: "Cadastro e gestão de membros", path: "/admin/membros", icon: Users },
+                  { label: "Agenda", desc: "Calendário e eventos da igreja", path: "/admin/agenda", icon: Calendar },
+                  { label: "Bíblia", desc: "Leitura e estudo bíblico", path: "/admin/biblia", icon: TrendingUp },
+                ].map((item, i) => (
+                  <Link key={item.path} to={item.path}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1], delay: i * 0.05 }}
+                      className="bg-card p-5 rounded-xl shadow-executive hover:shadow-executive-hover transition-shadow duration-300 h-full"
+                    >
+                      <div className="p-2.5 bg-accent/10 rounded-lg w-fit mb-3">
+                        <item.icon size={20} strokeWidth={1.5} className="text-accent" />
+                      </div>
+                      <h3 className="font-medium text-sm">{item.label}</h3>
+                      <p className="text-xs text-muted-foreground mt-1">{item.desc}</p>
+                    </motion.div>
                   </Link>
                 ))}
               </div>
