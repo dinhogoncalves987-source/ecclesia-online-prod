@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Wallet, Users, Calendar, BookOpen, FileText,
   Heart, MessageSquare, UsersRound, Archive, BarChart3, Menu, X,
-  Bell, ChevronLeft, Settings, LogOut
+  Bell, ChevronLeft, Settings, LogOut, Maximize, Minimize
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
