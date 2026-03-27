@@ -83,7 +83,7 @@ export default function Landing() {
             </p>
           </motion.div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {features.map((f, i) => (
+            {features.map((f) => (
               <Link
                 key={f.title}
                 to={f.path}
