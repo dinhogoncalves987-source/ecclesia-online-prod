@@ -10,6 +10,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
+import flagBR from "@/assets/flag-br.png";
+import flagUS from "@/assets/flag-us.png";
+import flagES from "@/assets/flag-es.png";
+
+const flagMap = { pt: flagBR, en: flagUS, es: flagES } as const;
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
@@ -88,14 +93,14 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           sidebarCollapsed ? "w-[72px]" : "w-72"
         }`}
       >
-        <div className="p-4 flex items-center gap-3 h-16">
+        <Link to="/admin" className="p-4 flex items-center gap-3 h-16">
           <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
             <span className="text-accent font-serif text-xl">Ω</span>
           </div>
           {!sidebarCollapsed && (
             <span className="font-serif text-xl tracking-tight text-foreground">Ecclesia</span>
           )}
-        </div>
+        </Link>
 
         <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => (
@@ -159,23 +164,20 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                 onClick={() => setLangMenuOpen(!langMenuOpen)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors text-sm font-semibold"
               >
-                <Globe size={16} />
-                <span className="hidden sm:inline">
-                  {lang === "pt" ? "🇧🇷" : lang === "en" ? "🇺🇸" : "🇪🇸"}
-                </span>
+                <img src={flagMap[lang]} alt="" className="w-5 h-5 rounded-sm object-cover" />
               </button>
               {langMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setLangMenuOpen(false)} />
                   <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-xl z-50 py-1 min-w-[160px]">
                     {([
-                      { code: "pt" as const, flag: "🇧🇷", label: "Português" },
-                      { code: "en" as const, flag: "🇺🇸", label: "English" },
-                      { code: "es" as const, flag: "🇪🇸", label: "Español" },
+                      { code: "pt" as const, flag: flagBR, label: "Português" },
+                      { code: "en" as const, flag: flagUS, label: "English" },
+                      { code: "es" as const, flag: flagES, label: "Español" },
                     ]).map(l => (
                       <button key={l.code} onClick={() => { setLang(l.code); setLangMenuOpen(false); }}
                         className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-secondary transition-colors ${lang === l.code ? "font-bold text-primary" : ""}`}>
-                        <span className="text-lg">{l.flag}</span> {l.label}
+                        <img src={l.flag} alt={l.label} className="w-5 h-5 rounded-sm object-cover" /> {l.label}
                       </button>
                     ))}
                   </div>
@@ -231,12 +233,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               className="fixed inset-y-0 left-0 w-72 bg-card shadow-executive-hover z-50 lg:hidden flex flex-col"
             >
               <div className="p-4 flex items-center justify-between h-16">
-                <div className="flex items-center gap-3">
+                <Link to="/admin" className="flex items-center gap-3" onClick={() => setMobileMenuOpen(false)}>
                   <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center">
                     <span className="text-accent font-serif text-xl">Ω</span>
                   </div>
                   <span className="font-serif text-xl tracking-tight">Ecclesia</span>
-                </div>
+                </Link>
                 <button onClick={() => setMobileMenuOpen(false)} className="p-2 rounded-lg hover:bg-secondary">
                   <X size={20} strokeWidth={1.5} />
                 </button>
