@@ -10,6 +10,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
+import flagBR from "@/assets/flag-br.png";
+import flagUS from "@/assets/flag-us.png";
+import flagES from "@/assets/flag-es.png";
+
+const flagMap = { pt: flagBR, en: flagUS, es: flagES } as const;
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
