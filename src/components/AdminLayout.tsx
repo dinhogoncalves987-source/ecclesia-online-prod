@@ -164,7 +164,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                 onClick={() => setLangMenuOpen(!langMenuOpen)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors text-sm font-semibold"
               >
-                <img src={flagMap[lang]} alt="" className="w-5 h-5 rounded-sm object-cover" />
+                <Globe size={16} />
               </button>
               {langMenuOpen && (
                 <>
