@@ -3,11 +3,12 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Wallet, Users, Calendar, BookOpen, FileText,
   Heart, MessageSquare, UsersRound, Archive, BarChart3, Menu, X,
-  Bell, ChevronLeft, Settings, LogOut, Maximize, Minimize
+  Bell, ChevronLeft, Settings, LogOut, Maximize, Minimize, Globe
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
 
 const navItems = [
@@ -36,10 +37,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
+  const { t, lang, setLang } = useLanguage();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileName, setProfileName] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
 
   const toggleFullscreen = useCallback(async () => {
     if (!document.fullscreenElement) {
@@ -112,7 +115,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                   isActive(item.path) ? "text-accent" : "group-hover:text-foreground"
                 }`}
               />
-              {!sidebarCollapsed && <span>{item.label}</span>}
+              {!sidebarCollapsed && <span>{t(item.label)}</span>}
             </Link>
           ))}
         </nav>
@@ -127,7 +130,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               strokeWidth={1.5}
               className={`transition-transform ${sidebarCollapsed ? "rotate-180" : ""}`}
             />
-            {!sidebarCollapsed && <span>Recolher</span>}
+            {!sidebarCollapsed && <span>{t("Recolher")}</span>}
           </button>
         </div>
       </aside>
@@ -144,7 +147,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               <Menu size={20} strokeWidth={1.5} />
             </button>
             <div className="hidden sm:block">
-              <p className="text-sm text-muted-foreground">Bem-vindo de volta</p>
+              <p className="text-sm text-muted-foreground">{t("Bem-vindo de volta")}</p>
               <p className="text-sm font-medium">{displayName}</p>
             </div>
           </div>
@@ -155,8 +158,37 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors text-sm font-semibold"
             >
               {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
-              <span className="hidden sm:inline">{isFullscreen ? "SAIR TELA CHEIA" : "VER EM TELA CHEIA"}</span>
+              <span className="hidden sm:inline">{isFullscreen ? t("SAIR TELA CHEIA") : t("VER EM TELA CHEIA")}</span>
             </button>
+            {/* Language selector */}
+            <div className="relative">
+              <button
+                onClick={() => setLangMenuOpen(!langMenuOpen)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors text-sm font-semibold"
+              >
+                <Globe size={16} />
+                <span className="hidden sm:inline">
+                  {lang === "pt" ? "🇧🇷" : lang === "en" ? "🇺🇸" : "🇪🇸"}
+                </span>
+              </button>
+              {langMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setLangMenuOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-xl z-50 py-1 min-w-[160px]">
+                    {([
+                      { code: "pt" as const, flag: "🇧🇷", label: "Português" },
+                      { code: "en" as const, flag: "🇺🇸", label: "English" },
+                      { code: "es" as const, flag: "🇪🇸", label: "Español" },
+                    ]).map(l => (
+                      <button key={l.code} onClick={() => { setLang(l.code); setLangMenuOpen(false); }}
+                        className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-secondary transition-colors ${lang === l.code ? "font-bold text-primary" : ""}`}>
+                        <span className="text-lg">{l.flag}</span> {l.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
             <ThemeToggle />
             <button className="p-2 rounded-lg hover:bg-secondary transition-colors relative">
               <Bell size={18} strokeWidth={1.5} />
@@ -219,20 +251,20 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                     }`}
                   >
                     <item.icon size={20} strokeWidth={1.5} className={isActive(item.path) ? "text-accent" : ""} />
-                    <span>{item.label}</span>
+                    <span>{t(item.label)}</span>
                   </Link>
                 ))}
               </nav>
 
               <div className="p-3 border-t border-border/50 space-y-0.5">
                 <button className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary w-full">
-                  <Settings size={20} strokeWidth={1.5} /> Configurações
+                  <Settings size={20} strokeWidth={1.5} /> {t("Configurações")}
                 </button>
                 <button
                   onClick={handleSignOut}
                   className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary w-full"
                 >
-                  <LogOut size={20} strokeWidth={1.5} /> Sair
+                  <LogOut size={20} strokeWidth={1.5} /> {t("Sair")}
                 </button>
               </div>
             </motion.div>
