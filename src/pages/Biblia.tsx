@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/AdminLayout";
-import { ChevronLeft, ChevronRight, Search, Bookmark, Eye, MessageSquare, Send, X, Sparkles, Trash2, BookOpen, Loader2, Mic, MicOff } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, Bookmark, Eye, MessageSquare, Send, X, Sparkles, Trash2, BookOpen, Loader2, Mic, MicOff, Download, Share2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
@@ -35,6 +35,7 @@ export default function Biblia() {
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isListening, setIsListening] = useState(false);
+  const [isChatListening, setIsChatListening] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const versesRef = useRef<HTMLDivElement>(null);
 
@@ -184,6 +185,45 @@ export default function Biblia() {
     recognition.start();
   };
 
+  const startChatVoice = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    const recognition = new SpeechRecognition();
+    recognition.lang = "pt-BR";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(prev => prev ? prev + " " + transcript : transcript);
+      setIsChatListening(false);
+    };
+    recognition.onerror = () => setIsChatListening(false);
+    recognition.onend = () => setIsChatListening(false);
+    setIsChatListening(true);
+    recognition.start();
+  };
+
+  const downloadMessage = (content: string) => {
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `estudo-biblico-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const shareMessage = async (content: string) => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Estudo Bíblico", text: content });
+      } catch { /* user cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(content);
+      alert("Texto copiado!");
+    }
+  };
+
   const filteredOT = searchQuery
     ? oldTestamentBooks.filter(b => b.name.toLowerCase().includes(searchQuery.toLowerCase()))
     : oldTestamentBooks;
@@ -331,16 +371,28 @@ export default function Biblia() {
                 </div>
               </div>
             )}
-            {messages.map((msg, i) => (
+             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
-                  msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary/70"
-                }`}>
-                  {msg.role === "assistant" ? (
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <div className="max-w-[85%]">
+                  <div className={`rounded-xl px-3 py-2 text-sm ${
+                    msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary/70"
+                  }`}>
+                    {msg.role === "assistant" ? (
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+                    ) : <p>{msg.content}</p>}
+                  </div>
+                  {msg.role === "assistant" && msg.content && !isLoading && (
+                    <div className="flex gap-1 mt-1 ml-1">
+                      <button onClick={() => downloadMessage(msg.content)} className="p-1 rounded hover:bg-secondary transition-colors" title="Baixar">
+                        <Download size={12} className="text-muted-foreground" />
+                      </button>
+                      <button onClick={() => shareMessage(msg.content)} className="p-1 rounded hover:bg-secondary transition-colors" title="Compartilhar">
+                        <Share2 size={12} className="text-muted-foreground" />
+                      </button>
                     </div>
-                  ) : <p>{msg.content}</p>}
+                  )}
                 </div>
               </div>
             ))}
@@ -358,7 +410,17 @@ export default function Biblia() {
           </div>
 
           <div className="p-3 border-t border-border/50">
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-end">
+              <button
+                onClick={startChatVoice}
+                disabled={isLoading}
+                className={`p-2.5 rounded-lg shrink-0 transition-colors ${
+                  isChatListening ? "bg-destructive/10 text-destructive animate-pulse" : "hover:bg-secondary text-muted-foreground"
+                }`}
+                title="Falar com microfone"
+              >
+                {isChatListening ? <MicOff size={14} /> : <Mic size={14} />}
+              </button>
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
