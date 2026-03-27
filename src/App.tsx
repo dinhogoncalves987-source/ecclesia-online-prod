@@ -15,7 +15,12 @@ import Financeiro from "./pages/Financeiro";
 import Membros from "./pages/Membros";
 import Agenda from "./pages/Agenda";
 import Biblia from "./pages/Biblia";
-import PlaceholderPage from "./pages/PlaceholderPage";
+import Oracoes from "./pages/Oracoes";
+import Comunicacao from "./pages/Comunicacao";
+import Grupos from "./pages/Grupos";
+import Documentos from "./pages/Documentos";
+import Relatorios from "./pages/Relatorios";
+import Escalas from "./pages/Escalas";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,12 +43,12 @@ const App = () => (
             <Route path="/admin/membros" element={<ProtectedRoute><Membros /></ProtectedRoute>} />
             <Route path="/admin/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
             <Route path="/admin/biblia" element={<ProtectedRoute><Biblia /></ProtectedRoute>} />
-            <Route path="/admin/oracoes" element={<ProtectedRoute><PlaceholderPage title="Pedidos de Oração" description="Módulo de pedidos de oração e intercessão em desenvolvimento." /></ProtectedRoute>} />
-            <Route path="/admin/comunicacao" element={<ProtectedRoute><PlaceholderPage title="Comunicação" description="Módulo de comunicação interna em desenvolvimento." /></ProtectedRoute>} />
-            <Route path="/admin/grupos" element={<ProtectedRoute><PlaceholderPage title="Pequenos Grupos" description="Módulo de gestão de pequenos grupos em desenvolvimento." /></ProtectedRoute>} />
-            <Route path="/admin/documentos" element={<ProtectedRoute><PlaceholderPage title="Documentos" description="Biblioteca de documentos em desenvolvimento." /></ProtectedRoute>} />
-            <Route path="/admin/relatorios" element={<ProtectedRoute><PlaceholderPage title="Relatórios" description="Módulo de relatórios em desenvolvimento." /></ProtectedRoute>} />
-            <Route path="/admin/escalas" element={<ProtectedRoute><PlaceholderPage title="Escalas" description="Módulo de escalas de serviço em desenvolvimento." /></ProtectedRoute>} />
+            <Route path="/admin/oracoes" element={<ProtectedRoute><Oracoes /></ProtectedRoute>} />
+            <Route path="/admin/comunicacao" element={<ProtectedRoute><Comunicacao /></ProtectedRoute>} />
+            <Route path="/admin/grupos" element={<ProtectedRoute><Grupos /></ProtectedRoute>} />
+            <Route path="/admin/documentos" element={<ProtectedRoute><Documentos /></ProtectedRoute>} />
+            <Route path="/admin/relatorios" element={<ProtectedRoute><Relatorios /></ProtectedRoute>} />
+            <Route path="/admin/escalas" element={<ProtectedRoute><Escalas /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
