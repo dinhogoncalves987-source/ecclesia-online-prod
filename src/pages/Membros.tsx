@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 import { toast } from "sonner";
 
 type Member = {
@@ -18,6 +19,7 @@ type Member = {
 
 export default function Membros() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -100,14 +102,14 @@ export default function Membros() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">Membros</h1>
+            <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">{t("Membros")}</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {members.length} cadastrados · {activeCount} ativos · {visitanteCount} visitantes
+              {members.length} {t("cadastrados")} · {activeCount} {t("ativos")} · {visitanteCount} {t("visitantes")}
             </p>
           </div>
           <button onClick={() => setShowForm(true)}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity self-start">
-            <Plus size={16} strokeWidth={1.5} /> Novo Membro
+            <Plus size={16} strokeWidth={1.5} /> {t("Novo Membro")}
           </button>
         </div>
 
@@ -116,23 +118,23 @@ export default function Membros() {
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
               <div className="bg-card rounded-xl shadow-executive p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-serif text-base">Cadastrar Membro</h3>
+                  <h3 className="font-serif text-base">{t("Cadastrar Membro")}</h3>
                   <button onClick={() => setShowForm(false)} className="p-1.5 rounded-lg hover:bg-secondary"><X size={16} strokeWidth={1.5} /></button>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" onKeyDown={handleFormKeyDown}>
-                  <input placeholder="Nome completo" value={newMember.name} onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
+                  <input placeholder={t("Nome completo")} value={newMember.name} onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
                     className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
-                  <input placeholder="Função" value={newMember.role} onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}
+                  <input placeholder={t("Função")} value={newMember.role} onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}
                     className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
-                  <input placeholder="Telefone" value={newMember.phone} onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
+                  <input placeholder={t("Telefone")} value={newMember.phone} onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
                     className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
-                  <input placeholder="E-mail" value={newMember.email} onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+                  <input placeholder={t("E-mail")} value={newMember.email} onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
                     className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
                 </div>
                 <button onClick={addMember} disabled={saving}
                   className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 inline-flex items-center gap-2">
                   {saving && <Loader2 size={14} className="animate-spin" />}
-                  Salvar Membro
+                  {t("Salvar Membro")}
                 </button>
               </div>
             </motion.div>
@@ -142,14 +144,14 @@ export default function Membros() {
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input placeholder="Buscar por nome, função ou e-mail..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+            <input placeholder={t("Buscar por nome, função ou e-mail...")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2.5 bg-card rounded-lg shadow-[var(--shadow-sm)] text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent/30" />
           </div>
           <div className="flex bg-secondary/50 rounded-lg p-0.5">
             {(["all", "Ativo", "Visitante", "Inativo"] as const).map(s => (
               <button key={s} onClick={() => setFilterStatus(s)}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${filterStatus === s ? "bg-card shadow-sm" : "text-muted-foreground"}`}>
-                {s === "all" ? "Todos" : s}
+                {s === "all" ? t("Todos") : t(s)}
               </button>
             ))}
           </div>
@@ -165,12 +167,12 @@ export default function Membros() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border/50 text-left text-xs text-muted-foreground">
-                    <th className="px-5 py-3 font-medium">Nome</th>
-                    <th className="px-5 py-3 font-medium">Função</th>
-                    <th className="px-5 py-3 font-medium">Contato</th>
-                    <th className="px-5 py-3 font-medium">Status</th>
-                    <th className="px-5 py-3 font-medium">Desde</th>
-                    <th className="px-5 py-3 font-medium w-16">Ações</th>
+                     <th className="px-5 py-3 font-medium">{t("Nome")}</th>
+                     <th className="px-5 py-3 font-medium">{t("Função")}</th>
+                     <th className="px-5 py-3 font-medium">{t("Contato")}</th>
+                     <th className="px-5 py-3 font-medium">{t("Status")}</th>
+                     <th className="px-5 py-3 font-medium">{t("Desde")}</th>
+                     <th className="px-5 py-3 font-medium w-16">{t("Ações")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -203,7 +205,7 @@ export default function Membros() {
                     </tr>
                   ))}
                   {filtered.length === 0 && (
-                    <tr><td colSpan={6} className="text-center py-8 text-sm text-muted-foreground">Nenhum membro encontrado.</td></tr>
+                    <tr><td colSpan={6} className="text-center py-8 text-sm text-muted-foreground">{t("Nenhum membro encontrado.")}</td></tr>
                   )}
                 </tbody>
               </table>
@@ -242,7 +244,7 @@ export default function Membros() {
                 </motion.div>
               ))}
               {filtered.length === 0 && (
-                <p className="text-center text-sm text-muted-foreground py-8">Nenhum membro encontrado.</p>
+                <p className="text-center text-sm text-muted-foreground py-8">{t("Nenhum membro encontrado.")}</p>
               )}
             </div>
           </>

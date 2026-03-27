@@ -1,22 +1,17 @@
 import { AdminLayout } from "@/components/AdminLayout";
-import { Archive, Plus, X, FileText, Download, FolderOpen } from "lucide-react";
+import { Archive, Plus, X, FileText, FolderOpen } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/hooks/useLanguage";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { ptBR, enUS, es } from "date-fns/locale";
 
 type Document = {
-  id: string;
-  title: string;
-  category: string;
-  description: string | null;
-  file_url: string | null;
-  file_type: string | null;
-  created_at: string;
-  user_id: string;
+  id: string; title: string; category: string; description: string | null;
+  file_url: string | null; file_type: string | null; created_at: string; user_id: string;
 };
 
 const categories = ["Geral", "Atas", "Estatuto", "Financeiro", "Eventos", "Ministerial"];
@@ -24,6 +19,7 @@ const categories = ["Geral", "Atas", "Estatuto", "Financeiro", "Eventos", "Minis
 export default function Documentos() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t, lang } = useLanguage();
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -31,6 +27,8 @@ export default function Documentos() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Geral");
   const [filterCat, setFilterCat] = useState("Todos");
+
+  const dateLoc = lang === "en" ? enUS : lang === "es" ? es : ptBR;
 
   const fetch_ = async () => {
     const { data } = await supabase.from("documents").select("*").order("created_at", { ascending: false });
@@ -45,9 +43,9 @@ export default function Documentos() {
     const { error } = await supabase.from("documents").insert({
       user_id: user.id, title: title.trim(), category, description: description.trim() || null,
     } as any);
-    if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
+    if (error) { toast({ title: t("Erro"), description: error.message, variant: "destructive" }); return; }
     setTitle(""); setDescription(""); setCategory("Geral"); setShowForm(false);
-    toast({ title: "Documento registrado!" });
+    toast({ title: t("Documento registrado!") });
     fetch_();
   };
 
@@ -64,28 +62,28 @@ export default function Documentos() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-serif font-bold text-foreground">Documentos</h1>
-            <p className="text-sm text-muted-foreground mt-1">Biblioteca de documentos da igreja</p>
+            <h1 className="text-2xl font-serif font-bold text-foreground">{t("Documentos")}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{t("Biblioteca de documentos da igreja")}</p>
           </div>
           <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
-            <Plus size={16} /> Novo Documento
+            <Plus size={16} /> {t("Novo Documento")}
           </button>
         </div>
 
         <div className="flex gap-2 flex-wrap">
           {uniqueCats.map(c => (
             <button key={c} onClick={() => setFilterCat(c)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filterCat === c ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>
-              {c}
+              {t(c)}
             </button>
           ))}
         </div>
 
         {loading ? (
-          <div className="text-center py-12 text-muted-foreground">Carregando...</div>
+          <div className="text-center py-12 text-muted-foreground">{t("Carregando...")}</div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-12">
             <FolderOpen size={48} className="mx-auto text-muted-foreground/30 mb-4" />
-            <p className="text-muted-foreground">Nenhum documento encontrado</p>
+            <p className="text-muted-foreground">{t("Nenhum documento encontrado")}</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -98,8 +96,8 @@ export default function Documentos() {
                 <div className="flex-1 min-w-0">
                   <h3 className="font-medium text-foreground truncate">{doc.title}</h3>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                    <span className="px-1.5 py-0.5 rounded bg-secondary">{doc.category}</span>
-                    <span>{format(new Date(doc.created_at), "dd MMM yyyy", { locale: ptBR })}</span>
+                    <span className="px-1.5 py-0.5 rounded bg-secondary">{t(doc.category)}</span>
+                    <span>{format(new Date(doc.created_at), "dd MMM yyyy", { locale: dateLoc })}</span>
                   </div>
                   {doc.description && <p className="text-xs text-muted-foreground mt-1 truncate">{doc.description}</p>}
                 </div>
@@ -120,24 +118,24 @@ export default function Documentos() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-40" onClick={() => setShowForm(false)} />
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="w-full max-w-md bg-card rounded-2xl p-6 shadow-xl max-h-[85vh] overflow-y-auto">
-                <h2 className="text-lg font-serif font-bold mb-4">Novo Documento</h2>
+                <h2 className="text-lg font-serif font-bold mb-4">{t("Novo Documento")}</h2>
                 <div className="space-y-3">
-                  <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título do documento" className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
-                  <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Descrição (opcional)" rows={2} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm resize-none" />
+                  <input value={title} onChange={e => setTitle(e.target.value)} placeholder={t("Título do documento")} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
+                  <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder={t("Descrição (opcional)")} rows={2} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm resize-none" />
                   <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Categoria</label>
+                    <label className="text-xs text-muted-foreground mb-1 block">{t("Categoria")}</label>
                     <div className="flex gap-2 flex-wrap">
                       {categories.map(c => (
                         <button key={c} onClick={() => setCategory(c)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${category === c ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
-                          {c}
+                          {t(c)}
                         </button>
                       ))}
                     </div>
                   </div>
                 </div>
                 <div className="flex gap-2 mt-4">
-                  <button onClick={() => setShowForm(false)} className="flex-1 py-2 rounded-lg bg-secondary text-sm font-medium">Cancelar</button>
-                  <button onClick={handleAdd} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">Salvar</button>
+                  <button onClick={() => setShowForm(false)} className="flex-1 py-2 rounded-lg bg-secondary text-sm font-medium">{t("Cancelar")}</button>
+                  <button onClick={handleAdd} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">{t("Salvar")}</button>
                 </div>
               </motion.div>
             </div>

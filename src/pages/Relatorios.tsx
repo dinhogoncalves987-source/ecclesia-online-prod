@@ -4,11 +4,12 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 import { format, startOfMonth, endOfMonth } from "date-fns";
-import { ptBR } from "date-fns/locale";
 
 export default function Relatorios() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [stats, setStats] = useState({
     totalMembers: 0, activeMembers: 0, visitors: 0,
     totalIncome: 0, totalExpense: 0, balance: 0,
@@ -55,26 +56,26 @@ export default function Relatorios() {
   }, []);
 
   const cards = [
-    { title: "Total de Membros", value: stats.totalMembers, sub: `${stats.activeMembers} ativos · ${stats.visitors} visitantes`, icon: Users, color: "text-blue-600 bg-blue-500/10" },
-    { title: "Receita do Mês", value: `R$ ${stats.totalIncome.toLocaleString("pt-BR")}`, icon: TrendingUp, color: "text-green-600 bg-green-500/10" },
-    { title: "Despesa do Mês", value: `R$ ${stats.totalExpense.toLocaleString("pt-BR")}`, icon: TrendingDown, color: "text-red-600 bg-red-500/10" },
-    { title: "Saldo", value: `R$ ${stats.balance.toLocaleString("pt-BR")}`, icon: Wallet, color: stats.balance >= 0 ? "text-green-600 bg-green-500/10" : "text-red-600 bg-red-500/10" },
-    { title: "Eventos no Mês", value: stats.totalEvents, icon: Calendar, color: "text-purple-600 bg-purple-500/10" },
-    { title: "Pedidos de Oração", value: stats.totalPrayers, sub: `${stats.answeredPrayers} respondidos`, icon: Heart, color: "text-pink-600 bg-pink-500/10" },
-    { title: "Pequenos Grupos", value: stats.totalGroups, icon: Users, color: "text-amber-600 bg-amber-500/10" },
-    { title: "Documentos", value: stats.totalDocs, icon: BarChart3, color: "text-accent bg-accent/10" },
+    { title: t("Total de Membros"), value: stats.totalMembers, sub: `${stats.activeMembers} ${t("ativos")} · ${stats.visitors} ${t("visitantes")}`, icon: Users, color: "text-blue-600 bg-blue-500/10" },
+    { title: t("Receita do Mês"), value: `R$ ${stats.totalIncome.toLocaleString("pt-BR")}`, icon: TrendingUp, color: "text-green-600 bg-green-500/10" },
+    { title: t("Despesa do Mês"), value: `R$ ${stats.totalExpense.toLocaleString("pt-BR")}`, icon: TrendingDown, color: "text-red-600 bg-red-500/10" },
+    { title: t("Saldo"), value: `R$ ${stats.balance.toLocaleString("pt-BR")}`, icon: Wallet, color: stats.balance >= 0 ? "text-green-600 bg-green-500/10" : "text-red-600 bg-red-500/10" },
+    { title: t("Eventos no Mês"), value: stats.totalEvents, icon: Calendar, color: "text-purple-600 bg-purple-500/10" },
+    { title: t("Pedidos de Oração"), value: stats.totalPrayers, sub: `${stats.answeredPrayers} ${t("respondidos")}`, icon: Heart, color: "text-pink-600 bg-pink-500/10" },
+    { title: t("Pequenos Grupos"), value: stats.totalGroups, icon: Users, color: "text-amber-600 bg-amber-500/10" },
+    { title: t("Documentos"), value: stats.totalDocs, icon: BarChart3, color: "text-accent bg-accent/10" },
   ];
 
   return (
     <AdminLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-serif font-bold text-foreground">Relatórios</h1>
-          <p className="text-sm text-muted-foreground mt-1">Visão geral de {format(new Date(), "MMMM yyyy", { locale: ptBR })}</p>
+          <h1 className="text-2xl font-serif font-bold text-foreground">{t("Relatórios")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t("Visão geral de")} {format(new Date(), "MMMM yyyy")}</p>
         </div>
 
         {loading ? (
-          <div className="text-center py-12 text-muted-foreground">Carregando relatórios...</div>
+          <div className="text-center py-12 text-muted-foreground">{t("Carregando relatórios...")}</div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {cards.map((card, i) => {
