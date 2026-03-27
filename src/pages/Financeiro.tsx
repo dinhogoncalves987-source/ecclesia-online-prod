@@ -1,51 +1,64 @@
 import { AdminLayout } from "@/components/AdminLayout";
 import { ExecutiveCard } from "@/components/ExecutiveCard";
-import { Wallet, TrendingUp, TrendingDown, PiggyBank, Plus, Download, X, Search } from "lucide-react";
+import { Wallet, TrendingUp, TrendingDown, PiggyBank, Plus, Download, X, Search, Loader2 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 type Transaction = {
-  id: number;
+  id: string;
   date: string;
-  desc: string;
-  type: "Entrada" | "Saída";
-  value: string;
+  description: string;
+  type: string;
   amount: number;
-  status: "Confirmado" | "Pago" | "Pendente";
+  status: string;
   category: string;
 };
-
-const initialTransactions: Transaction[] = [
-  { id: 1, date: "14/03", desc: "Dízimos — Culto Dominical", type: "Entrada", value: "R$ 12.450", amount: 12450, status: "Confirmado", category: "Dízimos" },
-  { id: 2, date: "13/03", desc: "Ofertas Missionárias", type: "Entrada", value: "R$ 3.200", amount: 3200, status: "Confirmado", category: "Ofertas" },
-  { id: 3, date: "12/03", desc: "Conta de Energia — Templo", type: "Saída", value: "R$ 1.850", amount: 1850, status: "Pago", category: "Utilidades" },
-  { id: 4, date: "11/03", desc: "Manutenção do Ar-condicionado", type: "Saída", value: "R$ 2.300", amount: 2300, status: "Pago", category: "Manutenção" },
-  { id: 5, date: "10/03", desc: "Dízimos — Culto de Quarta", type: "Entrada", value: "R$ 4.800", amount: 4800, status: "Confirmado", category: "Dízimos" },
-  { id: 6, date: "09/03", desc: "Material de Escola Dominical", type: "Saída", value: "R$ 450", amount: 450, status: "Pendente", category: "Material" },
-  { id: 7, date: "08/03", desc: "Ofertas Especiais — Construção", type: "Entrada", value: "R$ 8.500", amount: 8500, status: "Confirmado", category: "Ofertas" },
-  { id: 8, date: "07/03", desc: "Salário — Secretária", type: "Saída", value: "R$ 3.200", amount: 3200, status: "Pago", category: "Pessoal" },
-  { id: 9, date: "06/03", desc: "Ofertas — Culto da Juventude", type: "Entrada", value: "R$ 1.950", amount: 1950, status: "Confirmado", category: "Ofertas" },
-];
 
 const formatCurrency = (v: number) =>
   `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
+const formatDate = (d: string) => {
+  const date = new Date(d + "T00:00:00");
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+};
+
 export default function Financeiro() {
-  const [transactions, setTransactions] = useState(initialTransactions);
+  const { user } = useAuth();
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [filterType, setFilterType] = useState<"all" | "Entrada" | "Saída">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [newTx, setNewTx] = useState({ desc: "", type: "Entrada" as "Entrada" | "Saída", value: "", category: "" });
 
+  useEffect(() => {
+    if (!user) return;
+    const load = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*")
+        .order("date", { ascending: false });
+      if (error) { console.error(error); toast.error("Erro ao carregar transações"); }
+      else setTransactions(data || []);
+      setLoading(false);
+    };
+    load();
+  }, [user]);
+
   const filtered = transactions.filter(t => {
     if (filterType !== "all" && t.type !== filterType) return false;
-    if (searchQuery && !t.desc.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (searchQuery && !t.description.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
 
   const summary = useMemo(() => {
-    const totalReceita = transactions.filter(t => t.type === "Entrada").reduce((s, t) => s + t.amount, 0);
-    const totalDespesa = transactions.filter(t => t.type === "Saída").reduce((s, t) => s + t.amount, 0);
+    const totalReceita = transactions.filter(t => t.type === "Entrada").reduce((s, t) => s + Number(t.amount), 0);
+    const totalDespesa = transactions.filter(t => t.type === "Saída").reduce((s, t) => s + Number(t.amount), 0);
     const saldo = totalReceita - totalDespesa;
     return [
       { title: "Receita Total", value: formatCurrency(totalReceita), trend: "+10,8%", icon: TrendingUp },
@@ -55,24 +68,28 @@ export default function Financeiro() {
     ];
   }, [transactions]);
 
-  const addTransaction = () => {
-    if (!newTx.desc || !newTx.value) return;
+  const addTransaction = async () => {
+    if (!newTx.desc || !newTx.value || !user) return;
     const raw = newTx.value.replace(/[^\d,\.]/g, "").replace(",", ".");
     const amount = parseFloat(raw) || 0;
     if (amount <= 0) return;
-    const tx: Transaction = {
-      id: Date.now(),
-      date: new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
-      desc: newTx.desc,
+    setSaving(true);
+    const { data, error } = await supabase.from("transactions").insert({
+      user_id: user.id,
+      description: newTx.desc,
       type: newTx.type,
-      value: formatCurrency(amount),
       amount,
-      status: "Pendente",
       category: newTx.category || "Geral",
-    };
-    setTransactions([tx, ...transactions]);
+      status: "Pendente",
+    }).select().single();
+    if (error) { toast.error("Erro ao salvar"); console.error(error); }
+    else {
+      setTransactions([data, ...transactions]);
+      toast.success("Lançamento salvo!");
+    }
     setNewTx({ desc: "", type: "Entrada", value: "", category: "" });
     setShowForm(false);
+    setSaving(false);
   };
 
   const handleFormKeyDown = (e: React.KeyboardEvent) => {
@@ -106,7 +123,6 @@ export default function Financeiro() {
           ))}
         </div>
 
-        {/* New transaction form */}
         <AnimatePresence>
           {showForm && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
@@ -130,7 +146,9 @@ export default function Financeiro() {
                   <input placeholder="Categoria" value={newTx.category} onChange={(e) => setNewTx({ ...newTx, category: e.target.value })}
                     className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
                 </div>
-                <button onClick={addTransaction} className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+                <button onClick={addTransaction} disabled={saving}
+                  className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 inline-flex items-center gap-2">
+                  {saving && <Loader2 size={14} className="animate-spin" />}
                   Salvar Lançamento
                 </button>
               </div>
@@ -138,7 +156,6 @@ export default function Financeiro() {
           )}
         </AnimatePresence>
 
-        {/* Transactions table */}
         <div className="bg-card rounded-xl shadow-executive overflow-hidden">
           <div className="p-5 border-b border-border/50">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -146,19 +163,13 @@ export default function Financeiro() {
               <div className="flex items-center gap-2">
                 <div className="relative">
                   <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    placeholder="Buscar..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-8 pr-3 py-1.5 rounded-lg border border-input bg-background text-xs w-full sm:w-40 focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
+                  <input placeholder="Buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-8 pr-3 py-1.5 rounded-lg border border-input bg-background text-xs w-full sm:w-40 focus:outline-none focus:ring-1 focus:ring-ring" />
                 </div>
                 <div className="flex bg-secondary/50 rounded-lg p-0.5">
                   {(["all", "Entrada", "Saída"] as const).map(f => (
                     <button key={f} onClick={() => setFilterType(f)}
-                      className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-                        filterType === f ? "bg-card shadow-sm" : "text-muted-foreground"
-                      }`}>
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${filterType === f ? "bg-card shadow-sm" : "text-muted-foreground"}`}>
                       {f === "all" ? "Todos" : f === "Entrada" ? "Entradas" : "Saídas"}
                     </button>
                   ))}
@@ -167,66 +178,72 @@ export default function Financeiro() {
             </div>
           </div>
 
-          {/* Desktop table */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border/50 text-left text-xs text-muted-foreground">
-                  <th className="px-5 py-3 font-medium">Data</th>
-                  <th className="px-5 py-3 font-medium">Descrição</th>
-                  <th className="px-5 py-3 font-medium">Tipo</th>
-                  <th className="px-5 py-3 font-medium">Valor</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 size={24} className="animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <>
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border/50 text-left text-xs text-muted-foreground">
+                      <th className="px-5 py-3 font-medium">Data</th>
+                      <th className="px-5 py-3 font-medium">Descrição</th>
+                      <th className="px-5 py-3 font-medium">Tipo</th>
+                      <th className="px-5 py-3 font-medium">Valor</th>
+                      <th className="px-5 py-3 font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((t) => (
+                      <tr key={t.id} className="border-b border-border/30 hover:bg-secondary/30 transition-colors">
+                        <td className="px-5 py-3 text-muted-foreground tabular-nums">{formatDate(t.date)}</td>
+                        <td className="px-5 py-3 font-medium">{t.description}</td>
+                        <td className="px-5 py-3">
+                          <span className={`text-xs font-medium ${t.type === "Entrada" ? "text-success" : "text-destructive"}`}>{t.type}</span>
+                        </td>
+                        <td className="px-5 py-3 font-medium tabular-nums">{formatCurrency(Number(t.amount))}</td>
+                        <td className="px-5 py-3">
+                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                            t.status === "Confirmado" ? "bg-success/10 text-success" :
+                            t.status === "Pago" ? "bg-primary/10 text-primary" :
+                            "bg-accent/10 text-accent"
+                          }`}>{t.status}</span>
+                        </td>
+                      </tr>
+                    ))}
+                    {filtered.length === 0 && (
+                      <tr><td colSpan={5} className="text-center py-8 text-sm text-muted-foreground">Nenhuma movimentação encontrada.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="sm:hidden p-4 space-y-2">
                 {filtered.map((t) => (
-                  <tr key={t.id} className="border-b border-border/30 hover:bg-secondary/30 transition-colors">
-                    <td className="px-5 py-3 text-muted-foreground tabular-nums">{t.date}</td>
-                    <td className="px-5 py-3 font-medium">{t.desc}</td>
-                    <td className="px-5 py-3">
-                      <span className={`text-xs font-medium ${t.type === "Entrada" ? "text-success" : "text-destructive"}`}>{t.type}</span>
-                    </td>
-                    <td className="px-5 py-3 font-medium tabular-nums">{t.value}</td>
-                    <td className="px-5 py-3">
+                  <div key={t.id} className="p-3 rounded-lg bg-secondary/30">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                      <span>{formatDate(t.date)}</span>
+                      <span className={t.type === "Entrada" ? "text-success font-medium" : "text-destructive font-medium"}>{t.type}</span>
+                    </div>
+                    <p className="text-sm font-medium">{t.description}</p>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-sm font-medium tabular-nums">{formatCurrency(Number(t.amount))}</span>
                       <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
                         t.status === "Confirmado" ? "bg-success/10 text-success" :
                         t.status === "Pago" ? "bg-primary/10 text-primary" :
                         "bg-accent/10 text-accent"
                       }`}>{t.status}</span>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={5} className="text-center py-8 text-sm text-muted-foreground">Nenhuma movimentação encontrada.</td></tr>
+                  <p className="text-center text-sm text-muted-foreground py-8">Nenhuma movimentação encontrada.</p>
                 )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Mobile cards */}
-          <div className="sm:hidden p-4 space-y-2">
-            {filtered.map((t) => (
-              <div key={t.id} className="p-3 rounded-lg bg-secondary/30">
-                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                  <span>{t.date}</span>
-                  <span className={t.type === "Entrada" ? "text-success font-medium" : "text-destructive font-medium"}>{t.type}</span>
-                </div>
-                <p className="text-sm font-medium">{t.desc}</p>
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-sm font-medium tabular-nums">{t.value}</span>
-                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                    t.status === "Confirmado" ? "bg-success/10 text-success" :
-                    t.status === "Pago" ? "bg-primary/10 text-primary" :
-                    "bg-accent/10 text-accent"
-                  }`}>{t.status}</span>
-                </div>
               </div>
-            ))}
-            {filtered.length === 0 && (
-              <p className="text-center text-sm text-muted-foreground py-8">Nenhuma movimentação encontrada.</p>
-            )}
-          </div>
+            </>
+          )}
         </div>
       </div>
     </AdminLayout>
