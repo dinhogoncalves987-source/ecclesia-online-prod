@@ -7,14 +7,14 @@ import {
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const features = [
-  { icon: LayoutDashboard, title: "Dashboard Executivo", desc: "Visão gerencial completa com métricas em tempo real." },
-  { icon: Wallet, title: "Tesouraria", desc: "Controle financeiro robusto com relatórios detalhados." },
-  { icon: Users, title: "Gestão de Membros", desc: "Cadastro completo de membros e visitantes." },
-  { icon: Calendar, title: "Agenda Integrada", desc: "Calendário institucional para toda a comunidade." },
-  { icon: BookOpen, title: "Bíblia Sagrada", desc: "Leitura confortável com modo noturno integrado." },
-  { icon: Heart, title: "Pedidos de Oração", desc: "Acompanhamento pastoral e intercessão comunitária." },
-  { icon: MessageSquare, title: "Comunicação", desc: "Avisos, mensagens e comunicados centralizados." },
-  { icon: BarChart3, title: "Relatórios", desc: "Dados estratégicos para tomada de decisão." },
+  { icon: LayoutDashboard, title: "Dashboard Executivo", desc: "Visão gerencial completa com métricas em tempo real.", path: "/admin" },
+  { icon: Wallet, title: "Tesouraria", desc: "Controle financeiro robusto com relatórios detalhados.", path: "/admin/financeiro" },
+  { icon: Users, title: "Gestão de Membros", desc: "Cadastro completo de membros e visitantes.", path: "/admin/membros" },
+  { icon: Calendar, title: "Agenda Integrada", desc: "Calendário institucional para toda a comunidade.", path: "/admin/agenda" },
+  { icon: BookOpen, title: "Bíblia Sagrada", desc: "Leitura confortável com modo noturno integrado.", path: "/admin/biblia" },
+  { icon: Heart, title: "Pedidos de Oração", desc: "Acompanhamento pastoral e intercessão comunitária.", path: "/admin/oracoes" },
+  { icon: MessageSquare, title: "Comunicação", desc: "Avisos, mensagens e comunicados centralizados.", path: "/admin/comunicacao" },
+  { icon: BarChart3, title: "Relatórios", desc: "Dados estratégicos para tomada de decisão.", path: "/admin/relatorios" },
 ];
 
 const transition = { duration: 0.5, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] };
@@ -83,21 +83,18 @@ export default function Landing() {
             </p>
           </motion.div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {features.map((f, i) => (
-              <motion.div
+            {features.map((f) => (
+              <Link
                 key={f.title}
-                initial={{ opacity: 0, y: 12 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ ...transition, delay: i * 0.05 }}
-                className="bg-card p-5 rounded-xl shadow-executive hover:shadow-executive-hover transition-shadow"
+                to={f.path}
+                className="bg-card p-5 rounded-xl shadow-executive hover:shadow-executive-hover transition-shadow block"
               >
                 <div className="p-2.5 bg-accent/10 rounded-lg w-fit mb-3">
                   <f.icon size={20} strokeWidth={1.5} className="text-accent" />
                 </div>
                 <h3 className="font-medium text-sm">{f.title}</h3>
                 <p className="text-xs text-muted-foreground mt-1">{f.desc}</p>
-              </motion.div>
+              </Link>
             ))}
           </div>
         </div>
