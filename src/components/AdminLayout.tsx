@@ -150,6 +150,13 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={toggleFullscreen}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors text-sm font-semibold"
+            >
+              {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+              <span className="hidden sm:inline">{isFullscreen ? "SAIR TELA CHEIA" : "VER EM TELA CHEIA"}</span>
+            </button>
             <ThemeToggle />
             <button className="p-2 rounded-lg hover:bg-secondary transition-colors relative">
               <Bell size={18} strokeWidth={1.5} />
