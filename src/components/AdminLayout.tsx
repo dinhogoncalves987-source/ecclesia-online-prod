@@ -196,8 +196,48 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               <Bell size={18} strokeWidth={1.5} />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent rounded-full" />
             </button>
-            <div className="w-9 h-9 rounded-full bg-accent/20 border-2 border-accent/40 ml-1 flex items-center justify-center text-xs font-medium text-accent">
-              {initials}
+            {/* Profile avatar with dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                className="w-9 h-9 rounded-full overflow-hidden border-2 border-accent/40 ml-1 flex items-center justify-center text-xs font-medium text-accent bg-accent/20 hover:border-accent transition-colors"
+              >
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  initials
+                )}
+              </button>
+              {profileMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setProfileMenuOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-xl z-50 py-1 min-w-[180px]">
+                    <Link
+                      to="/admin/perfil"
+                      onClick={() => setProfileMenuOpen(false)}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-secondary transition-colors"
+                    >
+                      <User size={16} /> {t("Meu Perfil")}
+                    </Link>
+                    {isAdmin && (
+                      <Link
+                        to="/admin/gerenciar-acessos"
+                        onClick={() => setProfileMenuOpen(false)}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-secondary transition-colors"
+                      >
+                        <Shield size={16} /> {t("Gerenciar Acessos")}
+                      </Link>
+                    )}
+                    <hr className="my-1 border-border" />
+                    <button
+                      onClick={() => { setProfileMenuOpen(false); handleSignOut(); }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-secondary transition-colors text-destructive"
+                    >
+                      <LogOut size={16} /> {t("Sair")}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </header>
@@ -252,7 +292,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               </div>
 
               <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
-                {navItems.map((item) => (
+                {navItems.filter(item => canAccess(item.path)).map((item) => (
                   <Link
                     key={item.path}
                     to={item.path}
