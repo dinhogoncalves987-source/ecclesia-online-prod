@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
+import { LanguageProvider } from "@/hooks/useLanguage";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -29,6 +30,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
+        <LanguageProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
@@ -52,6 +54,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+        </LanguageProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
