@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      announcements: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          priority: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          priority?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          priority?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      documents: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          file_type: string | null
+          file_url: string | null
+          id: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       events: {
         Row: {
           color: string | null
@@ -86,6 +146,39 @@ export type Database = {
         }
         Relationships: []
       }
+      prayer_requests: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_anonymous: boolean
+          praying_count: number
+          status: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_anonymous?: boolean
+          praying_count?: number
+          status?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_anonymous?: boolean
+          praying_count?: number
+          status?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -115,6 +208,87 @@ export type Database = {
           phone?: string | null
           role_title?: string | null
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      schedules: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          id: string
+          ministry: string
+          notes: string | null
+          schedule_date: string
+          status: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          id?: string
+          ministry?: string
+          notes?: string | null
+          schedule_date: string
+          status?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          id?: string
+          ministry?: string
+          notes?: string | null
+          schedule_date?: string
+          status?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      small_groups: {
+        Row: {
+          created_at: string
+          current_members: number
+          description: string | null
+          id: string
+          leader: string
+          location: string | null
+          max_members: number
+          meeting_day: string | null
+          meeting_time: string | null
+          name: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_members?: number
+          description?: string | null
+          id?: string
+          leader: string
+          location?: string | null
+          max_members?: number
+          meeting_day?: string | null
+          meeting_time?: string | null
+          name: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_members?: number
+          description?: string | null
+          id?: string
+          leader?: string
+          location?: string | null
+          max_members?: number
+          meeting_day?: string | null
+          meeting_time?: string | null
+          name?: string
+          status?: string
           user_id?: string
         }
         Relationships: []
