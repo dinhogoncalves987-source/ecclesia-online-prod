@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Wallet, Users, Calendar, BookOpen, FileText,
   Heart, MessageSquare, UsersRound, Archive, BarChart3, Menu, X,
@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
@@ -32,10 +34,33 @@ const mobileNavItems = [
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileName, setProfileName] = useState("");
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("user_id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (data?.full_name) setProfileName(data.full_name);
+      });
+  }, [user]);
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
+
+  const displayName = profileName || user?.email?.split("@")[0] || "Usuário";
+  const initials = displayName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -105,7 +130,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             </button>
             <div className="hidden sm:block">
               <p className="text-sm text-muted-foreground">Bem-vindo de volta</p>
-              <p className="text-sm font-medium">Pastor Almeida</p>
+              <p className="text-sm font-medium">{displayName}</p>
             </div>
           </div>
 
@@ -115,7 +140,9 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               <Bell size={18} strokeWidth={1.5} />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent rounded-full" />
             </button>
-            <div className="w-9 h-9 rounded-full bg-accent/20 border-2 border-accent/40 ml-1" />
+            <div className="w-9 h-9 rounded-full bg-accent/20 border-2 border-accent/40 ml-1 flex items-center justify-center text-xs font-medium text-accent">
+              {initials}
+            </div>
           </div>
         </header>
 
@@ -179,9 +206,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                 <button className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary w-full">
                   <Settings size={20} strokeWidth={1.5} /> Configurações
                 </button>
-                <Link to="/" className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary w-full">
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary w-full"
+                >
                   <LogOut size={20} strokeWidth={1.5} /> Sair
-                </Link>
+                </button>
               </div>
             </motion.div>
           </>
