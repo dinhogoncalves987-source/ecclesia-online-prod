@@ -233,12 +233,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               className="fixed inset-y-0 left-0 w-72 bg-card shadow-executive-hover z-50 lg:hidden flex flex-col"
             >
               <div className="p-4 flex items-center justify-between h-16">
-                <div className="flex items-center gap-3">
+                <Link to="/admin" className="flex items-center gap-3" onClick={() => setMobileMenuOpen(false)}>
                   <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center">
                     <span className="text-accent font-serif text-xl">Ω</span>
                   </div>
                   <span className="font-serif text-xl tracking-tight">Ecclesia</span>
-                </div>
+                </Link>
                 <button onClick={() => setMobileMenuOpen(false)} className="p-2 rounded-lg hover:bg-secondary">
                   <X size={20} strokeWidth={1.5} />
                 </button>
