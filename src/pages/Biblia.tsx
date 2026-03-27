@@ -410,7 +410,17 @@ export default function Biblia() {
           </div>
 
           <div className="p-3 border-t border-border/50">
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-end">
+              <button
+                onClick={startChatVoice}
+                disabled={isLoading}
+                className={`p-2.5 rounded-lg shrink-0 transition-colors ${
+                  isChatListening ? "bg-destructive/10 text-destructive animate-pulse" : "hover:bg-secondary text-muted-foreground"
+                }`}
+                title="Falar com microfone"
+              >
+                {isChatListening ? <MicOff size={14} /> : <Mic size={14} />}
+              </button>
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
