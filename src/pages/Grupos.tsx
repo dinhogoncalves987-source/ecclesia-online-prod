@@ -111,24 +111,26 @@ export default function Grupos() {
         {showForm && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-40" onClick={() => setShowForm(false)} />
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="fixed inset-x-4 top-1/2 -translate-y-1/2 sm:inset-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-md bg-card rounded-2xl p-6 shadow-xl z-50 max-h-[90vh] overflow-y-auto">
-              <h2 className="text-lg font-serif font-bold mb-4">Novo Grupo</h2>
-              <div className="space-y-3">
-                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Nome do grupo" className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
-                <input value={form.leader} onChange={e => setForm(f => ({ ...f, leader: e.target.value }))} placeholder="Nome do líder" className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
-                <div className="grid grid-cols-2 gap-2">
-                  <input value={form.meeting_day} onChange={e => setForm(f => ({ ...f, meeting_day: e.target.value }))} placeholder="Dia (ex: Quarta)" className="px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
-                  <input value={form.meeting_time} onChange={e => setForm(f => ({ ...f, meeting_time: e.target.value }))} placeholder="Horário" className="px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="w-full max-w-md bg-card rounded-2xl p-6 shadow-xl max-h-[85vh] overflow-y-auto">
+                <h2 className="text-lg font-serif font-bold mb-4">Novo Grupo</h2>
+                <div className="space-y-3">
+                  <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Nome do grupo" className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
+                  <input value={form.leader} onChange={e => setForm(f => ({ ...f, leader: e.target.value }))} placeholder="Nome do líder" className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input value={form.meeting_day} onChange={e => setForm(f => ({ ...f, meeting_day: e.target.value }))} placeholder="Dia (ex: Quarta)" className="px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
+                    <input value={form.meeting_time} onChange={e => setForm(f => ({ ...f, meeting_time: e.target.value }))} placeholder="Horário" className="px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
+                  </div>
+                  <input value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} placeholder="Local" className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
+                  <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Descrição (opcional)" rows={2} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm resize-none" />
+                  <input type="number" value={form.max_members} onChange={e => setForm(f => ({ ...f, max_members: e.target.value }))} placeholder="Máx. membros" className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
                 </div>
-                <input value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} placeholder="Local" className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
-                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Descrição (opcional)" rows={2} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm resize-none" />
-                <input type="number" value={form.max_members} onChange={e => setForm(f => ({ ...f, max_members: e.target.value }))} placeholder="Máx. membros" className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
-              </div>
-              <div className="flex gap-2 mt-4">
-                <button onClick={() => setShowForm(false)} className="flex-1 py-2 rounded-lg bg-secondary text-sm font-medium">Cancelar</button>
-                <button onClick={handleAdd} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">Criar Grupo</button>
-              </div>
-            </motion.div>
+                <div className="flex gap-2 mt-4">
+                  <button onClick={() => setShowForm(false)} className="flex-1 py-2 rounded-lg bg-secondary text-sm font-medium">Cancelar</button>
+                  <button onClick={handleAdd} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">Criar Grupo</button>
+                </div>
+              </motion.div>
+            </div>
           </>
         )}
       </AnimatePresence>
