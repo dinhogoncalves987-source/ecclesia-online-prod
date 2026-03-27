@@ -260,7 +260,6 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                 <button className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary w-full">
                   <Settings size={20} strokeWidth={1.5} /> {t("Configurações")}
                 </button>
-                </button>
                 <button
                   onClick={handleSignOut}
                   className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary w-full"
