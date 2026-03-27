@@ -185,6 +185,45 @@ export default function Biblia() {
     recognition.start();
   };
 
+  const startChatVoice = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    const recognition = new SpeechRecognition();
+    recognition.lang = "pt-BR";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(prev => prev ? prev + " " + transcript : transcript);
+      setIsChatListening(false);
+    };
+    recognition.onerror = () => setIsChatListening(false);
+    recognition.onend = () => setIsChatListening(false);
+    setIsChatListening(true);
+    recognition.start();
+  };
+
+  const downloadMessage = (content: string) => {
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `estudo-biblico-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const shareMessage = async (content: string) => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Estudo Bíblico", text: content });
+      } catch { /* user cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(content);
+      alert("Texto copiado!");
+    }
+  };
+
   const filteredOT = searchQuery
     ? oldTestamentBooks.filter(b => b.name.toLowerCase().includes(searchQuery.toLowerCase()))
     : oldTestamentBooks;
