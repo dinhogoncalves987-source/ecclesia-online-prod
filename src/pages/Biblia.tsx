@@ -35,6 +35,7 @@ export default function Biblia() {
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isListening, setIsListening] = useState(false);
+  const [isChatListening, setIsChatListening] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const versesRef = useRef<HTMLDivElement>(null);
 
