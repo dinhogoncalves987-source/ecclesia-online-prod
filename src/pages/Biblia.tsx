@@ -371,16 +371,28 @@ export default function Biblia() {
                 </div>
               </div>
             )}
-            {messages.map((msg, i) => (
+             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
-                  msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary/70"
-                }`}>
-                  {msg.role === "assistant" ? (
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <div className="max-w-[85%]">
+                  <div className={`rounded-xl px-3 py-2 text-sm ${
+                    msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary/70"
+                  }`}>
+                    {msg.role === "assistant" ? (
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+                    ) : <p>{msg.content}</p>}
+                  </div>
+                  {msg.role === "assistant" && msg.content && !isLoading && (
+                    <div className="flex gap-1 mt-1 ml-1">
+                      <button onClick={() => downloadMessage(msg.content)} className="p-1 rounded hover:bg-secondary transition-colors" title="Baixar">
+                        <Download size={12} className="text-muted-foreground" />
+                      </button>
+                      <button onClick={() => shareMessage(msg.content)} className="p-1 rounded hover:bg-secondary transition-colors" title="Compartilhar">
+                        <Share2 size={12} className="text-muted-foreground" />
+                      </button>
                     </div>
-                  ) : <p>{msg.content}</p>}
+                  )}
                 </div>
               </div>
             ))}
