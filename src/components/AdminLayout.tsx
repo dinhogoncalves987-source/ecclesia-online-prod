@@ -93,14 +93,14 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           sidebarCollapsed ? "w-[72px]" : "w-72"
         }`}
       >
-        <div className="p-4 flex items-center gap-3 h-16">
+        <Link to="/admin" className="p-4 flex items-center gap-3 h-16">
           <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
             <span className="text-accent font-serif text-xl">Ω</span>
           </div>
           {!sidebarCollapsed && (
             <span className="font-serif text-xl tracking-tight text-foreground">Ecclesia</span>
           )}
-        </div>
+        </Link>
 
         <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => (
