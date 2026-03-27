@@ -146,21 +146,23 @@ export default function Oracoes() {
         {showForm && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-40" onClick={() => setShowForm(false)} />
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="fixed inset-x-4 top-1/2 -translate-y-1/2 sm:inset-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-md bg-card rounded-2xl p-6 shadow-xl z-50">
-              <h2 className="text-lg font-serif font-bold mb-4">{t("Novo Pedido de Oração")}</h2>
-              <div className="space-y-3">
-                <input value={title} onChange={e => setTitle(e.target.value)} placeholder={t("Título do pedido")} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
-                <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder={t("Descrição (opcional)")} rows={3} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm resize-none" />
-                <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
-                  <input type="checkbox" checked={isAnonymous} onChange={e => setIsAnonymous(e.target.checked)} className="rounded" />
-                  {t("Enviar de forma anônima")}
-                </label>
-              </div>
-              <div className="flex gap-2 mt-4">
-                <button onClick={() => setShowForm(false)} className="flex-1 py-2 rounded-lg bg-secondary text-sm font-medium">{t("Cancelar")}</button>
-                <button onClick={handleAdd} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">{t("Enviar Pedido")}</button>
-              </div>
-            </motion.div>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="w-full max-w-md bg-card rounded-2xl p-6 shadow-xl max-h-[85vh] overflow-y-auto">
+                <h2 className="text-lg font-serif font-bold mb-4">{t("Novo Pedido de Oração")}</h2>
+                <div className="space-y-3">
+                  <input value={title} onChange={e => setTitle(e.target.value)} placeholder={t("Título do pedido")} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
+                  <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder={t("Descrição (opcional)")} rows={3} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm resize-none" />
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                    <input type="checkbox" checked={isAnonymous} onChange={e => setIsAnonymous(e.target.checked)} className="rounded" />
+                    {t("Enviar de forma anônima")}
+                  </label>
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <button onClick={() => setShowForm(false)} className="flex-1 py-2 rounded-lg bg-secondary text-sm font-medium">{t("Cancelar")}</button>
+                  <button onClick={handleAdd} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">{t("Enviar Pedido")}</button>
+                </div>
+              </motion.div>
+            </div>
           </>
         )}
       </AnimatePresence>

@@ -113,27 +113,29 @@ export default function Comunicacao() {
         {showForm && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-40" onClick={() => setShowForm(false)} />
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="fixed inset-x-4 top-1/2 -translate-y-1/2 sm:inset-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-md bg-card rounded-2xl p-6 shadow-xl z-50">
-              <h2 className="text-lg font-serif font-bold mb-4">Novo Comunicado</h2>
-              <div className="space-y-3">
-                <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
-                <textarea value={content} onChange={e => setContent(e.target.value)} placeholder="Conteúdo do comunicado" rows={4} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm resize-none" />
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Prioridade</label>
-                  <div className="flex gap-2">
-                    {["Normal", "Importante", "Urgente"].map(p => (
-                      <button key={p} onClick={() => setPriority(p)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${priority === p ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
-                        {p}
-                      </button>
-                    ))}
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="w-full max-w-md bg-card rounded-2xl p-6 shadow-xl max-h-[85vh] overflow-y-auto">
+                <h2 className="text-lg font-serif font-bold mb-4">Novo Comunicado</h2>
+                <div className="space-y-3">
+                  <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Título" className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
+                  <textarea value={content} onChange={e => setContent(e.target.value)} placeholder="Conteúdo do comunicado" rows={4} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm resize-none" />
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Prioridade</label>
+                    <div className="flex gap-2">
+                      {["Normal", "Importante", "Urgente"].map(p => (
+                        <button key={p} onClick={() => setPriority(p)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${priority === p ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+                          {p}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="flex gap-2 mt-4">
-                <button onClick={() => setShowForm(false)} className="flex-1 py-2 rounded-lg bg-secondary text-sm font-medium">Cancelar</button>
-                <button onClick={handleAdd} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">Publicar</button>
-              </div>
-            </motion.div>
+                <div className="flex gap-2 mt-4">
+                  <button onClick={() => setShowForm(false)} className="flex-1 py-2 rounded-lg bg-secondary text-sm font-medium">Cancelar</button>
+                  <button onClick={handleAdd} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">Publicar</button>
+                </div>
+              </motion.div>
+            </div>
           </>
         )}
       </AnimatePresence>

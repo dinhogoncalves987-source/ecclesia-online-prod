@@ -124,29 +124,31 @@ export default function Escalas() {
         {showForm && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-40" onClick={() => setShowForm(false)} />
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="fixed inset-x-4 top-1/2 -translate-y-1/2 sm:inset-auto sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-md bg-card rounded-2xl p-6 shadow-xl z-50">
-              <h2 className="text-lg font-serif font-bold mb-4">Nova Escala</h2>
-              <div className="space-y-3">
-                <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Título (ex: Culto Domingo)" className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
-                <input type="date" value={form.schedule_date} onChange={e => setForm(f => ({ ...f, schedule_date: e.target.value }))} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Ministério</label>
-                  <div className="flex gap-2 flex-wrap">
-                    {ministries.map(m => (
-                      <button key={m} onClick={() => setForm(f => ({ ...f, ministry: m }))} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${form.ministry === m ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
-                        {m}
-                      </button>
-                    ))}
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="w-full max-w-md bg-card rounded-2xl p-6 shadow-xl max-h-[85vh] overflow-y-auto">
+                <h2 className="text-lg font-serif font-bold mb-4">Nova Escala</h2>
+                <div className="space-y-3">
+                  <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Título (ex: Culto Domingo)" className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
+                  <input type="date" value={form.schedule_date} onChange={e => setForm(f => ({ ...f, schedule_date: e.target.value }))} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Ministério</label>
+                    <div className="flex gap-2 flex-wrap">
+                      {ministries.map(m => (
+                        <button key={m} onClick={() => setForm(f => ({ ...f, ministry: m }))} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${form.ministry === m ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+                          {m}
+                        </button>
+                      ))}
+                    </div>
                   </div>
+                  <input value={form.assigned_to} onChange={e => setForm(f => ({ ...f, assigned_to: e.target.value }))} placeholder="Responsável(is)" className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
+                  <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Observações (opcional)" rows={2} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm resize-none" />
                 </div>
-                <input value={form.assigned_to} onChange={e => setForm(f => ({ ...f, assigned_to: e.target.value }))} placeholder="Responsável(is)" className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
-                <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Observações (opcional)" rows={2} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm resize-none" />
-              </div>
-              <div className="flex gap-2 mt-4">
-                <button onClick={() => setShowForm(false)} className="flex-1 py-2 rounded-lg bg-secondary text-sm font-medium">Cancelar</button>
-                <button onClick={handleAdd} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">Criar Escala</button>
-              </div>
-            </motion.div>
+                <div className="flex gap-2 mt-4">
+                  <button onClick={() => setShowForm(false)} className="flex-1 py-2 rounded-lg bg-secondary text-sm font-medium">Cancelar</button>
+                  <button onClick={handleAdd} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">Criar Escala</button>
+                </div>
+              </motion.div>
+            </div>
           </>
         )}
       </AnimatePresence>
