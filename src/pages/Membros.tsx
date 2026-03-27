@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/AdminLayout";
-import { Users, Search, Plus, Filter, Phone, X, Mail } from "lucide-react";
+import { Users, Search, Plus, Phone, X, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 
@@ -33,7 +33,10 @@ export default function Membros() {
 
   const filtered = members.filter(m => {
     if (filterStatus !== "all" && m.status !== filterStatus) return false;
-    if (searchQuery && !m.name.toLowerCase().includes(searchQuery.toLowerCase()) && !m.role.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      return m.name.toLowerCase().includes(q) || m.role.toLowerCase().includes(q) || m.email.toLowerCase().includes(q);
+    }
     return true;
   });
 
@@ -46,12 +49,31 @@ export default function Membros() {
       status: "Ativo",
       phone: newMember.phone,
       email: newMember.email,
-      since: "2026",
+      since: new Date().getFullYear().toString(),
     };
     setMembers([member, ...members]);
     setNewMember({ name: "", role: "", phone: "", email: "" });
     setShowForm(false);
   };
+
+  const removeMember = (id: number) => {
+    setMembers(members.filter(m => m.id !== id));
+  };
+
+  const toggleStatus = (id: number) => {
+    setMembers(members.map(m => {
+      if (m.id !== id) return m;
+      const next: Record<string, Member["status"]> = { Ativo: "Inativo", Inativo: "Ativo", Visitante: "Ativo" };
+      return { ...m, status: next[m.status] };
+    }));
+  };
+
+  const handleFormKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") { e.preventDefault(); addMember(); }
+  };
+
+  const activeCount = members.filter(m => m.status === "Ativo").length;
+  const visitanteCount = members.filter(m => m.status === "Visitante").length;
 
   return (
     <AdminLayout>
@@ -60,7 +82,7 @@ export default function Membros() {
           <div>
             <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">Membros</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {members.length} cadastrados · {members.filter(m => m.status === "Ativo").length} ativos
+              {members.length} cadastrados · {activeCount} ativos · {visitanteCount} visitantes
             </p>
           </div>
           <button
@@ -82,7 +104,7 @@ export default function Membros() {
                     <X size={16} strokeWidth={1.5} />
                   </button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" onKeyDown={handleFormKeyDown}>
                   <input placeholder="Nome completo" value={newMember.name} onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
                     className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
                   <input placeholder="Função" value={newMember.role} onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}
@@ -105,7 +127,7 @@ export default function Membros() {
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
-              placeholder="Buscar por nome ou função..."
+              placeholder="Buscar por nome, função ou e-mail..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2.5 bg-card rounded-lg shadow-[var(--shadow-sm)] text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
@@ -133,6 +155,7 @@ export default function Membros() {
                 <th className="px-5 py-3 font-medium">Contato</th>
                 <th className="px-5 py-3 font-medium">Status</th>
                 <th className="px-5 py-3 font-medium">Desde</th>
+                <th className="px-5 py-3 font-medium w-16">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -149,17 +172,23 @@ export default function Membros() {
                   <td className="px-5 py-3 text-muted-foreground">{m.role}</td>
                   <td className="px-5 py-3 text-muted-foreground">{m.phone}</td>
                   <td className="px-5 py-3">
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                      m.status === "Ativo" ? "bg-success/10 text-success" :
-                      m.status === "Visitante" ? "bg-accent/10 text-accent" :
-                      "bg-muted text-muted-foreground"
-                    }`}>{m.status}</span>
+                    <button onClick={() => toggleStatus(m.id)}
+                      className={`text-[10px] font-medium px-2 py-0.5 rounded-full cursor-pointer transition-colors ${
+                      m.status === "Ativo" ? "bg-success/10 text-success hover:bg-success/20" :
+                      m.status === "Visitante" ? "bg-accent/10 text-accent hover:bg-accent/20" :
+                      "bg-muted text-muted-foreground hover:bg-muted/80"
+                    }`}>{m.status}</button>
                   </td>
                   <td className="px-5 py-3 text-muted-foreground tabular-nums">{m.since}</td>
+                  <td className="px-5 py-3">
+                    <button onClick={() => removeMember(m.id)} className="p-1 rounded hover:bg-destructive/10 transition-colors" title="Remover">
+                      <Trash2 size={14} className="text-muted-foreground" />
+                    </button>
+                  </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={5} className="text-center py-8 text-sm text-muted-foreground">Nenhum membro encontrado.</td></tr>
+                <tr><td colSpan={6} className="text-center py-8 text-sm text-muted-foreground">Nenhum membro encontrado.</td></tr>
               )}
             </tbody>
           </table>
@@ -176,11 +205,12 @@ export default function Membros() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-medium truncate">{m.name}</p>
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
+                    <button onClick={() => toggleStatus(m.id)}
+                      className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
                       m.status === "Ativo" ? "bg-success/10 text-success" :
                       m.status === "Visitante" ? "bg-accent/10 text-accent" :
                       "bg-muted text-muted-foreground"
-                    }`}>{m.status}</span>
+                    }`}>{m.status}</button>
                   </div>
                   <p className="text-xs text-muted-foreground">{m.role}</p>
                   <div className="flex items-center gap-2 mt-1">
@@ -189,6 +219,9 @@ export default function Membros() {
                     </span>
                   </div>
                 </div>
+                <button onClick={() => removeMember(m.id)} className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors flex-shrink-0" title="Remover">
+                  <Trash2 size={14} className="text-muted-foreground" />
+                </button>
               </div>
             </motion.div>
           ))}

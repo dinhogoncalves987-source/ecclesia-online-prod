@@ -1,7 +1,6 @@
 import { AdminLayout } from "@/components/AdminLayout";
 import { ExecutiveCard } from "@/components/ExecutiveCard";
 import { Wallet, Users, TrendingUp, Calendar, Clock, Bell, Plus, ChevronRight } from "lucide-react";
-import { motion } from "framer-motion";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -32,6 +31,10 @@ export default function Dashboard() {
 
   const markAsRead = (id: number) => {
     setNotices(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+
+  const markAllAsRead = () => {
+    setNotices(prev => prev.map(n => ({ ...n, read: true })));
   };
 
   const unreadCount = notices.filter(n => !n.read).length;
@@ -101,7 +104,14 @@ export default function Dashboard() {
                   </span>
                 )}
               </div>
-              <Bell size={16} className="text-muted-foreground" />
+              <div className="flex items-center gap-2">
+                {unreadCount > 0 && (
+                  <button onClick={markAllAsRead} className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">
+                    Marcar todos como lidos
+                  </button>
+                )}
+                <Bell size={16} className="text-muted-foreground" />
+              </div>
             </div>
             <div className="space-y-2">
               {notices.map((n) => (
