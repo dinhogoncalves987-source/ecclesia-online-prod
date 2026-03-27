@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/AdminLayout";
-import { ChevronLeft, ChevronRight, Search, Bookmark, Eye, MessageSquare, Send, X, Sparkles, Trash2, BookOpen, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, Bookmark, Eye, MessageSquare, Send, X, Sparkles, Trash2, BookOpen, Loader2, Mic, MicOff } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
@@ -34,6 +34,7 @@ export default function Biblia() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isListening, setIsListening] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const versesRef = useRef<HTMLDivElement>(null);
 
@@ -167,6 +168,22 @@ export default function Biblia() {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
 
+  const startVoiceSearch = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    const recognition = new SpeechRecognition();
+    recognition.lang = "pt-BR";
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setSearchQuery(transcript);
+      setIsListening(false);
+    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+    setIsListening(true);
+    recognition.start();
+  };
+
   const filteredOT = searchQuery
     ? oldTestamentBooks.filter(b => b.name.toLowerCase().includes(searchQuery.toLowerCase()))
     : oldTestamentBooks;
@@ -182,7 +199,7 @@ export default function Biblia() {
           <div className="bg-card rounded-xl shadow-executive p-5 mb-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-serif text-base">Selecionar Livro</h3>
-              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                 <div className="relative">
                   <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input
@@ -192,6 +209,9 @@ export default function Biblia() {
                     className="pl-8 pr-3 py-1.5 rounded-lg border border-input bg-background text-xs w-36 sm:w-48 focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                 </div>
+                <button onClick={startVoiceSearch} className={`p-1.5 rounded-lg transition-colors ${isListening ? "bg-destructive/10 text-destructive animate-pulse" : "hover:bg-secondary text-muted-foreground"}`} title="Pesquisa por voz">
+                  {isListening ? <MicOff size={14} /> : <Mic size={14} />}
+                </button>
                 <button onClick={() => { setBookPickerOpen(false); setSearchQuery(""); }} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
                   <X size={14} strokeWidth={1.5} />
                 </button>

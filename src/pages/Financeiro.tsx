@@ -1,11 +1,12 @@
 import { AdminLayout } from "@/components/AdminLayout";
 import { ExecutiveCard } from "@/components/ExecutiveCard";
-import { Wallet, TrendingUp, TrendingDown, PiggyBank, Plus, Download, X, Search, Loader2 } from "lucide-react";
+import { Wallet, TrendingUp, TrendingDown, PiggyBank, Plus, Download, X, Search, Loader2, Copy, QrCode } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { useLanguage } from "@/hooks/useLanguage";
 
 type Transaction = {
   id: string;
@@ -27,6 +28,8 @@ const formatDate = (d: string) => {
 
 export default function Financeiro() {
   const { user } = useAuth();
+  const { t } = useLanguage();
+  const PIX_KEY = "sua-chave-pix@igreja.com";
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -113,6 +116,28 @@ export default function Financeiro() {
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
             >
               <Plus size={16} strokeWidth={1.5} /> Lançamento
+            </button>
+          </div>
+        </div>
+
+        {/* PIX Card */}
+        <div className="bg-card rounded-xl shadow-executive p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2.5 bg-accent/10 rounded-xl">
+              <QrCode size={24} className="text-accent" />
+            </div>
+            <div>
+              <h3 className="font-serif text-lg font-semibold">{t("Dizimar via PIX")}</h3>
+              <p className="text-xs text-muted-foreground">{t("Chave PIX da Igreja")}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 bg-secondary/50 rounded-lg p-3">
+            <code className="flex-1 text-sm font-mono break-all">{PIX_KEY}</code>
+            <button
+              onClick={() => { navigator.clipboard.writeText(PIX_KEY); toast.success(t("Chave copiada!")); }}
+              className="flex items-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors shrink-0"
+            >
+              <Copy size={14} /> {t("Copiar Chave PIX")}
             </button>
           </div>
         </div>
