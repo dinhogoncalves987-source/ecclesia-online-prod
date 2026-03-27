@@ -164,23 +164,20 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                 onClick={() => setLangMenuOpen(!langMenuOpen)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors text-sm font-semibold"
               >
-                <Globe size={16} />
-                <span className="hidden sm:inline">
-                  {lang === "pt" ? "🇧🇷" : lang === "en" ? "🇺🇸" : "🇪🇸"}
-                </span>
+                <img src={flagMap[lang]} alt="" className="w-5 h-5 rounded-sm object-cover" />
               </button>
               {langMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setLangMenuOpen(false)} />
                   <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-xl z-50 py-1 min-w-[160px]">
                     {([
-                      { code: "pt" as const, flag: "🇧🇷", label: "Português" },
-                      { code: "en" as const, flag: "🇺🇸", label: "English" },
-                      { code: "es" as const, flag: "🇪🇸", label: "Español" },
+                      { code: "pt" as const, flag: flagBR, label: "Português" },
+                      { code: "en" as const, flag: flagUS, label: "English" },
+                      { code: "es" as const, flag: flagES, label: "Español" },
                     ]).map(l => (
                       <button key={l.code} onClick={() => { setLang(l.code); setLangMenuOpen(false); }}
                         className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-secondary transition-colors ${lang === l.code ? "font-bold text-primary" : ""}`}>
-                        <span className="text-lg">{l.flag}</span> {l.label}
+                        <img src={l.flag} alt={l.label} className="w-5 h-5 rounded-sm object-cover" /> {l.label}
                       </button>
                     ))}
                   </div>
