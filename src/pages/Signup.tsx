@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -10,6 +10,8 @@ import { useLanguage } from "@/hooks/useLanguage";
 export default function Signup() {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const [searchParams] = useSearchParams();
+  const churchSlug = searchParams.get("church");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,7 +27,7 @@ export default function Signup() {
       email,
       password,
       options: {
-        data: { full_name: fullName },
+        data: { full_name: fullName, ...(churchSlug ? { church_slug: churchSlug } : {}) },
         emailRedirectTo: window.location.origin,
       },
     });
@@ -52,6 +54,9 @@ export default function Signup() {
           </Link>
           <h1 className="text-2xl font-serif tracking-tight">{t("Criar conta")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{t("Preencha os dados para começar")}</p>
+          {churchSlug && (
+            <p className="text-xs text-accent mt-2 font-medium">{t("Você foi convidado para uma congregação")}</p>
+          )}
         </div>
 
         <form onSubmit={handleSignup} className="bg-card rounded-xl shadow-executive p-6 space-y-4">

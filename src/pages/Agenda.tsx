@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useChurch } from "@/hooks/useChurch";
 import { useLanguage } from "@/hooks/useLanguage";
 import { toast } from "sonner";
 
@@ -32,6 +33,7 @@ export default function Agenda() {
   const now = new Date();
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { church } = useChurch();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -50,12 +52,13 @@ export default function Agenda() {
   const firstDayOffset = getFirstDayOfWeek(currentMonth, currentYear);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !church) return;
     const load = async () => {
       setLoading(true);
       const startDate = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`;
       const endDate = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${daysInMonth}`;
       const { data, error } = await supabase.from("events").select("*")
+        .eq("church_id", church.id)
         .gte("event_date", startDate).lte("event_date", endDate)
         .order("event_date");
       if (error) { console.error(error); toast.error(t("Erro ao carregar eventos")); }
@@ -63,7 +66,7 @@ export default function Agenda() {
       setLoading(false);
     };
     load();
-  }, [user, currentMonth, currentYear, daysInMonth, t]);
+  }, [user, church, currentMonth, currentYear, daysInMonth, t]);
 
   const getDay = (e: Event) => new Date(e.event_date + "T00:00:00").getDate();
 
@@ -84,12 +87,12 @@ export default function Agenda() {
   };
 
   const addEvent = async () => {
-    if (!newEvent.title || !newEvent.time || !user) return;
+    if (!newEvent.title || !newEvent.time || !user || !church) return;
     const day = selectedDay || (isCurrentMonth ? todayDay : 1);
     const eventDate = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     setSaving(true);
     const { data, error } = await supabase.from("events").insert({
-      user_id: user.id, title: newEvent.title, event_date: eventDate,
+      user_id: user.id, church_id: church.id, title: newEvent.title, event_date: eventDate,
       time: newEvent.time, location: newEvent.location || t("A definir"), color: newEvent.color,
     }).select().single();
     if (error) { toast.error(t("Erro ao salvar")); console.error(error); }

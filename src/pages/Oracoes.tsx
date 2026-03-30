@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useChurch } from "@/hooks/useChurch";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -24,6 +25,7 @@ export default function Oracoes() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t } = useLanguage();
+  const { church } = useChurch();
   const [requests, setRequests] = useState<PrayerRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -33,18 +35,19 @@ export default function Oracoes() {
   const [filter, setFilter] = useState<"Todos" | "Ativo" | "Respondido">("Todos");
 
   const fetchRequests = async () => {
-    const query = supabase.from("prayer_requests").select("*").order("created_at", { ascending: false });
+    if (!church) return;
+    const query = supabase.from("prayer_requests").select("*").eq("church_id", church.id).order("created_at", { ascending: false });
     const { data } = await query;
     setRequests((data as PrayerRequest[]) || []);
     setLoading(false);
   };
 
-  useEffect(() => { fetchRequests(); }, []);
+  useEffect(() => { if (church) fetchRequests(); }, [church]);
 
   const handleAdd = async () => {
-    if (!title.trim() || !user) return;
+    if (!title.trim() || !user || !church) return;
     const { error } = await supabase.from("prayer_requests").insert({
-      user_id: user.id, title: title.trim(), description: description.trim() || null, is_anonymous: isAnonymous,
+      user_id: user.id, church_id: church.id, title: title.trim(), description: description.trim() || null, is_anonymous: isAnonymous,
     } as any);
     if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
     setTitle(""); setDescription(""); setIsAnonymous(false); setShowForm(false);
@@ -116,7 +119,6 @@ export default function Oracoes() {
                   <span className="flex items-center gap-1"><Clock size={12} />{format(new Date(req.created_at), "dd MMM", { locale: ptBR })}</span>
                   <span className="flex items-center gap-1"><Heart size={12} />{req.praying_count} {t("orando")}</span>
                 </div>
-                {/* AMÉM Button */}
                 <button onClick={() => handlePray(req)}
                   className="w-full py-3 rounded-xl bg-accent/10 text-accent hover:bg-accent/20 transition-colors font-bold text-lg tracking-wide mt-1">
                   {t("AMÉM")}

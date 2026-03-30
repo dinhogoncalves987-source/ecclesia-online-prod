@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useChurch } from "@/hooks/useChurch";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 
@@ -29,6 +30,7 @@ const formatDate = (d: string) => {
 export default function Financeiro() {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { church } = useChurch();
   const PIX_KEY = "sua-chave-pix@igreja.com";
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,19 +41,20 @@ export default function Financeiro() {
   const [newTx, setNewTx] = useState({ desc: "", type: "Entrada" as "Entrada" | "Saída", value: "", category: "" });
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !church) return;
     const load = async () => {
       setLoading(true);
       const { data, error } = await supabase
         .from("transactions")
         .select("*")
+        .eq("church_id", church.id)
         .order("date", { ascending: false });
       if (error) { console.error(error); toast.error("Erro ao carregar transações"); }
       else setTransactions(data || []);
       setLoading(false);
     };
     load();
-  }, [user]);
+  }, [user, church]);
 
   const filtered = transactions.filter(t => {
     if (filterType !== "all" && t.type !== filterType) return false;
@@ -72,13 +75,14 @@ export default function Financeiro() {
   }, [transactions]);
 
   const addTransaction = async () => {
-    if (!newTx.desc || !newTx.value || !user) return;
+    if (!newTx.desc || !newTx.value || !user || !church) return;
     const raw = newTx.value.replace(/[^\d,\.]/g, "").replace(",", ".");
     const amount = parseFloat(raw) || 0;
     if (amount <= 0) return;
     setSaving(true);
     const { data, error } = await supabase.from("transactions").insert({
       user_id: user.id,
+      church_id: church.id,
       description: newTx.desc,
       type: newTx.type,
       amount,

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useChurch } from "@/hooks/useChurch";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
 import { format } from "date-fns";
@@ -20,6 +21,7 @@ export default function Escalas() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t, lang } = useLanguage();
+  const { church } = useChurch();
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -29,17 +31,18 @@ export default function Escalas() {
   const dateLoc = lang === "en" ? enUS : lang === "es" ? es : ptBR;
 
   const fetch_ = async () => {
-    const { data } = await supabase.from("schedules").select("*").order("schedule_date", { ascending: true });
+    if (!church) return;
+    const { data } = await supabase.from("schedules").select("*").eq("church_id", church.id).order("schedule_date", { ascending: true });
     setSchedules((data as Schedule[]) || []);
     setLoading(false);
   };
 
-  useEffect(() => { fetch_(); }, []);
+  useEffect(() => { if (church) fetch_(); }, [church]);
 
   const handleAdd = async () => {
-    if (!form.title.trim() || !form.schedule_date || !user) return;
+    if (!form.title.trim() || !form.schedule_date || !user || !church) return;
     const { error } = await supabase.from("schedules").insert({
-      user_id: user.id, title: form.title.trim(), schedule_date: form.schedule_date,
+      user_id: user.id, church_id: church.id, title: form.title.trim(), schedule_date: form.schedule_date,
       ministry: form.ministry, assigned_to: form.assigned_to || null, notes: form.notes || null,
     } as any);
     if (error) { toast({ title: t("Erro"), description: error.message, variant: "destructive" }); return; }

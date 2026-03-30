@@ -6,11 +6,13 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useChurch } from "@/hooks/useChurch";
 import { useLanguage } from "@/hooks/useLanguage";
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { church } = useChurch();
   const [notices, setNotices] = useState([
     { id: 1, text: t("Bem-vindo ao sistema de gestão da igreja!"), time: t("Agora"), read: false },
   ]);
@@ -24,7 +26,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !church) return;
     const load = async () => {
       setLoading(true);
       const now = new Date();
@@ -36,9 +38,9 @@ export default function Dashboard() {
       const todayStr = now.toISOString().split("T")[0];
 
       const [txRes, membersRes, eventsRes] = await Promise.all([
-        supabase.from("transactions").select("type, amount").gte("date", startDate).lte("date", endDate),
-        supabase.from("members").select("id, status"),
-        supabase.from("events").select("id, title, event_date, time").gte("event_date", todayStr).order("event_date").limit(5),
+        supabase.from("transactions").select("type, amount").eq("church_id", church.id).gte("date", startDate).lte("date", endDate),
+        supabase.from("members").select("id, status").eq("church_id", church.id),
+        supabase.from("events").select("id, title, event_date, time").eq("church_id", church.id).gte("event_date", todayStr).order("event_date").limit(5),
       ]);
 
       const txData = txRes.data || [];
@@ -46,7 +48,7 @@ export default function Dashboard() {
       const despesa = txData.filter(t => t.type === "Saída").reduce((s, t) => s + Number(t.amount), 0);
       const activeMembers = (membersRes.data || []).filter(m => m.status === "Ativo").length;
 
-      const eventsThisMonthRes = await supabase.from("events").select("id").gte("event_date", startDate).lte("event_date", endDate);
+      const eventsThisMonthRes = await supabase.from("events").select("id").eq("church_id", church.id).gte("event_date", startDate).lte("event_date", endDate);
       const eventsCount = (eventsThisMonthRes.data || []).length;
 
       const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}`;
@@ -68,7 +70,7 @@ export default function Dashboard() {
       setLoading(false);
     };
     load();
-  }, [user, t]);
+  }, [user, church, t]);
 
   const markAsRead = (id: number) => setNotices(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
   const markAllAsRead = () => setNotices(prev => prev.map(n => ({ ...n, read: true })));

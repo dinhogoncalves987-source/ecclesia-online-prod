@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useChurch } from "@/hooks/useChurch";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
 
@@ -17,23 +18,25 @@ export default function Grupos() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t } = useLanguage();
+  const { church } = useChurch();
   const [groups, setGroups] = useState<SmallGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", leader: "", meeting_day: "", meeting_time: "", location: "", description: "", max_members: "12" });
 
   const fetch_ = async () => {
-    const { data } = await supabase.from("small_groups").select("*").order("created_at", { ascending: false });
+    if (!church) return;
+    const { data } = await supabase.from("small_groups").select("*").eq("church_id", church.id).order("created_at", { ascending: false });
     setGroups((data as SmallGroup[]) || []);
     setLoading(false);
   };
 
-  useEffect(() => { fetch_(); }, []);
+  useEffect(() => { if (church) fetch_(); }, [church]);
 
   const handleAdd = async () => {
-    if (!form.name.trim() || !form.leader.trim() || !user) return;
+    if (!form.name.trim() || !form.leader.trim() || !user || !church) return;
     const { error } = await supabase.from("small_groups").insert({
-      user_id: user.id, name: form.name.trim(), leader: form.leader.trim(),
+      user_id: user.id, church_id: church.id, name: form.name.trim(), leader: form.leader.trim(),
       meeting_day: form.meeting_day || null, meeting_time: form.meeting_time || null,
       location: form.location || null, description: form.description || null,
       max_members: parseInt(form.max_members) || 12,

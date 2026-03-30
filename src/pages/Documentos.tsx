@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useChurch } from "@/hooks/useChurch";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
 import { format } from "date-fns";
@@ -20,6 +21,7 @@ export default function Documentos() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t, lang } = useLanguage();
+  const { church } = useChurch();
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -31,17 +33,18 @@ export default function Documentos() {
   const dateLoc = lang === "en" ? enUS : lang === "es" ? es : ptBR;
 
   const fetch_ = async () => {
-    const { data } = await supabase.from("documents").select("*").order("created_at", { ascending: false });
+    if (!church) return;
+    const { data } = await supabase.from("documents").select("*").eq("church_id", church.id).order("created_at", { ascending: false });
     setDocs((data as Document[]) || []);
     setLoading(false);
   };
 
-  useEffect(() => { fetch_(); }, []);
+  useEffect(() => { if (church) fetch_(); }, [church]);
 
   const handleAdd = async () => {
-    if (!title.trim() || !user) return;
+    if (!title.trim() || !user || !church) return;
     const { error } = await supabase.from("documents").insert({
-      user_id: user.id, title: title.trim(), category, description: description.trim() || null,
+      user_id: user.id, church_id: church.id, title: title.trim(), category, description: description.trim() || null,
     } as any);
     if (error) { toast({ title: t("Erro"), description: error.message, variant: "destructive" }); return; }
     setTitle(""); setDescription(""); setCategory("Geral"); setShowForm(false);
