@@ -81,8 +81,13 @@ export default function Biblia() {
 
   const goToBook = (index: number) => {
     setSelectedBookIndex(index);
-    setSelectedChapter(1);
+    setSelectedChapter(null);
+    setVerses([]);
     setBookPickerOpen(false);
+  };
+
+  const selectChapter = (ch: number) => {
+    setSelectedChapter(ch);
   };
 
   const prevChapter = () => {
