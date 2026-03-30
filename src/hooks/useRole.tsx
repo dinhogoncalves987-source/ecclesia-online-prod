@@ -19,6 +19,7 @@ const MODULE_ACCESS: Record<string, AppRole[]> = {
   "/admin/escalas": ["admin", "obreiro"],
   "/admin/perfil": ["admin", "tesoureiro", "obreiro", "lider", "membro"],
   "/admin/gerenciar-acessos": ["admin"],
+  "/admin/congregacoes": ["admin"],
 };
 
 export function useRole() {

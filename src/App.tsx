@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import { LanguageProvider } from "@/hooks/useLanguage";
+import { ChurchProvider } from "@/hooks/useChurch";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -24,6 +25,7 @@ import Relatorios from "./pages/Relatorios";
 import Escalas from "./pages/Escalas";
 import Perfil from "./pages/Perfil";
 import GerenciarAcessos from "./pages/GerenciarAcessos";
+import Congregacoes from "./pages/Congregacoes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +35,7 @@ const App = () => (
     <TooltipProvider>
       <AuthProvider>
         <LanguageProvider>
+        <ChurchProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
@@ -55,9 +58,11 @@ const App = () => (
             <Route path="/admin/escalas" element={<ProtectedRoute><Escalas /></ProtectedRoute>} />
             <Route path="/admin/perfil" element={<ProtectedRoute><Perfil /></ProtectedRoute>} />
             <Route path="/admin/gerenciar-acessos" element={<ProtectedRoute><GerenciarAcessos /></ProtectedRoute>} />
+            <Route path="/admin/congregacoes" element={<ProtectedRoute><Congregacoes /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+        </ChurchProvider>
         </LanguageProvider>
       </AuthProvider>
     </TooltipProvider>

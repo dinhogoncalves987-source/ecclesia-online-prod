@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Wallet, Users, Calendar, BookOpen, FileText,
   Heart, MessageSquare, UsersRound, Archive, BarChart3, Menu, X,
   Bell, ChevronLeft, Settings, LogOut, Maximize, Minimize, Globe,
-  Shield, User
+  Shield, User, Building2
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -31,6 +31,7 @@ const navItems = [
   { icon: BarChart3, label: "Relatórios", path: "/admin/relatorios" },
   { icon: FileText, label: "Escalas", path: "/admin/escalas" },
   { icon: Shield, label: "Gerenciar Acessos", path: "/admin/gerenciar-acessos" },
+  { icon: Building2, label: "Congregações", path: "/admin/congregacoes" },
 ];
 
 const mobileNavItems = [
