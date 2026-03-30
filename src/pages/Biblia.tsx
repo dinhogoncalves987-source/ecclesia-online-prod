@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/AdminLayout";
-import { ChevronLeft, ChevronRight, Search, Bookmark, Eye, MessageSquare, Send, X, Sparkles, Trash2, BookOpen, Loader2, Mic, MicOff, Download, Share2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, Bookmark, Eye, MessageSquare, Send, X, Sparkles, Trash2, BookOpen, Loader2, Mic, MicOff, Download, Share2, Plus, Image, FileText } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
