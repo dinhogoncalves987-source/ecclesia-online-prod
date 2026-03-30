@@ -47,12 +47,12 @@ export default function Congregacoes() {
   const loadCongregations = async () => {
     setLoading(true);
     const { data } = await supabase
-      .from("churches" as any)
+      .from("churches")
       .select("*")
       .eq("parent_church_id", church!.id);
 
     if (data) {
-      setCongregations((data as any[]).map((c: any) => ({
+      setCongregations(data.map((c) => ({
         id: c.id, name: c.name, slug: c.slug, address: c.address,
         city: c.city, state: c.state, phone: c.phone, email: c.email,
         pastor_name: c.pastor_name, is_matriz: c.is_matriz,
