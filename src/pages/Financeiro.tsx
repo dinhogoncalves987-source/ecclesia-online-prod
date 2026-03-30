@@ -239,7 +239,7 @@ export default function Financeiro() {
                       </tr>
                     ))}
                     {filtered.length === 0 && (
-                      <tr><td colSpan={5} className="text-center py-8 text-sm text-muted-foreground">Nenhuma movimentação encontrada.</td></tr>
+                      <tr><td colSpan={5} className="text-center py-8 text-sm text-muted-foreground">{t("Nenhuma movimentação encontrada.")}</td></tr>
                     )}
                   </tbody>
                 </table>
