@@ -419,32 +419,63 @@ export default function Biblia() {
             )}
           </div>
 
-          <div className="p-3 border-t border-border/50">
-            <div className="flex gap-2 items-end">
-              <button
-                onClick={startChatVoice}
-                disabled={isLoading}
-                className={`p-2.5 rounded-lg shrink-0 transition-colors ${
-                  isChatListening ? "bg-destructive/10 text-destructive animate-pulse" : "hover:bg-secondary text-muted-foreground"
-                }`}
-                title="Falar com microfone"
-              >
-                {isChatListening ? <MicOff size={14} /> : <Mic size={14} />}
-              </button>
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Pergunte sobre a Bíblia..."
-                rows={2}
-                className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2.5 text-base sm:text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring max-h-32"
-              />
+          <div className="p-2 border-t border-border/50">
+            <div className="flex items-end gap-1.5">
+              {/* + Attach button */}
+              <div className="relative shrink-0">
+                <input
+                  type="file"
+                  accept="image/*,.pdf,.doc,.docx,.txt"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const isImage = file.type.startsWith("image/");
+                      setInput(prev => prev + (prev ? " " : "") + `[${isImage ? "Imagem" : "Documento"}: ${file.name}]`);
+                    }
+                    e.target.value = "";
+                  }}
+                  title="Anexar arquivo"
+                />
+                <div className="p-2 rounded-full text-muted-foreground hover:bg-secondary transition-colors">
+                  <Plus size={18} />
+                </div>
+              </div>
+
+              {/* Input + mic + send grouped together */}
+              <div className="flex-1 flex items-end bg-secondary/50 rounded-full border border-input overflow-hidden">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Pergunte sobre a Bíblia..."
+                  rows={1}
+                  className="flex-1 resize-none bg-transparent px-4 py-2.5 text-base sm:text-sm placeholder:text-muted-foreground focus-visible:outline-none max-h-24 min-h-[40px]"
+                  style={{ scrollbarWidth: "none" }}
+                />
+
+                {/* Mic inside the input bar */}
+                {!input.trim() && (
+                  <button
+                    onClick={startChatVoice}
+                    disabled={isLoading}
+                    className={`p-2.5 shrink-0 transition-colors ${
+                      isChatListening ? "text-destructive animate-pulse" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                    title="Falar com microfone"
+                  >
+                    {isChatListening ? <MicOff size={18} /> : <Mic size={18} />}
+                  </button>
+                )}
+              </div>
+
+              {/* Send button */}
               <button
                 onClick={() => sendMessage()}
                 disabled={!input.trim() || isLoading}
-                className="p-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 transition-colors shrink-0"
+                className="p-2.5 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 disabled:opacity-30 transition-all shrink-0"
               >
-                <Send size={14} />
+                <Send size={16} />
               </button>
             </div>
           </div>
