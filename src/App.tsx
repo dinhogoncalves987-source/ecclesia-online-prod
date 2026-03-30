@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import { LanguageProvider } from "@/hooks/useLanguage";
+import { ChurchProvider } from "@/hooks/useChurch";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
