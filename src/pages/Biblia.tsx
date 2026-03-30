@@ -451,6 +451,15 @@ export default function Biblia() {
     </AnimatePresence>
   );
 
+  // Toggle chat + scroll on mobile
+  const toggleChat = () => {
+    const next = !chatOpen;
+    setChatOpen(next);
+    if (next) {
+      setTimeout(() => chatRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+    }
+  };
+
   // Main Content
   const content = (
     <div className={`${chatOpen && !zenMode ? "lg:grid lg:grid-cols-[1fr_420px] lg:gap-6" : ""} space-y-6 lg:space-y-0`}>
@@ -468,7 +477,7 @@ export default function Biblia() {
                 }`}>
                 <span className="text-xs font-bold">Aa+</span> Letras Gigantes
               </button>
-              <button onClick={() => setChatOpen(!chatOpen)}
+              <button onClick={toggleChat}
                 className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   chatOpen ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80"
                 }`}>
@@ -485,91 +494,123 @@ export default function Biblia() {
         {!zenMode && bookPicker}
         {!zenMode && chapterSelector}
 
-        {/* Scripture */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          key={`${selectedBookIndex}-${selectedChapter}`}
-          className={`bg-card rounded-xl shadow-executive ${zenMode ? "max-w-2xl mx-auto" : ""}`}
-        >
-          <div className="p-5 sm:p-8" ref={versesRef}>
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <button onClick={prevChapter} disabled={!hasPrev}
-                  className="p-1.5 rounded-lg hover:bg-secondary transition-colors disabled:opacity-30">
-                  <ChevronLeft size={18} strokeWidth={1.5} />
-                </button>
-                <button onClick={() => { if (!zenMode) setBookPickerOpen(!bookPickerOpen); }} className="text-center">
-                  <h2 className="font-serif text-lg hover:text-primary transition-colors">{selectedBook.name}</h2>
-                  <p className="text-xs text-muted-foreground">Capítulo {selectedChapter}</p>
-                </button>
-                <button onClick={nextChapter} disabled={!hasNext}
-                  className="p-1.5 rounded-lg hover:bg-secondary transition-colors disabled:opacity-30">
-                  <ChevronRight size={18} strokeWidth={1.5} />
-                </button>
-              </div>
-              <div className="flex gap-1">
-                <button className="p-2 rounded-lg hover:bg-secondary transition-colors">
-                  <Bookmark size={16} strokeWidth={1.5} className="text-muted-foreground" />
-                </button>
-                {zenMode && (
-                  <>
-                    <button onClick={() => setChatOpen(!chatOpen)}
-                      className={`p-2 rounded-lg transition-colors ${chatOpen ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}>
-                      <MessageSquare size={16} strokeWidth={1.5} className={chatOpen ? "" : "text-muted-foreground"} />
-                    </button>
-                    <button onClick={() => setZenMode(false)}
-                      className="p-2 rounded-lg hover:bg-secondary transition-colors text-xs font-medium text-muted-foreground">
-                      Sair
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="flex items-center justify-center py-16">
-                <Loader2 size={24} className="animate-spin text-muted-foreground" />
-              </div>
-            ) : verses.length === 0 ? (
-              <div className="text-center py-16 text-muted-foreground text-sm">
-                <p>Não foi possível carregar este capítulo.</p>
-                <button onClick={() => fetchVerses(selectedBook, selectedChapter)} className="mt-2 text-primary underline text-xs">
-                  Tentar novamente
-                </button>
-              </div>
+        {/* Mobile: AI Chat always visible below chapter selector */}
+        {!zenMode && (
+          <div ref={chatRef} className="lg:hidden">
+            {chatOpen ? (
+              chatPanel
             ) : (
-              <div className="space-y-4">
-                {verses.map(v => (
-                  <p key={v.num} className={`font-serif leading-relaxed ${largeFont ? "text-2xl sm:text-3xl" : "text-lg sm:text-xl"}`}>
-                    <sup className={`text-accent font-sans font-bold mr-1.5 tabular-nums ${largeFont ? "text-sm" : "text-xs"}`}>{v.num}</sup>
-                    {v.text}
-                  </p>
-                ))}
-              </div>
-            )}
-
-            {!loading && verses.length > 0 && (
-              <div className="flex items-center justify-between mt-8 pt-4 border-t border-border">
-                <button onClick={prevChapter} disabled={!hasPrev}
-                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors">
-                  <ChevronLeft size={14} /> Anterior
-                </button>
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {selectedBook.name} {selectedChapter} / {selectedBook.chapters}
-                </span>
-                <button onClick={nextChapter} disabled={!hasNext}
-                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors">
-                  Próximo <ChevronRight size={14} />
-                </button>
-              </div>
+              <button
+                onClick={toggleChat}
+                className="w-full bg-card rounded-xl shadow-executive p-5 flex items-center gap-3 hover:bg-secondary/30 transition-colors"
+              >
+                <div className="p-2.5 bg-accent/10 rounded-xl">
+                  <Sparkles size={20} className="text-accent" />
+                </div>
+                <div className="text-left flex-1">
+                  <p className="font-serif text-sm font-medium">Assistente Bíblico com IA</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Toque para perguntar, pedir esboços e estudos</p>
+                </div>
+                <MessageSquare size={18} className="text-muted-foreground" />
+              </button>
             )}
           </div>
-        </motion.div>
+        )}
 
-        {chatOpen && !zenMode && <div className="lg:hidden">{chatPanel}</div>}
+        {/* Scripture — only show when a chapter is selected */}
+        {selectedChapter !== null && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            key={`${selectedBookIndex}-${selectedChapter}`}
+            className={`bg-card rounded-xl shadow-executive ${zenMode ? "max-w-2xl mx-auto" : ""}`}
+          >
+            <div className="p-5 sm:p-8" ref={versesRef}>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <button onClick={prevChapter} disabled={!hasPrev}
+                    className="p-1.5 rounded-lg hover:bg-secondary transition-colors disabled:opacity-30">
+                    <ChevronLeft size={18} strokeWidth={1.5} />
+                  </button>
+                  <button onClick={() => { if (!zenMode) setBookPickerOpen(!bookPickerOpen); }} className="text-center">
+                    <h2 className="font-serif text-lg hover:text-primary transition-colors">{selectedBook.name}</h2>
+                    <p className="text-xs text-muted-foreground">Capítulo {selectedChapter}</p>
+                  </button>
+                  <button onClick={nextChapter} disabled={!hasNext}
+                    className="p-1.5 rounded-lg hover:bg-secondary transition-colors disabled:opacity-30">
+                    <ChevronRight size={18} strokeWidth={1.5} />
+                  </button>
+                </div>
+                <div className="flex gap-1">
+                  <button className="p-2 rounded-lg hover:bg-secondary transition-colors">
+                    <Bookmark size={16} strokeWidth={1.5} className="text-muted-foreground" />
+                  </button>
+                  {zenMode && (
+                    <>
+                      <button onClick={toggleChat}
+                        className={`p-2 rounded-lg transition-colors ${chatOpen ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}>
+                        <MessageSquare size={16} strokeWidth={1.5} className={chatOpen ? "" : "text-muted-foreground"} />
+                      </button>
+                      <button onClick={() => setZenMode(false)}
+                        className="p-2 rounded-lg hover:bg-secondary transition-colors text-xs font-medium text-muted-foreground">
+                        Sair
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 size={24} className="animate-spin text-muted-foreground" />
+                </div>
+              ) : verses.length === 0 ? (
+                <div className="text-center py-16 text-muted-foreground text-sm">
+                  <p>Não foi possível carregar este capítulo.</p>
+                  <button onClick={() => fetchVerses(selectedBook, selectedChapter)} className="mt-2 text-primary underline text-xs">
+                    Tentar novamente
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {verses.map(v => (
+                    <p key={v.num} className={`font-serif leading-relaxed ${largeFont ? "text-2xl sm:text-3xl" : "text-lg sm:text-xl"}`}>
+                      <sup className={`text-accent font-sans font-bold mr-1.5 tabular-nums ${largeFont ? "text-sm" : "text-xs"}`}>{v.num}</sup>
+                      {v.text}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              {!loading && verses.length > 0 && (
+                <div className="flex items-center justify-between mt-8 pt-4 border-t border-border">
+                  <button onClick={prevChapter} disabled={!hasPrev}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors">
+                    <ChevronLeft size={14} /> Anterior
+                  </button>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {selectedBook.name} {selectedChapter} / {selectedBook.chapters}
+                  </span>
+                  <button onClick={nextChapter} disabled={!hasNext}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors">
+                    Próximo <ChevronRight size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* No chapter selected message */}
+        {selectedChapter === null && !zenMode && (
+          <div className="bg-card rounded-xl shadow-executive p-8 text-center">
+            <BookOpen size={32} className="mx-auto text-muted-foreground/40 mb-3" />
+            <p className="text-sm text-muted-foreground">Selecione um capítulo acima para começar a leitura</p>
+          </div>
+        )}
       </div>
 
+      {/* Desktop: chat sidebar */}
       {chatOpen && !zenMode && <div className="hidden lg:block">{chatPanel}</div>}
       {zenMode && chatPanel}
     </div>
