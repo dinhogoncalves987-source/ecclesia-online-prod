@@ -90,12 +90,12 @@ export default function Congregacoes() {
       }
     } else {
       const { error } = await supabase
-        .from("churches" as any)
+        .from("churches")
         .insert({
           name: form.name, slug, parent_church_id: church!.id, is_matriz: false,
           address: form.address || null, city: form.city || null, state: form.state || null,
           phone: form.phone || null, email: form.email || null, pastor_name: form.pastor_name || null,
-        } as any);
+        });
 
       if (error) {
         toast({ title: t("Erro ao criar congregação"), description: error.message, variant: "destructive" });
