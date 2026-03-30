@@ -64,7 +64,9 @@ export default function Biblia() {
   }, []);
 
   useEffect(() => {
-    fetchVerses(selectedBook, selectedChapter);
+    if (selectedChapter !== null) {
+      fetchVerses(selectedBook, selectedChapter);
+    }
   }, [selectedBookIndex, selectedChapter, fetchVerses]);
 
   useEffect(() => {
