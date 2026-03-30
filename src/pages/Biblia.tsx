@@ -91,7 +91,7 @@ export default function Biblia() {
   };
 
   const prevChapter = () => {
-    if (selectedChapter > 1) {
+    if (selectedChapter !== null && selectedChapter > 1) {
       setSelectedChapter(selectedChapter - 1);
     } else if (selectedBookIndex > 0) {
       const prevBook = bibleBooks[selectedBookIndex - 1];
@@ -101,7 +101,7 @@ export default function Biblia() {
   };
 
   const nextChapter = () => {
-    if (selectedChapter < selectedBook.chapters) {
+    if (selectedChapter !== null && selectedChapter < selectedBook.chapters) {
       setSelectedChapter(selectedChapter + 1);
     } else if (selectedBookIndex < bibleBooks.length - 1) {
       setSelectedBookIndex(selectedBookIndex + 1);
@@ -109,8 +109,8 @@ export default function Biblia() {
     }
   };
 
-  const hasPrev = selectedBookIndex > 0 || selectedChapter > 1;
-  const hasNext = selectedBookIndex < bibleBooks.length - 1 || selectedChapter < selectedBook.chapters;
+  const hasPrev = selectedBookIndex > 0 || (selectedChapter !== null && selectedChapter > 1);
+  const hasNext = selectedBookIndex < bibleBooks.length - 1 || (selectedChapter !== null && selectedChapter < selectedBook.chapters);
 
   // Chat logic
   const sendMessage = async (messageText?: string) => {
