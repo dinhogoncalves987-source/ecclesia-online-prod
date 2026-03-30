@@ -264,7 +264,7 @@ export default function Financeiro() {
                   </div>
                 ))}
                 {filtered.length === 0 && (
-                  <p className="text-center text-sm text-muted-foreground py-8">Nenhuma movimentação encontrada.</p>
+                  <p className="text-center text-sm text-muted-foreground py-8">{t("Nenhuma movimentação encontrada.")}</p>
                 )}
               </div>
             </>
