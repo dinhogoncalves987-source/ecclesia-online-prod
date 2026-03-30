@@ -58,6 +58,7 @@ const App = () => (
             <Route path="/admin/escalas" element={<ProtectedRoute><Escalas /></ProtectedRoute>} />
             <Route path="/admin/perfil" element={<ProtectedRoute><Perfil /></ProtectedRoute>} />
             <Route path="/admin/gerenciar-acessos" element={<ProtectedRoute><GerenciarAcessos /></ProtectedRoute>} />
+            <Route path="/admin/congregacoes" element={<ProtectedRoute><Congregacoes /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
