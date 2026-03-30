@@ -24,6 +24,7 @@ import Relatorios from "./pages/Relatorios";
 import Escalas from "./pages/Escalas";
 import Perfil from "./pages/Perfil";
 import GerenciarAcessos from "./pages/GerenciarAcessos";
+import Congregacoes from "./pages/Congregacoes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
