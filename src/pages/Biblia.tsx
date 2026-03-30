@@ -23,6 +23,7 @@ const quickPrompts = [
 ];
 
 export default function Biblia() {
+  const { t } = useLanguage();
   const [zenMode, setZenMode] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [largeFont, setLargeFont] = useState(false);
