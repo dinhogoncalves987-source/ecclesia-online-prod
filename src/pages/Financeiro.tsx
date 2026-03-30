@@ -104,18 +104,18 @@ export default function Financeiro() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">Financeiro</h1>
-            <p className="text-sm text-muted-foreground mt-1">Tesouraria e controle contábil</p>
+            <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">{t("Financeiro")}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{t("Tesouraria e controle contábil")}</p>
           </div>
           <div className="flex gap-2">
             <button className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
-              <Download size={14} strokeWidth={1.5} /> Exportar
+              <Download size={14} strokeWidth={1.5} /> {t("Exportar")}
             </button>
             <button
               onClick={() => setShowForm(true)}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
             >
-              <Plus size={16} strokeWidth={1.5} /> Lançamento
+              <Plus size={16} strokeWidth={1.5} /> {t("Lançamento")}
             </button>
           </div>
         </div>
