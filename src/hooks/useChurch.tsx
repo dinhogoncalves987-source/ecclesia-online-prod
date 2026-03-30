@@ -64,31 +64,14 @@ export function ChurchProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Get all churches user can see
     const { data: allChurches } = await supabase
-      .from("churches" as any)
+      .from("churches")
       .select("*");
 
     if (allChurches) {
-      const typed = (allChurches as any[]).map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        slug: c.slug,
-        logo_url: c.logo_url,
-        primary_color: c.primary_color,
-        parent_church_id: c.parent_church_id,
-        is_matriz: c.is_matriz,
-        address: c.address,
-        city: c.city,
-        state: c.state,
-        phone: c.phone,
-        email: c.email,
-        pastor_name: c.pastor_name,
-      })) as Church[];
-
-      setChurches(typed);
-      const userChurch = typed.find(c => c.id === profile.church_id);
-      setChurch(userChurch || null);
+      setChurches(allChurches as Church[]);
+      const userChurch = allChurches.find(c => c.id === profile.church_id);
+      setChurch(userChurch ? (userChurch as Church) : null);
     }
 
     setLoading(false);
