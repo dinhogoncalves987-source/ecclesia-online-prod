@@ -47,12 +47,12 @@ export default function Congregacoes() {
   const loadCongregations = async () => {
     setLoading(true);
     const { data } = await supabase
-      .from("churches" as any)
+      .from("churches")
       .select("*")
       .eq("parent_church_id", church!.id);
 
     if (data) {
-      setCongregations((data as any[]).map((c: any) => ({
+      setCongregations(data.map((c) => ({
         id: c.id, name: c.name, slug: c.slug, address: c.address,
         city: c.city, state: c.state, phone: c.phone, email: c.email,
         pastor_name: c.pastor_name, is_matriz: c.is_matriz,
@@ -75,12 +75,12 @@ export default function Congregacoes() {
 
     if (editingId) {
       const { error } = await supabase
-        .from("churches" as any)
+        .from("churches")
         .update({
           name: form.name, address: form.address || null, city: form.city || null,
           state: form.state || null, phone: form.phone || null, email: form.email || null,
           pastor_name: form.pastor_name || null,
-        } as any)
+        })
         .eq("id", editingId);
 
       if (error) {
@@ -90,12 +90,12 @@ export default function Congregacoes() {
       }
     } else {
       const { error } = await supabase
-        .from("churches" as any)
+        .from("churches")
         .insert({
           name: form.name, slug, parent_church_id: church!.id, is_matriz: false,
           address: form.address || null, city: form.city || null, state: form.state || null,
           phone: form.phone || null, email: form.email || null, pastor_name: form.pastor_name || null,
-        } as any);
+        });
 
       if (error) {
         toast({ title: t("Erro ao criar congregação"), description: error.message, variant: "destructive" });
@@ -121,7 +121,7 @@ export default function Congregacoes() {
   };
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("churches" as any).delete().eq("id", id);
+    const { error } = await supabase.from("churches").delete().eq("id", id);
     if (error) {
       toast({ title: t("Erro ao excluir"), description: error.message, variant: "destructive" });
     } else {
