@@ -27,9 +27,9 @@ export default function Biblia() {
   const [largeFont, setLargeFont] = useState(false);
   const [bookPickerOpen, setBookPickerOpen] = useState(false);
   const [selectedBookIndex, setSelectedBookIndex] = useState(0);
-  const [selectedChapter, setSelectedChapter] = useState(1);
+  const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
   const [verses, setVerses] = useState<Verse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -38,6 +38,7 @@ export default function Biblia() {
   const [isChatListening, setIsChatListening] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const versesRef = useRef<HTMLDivElement>(null);
+  const chatRef = useRef<HTMLDivElement>(null);
 
   const selectedBook = bibleBooks[selectedBookIndex];
 
