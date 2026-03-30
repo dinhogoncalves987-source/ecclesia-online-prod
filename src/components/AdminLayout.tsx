@@ -255,12 +255,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Fullscreen button below header — hidden on mobile (not supported on iOS) */}
-        <div className="hidden sm:flex justify-end px-4 lg:px-8 pt-2">
+        {/* Fullscreen button below header */}
+        <div className="flex justify-end px-4 lg:px-8 pt-2">
           <button
             onClick={toggleFullscreen}
             className="p-2 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors"
-            title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+            title={isFullscreen ? t("Sair da tela cheia") : t("Tela cheia")}
           >
             {isFullscreen ? <Minimize size={18} className="text-foreground" /> : <Maximize size={18} className="text-foreground" />}
           </button>
