@@ -56,11 +56,17 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   const toggleFullscreen = useCallback(async () => {
-    if (!document.fullscreenElement) {
-      await document.documentElement.requestFullscreen();
-    } else {
-      await document.exitFullscreen();
-    }
+    try {
+      const doc = document as any;
+      const el = document.documentElement as any;
+      if (!doc.fullscreenElement && !doc.webkitFullscreenElement) {
+        if (el.requestFullscreen) await el.requestFullscreen();
+        else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
+      } else {
+        if (doc.exitFullscreen) await doc.exitFullscreen();
+        else if (doc.webkitExitFullscreen) await doc.webkitExitFullscreen();
+      }
+    } catch { /* not supported */ }
   }, []);
 
   useEffect(() => {
