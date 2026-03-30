@@ -31,6 +31,7 @@ const navItems = [
   { icon: BarChart3, label: "Relatórios", path: "/admin/relatorios" },
   { icon: FileText, label: "Escalas", path: "/admin/escalas" },
   { icon: Shield, label: "Gerenciar Acessos", path: "/admin/gerenciar-acessos" },
+  { icon: Building2, label: "Congregações", path: "/admin/congregacoes" },
 ];
 
 const mobileNavItems = [
