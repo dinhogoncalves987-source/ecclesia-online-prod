@@ -325,7 +325,7 @@ export default function Biblia() {
       </div>
       <div className="flex flex-wrap gap-1">
         {Array.from({ length: selectedBook.chapters }).map((_, i) => (
-          <button key={i} onClick={() => setSelectedChapter(i + 1)}
+          <button key={i} onClick={() => selectChapter(i + 1)}
             className={`w-8 h-8 rounded-lg text-xs font-medium tabular-nums transition-colors ${
               i + 1 === selectedChapter ? "bg-accent text-accent-foreground" : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
             }`}>
