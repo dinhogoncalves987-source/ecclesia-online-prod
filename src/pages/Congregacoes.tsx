@@ -121,7 +121,7 @@ export default function Congregacoes() {
   };
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("churches" as any).delete().eq("id", id);
+    const { error } = await supabase.from("churches").delete().eq("id", id);
     if (error) {
       toast({ title: t("Erro ao excluir"), description: error.message, variant: "destructive" });
     } else {
