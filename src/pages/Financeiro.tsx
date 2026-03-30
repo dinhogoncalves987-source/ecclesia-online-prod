@@ -153,28 +153,28 @@ export default function Financeiro() {
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
               <div className="bg-card rounded-xl shadow-executive p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-serif text-base">Novo Lançamento</h3>
+                  <h3 className="font-serif text-base">{t("Novo Lançamento")}</h3>
                   <button onClick={() => setShowForm(false)} className="p-1.5 rounded-lg hover:bg-secondary">
                     <X size={16} strokeWidth={1.5} />
                   </button>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" onKeyDown={handleFormKeyDown}>
-                  <input placeholder="Descrição" value={newTx.desc} onChange={(e) => setNewTx({ ...newTx, desc: e.target.value })}
+                  <input placeholder={t("Descrição")} value={newTx.desc} onChange={(e) => setNewTx({ ...newTx, desc: e.target.value })}
                     className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
-                  <input placeholder="Valor (ex: 1500)" value={newTx.value} onChange={(e) => setNewTx({ ...newTx, value: e.target.value })}
+                  <input placeholder={t("Valor (ex: 1500)")} value={newTx.value} onChange={(e) => setNewTx({ ...newTx, value: e.target.value })}
                     className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
                   <select value={newTx.type} onChange={(e) => setNewTx({ ...newTx, type: e.target.value as "Entrada" | "Saída" })}
                     className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-                    <option>Entrada</option>
-                    <option>Saída</option>
+                    <option>{t("Entrada")}</option>
+                    <option>{t("Saída")}</option>
                   </select>
-                  <input placeholder="Categoria" value={newTx.category} onChange={(e) => setNewTx({ ...newTx, category: e.target.value })}
+                  <input placeholder={t("Categoria")} value={newTx.category} onChange={(e) => setNewTx({ ...newTx, category: e.target.value })}
                     className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
                 </div>
                 <button onClick={addTransaction} disabled={saving}
                   className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 inline-flex items-center gap-2">
                   {saving && <Loader2 size={14} className="animate-spin" />}
-                  Salvar Lançamento
+                  {t("Salvar Lançamento")}
                 </button>
               </div>
             </motion.div>
