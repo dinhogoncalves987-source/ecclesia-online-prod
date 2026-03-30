@@ -4,12 +4,14 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useChurch } from "@/hooks/useChurch";
 import { useLanguage } from "@/hooks/useLanguage";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 
 export default function Relatorios() {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { church } = useChurch();
   const [stats, setStats] = useState({
     totalMembers: 0, activeMembers: 0, visitors: 0,
     totalIncome: 0, totalExpense: 0, balance: 0,
@@ -19,19 +21,20 @@ export default function Relatorios() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!church) return;
     const load = async () => {
       const now = new Date();
       const monthStart = format(startOfMonth(now), "yyyy-MM-dd");
       const monthEnd = format(endOfMonth(now), "yyyy-MM-dd");
 
       const [members, income, expense, events, prayers, groups, docs] = await Promise.all([
-        supabase.from("members").select("status"),
-        supabase.from("transactions").select("amount").eq("type", "Entrada").gte("date", monthStart).lte("date", monthEnd),
-        supabase.from("transactions").select("amount").eq("type", "Saída").gte("date", monthStart).lte("date", monthEnd),
-        supabase.from("events").select("id").gte("event_date", monthStart).lte("event_date", monthEnd),
-        supabase.from("prayer_requests").select("status"),
-        supabase.from("small_groups").select("id"),
-        supabase.from("documents").select("id"),
+        supabase.from("members").select("status").eq("church_id", church.id),
+        supabase.from("transactions").select("amount").eq("type", "Entrada").eq("church_id", church.id).gte("date", monthStart).lte("date", monthEnd),
+        supabase.from("transactions").select("amount").eq("type", "Saída").eq("church_id", church.id).gte("date", monthStart).lte("date", monthEnd),
+        supabase.from("events").select("id").eq("church_id", church.id).gte("event_date", monthStart).lte("event_date", monthEnd),
+        supabase.from("prayer_requests").select("status").eq("church_id", church.id),
+        supabase.from("small_groups").select("id").eq("church_id", church.id),
+        supabase.from("documents").select("id").eq("church_id", church.id),
       ]);
 
       const membersData = members.data || [];
@@ -53,7 +56,7 @@ export default function Relatorios() {
       setLoading(false);
     };
     load();
-  }, []);
+  }, [church]);
 
   const cards = [
     { title: t("Total de Membros"), value: stats.totalMembers, sub: `${stats.activeMembers} ${t("ativos")} · ${stats.visitors} ${t("visitantes")}`, icon: Users, color: "text-blue-600 bg-blue-500/10" },

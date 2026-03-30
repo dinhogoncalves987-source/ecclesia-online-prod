@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useChurch } from "@/hooks/useChurch";
 import { useLanguage } from "@/hooks/useLanguage";
 import { toast } from "sonner";
 
@@ -20,6 +21,7 @@ type Member = {
 export default function Membros() {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { church } = useChurch();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -29,16 +31,16 @@ export default function Membros() {
   const [newMember, setNewMember] = useState({ name: "", role: "", phone: "", email: "" });
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !church) return;
     const load = async () => {
       setLoading(true);
-      const { data, error } = await supabase.from("members").select("*").order("name");
+      const { data, error } = await supabase.from("members").select("*").eq("church_id", church.id).order("name");
       if (error) { console.error(error); toast.error("Erro ao carregar membros"); }
       else setMembers(data || []);
       setLoading(false);
     };
     load();
-  }, [user]);
+  }, [user, church]);
 
   const filtered = members.filter(m => {
     if (filterStatus !== "all" && m.status !== filterStatus) return false;
@@ -50,10 +52,11 @@ export default function Membros() {
   });
 
   const addMember = async () => {
-    if (!newMember.name || !user) return;
+    if (!newMember.name || !user || !church) return;
     setSaving(true);
     const { data, error } = await supabase.from("members").insert({
       user_id: user.id,
+      church_id: church.id,
       name: newMember.name,
       role: newMember.role || "Membro",
       phone: newMember.phone || null,

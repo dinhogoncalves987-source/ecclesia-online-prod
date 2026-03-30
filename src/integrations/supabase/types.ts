@@ -527,6 +527,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_view_church_data: {
+        Args: { _church_id: string; _user_id: string }
+        Returns: boolean
+      }
       get_user_church_id: { Args: { _user_id: string }; Returns: string }
       get_user_role: {
         Args: { _user_id: string }

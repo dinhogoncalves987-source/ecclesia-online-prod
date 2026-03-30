@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useChurch } from "@/hooks/useChurch";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
 import { format } from "date-fns";
@@ -28,6 +29,7 @@ export default function Comunicacao() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t, lang } = useLanguage();
+  const { church } = useChurch();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -38,16 +40,17 @@ export default function Comunicacao() {
   const dateLoc = lang === "en" ? enUS : lang === "es" ? es : ptBR;
 
   const fetch_ = async () => {
-    const { data } = await supabase.from("announcements").select("*").order("created_at", { ascending: false });
+    if (!church) return;
+    const { data } = await supabase.from("announcements").select("*").eq("church_id", church.id).order("created_at", { ascending: false });
     setAnnouncements((data as Announcement[]) || []);
     setLoading(false);
   };
 
-  useEffect(() => { fetch_(); }, []);
+  useEffect(() => { if (church) fetch_(); }, [church]);
 
   const handleAdd = async () => {
-    if (!title.trim() || !content.trim() || !user) return;
-    const { error } = await supabase.from("announcements").insert({ user_id: user.id, title: title.trim(), content: content.trim(), priority } as any);
+    if (!title.trim() || !content.trim() || !user || !church) return;
+    const { error } = await supabase.from("announcements").insert({ user_id: user.id, church_id: church.id, title: title.trim(), content: content.trim(), priority } as any);
     if (error) { toast({ title: t("Erro"), description: error.message, variant: "destructive" }); return; }
     setTitle(""); setContent(""); setPriority("Normal"); setShowForm(false);
     toast({ title: t("Comunicado publicado!") });
