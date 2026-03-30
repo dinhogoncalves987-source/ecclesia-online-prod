@@ -212,13 +212,13 @@ export default function Financeiro() {
               <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-border/50 text-left text-xs text-muted-foreground">
-                      <th className="px-5 py-3 font-medium">Data</th>
-                      <th className="px-5 py-3 font-medium">Descrição</th>
-                      <th className="px-5 py-3 font-medium">Tipo</th>
-                      <th className="px-5 py-3 font-medium">Valor</th>
-                      <th className="px-5 py-3 font-medium">Status</th>
-                    </tr>
+                     <tr className="border-b border-border/50 text-left text-xs text-muted-foreground">
+                       <th className="px-5 py-3 font-medium">{t("Data")}</th>
+                       <th className="px-5 py-3 font-medium">{t("Descrição")}</th>
+                       <th className="px-5 py-3 font-medium">{t("Tipo")}</th>
+                       <th className="px-5 py-3 font-medium">{t("Valor")}</th>
+                       <th className="px-5 py-3 font-medium">{t("Status")}</th>
+                     </tr>
                   </thead>
                   <tbody>
                     {filtered.map((t) => (
