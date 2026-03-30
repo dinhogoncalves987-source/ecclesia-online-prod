@@ -184,18 +184,18 @@ export default function Financeiro() {
         <div className="bg-card rounded-xl shadow-executive overflow-hidden">
           <div className="p-5 border-b border-border/50">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <h2 className="font-serif text-lg">Movimentações Recentes</h2>
+              <h2 className="font-serif text-lg">{t("Movimentações Recentes")}</h2>
               <div className="flex items-center gap-2">
                 <div className="relative">
                   <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input placeholder="Buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                  <input placeholder={t("Buscar...")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-8 pr-3 py-1.5 rounded-lg border border-input bg-background text-xs w-full sm:w-40 focus:outline-none focus:ring-1 focus:ring-ring" />
                 </div>
                 <div className="flex bg-secondary/50 rounded-lg p-0.5">
                   {(["all", "Entrada", "Saída"] as const).map(f => (
                     <button key={f} onClick={() => setFilterType(f)}
                       className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${filterType === f ? "bg-card shadow-sm" : "text-muted-foreground"}`}>
-                      {f === "all" ? "Todos" : f === "Entrada" ? "Entradas" : "Saídas"}
+                      {f === "all" ? t("Todos") : f === "Entrada" ? t("Entradas") : t("Saídas")}
                     </button>
                   ))}
                 </div>
