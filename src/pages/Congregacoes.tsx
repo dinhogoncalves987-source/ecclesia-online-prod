@@ -75,12 +75,12 @@ export default function Congregacoes() {
 
     if (editingId) {
       const { error } = await supabase
-        .from("churches" as any)
+        .from("churches")
         .update({
           name: form.name, address: form.address || null, city: form.city || null,
           state: form.state || null, phone: form.phone || null, email: form.email || null,
           pastor_name: form.pastor_name || null,
-        } as any)
+        })
         .eq("id", editingId);
 
       if (error) {
