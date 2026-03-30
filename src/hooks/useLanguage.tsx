@@ -360,7 +360,6 @@ const translations: Record<string, Record<Lang, string>> = {
   "eventos": { pt: "eventos", en: "events", es: "eventos" },
   "Novo Evento —": { pt: "Novo Evento —", en: "New Event —", es: "Nuevo Evento —" },
   "de": { pt: "de", en: "of", es: "de" },
-  "Título do evento": { pt: "Título do evento", en: "Event title", es: "Título del evento" },
 
   // GerenciarAcessos extra
   "Administrador": { pt: "Administrador", en: "Administrator", es: "Administrador" },
