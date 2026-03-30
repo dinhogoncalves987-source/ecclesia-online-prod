@@ -5,6 +5,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import { bibleBooks, oldTestamentBooks, newTestamentBooks, type BibleBook } from "@/data/bible-books";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useLanguage } from "@/hooks/useLanguage";
 
 type Verse = { num: number; text: string };
 type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -22,6 +23,7 @@ const quickPrompts = [
 ];
 
 export default function Biblia() {
+  const { t } = useLanguage();
   const [zenMode, setZenMode] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [largeFont, setLargeFont] = useState(false);

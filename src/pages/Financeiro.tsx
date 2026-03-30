@@ -104,18 +104,18 @@ export default function Financeiro() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">Financeiro</h1>
-            <p className="text-sm text-muted-foreground mt-1">Tesouraria e controle contábil</p>
+            <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">{t("Financeiro")}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{t("Tesouraria e controle contábil")}</p>
           </div>
           <div className="flex gap-2">
             <button className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
-              <Download size={14} strokeWidth={1.5} /> Exportar
+              <Download size={14} strokeWidth={1.5} /> {t("Exportar")}
             </button>
             <button
               onClick={() => setShowForm(true)}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
             >
-              <Plus size={16} strokeWidth={1.5} /> Lançamento
+              <Plus size={16} strokeWidth={1.5} /> {t("Lançamento")}
             </button>
           </div>
         </div>
@@ -153,28 +153,28 @@ export default function Financeiro() {
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
               <div className="bg-card rounded-xl shadow-executive p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-serif text-base">Novo Lançamento</h3>
+                  <h3 className="font-serif text-base">{t("Novo Lançamento")}</h3>
                   <button onClick={() => setShowForm(false)} className="p-1.5 rounded-lg hover:bg-secondary">
                     <X size={16} strokeWidth={1.5} />
                   </button>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" onKeyDown={handleFormKeyDown}>
-                  <input placeholder="Descrição" value={newTx.desc} onChange={(e) => setNewTx({ ...newTx, desc: e.target.value })}
+                  <input placeholder={t("Descrição")} value={newTx.desc} onChange={(e) => setNewTx({ ...newTx, desc: e.target.value })}
                     className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
-                  <input placeholder="Valor (ex: 1500)" value={newTx.value} onChange={(e) => setNewTx({ ...newTx, value: e.target.value })}
+                  <input placeholder={t("Valor (ex: 1500)")} value={newTx.value} onChange={(e) => setNewTx({ ...newTx, value: e.target.value })}
                     className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
                   <select value={newTx.type} onChange={(e) => setNewTx({ ...newTx, type: e.target.value as "Entrada" | "Saída" })}
                     className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-                    <option>Entrada</option>
-                    <option>Saída</option>
+                    <option>{t("Entrada")}</option>
+                    <option>{t("Saída")}</option>
                   </select>
-                  <input placeholder="Categoria" value={newTx.category} onChange={(e) => setNewTx({ ...newTx, category: e.target.value })}
+                  <input placeholder={t("Categoria")} value={newTx.category} onChange={(e) => setNewTx({ ...newTx, category: e.target.value })}
                     className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
                 </div>
                 <button onClick={addTransaction} disabled={saving}
                   className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 inline-flex items-center gap-2">
                   {saving && <Loader2 size={14} className="animate-spin" />}
-                  Salvar Lançamento
+                  {t("Salvar Lançamento")}
                 </button>
               </div>
             </motion.div>
@@ -184,18 +184,18 @@ export default function Financeiro() {
         <div className="bg-card rounded-xl shadow-executive overflow-hidden">
           <div className="p-5 border-b border-border/50">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <h2 className="font-serif text-lg">Movimentações Recentes</h2>
+              <h2 className="font-serif text-lg">{t("Movimentações Recentes")}</h2>
               <div className="flex items-center gap-2">
                 <div className="relative">
                   <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input placeholder="Buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                  <input placeholder={t("Buscar...")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-8 pr-3 py-1.5 rounded-lg border border-input bg-background text-xs w-full sm:w-40 focus:outline-none focus:ring-1 focus:ring-ring" />
                 </div>
                 <div className="flex bg-secondary/50 rounded-lg p-0.5">
                   {(["all", "Entrada", "Saída"] as const).map(f => (
                     <button key={f} onClick={() => setFilterType(f)}
                       className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${filterType === f ? "bg-card shadow-sm" : "text-muted-foreground"}`}>
-                      {f === "all" ? "Todos" : f === "Entrada" ? "Entradas" : "Saídas"}
+                      {f === "all" ? t("Todos") : f === "Entrada" ? t("Entradas") : t("Saídas")}
                     </button>
                   ))}
                 </div>
@@ -212,13 +212,13 @@ export default function Financeiro() {
               <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-border/50 text-left text-xs text-muted-foreground">
-                      <th className="px-5 py-3 font-medium">Data</th>
-                      <th className="px-5 py-3 font-medium">Descrição</th>
-                      <th className="px-5 py-3 font-medium">Tipo</th>
-                      <th className="px-5 py-3 font-medium">Valor</th>
-                      <th className="px-5 py-3 font-medium">Status</th>
-                    </tr>
+                     <tr className="border-b border-border/50 text-left text-xs text-muted-foreground">
+                       <th className="px-5 py-3 font-medium">{t("Data")}</th>
+                       <th className="px-5 py-3 font-medium">{t("Descrição")}</th>
+                       <th className="px-5 py-3 font-medium">{t("Tipo")}</th>
+                       <th className="px-5 py-3 font-medium">{t("Valor")}</th>
+                       <th className="px-5 py-3 font-medium">{t("Status")}</th>
+                     </tr>
                   </thead>
                   <tbody>
                     {filtered.map((t) => (
@@ -239,7 +239,7 @@ export default function Financeiro() {
                       </tr>
                     ))}
                     {filtered.length === 0 && (
-                      <tr><td colSpan={5} className="text-center py-8 text-sm text-muted-foreground">Nenhuma movimentação encontrada.</td></tr>
+                      <tr><td colSpan={5} className="text-center py-8 text-sm text-muted-foreground">{t("Nenhuma movimentação encontrada.")}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -264,7 +264,7 @@ export default function Financeiro() {
                   </div>
                 ))}
                 {filtered.length === 0 && (
-                  <p className="text-center text-sm text-muted-foreground py-8">Nenhuma movimentação encontrada.</p>
+                  <p className="text-center text-sm text-muted-foreground py-8">{t("Nenhuma movimentação encontrada.")}</p>
                 )}
               </div>
             </>

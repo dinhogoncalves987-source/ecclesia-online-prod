@@ -6,17 +6,19 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [notices, setNotices] = useState([
-    { id: 1, text: "Bem-vindo ao sistema de gestão da igreja!", time: "Agora", read: false },
+    { id: 1, text: t("Bem-vindo ao sistema de gestão da igreja!"), time: t("Agora"), read: false },
   ]);
   const [metrics, setMetrics] = useState([
-    { title: "Receita do Mês", value: "R$ 0", trend: "", icon: Wallet },
-    { title: "Despesas do Mês", value: "R$ 0", trend: "", icon: TrendingUp },
-    { title: "Membros Ativos", value: "0", icon: Users },
-    { title: "Eventos no Mês", value: "0", icon: Calendar },
+    { title: t("Receita do Mês"), value: "R$ 0", trend: "", icon: Wallet },
+    { title: t("Despesas do Mês"), value: "R$ 0", trend: "", icon: TrendingUp },
+    { title: t("Membros Ativos"), value: "0", icon: Users },
+    { title: t("Eventos no Mês"), value: "0", icon: Calendar },
   ]);
   const [upcomingEvents, setUpcomingEvents] = useState<{ id: string; title: string; date: string; time: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,17 +46,16 @@ export default function Dashboard() {
       const despesa = txData.filter(t => t.type === "Saída").reduce((s, t) => s + Number(t.amount), 0);
       const activeMembers = (membersRes.data || []).filter(m => m.status === "Ativo").length;
 
-      // Count events this month
       const eventsThisMonthRes = await supabase.from("events").select("id").gte("event_date", startDate).lte("event_date", endDate);
       const eventsCount = (eventsThisMonthRes.data || []).length;
 
       const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}`;
 
       setMetrics([
-        { title: "Receita do Mês", value: fmt(receita), trend: "", icon: Wallet },
-        { title: "Despesas do Mês", value: fmt(despesa), trend: "", icon: TrendingUp },
-        { title: "Membros Ativos", value: activeMembers.toString(), icon: Users },
-        { title: "Eventos no Mês", value: eventsCount.toString(), icon: Calendar },
+        { title: t("Receita do Mês"), value: fmt(receita), trend: "", icon: Wallet },
+        { title: t("Despesas do Mês"), value: fmt(despesa), trend: "", icon: TrendingUp },
+        { title: t("Membros Ativos"), value: activeMembers.toString(), icon: Users },
+        { title: t("Eventos no Mês"), value: eventsCount.toString(), icon: Calendar },
       ]);
 
       setUpcomingEvents((eventsRes.data || []).map(e => ({
@@ -67,7 +68,7 @@ export default function Dashboard() {
       setLoading(false);
     };
     load();
-  }, [user]);
+  }, [user, t]);
 
   const markAsRead = (id: number) => setNotices(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
   const markAllAsRead = () => setNotices(prev => prev.map(n => ({ ...n, read: true })));
@@ -79,11 +80,11 @@ export default function Dashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-1">Visão geral da administração</p>
+            <p className="text-sm text-muted-foreground mt-1">{t("Visão geral da administração")}</p>
           </div>
           <div className="flex gap-2">
             <Link to="/admin/agenda" className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
-              <Plus size={16} strokeWidth={1.5} /> Novo Evento
+              <Plus size={16} strokeWidth={1.5} /> {t("Novo Evento")}
             </Link>
           </div>
         </div>
@@ -103,14 +104,14 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-card rounded-xl shadow-executive p-5 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-serif text-lg">Próximos Eventos</h2>
+                  <h2 className="font-serif text-lg">{t("Próximos Eventos")}</h2>
                   <Link to="/admin/agenda" className="text-xs text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1">
-                    Ver todos <ChevronRight size={12} />
+                    {t("Ver todos")} <ChevronRight size={12} />
                   </Link>
                 </div>
                 <div className="space-y-3">
                   {upcomingEvents.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-4">Nenhum evento próximo</p>
+                    <p className="text-sm text-muted-foreground text-center py-4">{t("Nenhum evento próximo")}</p>
                   )}
                   {upcomingEvents.map((e) => (
                     <div key={e.id} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors">
@@ -134,14 +135,14 @@ export default function Dashboard() {
               <div className="bg-card rounded-xl shadow-executive p-5 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <h2 className="font-serif text-lg">Avisos</h2>
+                    <h2 className="font-serif text-lg">{t("Avisos")}</h2>
                     {unreadCount > 0 && (
                       <span className="text-[10px] font-bold bg-accent text-accent-foreground px-1.5 py-0.5 rounded-full">{unreadCount}</span>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
                     {unreadCount > 0 && (
-                      <button onClick={markAllAsRead} className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">Marcar todos como lidos</button>
+                      <button onClick={markAllAsRead} className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">{t("Marcar todos como lidos")}</button>
                     )}
                     <Bell size={16} className="text-muted-foreground" />
                   </div>
@@ -159,13 +160,13 @@ export default function Dashboard() {
             </div>
 
             <div>
-              <h2 className="font-serif text-lg mb-3">Acesso Rápido</h2>
+              <h2 className="font-serif text-lg mb-3">{t("Acesso Rápido")}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                  { label: "Financeiro", desc: "Controle financeiro e relatórios", path: "/admin/financeiro", icon: Wallet },
-                  { label: "Membros", desc: "Cadastro e gestão de membros", path: "/admin/membros", icon: Users },
-                  { label: "Agenda", desc: "Calendário e eventos da igreja", path: "/admin/agenda", icon: Calendar },
-                  { label: "Bíblia", desc: "Leitura e estudo bíblico", path: "/admin/biblia", icon: TrendingUp },
+                  { label: t("Financeiro"), desc: t("Controle financeiro e relatórios"), path: "/admin/financeiro", icon: Wallet },
+                  { label: t("Membros"), desc: t("Cadastro e gestão de membros"), path: "/admin/membros", icon: Users },
+                  { label: t("Agenda"), desc: t("Calendário e eventos da igreja"), path: "/admin/agenda", icon: Calendar },
+                  { label: t("Bíblia"), desc: t("Leitura e estudo bíblico"), path: "/admin/biblia", icon: TrendingUp },
                 ].map((item, i) => (
                   <Link key={item.path} to={item.path}>
                     <motion.div
