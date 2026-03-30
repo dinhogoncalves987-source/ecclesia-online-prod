@@ -328,6 +328,65 @@ const translations: Record<string, Record<Lang, string>> = {
 
   // Footer
   "Todos os direitos reservados.": { pt: "Todos os direitos reservados.", en: "All rights reserved.", es: "Todos los derechos reservados." },
+
+  // Fullscreen
+  "Tela cheia": { pt: "Tela cheia", en: "Fullscreen", es: "Pantalla completa" },
+  "Sair da tela cheia": { pt: "Sair da tela cheia", en: "Exit fullscreen", es: "Salir de pantalla completa" },
+
+  // Bible extra
+  "Selecione um capítulo acima para começar a leitura": { pt: "Selecione um capítulo acima para começar a leitura", en: "Select a chapter above to start reading", es: "Seleccione un capítulo arriba para comenzar la lectura" },
+  "Toque para perguntar, pedir esboços e estudos": { pt: "Toque para perguntar, pedir esboços e estudos", en: "Tap to ask questions, request outlines and studies", es: "Toque para preguntar, pedir bosquejos y estudios" },
+  "Capítulo": { pt: "Capítulo", en: "Chapter", es: "Capítulo" },
+  "Não foi possível carregar este capítulo.": { pt: "Não foi possível carregar este capítulo.", en: "Could not load this chapter.", es: "No fue posible cargar este capítulo." },
+  "Tentar novamente": { pt: "Tentar novamente", en: "Try again", es: "Intentar de nuevo" },
+  "Limpar conversa": { pt: "Limpar conversa", en: "Clear conversation", es: "Limpiar conversación" },
+  "Falar com microfone": { pt: "Falar com microfone", en: "Speak with microphone", es: "Hablar con micrófono" },
+  "Baixar": { pt: "Baixar", en: "Download", es: "Descargar" },
+  "Compartilhar": { pt: "Compartilhar", en: "Share", es: "Compartir" },
+  "Pesquisa por voz": { pt: "Pesquisa por voz", en: "Voice search", es: "Búsqueda por voz" },
+
+  // Forgot / Reset password
+  "Recuperar senha": { pt: "Recuperar senha", en: "Recover password", es: "Recuperar contraseña" },
+  "Enviaremos um link para redefinir sua senha": { pt: "Enviaremos um link para redefinir sua senha", en: "We'll send a link to reset your password", es: "Le enviaremos un enlace para restablecer su contraseña" },
+  "Enviar link": { pt: "Enviar link", en: "Send link", es: "Enviar enlace" },
+  "Voltar ao login": { pt: "Voltar ao login", en: "Back to login", es: "Volver al inicio de sesión" },
+  "E-mail enviado para": { pt: "E-mail enviado para", en: "Email sent to", es: "Correo enviado a" },
+  "Verifique sua caixa de entrada e siga as instruções.": { pt: "Verifique sua caixa de entrada e siga as instruções.", en: "Check your inbox and follow the instructions.", es: "Revise su bandeja de entrada y siga las instrucciones." },
+  "Erro ao entrar": { pt: "Erro ao entrar", en: "Login error", es: "Error al iniciar sesión" },
+  "Erro ao criar conta": { pt: "Erro ao criar conta", en: "Error creating account", es: "Error al crear cuenta" },
+
+  // Agenda extra
+  "evento": { pt: "evento", en: "event", es: "evento" },
+  "eventos": { pt: "eventos", en: "events", es: "eventos" },
+  "Novo Evento —": { pt: "Novo Evento —", en: "New Event —", es: "Nuevo Evento —" },
+  "de": { pt: "de", en: "of", es: "de" },
+  "Título do evento": { pt: "Título do evento", en: "Event title", es: "Título del evento" },
+
+  // GerenciarAcessos extra
+  "Administrador": { pt: "Administrador", en: "Administrator", es: "Administrador" },
+  "Tesoureiro": { pt: "Tesoureiro", en: "Treasurer", es: "Tesorero" },
+  "Obreiro": { pt: "Obreiro", en: "Worker", es: "Obrero" },
+  "Líder de Grupo": { pt: "Líder de Grupo", en: "Group Leader", es: "Líder de Grupo" },
+  "Acesso total ao sistema. Pode gerenciar outros usuários.": { pt: "Acesso total ao sistema. Pode gerenciar outros usuários.", en: "Full system access. Can manage other users.", es: "Acceso total al sistema. Puede gestionar otros usuarios." },
+  "Acesso a Financeiro e Relatórios.": { pt: "Acesso a Financeiro e Relatórios.", en: "Access to Finances and Reports.", es: "Acceso a Finanzas e Informes." },
+  "Acesso a Agenda, Comunicação, Documentos e Escalas.": { pt: "Acesso a Agenda, Comunicação, Documentos e Escalas.", en: "Access to Calendar, Communication, Documents and Schedules.", es: "Acceso a Agenda, Comunicación, Documentos y Escalas." },
+  "Acesso a Agenda e Pequenos Grupos.": { pt: "Acesso a Agenda e Pequenos Grupos.", en: "Access to Calendar and Small Groups.", es: "Acceso a Agenda y Grupos Pequeños." },
+  "Acesso apenas à Bíblia e Pedidos de Oração.": { pt: "Acesso apenas à Bíblia e Pedidos de Oração.", en: "Access only to Bible and Prayer Requests.", es: "Acceso solo a Biblia y Peticiones de Oración." },
+
+  // Dashboard cards
+  "Bem-vindo ao sistema de gestão da igreja!": { pt: "Bem-vindo ao sistema de gestão da igreja!", en: "Welcome to the church management system!", es: "¡Bienvenido al sistema de gestión de la iglesia!" },
+  "Agora": { pt: "Agora", en: "Now", es: "Ahora" },
+
+  // Misc
+  "Pago": { pt: "Pago", en: "Paid", es: "Pagado" },
+  "Erro ao salvar": { pt: "Erro ao salvar", en: "Error saving", es: "Error al guardar" },
+  "Erro ao carregar eventos": { pt: "Erro ao carregar eventos", en: "Error loading events", es: "Error al cargar eventos" },
+  "Erro ao remover evento": { pt: "Erro ao remover evento", en: "Error removing event", es: "Error al eliminar evento" },
+  "Erro ao carregar transações": { pt: "Erro ao carregar transações", en: "Error loading transactions", es: "Error al cargar transacciones" },
+  "Erro ao enviar foto": { pt: "Erro ao enviar foto", en: "Error uploading photo", es: "Error al subir foto" },
+  "Erro ao atualizar": { pt: "Erro ao atualizar", en: "Error updating", es: "Error al actualizar" },
+  "A definir": { pt: "A definir", en: "TBD", es: "Por definir" },
+  "Texto copiado!": { pt: "Texto copiado!", en: "Text copied!", es: "¡Texto copiado!" },
 };
 
 type LanguageContextType = {
