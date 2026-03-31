@@ -270,7 +270,7 @@ export default function Biblia() {
 
             {filteredOT.length > 0 && (
               <div className="mb-4">
-                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2">Antigo Testamento</p>
+                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2">{t("Antigo Testamento")}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {filteredOT.map(b => {
                     const idx = bibleBooks.indexOf(b);
