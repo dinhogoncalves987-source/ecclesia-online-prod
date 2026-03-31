@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Music, Search, Play, Upload, ExternalLink, Youtube, Sparkles, Send, X, Loader2, Mic, MicOff } from "lucide-react";
+import { Music, Search, Play, Upload, ExternalLink, Youtube, Sparkles, Send, X, Loader2, Mic, MicOff, Plus, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -266,42 +266,76 @@ export default function Hinario() {
                     </div>
                   )}
 
-                  {/* Voice transcript */}
-                  {isChatListening && (
-                    <div className="mb-2 p-2 rounded-lg bg-accent/10 border border-accent/20">
-                      <p className="text-xs text-muted-foreground mb-1">🎤 {t("Ouvindo...")}</p>
-                      <p className="text-sm text-foreground">{voiceTranscript || "..."}</p>
-                      <div className="flex gap-2 mt-2">
-                        <button onClick={() => stopChatVoice(true)} className="text-xs px-2 py-1 bg-accent text-accent-foreground rounded">✓ {t("Enviar")}</button>
-                        <button onClick={() => stopChatVoice(false)} className="text-xs px-2 py-1 bg-secondary text-foreground rounded">✕ {t("Cancelar")}</button>
+                  {/* Chat input area */}
+                  <div className="border-t border-border/50 pt-3 mt-2">
+                    {isChatListening ? (
+                      <div className="flex items-start gap-2">
+                        <button
+                          onClick={() => stopChatVoice(false)}
+                          className="p-2.5 rounded-full bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors shrink-0 mt-0.5"
+                          title={t("Cancelar")}
+                        >
+                          <X size={18} />
+                        </button>
+                        <div className="flex-1 min-w-0 bg-destructive/5 rounded-2xl px-4 py-2.5 border border-destructive/20 max-h-40 overflow-y-auto">
+                          <div className="flex items-start gap-2">
+                            <span className="w-2 h-2 bg-destructive rounded-full animate-pulse shrink-0 mt-1.5" />
+                            <p className="text-sm break-words whitespace-pre-wrap">
+                              {voiceTranscript || t("Ouvindo...")}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => stopChatVoice(true)}
+                          className="p-2.5 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 transition-colors shrink-0 mt-0.5"
+                          title={t("Confirmar")}
+                        >
+                          <Check size={18} />
+                        </button>
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="flex items-end gap-1.5">
+                        {/* + button */}
+                        <div className="p-2 rounded-full text-muted-foreground hover:bg-secondary transition-colors shrink-0">
+                          <Plus size={18} />
+                        </div>
 
-                  {/* Chat input */}
-                  <div className="flex gap-2 items-end">
-                    <button
-                      onClick={isChatListening ? () => stopChatVoice(false) : startChatVoice}
-                      className={`p-2 rounded-lg transition-colors flex-shrink-0 ${isChatListening ? "bg-destructive text-destructive-foreground" : "bg-secondary hover:bg-secondary/80 text-muted-foreground"}`}
-                    >
-                      {isChatListening ? <MicOff size={18} /> : <Mic size={18} />}
-                    </button>
-                    <textarea
-                      ref={textareaRef}
-                      value={chatInput}
-                      onChange={e => setChatInput(e.target.value)}
-                      onKeyDown={handleChatKeyDown}
-                      placeholder={t("Pergunte sobre hinos, peça sugestões...")}
-                      className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm min-h-[40px] max-h-[100px] focus:outline-none focus:ring-1 focus:ring-ring"
-                      rows={1}
-                    />
-                    <button
-                      onClick={() => sendMessage()}
-                      disabled={isLoading || !chatInput.trim()}
-                      className="p-2 rounded-lg bg-accent text-accent-foreground hover:bg-accent/90 transition-colors disabled:opacity-50 flex-shrink-0"
-                    >
-                      {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-                    </button>
+                        {/* Input + mic grouped */}
+                        <div className="flex-1 flex items-end bg-secondary/50 rounded-2xl border border-input overflow-hidden">
+                          <textarea
+                            ref={textareaRef}
+                            value={chatInput}
+                            onChange={e => setChatInput(e.target.value)}
+                            onKeyDown={handleChatKeyDown}
+                            placeholder={t("Pergunte sobre hinos, peça sugestões...")}
+                            rows={1}
+                            className="flex-1 resize-none bg-transparent px-4 py-2.5 text-base sm:text-sm placeholder:text-muted-foreground focus-visible:outline-none min-h-[40px]"
+                            style={{ scrollbarWidth: "none", maxHeight: "160px", overflow: "auto" }}
+                          />
+
+                          {/* Mic inside the input bar */}
+                          {!chatInput.trim() && (
+                            <button
+                              onClick={startChatVoice}
+                              disabled={isLoading}
+                              className="p-2.5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                              title={t("Falar com microfone")}
+                            >
+                              <Mic size={18} />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Send button */}
+                        <button
+                          onClick={() => sendMessage()}
+                          disabled={!chatInput.trim() || isLoading}
+                          className="p-2.5 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 disabled:opacity-30 transition-all shrink-0"
+                        >
+                          <Send size={16} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
