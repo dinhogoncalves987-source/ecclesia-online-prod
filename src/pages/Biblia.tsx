@@ -431,7 +431,7 @@ export default function Biblia() {
                     const file = e.target.files?.[0];
                     if (file) {
                       const isImage = file.type.startsWith("image/");
-                      setInput(prev => prev + (prev ? " " : "") + `[${isImage ? "Imagem" : "Documento"}: ${file.name}]`);
+                      setInput(prev => prev + (prev ? " " : "") + `[${isImage ? t("Imagem") : t("Documento")}${": " + file.name}]`);
                     }
                     e.target.value = "";
                   }}
