@@ -56,10 +56,10 @@ export default function Hinario() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
             <Input
-              placeholder={t("Buscar por número ou título...")}
-              value={busca}
-              onChange={e => setBusca(e.target.value)}
-              className="pl-10"
+            placeholder={t("Ex: 2 ou Santo, Santo...")}
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+            className="pl-10"
             />
           </div>
           <div className="flex gap-2 flex-wrap">
