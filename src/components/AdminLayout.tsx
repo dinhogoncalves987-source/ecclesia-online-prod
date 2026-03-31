@@ -19,7 +19,7 @@ import flagES from "@/assets/flag-es.png";
 
 const flagMap = { pt: flagBR, en: flagUS, es: flagES } as const;
 
-const navItems = [
+const baseNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
   { icon: Wallet, label: "Financeiro", path: "/admin/financeiro" },
   { icon: Users, label: "Membros", path: "/admin/membros" },
