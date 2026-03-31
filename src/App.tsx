@@ -26,6 +26,7 @@ import Escalas from "./pages/Escalas";
 import Perfil from "./pages/Perfil";
 import GerenciarAcessos from "./pages/GerenciarAcessos";
 import Congregacoes from "./pages/Congregacoes";
+import SuperAdmin from "./pages/SuperAdmin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
