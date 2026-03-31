@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { BookOpen, RefreshCw, Sparkles, Sun, CloudSun, Moon } from "lucide-react";
+import { BookOpen, RefreshCw, Sparkles, Sun, CloudSun, Moon, Share2, Copy, Check } from "lucide-react";
+import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 import { motion } from "framer-motion";
 
@@ -45,6 +46,36 @@ export function DailyDevotional() {
   const [devotional, setDevotional] = useState<Devotional | null>(null);
   const [loading, setLoading] = useState(true);
   const [activePeriod, setActivePeriod] = useState<Period>(getCurrentPeriod);
+  const [copied, setCopied] = useState(false);
+
+  const getShareText = () => {
+    if (!devotional) return "";
+    let text = `✝️ ${t(PERIOD_CONFIG[activePeriod].label)}\n\n"${devotional.verse}"\n— ${devotional.reference}`;
+    if (devotional.reflection) text += `\n\n💭 ${devotional.reflection}`;
+    text += `\n\n📖 Ecclesia App`;
+    return text;
+  };
+
+  const handleShare = async () => {
+    const text = getShareText();
+    if (navigator.share) {
+      try {
+        await navigator.share({ text });
+      } catch {}
+    } else {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      toast.success(t("Devocional copiado!"));
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(getShareText());
+    setCopied(true);
+    toast.success(t("Devocional copiado!"));
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const fetchDevotional = async (period: Period) => {
     setLoading(true);
@@ -144,6 +175,23 @@ export function DailyDevotional() {
                 <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">{devotional.reflection}</p>
               </div>
             )}
+
+            {/* Share & Copy buttons */}
+            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/30">
+              <button
+                onClick={handleShare}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-medium transition-colors"
+              >
+                <Share2 size={13} /> {t("Compartilhar")}
+              </button>
+              <button
+                onClick={handleCopy}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/50 hover:bg-secondary text-foreground text-xs font-medium transition-colors"
+              >
+                {copied ? <Check size={13} /> : <Copy size={13} />}
+                {copied ? t("Copiado!") : t("Copiar")}
+              </button>
+            </div>
           </>
         ) : null}
       </div>
