@@ -18,7 +18,7 @@ interface UserWithRole {
   role_id: string;
 }
 
-const ROLE_LABELS: Record<AppRole, string> = {
+const ROLE_LABEL_KEYS: Record<AppRole, string> = {
   admin: "Administrador",
   tesoureiro: "Tesoureiro",
   obreiro: "Obreiro",
