@@ -490,64 +490,91 @@ export default function Biblia() {
           </div>
 
           <div className="p-2 border-t border-border/50">
-            <div className="flex items-end gap-1.5">
-              {/* + Attach button */}
-              <div className="relative shrink-0">
-                <input
-                  type="file"
-                  accept="image/*,.pdf,.doc,.docx,.txt"
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const isImage = file.type.startsWith("image/");
-                      setInput(prev => prev + (prev ? " " : "") + `[${isImage ? t("Imagem") : t("Documento")}${": " + file.name}]`);
-                    }
-                    e.target.value = "";
-                  }}
-                  title={t("Anexar arquivo")}
-                />
-                <div className="p-2 rounded-full text-muted-foreground hover:bg-secondary transition-colors">
-                  <Plus size={18} />
+            {/* Voice recording mode */}
+            {isChatListening ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => stopChatVoice(false)}
+                  className="p-2.5 rounded-full bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors shrink-0"
+                  title={t("Cancelar")}
+                >
+                  <X size={18} />
+                </button>
+                <div className="flex-1 bg-destructive/5 rounded-2xl px-4 py-2.5 border border-destructive/20">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 bg-destructive rounded-full animate-pulse" />
+                    <p className="text-sm truncate">
+                      {voiceTranscript || t("Ouvindo...")}
+                    </p>
+                  </div>
                 </div>
+                <button
+                  onClick={() => stopChatVoice(true)}
+                  className="p-2.5 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 transition-colors shrink-0"
+                  title={t("Confirmar")}
+                >
+                  <Check size={18} />
+                </button>
               </div>
+            ) : (
+              <div className="flex items-end gap-1.5">
+                {/* + Attach button */}
+                <div className="relative shrink-0">
+                  <input
+                    type="file"
+                    accept="image/*,.pdf,.doc,.docx,.txt"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const isImage = file.type.startsWith("image/");
+                        setInput(prev => prev + (prev ? " " : "") + `[${isImage ? t("Imagem") : t("Documento")}${": " + file.name}]`);
+                      }
+                      e.target.value = "";
+                    }}
+                    title={t("Anexar arquivo")}
+                  />
+                  <div className="p-2 rounded-full text-muted-foreground hover:bg-secondary transition-colors">
+                    <Plus size={18} />
+                  </div>
+                </div>
 
-              {/* Input + mic + send grouped together */}
-              <div className="flex-1 flex items-end bg-secondary/50 rounded-full border border-input overflow-hidden">
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={t("Pergunte sobre a Bíblia...")}
-                  rows={1}
-                  className="flex-1 resize-none bg-transparent px-4 py-2.5 text-base sm:text-sm placeholder:text-muted-foreground focus-visible:outline-none max-h-24 min-h-[40px]"
-                  style={{ scrollbarWidth: "none" }}
-                />
+                {/* Input + mic grouped */}
+                <div className="flex-1 flex items-end bg-secondary/50 rounded-2xl border border-input overflow-hidden">
+                  <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={t("Pergunte sobre a Bíblia...")}
+                    rows={1}
+                    className="flex-1 resize-none bg-transparent px-4 py-2.5 text-base sm:text-sm placeholder:text-muted-foreground focus-visible:outline-none min-h-[40px]"
+                    style={{ scrollbarWidth: "none", maxHeight: "160px", overflow: "auto" }}
+                  />
 
-                {/* Mic inside the input bar */}
-                {!input.trim() && (
-                  <button
-                    onClick={startChatVoice}
-                    disabled={isLoading}
-                    className={`p-2.5 shrink-0 transition-colors ${
-                      isChatListening ? "text-destructive animate-pulse" : "text-muted-foreground hover:text-foreground"
-                    }`}
-                    title={t("Falar com microfone")}
-                  >
-                    {isChatListening ? <MicOff size={18} /> : <Mic size={18} />}
-                  </button>
-                )}
+                  {/* Mic inside the input bar - shows when no text */}
+                  {!input.trim() && (
+                    <button
+                      onClick={startChatVoice}
+                      disabled={isLoading}
+                      className="p-2.5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                      title={t("Falar com microfone")}
+                    >
+                      <Mic size={18} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Send button */}
+                <button
+                  onClick={() => sendMessage()}
+                  disabled={!input.trim() || isLoading}
+                  className="p-2.5 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 disabled:opacity-30 transition-all shrink-0"
+                >
+                  <Send size={16} />
+                </button>
               </div>
-
-              {/* Send button */}
-              <button
-                onClick={() => sendMessage()}
-                disabled={!input.trim() || isLoading}
-                className="p-2.5 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 disabled:opacity-30 transition-all shrink-0"
-              >
-                <Send size={16} />
-              </button>
-            </div>
+            )}
           </div>
         </motion.div>
       )}
