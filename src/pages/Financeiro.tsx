@@ -49,7 +49,7 @@ export default function Financeiro() {
         .select("*")
         .eq("church_id", church.id)
         .order("date", { ascending: false });
-      if (error) { console.error(error); toast.error("Erro ao carregar transações"); }
+      if (error) { console.error(error); toast.error(t("Erro ao carregar transações")); }
       else setTransactions(data || []);
       setLoading(false);
     };
