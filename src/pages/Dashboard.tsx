@@ -106,6 +106,9 @@ export default function Dashboard() {
               ))}
             </div>
 
+            {/* Matriz consolidated panel */}
+            {isMatriz && isAdmin && <MatrizDashboard />}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-card rounded-xl shadow-executive p-5 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
