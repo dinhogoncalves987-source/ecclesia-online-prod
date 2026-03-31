@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Wallet, Users, Calendar, BookOpen, FileText,
   Heart, MessageSquare, UsersRound, Archive, BarChart3, Menu, X,
   Bell, ChevronLeft, Settings, LogOut, Maximize, Minimize, Globe,
-  Shield, User, Building2
+  Shield, User, Building2, Music
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -21,10 +21,11 @@ const flagMap = { pt: flagBR, en: flagUS, es: flagES } as const;
 
 const baseNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
+  { icon: BookOpen, label: "Bíblia Sagrada", path: "/admin/biblia" },
+  { icon: Music, label: "Harpa", path: "/admin/hinario" },
   { icon: Wallet, label: "Financeiro", path: "/admin/financeiro" },
   { icon: Users, label: "Membros", path: "/admin/membros" },
   { icon: Calendar, label: "Agenda", path: "/admin/agenda" },
-  { icon: BookOpen, label: "Bíblia Sagrada", path: "/admin/biblia" },
   { icon: Heart, label: "Pedidos de Oração", path: "/admin/oracoes" },
   { icon: MessageSquare, label: "Comunicação", path: "/admin/comunicacao" },
   { icon: UsersRound, label: "Pequenos Grupos", path: "/admin/grupos" },

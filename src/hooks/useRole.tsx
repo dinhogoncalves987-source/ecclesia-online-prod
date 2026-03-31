@@ -11,6 +11,7 @@ const MODULE_ACCESS: Record<string, AppRole[]> = {
   "/admin/membros": ["superadmin", "admin"],
   "/admin/agenda": ["superadmin", "admin", "obreiro", "lider"],
   "/admin/biblia": ["superadmin", "admin", "tesoureiro", "obreiro", "lider", "membro"],
+  "/admin/hinario": ["superadmin", "admin", "tesoureiro", "obreiro", "lider", "membro"],
   "/admin/oracoes": ["superadmin", "admin", "tesoureiro", "obreiro", "lider", "membro"],
   "/admin/comunicacao": ["superadmin", "admin", "obreiro"],
   "/admin/grupos": ["superadmin", "admin", "lider"],

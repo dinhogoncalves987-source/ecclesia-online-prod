@@ -17,6 +17,7 @@ import Financeiro from "./pages/Financeiro";
 import Membros from "./pages/Membros";
 import Agenda from "./pages/Agenda";
 import Biblia from "./pages/Biblia";
+import Hinario from "./pages/Hinario";
 import Oracoes from "./pages/Oracoes";
 import Comunicacao from "./pages/Comunicacao";
 import Grupos from "./pages/Grupos";
@@ -51,6 +52,7 @@ const App = () => (
             <Route path="/admin/membros" element={<ProtectedRoute><Membros /></ProtectedRoute>} />
             <Route path="/admin/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
             <Route path="/admin/biblia" element={<ProtectedRoute><Biblia /></ProtectedRoute>} />
+            <Route path="/admin/hinario" element={<ProtectedRoute><Hinario /></ProtectedRoute>} />
             <Route path="/admin/oracoes" element={<ProtectedRoute><Oracoes /></ProtectedRoute>} />
             <Route path="/admin/comunicacao" element={<ProtectedRoute><Comunicacao /></ProtectedRoute>} />
             <Route path="/admin/grupos" element={<ProtectedRoute><Grupos /></ProtectedRoute>} />
