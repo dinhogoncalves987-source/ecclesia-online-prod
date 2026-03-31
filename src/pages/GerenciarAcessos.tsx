@@ -18,7 +18,7 @@ interface UserWithRole {
   role_id: string;
 }
 
-const ROLE_LABELS: Record<AppRole, string> = {
+const ROLE_LABEL_KEYS: Record<AppRole, string> = {
   admin: "Administrador",
   tesoureiro: "Tesoureiro",
   obreiro: "Obreiro",
@@ -34,7 +34,7 @@ const ROLE_COLORS: Record<AppRole, string> = {
   membro: "bg-secondary text-muted-foreground",
 };
 
-const ROLE_DESCRIPTIONS: Record<AppRole, string> = {
+const ROLE_DESC_KEYS: Record<AppRole, string> = {
   admin: "Acesso total ao sistema. Pode gerenciar outros usuários.",
   tesoureiro: "Acesso a Financeiro e Relatórios.",
   obreiro: "Acesso a Agenda, Comunicação, Documentos e Escalas.",
@@ -89,9 +89,9 @@ export default function GerenciarAcessos() {
         .eq("id", roleId);
 
       if (error) {
-        toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
+        toast({ title: t("Erro ao atualizar"), description: error.message, variant: "destructive" });
       } else {
-        toast({ title: `Função atualizada para ${ROLE_LABELS[newRole]}` });
+        toast({ title: `${t("Função atualizada para")} ${t(ROLE_LABEL_KEYS[newRole])}` });
         setUsers(prev => prev.map(u => u.user_id === userId ? { ...u, role: newRole } : u));
       }
     }
@@ -117,12 +117,12 @@ export default function GerenciarAcessos() {
         <div className="bg-card rounded-xl shadow-executive p-5">
           <h2 className="font-medium text-sm mb-3">{t("Funções disponíveis")}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {(Object.keys(ROLE_LABELS) as AppRole[]).map(role => (
+            {(Object.keys(ROLE_LABEL_KEYS) as AppRole[]).map(role => (
               <div key={role} className="p-3 rounded-lg bg-secondary/30">
                 <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${ROLE_COLORS[role]}`}>
-                  {ROLE_LABELS[role]}
+                  {t(ROLE_LABEL_KEYS[role])}
                 </span>
-                <p className="text-xs text-muted-foreground mt-1.5">{ROLE_DESCRIPTIONS[role]}</p>
+                <p className="text-xs text-muted-foreground mt-1.5">{t(ROLE_DESC_KEYS[role])}</p>
               </div>
             ))}
           </div>
@@ -154,8 +154,8 @@ export default function GerenciarAcessos() {
 
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">
-                        {u.full_name || "Sem nome"}
-                        {isCurrentUser && <span className="text-xs text-muted-foreground ml-1">(você)</span>}
+                        {u.full_name || t("Sem nome")}
+                        {isCurrentUser && <span className="text-xs text-muted-foreground ml-1">{t("(você)")}</span>}
                       </p>
                     </div>
 
@@ -170,8 +170,8 @@ export default function GerenciarAcessos() {
                             disabled={isCurrentUser}
                             className={`appearance-none pl-3 pr-8 py-1.5 rounded-lg text-xs font-semibold border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/30 ${ROLE_COLORS[u.role]} ${isCurrentUser ? "opacity-60 cursor-not-allowed" : ""}`}
                           >
-                            {(Object.keys(ROLE_LABELS) as AppRole[]).map(r => (
-                              <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                            {(Object.keys(ROLE_LABEL_KEYS) as AppRole[]).map(r => (
+                              <option key={r} value={r}>{t(ROLE_LABEL_KEYS[r])}</option>
                             ))}
                           </select>
                           <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />

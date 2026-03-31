@@ -67,12 +67,12 @@ export default function Financeiro() {
     const totalDespesa = transactions.filter(t => t.type === "Saída").reduce((s, t) => s + Number(t.amount), 0);
     const saldo = totalReceita - totalDespesa;
     return [
-      { title: "Receita Total", value: formatCurrency(totalReceita), trend: "+10,8%", icon: TrendingUp },
-      { title: "Despesas Totais", value: formatCurrency(totalDespesa), trend: "-3,2%", trendLabel: "redução", icon: TrendingDown },
-      { title: "Saldo Atual", value: formatCurrency(saldo), icon: Wallet },
-      { title: "Reserva", value: "R$ 85.200", icon: PiggyBank },
+      { title: t("Receita Total"), value: formatCurrency(totalReceita), trend: "+10,8%", icon: TrendingUp },
+      { title: t("Despesas Totais"), value: formatCurrency(totalDespesa), trend: "-3,2%", trendLabel: t("redução"), icon: TrendingDown },
+      { title: t("Saldo Atual"), value: formatCurrency(saldo), icon: Wallet },
+      { title: t("Reserva"), value: "R$ 85.200", icon: PiggyBank },
     ];
-  }, [transactions]);
+  }, [transactions, t]);
 
   const addTransaction = async () => {
     if (!newTx.desc || !newTx.value || !user || !church) return;
