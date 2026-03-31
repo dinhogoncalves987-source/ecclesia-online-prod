@@ -70,8 +70,6 @@ const translations: Record<string, Record<Lang, string>> = {
   "Novo Aviso": { pt: "Novo Aviso", en: "New Notice", es: "Nuevo Aviso" },
   "Título do aviso": { pt: "Título do aviso", en: "Notice title", es: "Título del aviso" },
   "Conteúdo do aviso": { pt: "Conteúdo do aviso", en: "Notice content", es: "Contenido del aviso" },
-  "Publicar": { pt: "Publicar", en: "Publish", es: "Publicar" },
-  "Inativo": { pt: "Inativo", en: "Inactive", es: "Inactivo" },
   "Desativar": { pt: "Desativar", en: "Deactivate", es: "Desactivar" },
   "Ativar": { pt: "Ativar", en: "Activate", es: "Activar" },
   "Nenhum aviso criado": { pt: "Nenhum aviso criado", en: "No notices created", es: "Ningún aviso creado" },
