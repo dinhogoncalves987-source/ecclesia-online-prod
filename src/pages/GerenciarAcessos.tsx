@@ -117,12 +117,12 @@ export default function GerenciarAcessos() {
         <div className="bg-card rounded-xl shadow-executive p-5">
           <h2 className="font-medium text-sm mb-3">{t("Funções disponíveis")}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {(Object.keys(ROLE_LABELS) as AppRole[]).map(role => (
+            {(Object.keys(ROLE_LABEL_KEYS) as AppRole[]).map(role => (
               <div key={role} className="p-3 rounded-lg bg-secondary/30">
                 <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${ROLE_COLORS[role]}`}>
-                  {ROLE_LABELS[role]}
+                  {t(ROLE_LABEL_KEYS[role])}
                 </span>
-                <p className="text-xs text-muted-foreground mt-1.5">{ROLE_DESCRIPTIONS[role]}</p>
+                <p className="text-xs text-muted-foreground mt-1.5">{t(ROLE_DESC_KEYS[role])}</p>
               </div>
             ))}
           </div>
