@@ -567,7 +567,7 @@ export default function Biblia() {
                   </button>
                   <button onClick={() => { if (!zenMode) setBookPickerOpen(!bookPickerOpen); }} className="text-center">
                     <h2 className="font-serif text-lg hover:text-primary transition-colors">{selectedBook.name}</h2>
-                    <p className="text-xs text-muted-foreground">Capítulo {selectedChapter}</p>
+                    <p className="text-xs text-muted-foreground">{t("Capítulo")} {selectedChapter}</p>
                   </button>
                   <button onClick={nextChapter} disabled={!hasNext}
                     className="p-1.5 rounded-lg hover:bg-secondary transition-colors disabled:opacity-30">
