@@ -58,6 +58,7 @@ export type Database = {
           city: string | null
           created_at: string
           email: string | null
+          hierarchy_level: string | null
           id: string
           is_matriz: boolean
           logo_url: string | null
@@ -75,6 +76,7 @@ export type Database = {
           city?: string | null
           created_at?: string
           email?: string | null
+          hierarchy_level?: string | null
           id?: string
           is_matriz?: boolean
           logo_url?: string | null
@@ -92,6 +94,7 @@ export type Database = {
           city?: string | null
           created_at?: string
           email?: string | null
+          hierarchy_level?: string | null
           id?: string
           is_matriz?: boolean
           logo_url?: string | null
