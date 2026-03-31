@@ -92,7 +92,7 @@ export default function Financeiro() {
     if (error) { toast.error(t("Erro ao salvar")); console.error(error); }
     else {
       setTransactions([data, ...transactions]);
-      toast.success("Lançamento salvo!");
+      toast.success(t("Lançamento salvo!"));
     }
     setNewTx({ desc: "", type: "Entrada", value: "", category: "" });
     setShowForm(false);

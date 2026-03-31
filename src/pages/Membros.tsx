@@ -89,7 +89,7 @@ export default function Membros() {
     const next: Record<string, string> = { Ativo: "Inativo", Inativo: "Ativo", Visitante: "Ativo" };
     const newStatus = next[member.status] || "Ativo";
     const { error } = await supabase.from("members").update({ status: newStatus }).eq("id", id);
-    if (error) { toast.error("Erro ao atualizar status"); }
+    if (error) { toast.error(t("Erro ao atualizar")); }
     else setMembers(members.map(m => m.id === id ? { ...m, status: newStatus } : m));
   };
 
