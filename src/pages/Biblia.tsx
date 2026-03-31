@@ -255,7 +255,7 @@ export default function Biblia() {
                   <input
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Buscar livro..."
+                    placeholder={t("Buscar livro...")}
                     className="pl-8 pr-3 py-1.5 rounded-lg border border-input bg-background text-xs w-36 sm:w-48 focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                 </div>
