@@ -380,25 +380,26 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
             >
               <div className="bg-card rounded-2xl shadow-xl border border-border p-6 w-full max-w-sm">
-              <div className="text-center">
-                <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-                  <LogOut size={24} className="text-destructive" />
-                </div>
-                <h3 className="font-serif text-lg font-semibold mb-1">{t("Sair da conta")}</h3>
-                <p className="text-sm text-muted-foreground mb-6">{t("Tem certeza que deseja sair? Você precisará fazer login novamente.")}</p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setShowLogoutConfirm(false)}
-                    className="flex-1 px-4 py-2.5 rounded-lg bg-secondary text-foreground text-sm font-medium hover:bg-secondary/80 transition-colors"
-                  >
-                    {t("Cancelar")}
-                  </button>
-                  <button
-                    onClick={handleSignOut}
-                    className="flex-1 px-4 py-2.5 rounded-lg bg-destructive text-destructive-foreground text-sm font-medium hover:opacity-90 transition-opacity"
-                  >
-                    {t("Sim, sair")}
-                  </button>
+                <div className="text-center">
+                  <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+                    <LogOut size={24} className="text-destructive" />
+                  </div>
+                  <h3 className="font-serif text-lg font-semibold mb-1">{t("Sair da conta")}</h3>
+                  <p className="text-sm text-muted-foreground mb-6">{t("Tem certeza que deseja sair? Você precisará fazer login novamente.")}</p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowLogoutConfirm(false)}
+                      className="flex-1 px-4 py-2.5 rounded-lg bg-secondary text-foreground text-sm font-medium hover:bg-secondary/80 transition-colors"
+                    >
+                      {t("Cancelar")}
+                    </button>
+                    <button
+                      onClick={handleSignOut}
+                      className="flex-1 px-4 py-2.5 rounded-lg bg-destructive text-destructive-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+                    >
+                      {t("Sim, sair")}
+                    </button>
+                  </div>
                 </div>
               </div>
             </motion.div>
