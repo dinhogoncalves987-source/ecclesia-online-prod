@@ -38,6 +38,9 @@ export default function Biblia() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isChatListening, setIsChatListening] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const recognitionRef = useRef<any>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const versesRef = useRef<HTMLDivElement>(null);
   const chatRef = useRef<HTMLDivElement>(null);
