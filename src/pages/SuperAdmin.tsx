@@ -61,7 +61,7 @@ export default function SuperAdmin() {
   const [showChurchForm, setShowChurchForm] = useState(false);
   const [churchForm, setChurchForm] = useState({
     name: "", city: "", state: "", pastor_name: "", email: "", phone: "", address: "",
-    is_matriz: true, parent_church_id: "",
+    hierarchy_level: "matriz" as string, parent_church_id: "",
   });
 
   // Notice form
