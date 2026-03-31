@@ -10,6 +10,8 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { format } from "date-fns";
 import { ptBR, enUS, es } from "date-fns/locale";
 import { BulkImportModal } from "@/components/BulkImportModal";
+import { AIImportModal } from "@/components/AIImportModal";
+import { Sparkles } from "lucide-react";
 
 type Document = {
   id: string; title: string; category: string; description: string | null;
