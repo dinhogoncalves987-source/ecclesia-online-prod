@@ -155,6 +155,10 @@ export default function Financeiro() {
             <button className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
               <Download size={14} strokeWidth={1.5} /> {t("Exportar")}
             </button>
+            <button onClick={() => setShowAIImport(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-accent/10 text-accent rounded-lg text-sm font-medium hover:bg-accent/20 transition-colors">
+              <Sparkles size={14} strokeWidth={1.5} /> {t("Importar com IA")}
+            </button>
             <button
               onClick={() => setShowImport(true)}
               className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
