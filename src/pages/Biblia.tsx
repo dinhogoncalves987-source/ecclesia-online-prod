@@ -514,7 +514,7 @@ export default function Biblia() {
                 className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   chatOpen ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80"
                 }`}>
-                <MessageSquare size={14} strokeWidth={1.5} /> Assistente IA
+                <MessageSquare size={14} strokeWidth={1.5} /> {t("Assistente IA")}
               </button>
               <button onClick={() => setZenMode(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
