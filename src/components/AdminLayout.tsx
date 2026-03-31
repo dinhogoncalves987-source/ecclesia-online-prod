@@ -30,6 +30,7 @@ const baseNavItems = [
   { icon: MessageSquare, label: "Comunicação", path: "/admin/comunicacao" },
   { icon: UsersRound, label: "Pequenos Grupos", path: "/admin/grupos" },
   { icon: Archive, label: "Documentos", path: "/admin/documentos" },
+  { icon: Gavel, label: "Assembleia Geral", path: "/admin/assembleia-geral" },
   { icon: BarChart3, label: "Relatórios", path: "/admin/relatorios" },
   { icon: FileText, label: "Escalas", path: "/admin/escalas" },
   { icon: Shield, label: "Gerenciar Acessos", path: "/admin/gerenciar-acessos" },
