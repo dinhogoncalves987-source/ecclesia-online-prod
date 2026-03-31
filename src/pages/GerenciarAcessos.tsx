@@ -170,8 +170,8 @@ export default function GerenciarAcessos() {
                             disabled={isCurrentUser}
                             className={`appearance-none pl-3 pr-8 py-1.5 rounded-lg text-xs font-semibold border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/30 ${ROLE_COLORS[u.role]} ${isCurrentUser ? "opacity-60 cursor-not-allowed" : ""}`}
                           >
-                            {(Object.keys(ROLE_LABELS) as AppRole[]).map(r => (
-                              <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                            {(Object.keys(ROLE_LABEL_KEYS) as AppRole[]).map(r => (
+                              <option key={r} value={r}>{t(ROLE_LABEL_KEYS[r])}</option>
                             ))}
                           </select>
                           <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
