@@ -20,8 +20,11 @@ export default function Relatorios() {
   });
   const [loading, setLoading] = useState(true);
 
+  const { loading: churchLoading } = useChurch();
+
   useEffect(() => {
-    if (!church) return;
+    if (churchLoading) return;
+    if (!church) { setLoading(false); return; }
     const load = async () => {
       const now = new Date();
       const monthStart = format(startOfMonth(now), "yyyy-MM-dd");
