@@ -185,6 +185,14 @@ export default function Documentos() {
           </>
         )}
       </AnimatePresence>
+      <BulkImportModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImport={handleBulkImport}
+        fields={docFields}
+        templateData={docTemplate}
+        title={t("Importar Documentos")}
+      />
     </AdminLayout>
   );
 }
