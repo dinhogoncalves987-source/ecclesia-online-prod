@@ -8,6 +8,8 @@ import { useChurch } from "@/hooks/useChurch";
 import { useLanguage } from "@/hooks/useLanguage";
 import { toast } from "sonner";
 import { BulkImportModal } from "@/components/BulkImportModal";
+import { AIImportModal } from "@/components/AIImportModal";
+import { Sparkles } from "lucide-react";
 
 type Member = {
   id: string;
