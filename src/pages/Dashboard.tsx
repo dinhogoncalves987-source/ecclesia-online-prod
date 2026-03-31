@@ -1,6 +1,7 @@
 import { AdminLayout } from "@/components/AdminLayout";
 import { ExecutiveCard } from "@/components/ExecutiveCard";
 import { MatrizDashboard } from "@/components/MatrizDashboard";
+import { DailyDevotional } from "@/components/DailyDevotional";
 import { motion } from "framer-motion";
 import { Wallet, Users, TrendingUp, Calendar, Clock, Bell, Plus, ChevronRight, Loader2, Shield, Building2, Globe } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -116,6 +117,9 @@ export default function Dashboard() {
             </Link>
           </div>
         </div>
+
+        {/* Daily Devotional - always visible */}
+        <DailyDevotional />
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
