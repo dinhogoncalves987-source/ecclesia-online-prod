@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/AdminLayout";
-import { Users, Search, Plus, Phone, X, Trash2, Loader2 } from "lucide-react";
+import { Users, Search, Plus, Phone, X, Trash2, Loader2, Upload } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useChurch } from "@/hooks/useChurch";
 import { useLanguage } from "@/hooks/useLanguage";
 import { toast } from "sonner";
+import { BulkImportModal } from "@/components/BulkImportModal";
 
 type Member = {
   id: string;
@@ -29,6 +30,41 @@ export default function Membros() {
   const [filterStatus, setFilterStatus] = useState<"all" | "Ativo" | "Visitante" | "Inativo">("all");
   const [showForm, setShowForm] = useState(false);
   const [newMember, setNewMember] = useState({ name: "", role: "", phone: "", email: "" });
+  const [showImport, setShowImport] = useState(false);
+
+  const memberFields = [
+    { key: "name", label: t("Nome"), required: true },
+    { key: "role", label: t("Função") },
+    { key: "phone", label: t("Telefone") },
+    { key: "email", label: t("E-mail") },
+    { key: "status", label: t("Status") },
+  ];
+
+  const memberTemplate = [
+    { name: "João Silva", role: "Diácono", phone: "(11) 99999-0001", email: "joao@email.com", status: "Ativo" },
+    { name: "Maria Souza", role: "Membro", phone: "(11) 99999-0002", email: "maria@email.com", status: "Ativo" },
+  ];
+
+  const handleBulkImport = async (rows: Record<string, string>[]) => {
+    if (!user || !church) return { success: 0, errors: 0 };
+    let success = 0, errors = 0;
+    for (const row of rows) {
+      if (!row.name) { errors++; continue; }
+      const { error } = await supabase.from("members").insert({
+        user_id: user.id, church_id: church.id,
+        name: row.name, role: row.role || "Membro",
+        phone: row.phone || null, email: row.email || null,
+        since: new Date().getFullYear().toString(),
+        status: row.status || "Ativo",
+      });
+      if (error) errors++; else success++;
+    }
+    if (success > 0) {
+      const { data } = await supabase.from("members").select("*").eq("church_id", church.id).order("name");
+      setMembers(data || []);
+    }
+    return { success, errors };
+  };
 
   useEffect(() => {
     if (!user || !church) { setLoading(false); return; }
@@ -110,10 +146,16 @@ export default function Membros() {
               {members.length} {t("cadastrados")} · {activeCount} {t("ativos")} · {visitanteCount} {t("visitantes")}
             </p>
           </div>
-          <button onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity self-start">
-            <Plus size={16} strokeWidth={1.5} /> {t("Novo Membro")}
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setShowImport(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
+              <Upload size={14} strokeWidth={1.5} /> {t("Importar CSV")}
+            </button>
+            <button onClick={() => setShowForm(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity self-start">
+              <Plus size={16} strokeWidth={1.5} /> {t("Novo Membro")}
+            </button>
+          </div>
         </div>
 
         <AnimatePresence>
@@ -253,6 +295,14 @@ export default function Membros() {
           </>
         )}
       </div>
+      <BulkImportModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImport={handleBulkImport}
+        fields={memberFields}
+        templateData={memberTemplate}
+        title={t("Importar Membros")}
+      />
     </AdminLayout>
   );
 }

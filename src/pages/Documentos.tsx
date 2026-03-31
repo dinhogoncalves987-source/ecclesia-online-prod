@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/AdminLayout";
-import { Archive, Plus, X, FileText, FolderOpen } from "lucide-react";
+import { Archive, Plus, X, FileText, FolderOpen, Upload, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
 import { format } from "date-fns";
 import { ptBR, enUS, es } from "date-fns/locale";
+import { BulkImportModal } from "@/components/BulkImportModal";
 
 type Document = {
   id: string; title: string; category: string; description: string | null;
@@ -29,6 +30,35 @@ export default function Documentos() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Geral");
   const [filterCat, setFilterCat] = useState("Todos");
+  const [showImport, setShowImport] = useState(false);
+
+  const docFields = [
+    { key: "title", label: t("Título"), required: true },
+    { key: "category", label: t("Categoria") },
+    { key: "description", label: t("Descrição") },
+  ];
+
+  const docTemplate = [
+    { title: "Ata de Reunião - Janeiro", category: "Atas", description: "Reunião ordinária" },
+    { title: "Estatuto Social", category: "Estatuto", description: "Documento oficial" },
+  ];
+
+  const handleBulkImport = async (rows: Record<string, string>[]) => {
+    if (!user || !church) return { success: 0, errors: 0 };
+    let success = 0, errors = 0;
+    for (const row of rows) {
+      if (!row.title) { errors++; continue; }
+      const { error } = await supabase.from("documents").insert({
+        user_id: user.id, church_id: church.id,
+        title: row.title,
+        category: row.category || "Geral",
+        description: row.description || null,
+      } as any);
+      if (error) errors++; else success++;
+    }
+    if (success > 0) fetch_();
+    return { success, errors };
+  };
 
   const dateLoc = lang === "en" ? enUS : lang === "es" ? es : ptBR;
 
@@ -73,9 +103,14 @@ export default function Documentos() {
             <h1 className="text-2xl font-serif font-bold text-foreground">{t("Documentos")}</h1>
             <p className="text-sm text-muted-foreground mt-1">{t("Biblioteca de documentos da igreja")}</p>
           </div>
-          <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
-            <Plus size={16} /> {t("Novo Documento")}
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setShowImport(true)} className="flex items-center gap-2 px-3 py-2.5 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
+              <Upload size={14} /> {t("Importar CSV")}
+            </button>
+            <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+              <Plus size={16} /> {t("Novo Documento")}
+            </button>
+          </div>
         </div>
 
         <div className="flex gap-2 flex-wrap">
@@ -150,6 +185,14 @@ export default function Documentos() {
           </>
         )}
       </AnimatePresence>
+      <BulkImportModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImport={handleBulkImport}
+        fields={docFields}
+        templateData={docTemplate}
+        title={t("Importar Documentos")}
+      />
     </AdminLayout>
   );
 }
