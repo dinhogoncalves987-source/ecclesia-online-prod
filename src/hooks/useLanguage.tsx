@@ -419,7 +419,6 @@ const translations: Record<string, Record<Lang, string>> = {
   "Documento": { pt: "Documento", en: "Document", es: "Documento" },
   "Anexar arquivo": { pt: "Anexar arquivo", en: "Attach file", es: "Adjuntar archivo" },
   "Estudo Bíblico": { pt: "Estudo Bíblico", en: "Bible Study", es: "Estudio Bíblico" },
-  "Selecione um capítulo acima para começar a leitura": { pt: "Selecione um capítulo acima para começar a leitura", en: "Select a chapter above to start reading", es: "Seleccione un capítulo arriba para comenzar la lectura" },
 };
 
 type LanguageContextType = {
