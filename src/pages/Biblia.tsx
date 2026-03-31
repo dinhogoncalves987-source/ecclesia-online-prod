@@ -462,7 +462,7 @@ export default function Biblia() {
                     className={`p-2.5 shrink-0 transition-colors ${
                       isChatListening ? "text-destructive animate-pulse" : "text-muted-foreground hover:text-foreground"
                     }`}
-                    title="Falar com microfone"
+                    title={t("Falar com microfone")}
                   >
                     {isChatListening ? <MicOff size={18} /> : <Mic size={18} />}
                   </button>
