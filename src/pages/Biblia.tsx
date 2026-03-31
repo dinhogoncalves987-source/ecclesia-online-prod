@@ -368,8 +368,8 @@ export default function Biblia() {
                   <Sparkles size={24} className="text-accent" />
                 </div>
                 <div>
-                  <p className="font-serif text-sm font-medium">Assistente Bíblico com IA</p>
-                  <p className="text-xs text-muted-foreground mt-1">Faça perguntas, peça esboços e estudos profundos.</p>
+                   <p className="font-serif text-sm font-medium">{t("Assistente Bíblico com IA")}</p>
+                   <p className="text-xs text-muted-foreground mt-1">{t("Faça perguntas, peça esboços e estudos profundos.")}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-4 w-full max-w-xs">
                   {quickPrompts.map(qp => (
