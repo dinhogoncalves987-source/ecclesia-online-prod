@@ -35,7 +35,7 @@ export default function Membros() {
     const load = async () => {
       setLoading(true);
       const { data, error } = await supabase.from("members").select("*").eq("church_id", church.id).order("name");
-      if (error) { console.error(error); toast.error("Erro ao carregar membros"); }
+      if (error) { console.error(error); toast.error(t("Erro ao carregar membros")); }
       else setMembers(data || []);
       setLoading(false);
     };
