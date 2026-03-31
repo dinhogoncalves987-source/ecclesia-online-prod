@@ -153,17 +153,19 @@ export default function SuperAdmin() {
   const handleCreateChurch = async () => {
     if (!churchForm.name.trim()) { toast.error(t("Nome é obrigatório")); return; }
     const slug = generateSlug(churchForm.name);
+    const isSede = churchForm.hierarchy_level === "sede";
+    const isMatriz = churchForm.hierarchy_level === "sede" || churchForm.hierarchy_level === "matriz";
     const { error } = await supabase.from("churches").insert({
       name: churchForm.name.trim(), slug,
-      is_matriz: churchForm.is_matriz,
+      is_matriz: isMatriz,
       parent_church_id: churchForm.parent_church_id || null,
       city: churchForm.city || null, state: churchForm.state || null,
       pastor_name: churchForm.pastor_name || null, email: churchForm.email || null,
       phone: churchForm.phone || null, address: churchForm.address || null,
-    });
+    } as any);
     if (error) { toast.error(error.message); return; }
     toast.success(t("Igreja criada com sucesso!"));
-    setChurchForm({ name: "", city: "", state: "", pastor_name: "", email: "", phone: "", address: "", is_matriz: true, parent_church_id: "" });
+    setChurchForm({ name: "", city: "", state: "", pastor_name: "", email: "", phone: "", address: "", hierarchy_level: "matriz", parent_church_id: "" });
     setShowChurchForm(false);
     loadData();
   };
