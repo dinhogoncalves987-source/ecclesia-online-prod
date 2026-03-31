@@ -508,7 +508,7 @@ export default function Biblia() {
                 className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   largeFont ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80"
                 }`}>
-                <span className="text-xs font-bold">Aa+</span> Letras Gigantes
+                <span className="text-xs font-bold">Aa+</span> {t("Letras Gigantes")}
               </button>
               <button onClick={toggleChat}
                 className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
