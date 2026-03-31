@@ -626,7 +626,7 @@ export default function Biblia() {
                   </span>
                   <button onClick={nextChapter} disabled={!hasNext}
                     className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors">
-                    Próximo <ChevronRight size={14} />
+                    {t("Próximo")} <ChevronRight size={14} />
                   </button>
                 </div>
               )}
