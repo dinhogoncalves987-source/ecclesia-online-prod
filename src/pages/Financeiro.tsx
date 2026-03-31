@@ -89,7 +89,7 @@ export default function Financeiro() {
       category: newTx.category || "Geral",
       status: "Pendente",
     }).select().single();
-    if (error) { toast.error("Erro ao salvar"); console.error(error); }
+    if (error) { toast.error(t("Erro ao salvar")); console.error(error); }
     else {
       setTransactions([data, ...transactions]);
       toast.success("Lançamento salvo!");
