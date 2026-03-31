@@ -247,7 +247,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                     )}
                     <hr className="my-1 border-border" />
                     <button
-                      onClick={() => { setProfileMenuOpen(false); handleSignOut(); }}
+                      onClick={() => { setProfileMenuOpen(false); setShowLogoutConfirm(true); }}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-secondary transition-colors text-destructive"
                     >
                       <LogOut size={16} /> {t("Sair")}
