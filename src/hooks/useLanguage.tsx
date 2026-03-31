@@ -241,7 +241,6 @@ const translations: Record<string, Record<Lang, string>> = {
   "Geral": { pt: "Geral", en: "General", es: "General" },
   "Atas": { pt: "Atas", en: "Minutes", es: "Actas" },
   "Estatuto": { pt: "Estatuto", en: "Statute", es: "Estatuto" },
-  "Eventos": { pt: "Eventos", en: "Events", es: "Eventos" },
   "Ministerial": { pt: "Ministerial", en: "Ministerial", es: "Ministerial" },
 
   // Relatorios
