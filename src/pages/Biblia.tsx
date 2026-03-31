@@ -541,8 +541,8 @@ export default function Biblia() {
                   <Sparkles size={20} className="text-accent" />
                 </div>
                 <div className="text-left flex-1">
-                  <p className="font-serif text-sm font-medium">Assistente Bíblico com IA</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Toque para perguntar, pedir esboços e estudos</p>
+                   <p className="font-serif text-sm font-medium">{t("Assistente Bíblico com IA")}</p>
+                   <p className="text-xs text-muted-foreground mt-0.5">{t("Toque para perguntar, pedir esboços e estudos")}</p>
                 </div>
                 <MessageSquare size={18} className="text-muted-foreground" />
               </button>
