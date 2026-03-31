@@ -175,6 +175,23 @@ export function DailyDevotional() {
                 <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">{devotional.reflection}</p>
               </div>
             )}
+
+            {/* Share & Copy buttons */}
+            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/30">
+              <button
+                onClick={handleShare}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-medium transition-colors"
+              >
+                <Share2 size={13} /> {t("Compartilhar")}
+              </button>
+              <button
+                onClick={handleCopy}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/50 hover:bg-secondary text-foreground text-xs font-medium transition-colors"
+              >
+                {copied ? <Check size={13} /> : <Copy size={13} />}
+                {copied ? t("Copiado!") : t("Copiar")}
+              </button>
+            </div>
           </>
         ) : null}
       </div>
