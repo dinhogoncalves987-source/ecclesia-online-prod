@@ -121,7 +121,7 @@ export function DailyDevotional() {
             <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center">
               <BookOpen size={16} className="text-primary" />
             </div>
-            <h2 className="font-serif text-lg text-foreground">{t(config.label)}</h2>
+            <h2 className="font-serif text-lg text-foreground">{t(config.labelKey)}</h2>
           </div>
 
           {/* Period selector */}
