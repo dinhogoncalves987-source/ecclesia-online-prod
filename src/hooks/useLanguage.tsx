@@ -247,7 +247,6 @@ const translations: Record<string, Record<Lang, string>> = {
   "Total de Membros": { pt: "Total de Membros", en: "Total Members", es: "Total de Miembros" },
   "Receita do Mês (relatório)": { pt: "Receita do Mês", en: "Monthly Revenue", es: "Ingresos del Mes" },
   "Despesa do Mês": { pt: "Despesa do Mês", en: "Monthly Expense", es: "Gasto del Mes" },
-  "Saldo": { pt: "Saldo", en: "Balance", es: "Saldo" },
   "Carregando relatórios...": { pt: "Carregando relatórios...", en: "Loading reports...", es: "Cargando informes..." },
   "respondidos": { pt: "respondidos", en: "answered", es: "respondidos" },
   "Visão geral de": { pt: "Visão geral de", en: "Overview of", es: "Visión general de" },
