@@ -199,6 +199,14 @@ export default function Documentos() {
         templateData={docTemplate}
         title={t("Importar Documentos")}
       />
+      <AIImportModal
+        open={showAIImport}
+        onClose={() => setShowAIImport(false)}
+        onImport={handleBulkImport}
+        fields={docFields}
+        title={t("Importar Documentos com IA")}
+        moduleName="Documentos"
+      />
     </AdminLayout>
   );
 }

@@ -333,6 +333,14 @@ export default function Financeiro() {
         templateData={financeTemplate}
         title={t("Importar Lançamentos")}
       />
+      <AIImportModal
+        open={showAIImport}
+        onClose={() => setShowAIImport(false)}
+        onImport={handleBulkImport}
+        fields={financeFields}
+        title={t("Importar Lançamentos com IA")}
+        moduleName="Financeiro"
+      />
     </AdminLayout>
   );
 }

@@ -310,6 +310,14 @@ export default function Membros() {
         templateData={memberTemplate}
         title={t("Importar Membros")}
       />
+      <AIImportModal
+        open={showAIImport}
+        onClose={() => setShowAIImport(false)}
+        onImport={handleBulkImport}
+        fields={memberFields}
+        title={t("Importar Membros com IA")}
+        moduleName="Membros"
+      />
     </AdminLayout>
   );
 }
