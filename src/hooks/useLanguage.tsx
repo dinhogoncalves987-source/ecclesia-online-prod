@@ -413,7 +413,6 @@ const translations: Record<string, Record<Lang, string>> = {
   "Total de Congregações": { pt: "Total de Congregações", en: "Total Congregations", es: "Total de Congregaciones" },
   "Editar": { pt: "Editar", en: "Edit", es: "Editar" },
   "Excluir": { pt: "Excluir", en: "Delete", es: "Eliminar" },
-  "Sem nome": { pt: "Sem nome", en: "No name", es: "Sin nombre" },
 };
 
 type LanguageContextType = {
