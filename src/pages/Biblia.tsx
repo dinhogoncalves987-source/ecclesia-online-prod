@@ -599,9 +599,9 @@ export default function Biblia() {
                 </div>
               ) : verses.length === 0 ? (
                 <div className="text-center py-16 text-muted-foreground text-sm">
-                  <p>Não foi possível carregar este capítulo.</p>
+                  <p>{t("Não foi possível carregar este capítulo.")}</p>
                   <button onClick={() => fetchVerses(selectedBook, selectedChapter)} className="mt-2 text-primary underline text-xs">
-                    Tentar novamente
+                    {t("Tentar novamente")}
                   </button>
                 </div>
               ) : (
