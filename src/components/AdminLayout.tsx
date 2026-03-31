@@ -51,6 +51,14 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const { t, lang, setLang } = useLanguage();
   const { canAccess, isAdmin, isSuperAdmin } = useRole();
   const { isMatriz } = useChurch();
+
+  // Build nav items - rename "Congregações" to "Admin Matriz" for matriz admins
+  const navItems = baseNavItems.map(item => {
+    if (item.path === "/admin/congregacoes" && isMatriz && isAdmin) {
+      return { ...item, label: "Admin Matriz" };
+    }
+    return item;
+  });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileName, setProfileName] = useState("");
