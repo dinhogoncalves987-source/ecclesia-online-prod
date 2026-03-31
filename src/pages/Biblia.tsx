@@ -619,7 +619,7 @@ export default function Biblia() {
                 <div className="flex items-center justify-between mt-8 pt-4 border-t border-border">
                   <button onClick={prevChapter} disabled={!hasPrev}
                     className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors">
-                    <ChevronLeft size={14} /> Anterior
+                    <ChevronLeft size={14} /> {t("Anterior")}
                   </button>
                   <span className="text-xs text-muted-foreground tabular-nums">
                     {selectedBook.name} {selectedChapter} / {selectedBook.chapters}
