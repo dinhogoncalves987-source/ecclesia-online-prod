@@ -245,8 +245,8 @@ export default function Biblia() {
         }
       };
       recognition.onend = () => {
-        // If still listening, restart (continuous mode can stop on silence)
-        if (recognitionRef.current && isChatListening) {
+        // If still listening (ref exists), restart (continuous mode can stop on silence)
+        if (recognitionRef.current) {
           try { recognitionRef.current.start(); } catch {}
         }
       };
