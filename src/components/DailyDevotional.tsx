@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { BookOpen, RefreshCw, Sparkles, Sun, CloudSun, Moon } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
 import { motion } from "framer-motion";
 
