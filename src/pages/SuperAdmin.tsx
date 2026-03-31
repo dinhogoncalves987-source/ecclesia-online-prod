@@ -17,6 +17,7 @@ interface ChurchSummary {
   name: string;
   slug: string;
   is_matriz: boolean;
+  hierarchy_level: string;
   city: string | null;
   state: string | null;
   pastor_name: string | null;
