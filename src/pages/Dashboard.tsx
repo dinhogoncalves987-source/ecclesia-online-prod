@@ -2,7 +2,7 @@ import { AdminLayout } from "@/components/AdminLayout";
 import { ExecutiveCard } from "@/components/ExecutiveCard";
 import { MatrizDashboard } from "@/components/MatrizDashboard";
 import { motion } from "framer-motion";
-import { Wallet, Users, TrendingUp, Calendar, Clock, Bell, Plus, ChevronRight, Loader2 } from "lucide-react";
+import { Wallet, Users, TrendingUp, Calendar, Clock, Bell, Plus, ChevronRight, Loader2, Shield, Building2, Globe } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,23 +15,43 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const { church, isMatriz } = useChurch();
-  const { isAdmin } = useRole();
-  const [notices, setNotices] = useState([
-    { id: 1, text: t("Bem-vindo ao sistema de gestão da igreja!"), time: t("Agora"), read: false },
-  ]);
+  const { isAdmin, isSuperAdmin } = useRole();
+  const [platformNotices, setPlatformNotices] = useState<{ id: string; title: string; content: string; priority: string; created_at: string }[]>([]);
   const [metrics, setMetrics] = useState([
     { title: t("Receita do Mês"), value: "R$ 0", trend: "", icon: Wallet },
     { title: t("Despesas do Mês"), value: "R$ 0", trend: "", icon: TrendingUp },
     { title: t("Membros Ativos"), value: "0", icon: Users },
     { title: t("Eventos no Mês"), value: "0", icon: Calendar },
   ]);
+  const [superMetrics, setSuperMetrics] = useState<{ churches: number; users: number } | null>(null);
   const [upcomingEvents, setUpcomingEvents] = useState<{ id: string; title: string; date: string; time: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user || !church) { setLoading(false); return; }
+    if (!user) { setLoading(false); return; }
     const load = async () => {
       setLoading(true);
+
+      // Load platform notices for everyone
+      const { data: noticesData } = await supabase
+        .from("platform_notices")
+        .select("id, title, content, priority, created_at")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      setPlatformNotices(noticesData || []);
+
+      // Super admin global metrics
+      if (isSuperAdmin) {
+        const [churchCount, userCount] = await Promise.all([
+          supabase.from("churches").select("id", { count: "exact", head: true }),
+          supabase.from("profiles").select("id", { count: "exact", head: true }),
+        ]);
+        setSuperMetrics({ churches: churchCount.count || 0, users: userCount.count || 0 });
+      }
+
+      if (!church) { setLoading(false); return; }
+
       const now = new Date();
       const year = now.getFullYear();
       const month = now.getMonth();
@@ -73,11 +93,7 @@ export default function Dashboard() {
       setLoading(false);
     };
     load();
-  }, [user, church, t]);
-
-  const markAsRead = (id: number) => setNotices(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-  const markAllAsRead = () => setNotices(prev => prev.map(n => ({ ...n, read: true })));
-  const unreadCount = notices.filter(n => !n.read).length;
+  }, [user, church, t, isSuperAdmin]);
 
   return (
     <AdminLayout>
@@ -85,9 +101,16 @@ export default function Dashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-1">{t("Visão geral da administração")}</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {isSuperAdmin ? t("Visão global da plataforma") : t("Visão geral da administração")}
+            </p>
           </div>
           <div className="flex gap-2">
+            {isSuperAdmin && (
+              <Link to="/admin/super-admin" className="inline-flex items-center gap-1.5 px-4 py-2 bg-secondary text-foreground rounded-lg text-sm font-medium hover:bg-secondary/80 transition-opacity">
+                <Shield size={16} strokeWidth={1.5} /> {t("Painel da Plataforma")}
+              </Link>
+            )}
             <Link to="/admin/agenda" className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
               <Plus size={16} strokeWidth={1.5} /> {t("Novo Evento")}
             </Link>
@@ -100,6 +123,29 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
+            {/* Super Admin global metrics */}
+            {isSuperAdmin && superMetrics && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                  className="bg-card rounded-xl p-4 shadow-sm border border-border/50">
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-purple-500/10 mb-2">
+                    <Globe size={18} className="text-purple-600" />
+                  </div>
+                  <p className="text-xl font-bold">{superMetrics.churches}</p>
+                  <p className="text-[10px] text-muted-foreground">{t("Total de Igrejas")}</p>
+                </motion.div>
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+                  className="bg-card rounded-xl p-4 shadow-sm border border-border/50">
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-emerald-500/10 mb-2">
+                    <Users size={18} className="text-emerald-600" />
+                  </div>
+                  <p className="text-xl font-bold">{superMetrics.users}</p>
+                  <p className="text-[10px] text-muted-foreground">{t("Total de Usuários")}</p>
+                </motion.div>
+              </div>
+            )}
+
+            {/* Church metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {metrics.map((m, i) => (
                 <ExecutiveCard key={m.title} {...m} index={i} />
@@ -140,28 +186,33 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              {/* Platform Notices */}
               <div className="bg-card rounded-xl shadow-executive p-5 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <h2 className="font-serif text-lg">{t("Avisos")}</h2>
-                    {unreadCount > 0 && (
-                      <span className="text-[10px] font-bold bg-accent text-accent-foreground px-1.5 py-0.5 rounded-full">{unreadCount}</span>
+                    {platformNotices.length > 0 && (
+                      <span className="text-[10px] font-bold bg-accent text-accent-foreground px-1.5 py-0.5 rounded-full">{platformNotices.length}</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    {unreadCount > 0 && (
-                      <button onClick={markAllAsRead} className="text-[10px] text-muted-foreground hover:text-foreground transition-colors">{t("Marcar todos como lidos")}</button>
-                    )}
-                    <Bell size={16} className="text-muted-foreground" />
-                  </div>
+                  <Bell size={16} className="text-muted-foreground" />
                 </div>
                 <div className="space-y-2">
-                  {notices.map((n) => (
-                    <button key={n.id} onClick={() => markAsRead(n.id)}
-                      className={`w-full text-left p-3 rounded-lg transition-colors ${n.read ? "bg-secondary/30" : "bg-accent/10 hover:bg-accent/15 border-l-2 border-accent"}`}>
-                      <p className="text-sm">{n.text}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{n.time}</p>
-                    </button>
+                  {platformNotices.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">{t("Nenhum aviso")}</p>
+                  )}
+                  {platformNotices.map((n) => (
+                    <div key={n.id}
+                      className={`p-3 rounded-lg transition-colors ${n.priority === "Urgente" ? "bg-destructive/10 border-l-2 border-destructive" : "bg-secondary/30"}`}>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">{n.title}</p>
+                        {n.priority === "Urgente" && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/20 text-destructive font-semibold">{t("Urgente")}</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{n.content}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">{new Date(n.created_at).toLocaleDateString("pt-BR")}</p>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -171,10 +222,10 @@ export default function Dashboard() {
               <h2 className="font-serif text-lg mb-3">{t("Acesso Rápido")}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
+                  ...(isSuperAdmin ? [{ label: t("Super Admin"), desc: t("Gestão global da plataforma"), path: "/admin/super-admin", icon: Shield }] : []),
                   { label: t("Financeiro"), desc: t("Controle financeiro e relatórios"), path: "/admin/financeiro", icon: Wallet },
                   { label: t("Membros"), desc: t("Cadastro e gestão de membros"), path: "/admin/membros", icon: Users },
                   { label: t("Agenda"), desc: t("Calendário e eventos da igreja"), path: "/admin/agenda", icon: Calendar },
-                  { label: t("Bíblia"), desc: t("Leitura e estudo bíblico"), path: "/admin/biblia", icon: TrendingUp },
                 ].map((item, i) => (
                   <Link key={item.path} to={item.path}>
                     <motion.div
