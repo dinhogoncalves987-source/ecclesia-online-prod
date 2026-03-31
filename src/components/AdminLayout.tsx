@@ -377,8 +377,9 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-card rounded-2xl shadow-xl border border-border p-6 w-[90%] max-w-sm"
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
             >
+              <div className="bg-card rounded-2xl shadow-xl border border-border p-6 w-full max-w-sm">
               <div className="text-center">
                 <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
                   <LogOut size={24} className="text-destructive" />
