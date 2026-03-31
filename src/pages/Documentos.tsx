@@ -103,9 +103,14 @@ export default function Documentos() {
             <h1 className="text-2xl font-serif font-bold text-foreground">{t("Documentos")}</h1>
             <p className="text-sm text-muted-foreground mt-1">{t("Biblioteca de documentos da igreja")}</p>
           </div>
-          <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
-            <Plus size={16} /> {t("Novo Documento")}
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setShowImport(true)} className="flex items-center gap-2 px-3 py-2.5 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
+              <Upload size={14} /> {t("Importar CSV")}
+            </button>
+            <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+              <Plus size={16} /> {t("Novo Documento")}
+            </button>
+          </div>
         </div>
 
         <div className="flex gap-2 flex-wrap">
