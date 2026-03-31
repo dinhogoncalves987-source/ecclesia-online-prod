@@ -604,7 +604,6 @@ const translations: Record<string, Record<Lang, string>> = {
   "* O upload de áudio será habilitado em breve. Você poderá enviar gravações de ensaios, louvores próprios da congregação e muito mais.": { pt: "* O upload de áudio será habilitado em breve. Você poderá enviar gravações de ensaios, louvores próprios da congregação e muito mais.", en: "* Audio upload will be available soon. You'll be able to upload rehearsal recordings, congregation's own worship songs and much more.", es: "* La subida de audio estará disponible pronto. Podrá enviar grabaciones de ensayos, alabanzas propias de la congregación y mucho más." },
 
   // Assembleia extras
-  "Documento": { pt: "Documento", en: "Document", es: "Documento" },
 
   // Admin Matriz label
   "Admin Matriz": { pt: "Admin Matriz", en: "HQ Admin", es: "Admin Matriz" },
