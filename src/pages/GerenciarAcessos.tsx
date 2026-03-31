@@ -89,7 +89,7 @@ export default function GerenciarAcessos() {
         .eq("id", roleId);
 
       if (error) {
-        toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
+        toast({ title: t("Erro ao atualizar"), description: error.message, variant: "destructive" });
       } else {
         toast({ title: `${t("Função atualizada para")} ${t(ROLE_LABEL_KEYS[newRole])}` });
         setUsers(prev => prev.map(u => u.user_id === userId ? { ...u, role: newRole } : u));
