@@ -393,6 +393,8 @@ const translations: Record<string, Record<Lang, string>> = {
   "Permissão de microfone negada. Verifique as configurações do seu navegador.": { pt: "Permissão de microfone negada. Verifique as configurações do seu navegador.", en: "Microphone permission denied. Check your browser settings.", es: "Permiso de micrófono denegado. Verifique la configuración de su navegador." },
   "Nenhuma fala detectada. Tente novamente.": { pt: "Nenhuma fala detectada. Tente novamente.", en: "No speech detected. Try again.", es: "No se detectó voz. Inténtelo de nuevo." },
   "Erro ao iniciar o microfone. Tente usar o Google Chrome.": { pt: "Erro ao iniciar o microfone. Tente usar o Google Chrome.", en: "Error starting microphone. Try using Google Chrome.", es: "Error al iniciar el micrófono. Intente usar Google Chrome." },
+  "Ouvindo...": { pt: "Ouvindo...", en: "Listening...", es: "Escuchando..." },
+  "Confirmar": { pt: "Confirmar", en: "Confirm", es: "Confirmar" },
   "redução": { pt: "redução", en: "reduction", es: "reducción" },
 
   // Congregações
