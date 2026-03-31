@@ -268,7 +268,7 @@ export default function SuperAdmin() {
                     {t("Sede")}
                   </span>
                 )}
-                {c.hierarchy_level === "matriz" && c.hierarchy_level !== "sede" && (
+                {c.hierarchy_level !== "sede" && c.hierarchy_level !== "congregacao" && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/20 text-accent font-semibold shrink-0">
                     {t("Matriz")}
                   </span>
