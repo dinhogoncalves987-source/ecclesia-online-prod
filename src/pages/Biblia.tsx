@@ -181,18 +181,33 @@ export default function Biblia() {
 
   const startVoiceSearch = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-    const recognition = new SpeechRecognition();
-    recognition.lang = "pt-BR";
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      setSearchQuery(transcript);
+    if (!SpeechRecognition) {
+      alert(t("Seu navegador não suporta reconhecimento de voz. Tente usar o Google Chrome."));
+      return;
+    }
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = "pt-BR";
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setSearchQuery(transcript);
+        setIsListening(false);
+      };
+      recognition.onerror = (event: any) => {
+        console.error("Voice search error:", event.error);
+        setIsListening(false);
+        if (event.error === "not-allowed") {
+          alert(t("Permissão de microfone negada. Verifique as configurações do seu navegador."));
+        }
+      };
+      recognition.onend = () => setIsListening(false);
+      setIsListening(true);
+      recognition.start();
+    } catch (e) {
+      console.error("Voice search start error:", e);
       setIsListening(false);
-    };
-    recognition.onerror = () => setIsListening(false);
-    recognition.onend = () => setIsListening(false);
-    setIsListening(true);
-    recognition.start();
+      alert(t("Erro ao iniciar o microfone. Tente usar o Google Chrome."));
+    }
   };
 
   const startChatVoice = () => {
