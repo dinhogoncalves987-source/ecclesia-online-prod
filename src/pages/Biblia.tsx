@@ -259,7 +259,7 @@ export default function Biblia() {
                     className="pl-8 pr-3 py-1.5 rounded-lg border border-input bg-background text-xs w-36 sm:w-48 focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                 </div>
-                <button onClick={startVoiceSearch} className={`p-1.5 rounded-lg transition-colors ${isListening ? "bg-destructive/10 text-destructive animate-pulse" : "hover:bg-secondary text-muted-foreground"}`} title="Pesquisa por voz">
+                <button onClick={startVoiceSearch} className={`p-1.5 rounded-lg transition-colors ${isListening ? "bg-destructive/10 text-destructive animate-pulse" : "hover:bg-secondary text-muted-foreground"}`} title={t("Pesquisa por voz")}>
                   {isListening ? <MicOff size={14} /> : <Mic size={14} />}
                 </button>
                 <button onClick={() => { setBookPickerOpen(false); setSearchQuery(""); }} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
