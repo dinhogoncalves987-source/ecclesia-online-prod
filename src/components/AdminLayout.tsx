@@ -56,6 +56,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const toggleFullscreen = useCallback(async () => {
     try {
@@ -100,6 +101,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const isActive = (path: string) => location.pathname === path;
 
   const handleSignOut = async () => {
+    setShowLogoutConfirm(false);
     await signOut();
     navigate("/");
   };
@@ -245,7 +247,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                     )}
                     <hr className="my-1 border-border" />
                     <button
-                      onClick={() => { setProfileMenuOpen(false); handleSignOut(); }}
+                      onClick={() => { setProfileMenuOpen(false); setShowLogoutConfirm(true); }}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-secondary transition-colors text-destructive"
                     >
                       <LogOut size={16} /> {t("Sair")}
@@ -325,11 +327,15 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               </nav>
 
               <div className="p-3 border-t border-border/50 space-y-0.5">
-                <button className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary w-full">
+                <Link
+                  to="/admin/perfil"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary w-full"
+                >
                   <Settings size={20} strokeWidth={1.5} /> {t("Configurações")}
-                </button>
+                </Link>
                 <button
-                  onClick={handleSignOut}
+                  onClick={() => { setMobileMenuOpen(false); setShowLogoutConfirm(true); }}
                   className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary w-full"
                 >
                   <LogOut size={20} strokeWidth={1.5} /> {t("Sair")}
@@ -355,6 +361,49 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           </Link>
         ))}
       </nav>
+
+      {/* Logout confirmation modal */}
+      <AnimatePresence>
+        {showLogoutConfirm && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50"
+              onClick={() => setShowLogoutConfirm(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-card rounded-2xl shadow-xl border border-border p-6 w-[90%] max-w-sm"
+            >
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+                  <LogOut size={24} className="text-destructive" />
+                </div>
+                <h3 className="font-serif text-lg font-semibold mb-1">{t("Sair da conta")}</h3>
+                <p className="text-sm text-muted-foreground mb-6">{t("Tem certeza que deseja sair? Você precisará fazer login novamente.")}</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowLogoutConfirm(false)}
+                    className="flex-1 px-4 py-2.5 rounded-lg bg-secondary text-foreground text-sm font-medium hover:bg-secondary/80 transition-colors"
+                  >
+                    {t("Cancelar")}
+                  </button>
+                  <button
+                    onClick={handleSignOut}
+                    className="flex-1 px-4 py-2.5 rounded-lg bg-destructive text-destructive-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+                  >
+                    {t("Sim, sair")}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

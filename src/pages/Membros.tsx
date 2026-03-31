@@ -31,7 +31,7 @@ export default function Membros() {
   const [newMember, setNewMember] = useState({ name: "", role: "", phone: "", email: "" });
 
   useEffect(() => {
-    if (!user || !church) return;
+    if (!user || !church) { setLoading(false); return; }
     const load = async () => {
       setLoading(true);
       const { data, error } = await supabase.from("members").select("*").eq("church_id", church.id).order("name");

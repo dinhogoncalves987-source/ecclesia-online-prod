@@ -52,7 +52,10 @@ export default function Agenda() {
   const firstDayOffset = getFirstDayOfWeek(currentMonth, currentYear);
 
   useEffect(() => {
-    if (!user || !church) return;
+    if (!user || !church) {
+      setLoading(false);
+      return;
+    }
     const load = async () => {
       setLoading(true);
       const startDate = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`;
