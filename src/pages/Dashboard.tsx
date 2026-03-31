@@ -78,10 +78,10 @@ export default function Dashboard() {
       const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}`;
 
       setMetrics([
-        { title: t("Receita do Mês"), value: fmt(receita), trend: "", icon: Wallet },
-        { title: t("Despesas do Mês"), value: fmt(despesa), trend: "", icon: TrendingUp },
-        { title: t("Membros Ativos"), value: activeMembers.toString(), icon: Users },
-        { title: t("Eventos no Mês"), value: eventsCount.toString(), icon: Calendar },
+        { title: t("Receita do Mês"), value: fmt(receita), trend: "", icon: Wallet, href: "/admin/financeiro" },
+        { title: t("Despesas do Mês"), value: fmt(despesa), trend: "", icon: TrendingUp, href: "/admin/financeiro" },
+        { title: t("Membros Ativos"), value: activeMembers.toString(), icon: Users, href: "/admin/membros" },
+        { title: t("Eventos no Mês"), value: eventsCount.toString(), icon: Calendar, href: "/admin/agenda" },
       ]);
 
       setUpcomingEvents((eventsRes.data || []).map(e => ({
