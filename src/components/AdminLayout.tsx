@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useRole } from "@/hooks/useRole";
+import { useChurch } from "@/hooks/useChurch";
 import { supabase } from "@/integrations/supabase/client";
 import flagBR from "@/assets/flag-br.png";
 import flagUS from "@/assets/flag-us.png";
@@ -18,7 +19,7 @@ import flagES from "@/assets/flag-es.png";
 
 const flagMap = { pt: flagBR, en: flagUS, es: flagES } as const;
 
-const navItems = [
+const baseNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
   { icon: Wallet, label: "Financeiro", path: "/admin/financeiro" },
   { icon: Users, label: "Membros", path: "/admin/membros" },
@@ -48,7 +49,16 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { t, lang, setLang } = useLanguage();
-  const { canAccess, isAdmin } = useRole();
+  const { canAccess, isAdmin, isSuperAdmin } = useRole();
+  const { isMatriz } = useChurch();
+
+  // Build nav items - rename "Congregações" to "Admin Matriz" for matriz admins
+  const navItems = baseNavItems.map(item => {
+    if (item.path === "/admin/congregacoes" && isMatriz && isAdmin) {
+      return { ...item, label: "Admin Matriz" };
+    }
+    return item;
+  });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileName, setProfileName] = useState("");
