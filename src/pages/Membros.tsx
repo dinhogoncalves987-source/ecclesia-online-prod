@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/AdminLayout";
-import { Users, Search, Plus, Phone, X, Trash2, Loader2 } from "lucide-react";
+import { Users, Search, Plus, Phone, X, Trash2, Loader2, Upload } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useChurch } from "@/hooks/useChurch";
 import { useLanguage } from "@/hooks/useLanguage";
 import { toast } from "sonner";
+import { BulkImportModal } from "@/components/BulkImportModal";
 
 type Member = {
   id: string;
