@@ -148,9 +148,15 @@ export default function Financeiro() {
             <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">{t("Financeiro")}</h1>
             <p className="text-sm text-muted-foreground mt-1">{t("Tesouraria e controle contábil")}</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <button className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
               <Download size={14} strokeWidth={1.5} /> {t("Exportar")}
+            </button>
+            <button
+              onClick={() => setShowImport(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
+            >
+              <Upload size={14} strokeWidth={1.5} /> {t("Importar CSV")}
             </button>
             <button
               onClick={() => setShowForm(true)}
