@@ -395,10 +395,10 @@ export default function Biblia() {
                   </div>
                   {msg.role === "assistant" && msg.content && !isLoading && (
                     <div className="flex gap-1 mt-1 ml-1">
-                      <button onClick={() => downloadMessage(msg.content)} className="p-1 rounded hover:bg-secondary transition-colors" title="Baixar">
+                      <button onClick={() => downloadMessage(msg.content)} className="p-1 rounded hover:bg-secondary transition-colors" title={t("Baixar")}>
                         <Download size={12} className="text-muted-foreground" />
                       </button>
-                      <button onClick={() => shareMessage(msg.content)} className="p-1 rounded hover:bg-secondary transition-colors" title="Compartilhar">
+                      <button onClick={() => shareMessage(msg.content)} className="p-1 rounded hover:bg-secondary transition-colors" title={t("Compartilhar")}>
                         <Share2 size={12} className="text-muted-foreground" />
                       </button>
                     </div>
