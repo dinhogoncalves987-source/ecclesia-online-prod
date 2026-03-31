@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Music, Search, Play, Upload, ExternalLink, Youtube, Sparkles, Send, X, Loader2, Mic, MicOff } from "lucide-react";
+import { Music, Search, Play, Upload, ExternalLink, Youtube, Sparkles, Send, X, Loader2, Mic, MicOff, Plus, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
