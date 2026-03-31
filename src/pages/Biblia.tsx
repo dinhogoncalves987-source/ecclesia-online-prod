@@ -15,11 +15,11 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const VERSES_URL = `${SUPABASE_URL}/functions/v1/bible-verses`;
 const CHAT_URL = `${SUPABASE_URL}/functions/v1/bible-chat`;
 
-const quickPrompts = [
-  { label: "Esboço de pregação", prompt: "Crie um esboço completo de pregação sobre" },
-  { label: "Estudo profundo", prompt: "Faça um estudo bíblico profundo sobre" },
-  { label: "Contexto histórico", prompt: "Explique o contexto histórico de" },
-  { label: "Aplicação prática", prompt: "Quais são as aplicações práticas de" },
+const quickPromptKeys = [
+  { labelKey: "Esboço de pregação", promptKey: "Crie um esboço completo de pregação sobre" },
+  { labelKey: "Estudo profundo", promptKey: "Faça um estudo bíblico profundo sobre" },
+  { labelKey: "Contexto histórico", promptKey: "Explique o contexto histórico de" },
+  { labelKey: "Aplicação prática", promptKey: "Quais são as aplicações práticas de" },
 ];
 
 export default function Biblia() {
