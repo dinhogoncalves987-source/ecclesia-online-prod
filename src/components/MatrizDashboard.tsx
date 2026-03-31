@@ -116,29 +116,30 @@ export function MatrizDashboard() {
         </div>
       </div>
 
-      {/* Totals */}
+      {/* Totals - all clickable */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: t("Total Membros"), value: totals.members.toString(), icon: Users, color: "text-blue-600 bg-blue-500/10" },
-          { label: t("Membros Ativos"), value: totals.activeMembers.toString(), icon: Users, color: "text-green-600 bg-green-500/10" },
-          { label: t("Receita Total"), value: fmt(totals.income), icon: TrendingUp, color: "text-emerald-600 bg-emerald-500/10" },
-          { label: t("Despesas Totais"), value: fmt(totals.expense), icon: TrendingDown, color: "text-red-600 bg-red-500/10" },
-          { label: t("Saldo Geral"), value: fmt(totals.income - totals.expense), icon: Wallet, color: totals.income - totals.expense >= 0 ? "text-emerald-600 bg-emerald-500/10" : "text-red-600 bg-red-500/10" },
-          { label: t("Pedidos de Oração"), value: totals.prayers.toString(), icon: Heart, color: "text-pink-600 bg-pink-500/10" },
+          { label: t("Total Membros"), value: totals.members.toString(), icon: Users, color: "text-blue-600 bg-blue-500/10", href: "/admin/membros" },
+          { label: t("Membros Ativos"), value: totals.activeMembers.toString(), icon: Users, color: "text-green-600 bg-green-500/10", href: "/admin/membros" },
+          { label: t("Receita Total"), value: fmt(totals.income), icon: TrendingUp, color: "text-emerald-600 bg-emerald-500/10", href: "/admin/financeiro" },
+          { label: t("Despesas Totais"), value: fmt(totals.expense), icon: TrendingDown, color: "text-red-600 bg-red-500/10", href: "/admin/financeiro" },
+          { label: t("Saldo Geral"), value: fmt(totals.income - totals.expense), icon: Wallet, color: totals.income - totals.expense >= 0 ? "text-emerald-600 bg-emerald-500/10" : "text-red-600 bg-red-500/10", href: "/admin/financeiro" },
+          { label: t("Pedidos de Oração"), value: totals.prayers.toString(), icon: Heart, color: "text-pink-600 bg-pink-500/10", href: "/admin/oracoes" },
         ].map((item, i) => (
-          <motion.div
-            key={item.label}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-            className="bg-card rounded-xl p-4 shadow-sm border border-border/50"
-          >
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${item.color} mb-2`}>
-              <item.icon size={16} />
-            </div>
-            <p className="text-lg font-bold">{item.value}</p>
-            <p className="text-[11px] text-muted-foreground">{item.label}</p>
-          </motion.div>
+          <Link key={item.label} to={item.href}>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className="bg-card rounded-xl p-4 shadow-sm border border-border/50 hover:shadow-md transition-shadow cursor-pointer"
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${item.color} mb-2`}>
+                <item.icon size={16} />
+              </div>
+              <p className="text-lg font-bold">{item.value}</p>
+              <p className="text-[11px] text-muted-foreground">{item.label}</p>
+            </motion.div>
+          </Link>
         ))}
       </div>
 
