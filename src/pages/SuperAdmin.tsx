@@ -46,10 +46,13 @@ export default function SuperAdmin() {
   const [noticeContent, setNoticeContent] = useState("");
   const [noticePriority, setNoticePriority] = useState("Normal");
 
+  const { loading: roleLoading } = useRole();
+
   useEffect(() => {
-    if (role !== "superadmin") return;
+    if (roleLoading) return;
+    if (role !== "superadmin") { setLoading(false); return; }
     loadData();
-  }, [role]);
+  }, [role, roleLoading]);
 
   const loadData = async () => {
     setLoading(true);

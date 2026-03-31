@@ -24,6 +24,8 @@ export default function Grupos() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", leader: "", meeting_day: "", meeting_time: "", location: "", description: "", max_members: "12" });
 
+  const { loading: churchLoading } = useChurch();
+
   const fetch_ = async () => {
     if (!church) return;
     const { data } = await supabase.from("small_groups").select("*").eq("church_id", church.id).order("created_at", { ascending: false });
@@ -31,7 +33,11 @@ export default function Grupos() {
     setLoading(false);
   };
 
-  useEffect(() => { if (church) fetch_(); }, [church]);
+  useEffect(() => {
+    if (churchLoading) return;
+    if (!church) { setLoading(false); return; }
+    fetch_();
+  }, [church, churchLoading]);
 
   const handleAdd = async () => {
     if (!form.name.trim() || !form.leader.trim() || !user || !church) return;

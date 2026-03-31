@@ -59,7 +59,7 @@ export default function Relatorios() {
       setLoading(false);
     };
     load();
-  }, [church]);
+  }, [church, churchLoading]);
 
   const cards = [
     { title: t("Total de Membros"), value: stats.totalMembers, sub: `${stats.activeMembers} ${t("ativos")} · ${stats.visitors} ${t("visitantes")}`, icon: Users, color: "text-blue-600 bg-blue-500/10" },

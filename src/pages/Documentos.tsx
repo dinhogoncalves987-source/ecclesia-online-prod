@@ -32,6 +32,8 @@ export default function Documentos() {
 
   const dateLoc = lang === "en" ? enUS : lang === "es" ? es : ptBR;
 
+  const { loading: churchLoading } = useChurch();
+
   const fetch_ = async () => {
     if (!church) return;
     const { data } = await supabase.from("documents").select("*").eq("church_id", church.id).order("created_at", { ascending: false });
@@ -39,7 +41,11 @@ export default function Documentos() {
     setLoading(false);
   };
 
-  useEffect(() => { if (church) fetch_(); }, [church]);
+  useEffect(() => {
+    if (churchLoading) return;
+    if (!church) { setLoading(false); return; }
+    fetch_();
+  }, [church, churchLoading]);
 
   const handleAdd = async () => {
     if (!title.trim() || !user || !church) return;

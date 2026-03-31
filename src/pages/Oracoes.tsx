@@ -34,6 +34,8 @@ export default function Oracoes() {
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [filter, setFilter] = useState<"Todos" | "Ativo" | "Respondido">("Todos");
 
+  const { loading: churchLoading } = useChurch();
+
   const fetchRequests = async () => {
     if (!church) return;
     const query = supabase.from("prayer_requests").select("*").eq("church_id", church.id).order("created_at", { ascending: false });
@@ -42,7 +44,11 @@ export default function Oracoes() {
     setLoading(false);
   };
 
-  useEffect(() => { if (church) fetchRequests(); }, [church]);
+  useEffect(() => {
+    if (churchLoading) return;
+    if (!church) { setLoading(false); return; }
+    fetchRequests();
+  }, [church, churchLoading]);
 
   const handleAdd = async () => {
     if (!title.trim() || !user || !church) return;
