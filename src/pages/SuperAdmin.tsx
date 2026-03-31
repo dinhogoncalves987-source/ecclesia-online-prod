@@ -263,9 +263,19 @@ export default function SuperAdmin() {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium truncate">{c.name}</span>
-                {c.is_matriz && (
+                {c.hierarchy_level === "sede" && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-600 font-semibold shrink-0">
+                    {t("Sede")}
+                  </span>
+                )}
+                {c.hierarchy_level === "matriz" && c.hierarchy_level !== "sede" && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/20 text-accent font-semibold shrink-0">
                     {t("Matriz")}
+                  </span>
+                )}
+                {c.hierarchy_level === "congregacao" && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-semibold shrink-0">
+                    {t("Congregação")}
                   </span>
                 )}
               </div>
