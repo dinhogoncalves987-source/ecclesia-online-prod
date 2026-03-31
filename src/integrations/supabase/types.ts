@@ -252,6 +252,36 @@ export type Database = {
           },
         ]
       }
+      platform_notices: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_active: boolean
+          priority: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          priority?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          priority?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       prayer_requests: {
         Row: {
           church_id: string | null
@@ -443,6 +473,27 @@ export type Database = {
           },
         ]
       }
+      super_admins: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           amount: number
@@ -547,9 +598,16 @@ export type Database = {
         Args: { _church_id: string; _user_id: string }
         Returns: boolean
       }
+      is_superadmin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "tesoureiro" | "obreiro" | "lider" | "membro"
+      app_role:
+        | "admin"
+        | "tesoureiro"
+        | "obreiro"
+        | "lider"
+        | "membro"
+        | "superadmin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -677,7 +735,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "tesoureiro", "obreiro", "lider", "membro"],
+      app_role: [
+        "admin",
+        "tesoureiro",
+        "obreiro",
+        "lider",
+        "membro",
+        "superadmin",
+      ],
     },
   },
 } as const

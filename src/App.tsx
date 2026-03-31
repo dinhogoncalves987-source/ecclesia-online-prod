@@ -26,6 +26,7 @@ import Escalas from "./pages/Escalas";
 import Perfil from "./pages/Perfil";
 import GerenciarAcessos from "./pages/GerenciarAcessos";
 import Congregacoes from "./pages/Congregacoes";
+import SuperAdmin from "./pages/SuperAdmin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -59,6 +60,7 @@ const App = () => (
             <Route path="/admin/perfil" element={<ProtectedRoute><Perfil /></ProtectedRoute>} />
             <Route path="/admin/gerenciar-acessos" element={<ProtectedRoute><GerenciarAcessos /></ProtectedRoute>} />
             <Route path="/admin/congregacoes" element={<ProtectedRoute><Congregacoes /></ProtectedRoute>} />
+            <Route path="/admin/super-admin" element={<ProtectedRoute><SuperAdmin /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
