@@ -35,7 +35,7 @@ export default function Membros() {
     const load = async () => {
       setLoading(true);
       const { data, error } = await supabase.from("members").select("*").eq("church_id", church.id).order("name");
-      if (error) { console.error(error); toast.error("Erro ao carregar membros"); }
+      if (error) { console.error(error); toast.error(t("Erro ao carregar membros")); }
       else setMembers(data || []);
       setLoading(false);
     };
@@ -64,10 +64,10 @@ export default function Membros() {
       since: new Date().getFullYear().toString(),
       status: "Ativo",
     }).select().single();
-    if (error) { toast.error("Erro ao salvar membro"); console.error(error); }
+    if (error) { toast.error(t("Erro ao salvar")); console.error(error); }
     else {
       setMembers([data, ...members]);
-      toast.success("Membro cadastrado!");
+      toast.success(t("Membro cadastrado!"));
     }
     setNewMember({ name: "", role: "", phone: "", email: "" });
     setShowForm(false);
@@ -76,10 +76,10 @@ export default function Membros() {
 
   const removeMember = async (id: string) => {
     const { error } = await supabase.from("members").delete().eq("id", id);
-    if (error) { toast.error("Erro ao remover"); console.error(error); }
+    if (error) { toast.error(t("Erro ao remover")); console.error(error); }
     else {
       setMembers(members.filter(m => m.id !== id));
-      toast.success("Membro removido");
+      toast.success(t("Membro removido"));
     }
   };
 
@@ -89,7 +89,7 @@ export default function Membros() {
     const next: Record<string, string> = { Ativo: "Inativo", Inativo: "Ativo", Visitante: "Ativo" };
     const newStatus = next[member.status] || "Ativo";
     const { error } = await supabase.from("members").update({ status: newStatus }).eq("id", id);
-    if (error) { toast.error("Erro ao atualizar status"); }
+    if (error) { toast.error(t("Erro ao atualizar")); }
     else setMembers(members.map(m => m.id === id ? { ...m, status: newStatus } : m));
   };
 

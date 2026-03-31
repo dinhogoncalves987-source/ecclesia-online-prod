@@ -49,7 +49,7 @@ export default function Financeiro() {
         .select("*")
         .eq("church_id", church.id)
         .order("date", { ascending: false });
-      if (error) { console.error(error); toast.error("Erro ao carregar transações"); }
+      if (error) { console.error(error); toast.error(t("Erro ao carregar transações")); }
       else setTransactions(data || []);
       setLoading(false);
     };
@@ -89,10 +89,10 @@ export default function Financeiro() {
       category: newTx.category || "Geral",
       status: "Pendente",
     }).select().single();
-    if (error) { toast.error("Erro ao salvar"); console.error(error); }
+    if (error) { toast.error(t("Erro ao salvar")); console.error(error); }
     else {
       setTransactions([data, ...transactions]);
-      toast.success("Lançamento salvo!");
+      toast.success(t("Lançamento salvo!"));
     }
     setNewTx({ desc: "", type: "Entrada", value: "", category: "" });
     setShowForm(false);

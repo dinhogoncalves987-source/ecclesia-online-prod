@@ -384,6 +384,9 @@ const translations: Record<string, Record<Lang, string>> = {
   "Erro ao carregar transações": { pt: "Erro ao carregar transações", en: "Error loading transactions", es: "Error al cargar transacciones" },
   "Erro ao enviar foto": { pt: "Erro ao enviar foto", en: "Error uploading photo", es: "Error al subir foto" },
   "Erro ao atualizar": { pt: "Erro ao atualizar", en: "Error updating", es: "Error al actualizar" },
+  "Erro ao carregar membros": { pt: "Erro ao carregar membros", en: "Error loading members", es: "Error al cargar miembros" },
+  "Erro ao remover": { pt: "Erro ao remover", en: "Error removing", es: "Error al eliminar" },
+  "Erro ao buscar versículos": { pt: "Erro ao buscar versículos", en: "Error fetching verses", es: "Error al buscar versículos" },
   "A definir": { pt: "A definir", en: "TBD", es: "Por definir" },
   "Texto copiado!": { pt: "Texto copiado!", en: "Text copied!", es: "¡Texto copiado!" },
   "redução": { pt: "redução", en: "reduction", es: "reducción" },
@@ -413,6 +416,13 @@ const translations: Record<string, Record<Lang, string>> = {
   "Total de Congregações": { pt: "Total de Congregações", en: "Total Congregations", es: "Total de Congregaciones" },
   "Editar": { pt: "Editar", en: "Edit", es: "Editar" },
   "Excluir": { pt: "Excluir", en: "Delete", es: "Eliminar" },
+
+  // Biblia extras
+  "Imagem": { pt: "Imagem", en: "Image", es: "Imagen" },
+  "Documento": { pt: "Documento", en: "Document", es: "Documento" },
+  "Anexar arquivo": { pt: "Anexar arquivo", en: "Attach file", es: "Adjuntar archivo" },
+  "Estudo Bíblico": { pt: "Estudo Bíblico", en: "Bible Study", es: "Estudio Bíblico" },
+  "Ex: Pastor, Diácono, Membro...": { pt: "Ex: Pastor, Diácono, Membro...", en: "E.g.: Pastor, Deacon, Member...", es: "Ej: Pastor, Diácono, Miembro..." },
 };
 
 type LanguageContextType = {

@@ -162,7 +162,7 @@ export default function Perfil() {
               type="text"
               value={roleTitle}
               onChange={e => setRoleTitle(e.target.value)}
-              placeholder="Ex: Pastor, Diácono, Membro..."
+              placeholder={t("Ex: Pastor, Diácono, Membro...")}
               className="mt-1.5 w-full px-4 py-3 rounded-lg border border-input bg-background text-base focus:outline-none focus:ring-2 focus:ring-accent/30"
             />
           </div>

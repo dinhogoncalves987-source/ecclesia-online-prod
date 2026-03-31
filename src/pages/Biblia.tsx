@@ -15,11 +15,11 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const VERSES_URL = `${SUPABASE_URL}/functions/v1/bible-verses`;
 const CHAT_URL = `${SUPABASE_URL}/functions/v1/bible-chat`;
 
-const quickPrompts = [
-  { label: "Esboço de pregação", prompt: "Crie um esboço completo de pregação sobre" },
-  { label: "Estudo profundo", prompt: "Faça um estudo bíblico profundo sobre" },
-  { label: "Contexto histórico", prompt: "Explique o contexto histórico de" },
-  { label: "Aplicação prática", prompt: "Quais são as aplicações práticas de" },
+const quickPromptKeys = [
+  { labelKey: "Esboço de pregação", promptKey: "Crie um esboço completo de pregação sobre" },
+  { labelKey: "Estudo profundo", promptKey: "Faça um estudo bíblico profundo sobre" },
+  { labelKey: "Contexto histórico", promptKey: "Explique o contexto histórico de" },
+  { labelKey: "Aplicação prática", promptKey: "Quais são as aplicações práticas de" },
 ];
 
 export default function Biblia() {
@@ -226,11 +226,11 @@ export default function Biblia() {
   const shareMessage = async (content: string) => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: "Estudo Bíblico", text: content });
+        await navigator.share({ title: t("Assistente Bíblico"), text: content });
       } catch { /* user cancelled */ }
     } else {
       await navigator.clipboard.writeText(content);
-      alert("Texto copiado!");
+      alert(t("Texto copiado!"));
     }
   };
 
@@ -248,18 +248,18 @@ export default function Biblia() {
         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
           <div className="bg-card rounded-xl shadow-executive p-5 mb-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-serif text-base">Selecionar Livro</h3>
+              <h3 className="font-serif text-base">{t("Selecionar Livro")}</h3>
                 <div className="flex items-center gap-2">
                 <div className="relative">
                   <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Buscar livro..."
+                    placeholder={t("Buscar livro...")}
                     className="pl-8 pr-3 py-1.5 rounded-lg border border-input bg-background text-xs w-36 sm:w-48 focus:outline-none focus:ring-1 focus:ring-ring"
                   />
                 </div>
-                <button onClick={startVoiceSearch} className={`p-1.5 rounded-lg transition-colors ${isListening ? "bg-destructive/10 text-destructive animate-pulse" : "hover:bg-secondary text-muted-foreground"}`} title="Pesquisa por voz">
+                <button onClick={startVoiceSearch} className={`p-1.5 rounded-lg transition-colors ${isListening ? "bg-destructive/10 text-destructive animate-pulse" : "hover:bg-secondary text-muted-foreground"}`} title={t("Pesquisa por voz")}>
                   {isListening ? <MicOff size={14} /> : <Mic size={14} />}
                 </button>
                 <button onClick={() => { setBookPickerOpen(false); setSearchQuery(""); }} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
@@ -270,7 +270,7 @@ export default function Biblia() {
 
             {filteredOT.length > 0 && (
               <div className="mb-4">
-                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2">Antigo Testamento</p>
+                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2">{t("Antigo Testamento")}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {filteredOT.map(b => {
                     const idx = bibleBooks.indexOf(b);
@@ -289,7 +289,7 @@ export default function Biblia() {
 
             {filteredNT.length > 0 && (
               <div>
-                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2">Novo Testamento</p>
+                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2">{t("Novo Testamento")}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {filteredNT.map(b => {
                     const idx = bibleBooks.indexOf(b);
@@ -323,7 +323,7 @@ export default function Biblia() {
             ({selectedBook.testament === "AT" ? "AT" : "NT"})
           </span>
         </button>
-        <span className="text-xs text-muted-foreground">{selectedBook.chapters} capítulos</span>
+        <span className="text-xs text-muted-foreground">{selectedBook.chapters} {t("capítulos")}</span>
       </div>
       <div className="flex flex-wrap gap-1">
         {Array.from({ length: selectedBook.chapters }).map((_, i) => (
@@ -347,11 +347,11 @@ export default function Biblia() {
           <div className="p-4 border-b border-border/50 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Sparkles size={16} className="text-accent" />
-              <h3 className="font-serif text-sm">Assistente Bíblico</h3>
+              <h3 className="font-serif text-sm">{t("Assistente Bíblico")}</h3>
             </div>
             <div className="flex items-center gap-1">
               {messages.length > 0 && (
-                <button onClick={() => setMessages([])} className="p-1.5 rounded-lg hover:bg-secondary transition-colors" title="Limpar conversa">
+                <button onClick={() => setMessages([])} className="p-1.5 rounded-lg hover:bg-secondary transition-colors" title={t("Limpar conversa")}>
                   <Trash2 size={14} strokeWidth={1.5} className="text-muted-foreground" />
                 </button>
               )}
@@ -368,14 +368,14 @@ export default function Biblia() {
                   <Sparkles size={24} className="text-accent" />
                 </div>
                 <div>
-                  <p className="font-serif text-sm font-medium">Assistente Bíblico com IA</p>
-                  <p className="text-xs text-muted-foreground mt-1">Faça perguntas, peça esboços e estudos profundos.</p>
+                   <p className="font-serif text-sm font-medium">{t("Assistente Bíblico com IA")}</p>
+                   <p className="text-xs text-muted-foreground mt-1">{t("Faça perguntas, peça esboços e estudos profundos.")}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-4 w-full max-w-xs">
-                  {quickPrompts.map(qp => (
-                    <button key={qp.label} onClick={() => setInput(qp.prompt + " ")}
+                  {quickPromptKeys.map(qp => (
+                    <button key={qp.labelKey} onClick={() => setInput(t(qp.promptKey) + " ")}
                       className="text-left p-2.5 rounded-lg bg-secondary/50 hover:bg-secondary text-xs text-muted-foreground hover:text-foreground transition-colors">
-                      {qp.label}
+                      {t(qp.labelKey)}
                     </button>
                   ))}
                 </div>
@@ -395,10 +395,10 @@ export default function Biblia() {
                   </div>
                   {msg.role === "assistant" && msg.content && !isLoading && (
                     <div className="flex gap-1 mt-1 ml-1">
-                      <button onClick={() => downloadMessage(msg.content)} className="p-1 rounded hover:bg-secondary transition-colors" title="Baixar">
+                      <button onClick={() => downloadMessage(msg.content)} className="p-1 rounded hover:bg-secondary transition-colors" title={t("Baixar")}>
                         <Download size={12} className="text-muted-foreground" />
                       </button>
-                      <button onClick={() => shareMessage(msg.content)} className="p-1 rounded hover:bg-secondary transition-colors" title="Compartilhar">
+                      <button onClick={() => shareMessage(msg.content)} className="p-1 rounded hover:bg-secondary transition-colors" title={t("Compartilhar")}>
                         <Share2 size={12} className="text-muted-foreground" />
                       </button>
                     </div>
@@ -431,11 +431,11 @@ export default function Biblia() {
                     const file = e.target.files?.[0];
                     if (file) {
                       const isImage = file.type.startsWith("image/");
-                      setInput(prev => prev + (prev ? " " : "") + `[${isImage ? "Imagem" : "Documento"}: ${file.name}]`);
+                      setInput(prev => prev + (prev ? " " : "") + `[${isImage ? t("Imagem") : t("Documento")}${": " + file.name}]`);
                     }
                     e.target.value = "";
                   }}
-                  title="Anexar arquivo"
+                  title={t("Anexar arquivo")}
                 />
                 <div className="p-2 rounded-full text-muted-foreground hover:bg-secondary transition-colors">
                   <Plus size={18} />
@@ -448,7 +448,7 @@ export default function Biblia() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Pergunte sobre a Bíblia..."
+                  placeholder={t("Pergunte sobre a Bíblia...")}
                   rows={1}
                   className="flex-1 resize-none bg-transparent px-4 py-2.5 text-base sm:text-sm placeholder:text-muted-foreground focus-visible:outline-none max-h-24 min-h-[40px]"
                   style={{ scrollbarWidth: "none" }}
@@ -462,7 +462,7 @@ export default function Biblia() {
                     className={`p-2.5 shrink-0 transition-colors ${
                       isChatListening ? "text-destructive animate-pulse" : "text-muted-foreground hover:text-foreground"
                     }`}
-                    title="Falar com microfone"
+                    title={t("Falar com microfone")}
                   >
                     {isChatListening ? <MicOff size={18} /> : <Mic size={18} />}
                   </button>
@@ -500,25 +500,25 @@ export default function Biblia() {
         {!zenMode && (
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">Bíblia Sagrada</h1>
-              <p className="text-sm text-muted-foreground mt-1">Leitura e meditação — Tradução Almeida</p>
+               <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">{t("Bíblia Sagrada")}</h1>
+               <p className="text-sm text-muted-foreground mt-1">{t("Leitura e meditação — Tradução Almeida")}</p>
             </div>
             <div className="flex gap-2 flex-wrap">
               <button onClick={() => setLargeFont(!largeFont)}
                 className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   largeFont ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80"
                 }`}>
-                <span className="text-xs font-bold">Aa+</span> Letras Gigantes
+                <span className="text-xs font-bold">Aa+</span> {t("Letras Gigantes")}
               </button>
               <button onClick={toggleChat}
                 className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   chatOpen ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80"
                 }`}>
-                <MessageSquare size={14} strokeWidth={1.5} /> Assistente IA
+                <MessageSquare size={14} strokeWidth={1.5} /> {t("Assistente IA")}
               </button>
               <button onClick={() => setZenMode(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
-                <Eye size={14} strokeWidth={1.5} /> Modo Zen
+                <Eye size={14} strokeWidth={1.5} /> {t("Modo Zen")}
               </button>
             </div>
           </div>
@@ -541,8 +541,8 @@ export default function Biblia() {
                   <Sparkles size={20} className="text-accent" />
                 </div>
                 <div className="text-left flex-1">
-                  <p className="font-serif text-sm font-medium">Assistente Bíblico com IA</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Toque para perguntar, pedir esboços e estudos</p>
+                   <p className="font-serif text-sm font-medium">{t("Assistente Bíblico com IA")}</p>
+                   <p className="text-xs text-muted-foreground mt-0.5">{t("Toque para perguntar, pedir esboços e estudos")}</p>
                 </div>
                 <MessageSquare size={18} className="text-muted-foreground" />
               </button>
@@ -567,7 +567,7 @@ export default function Biblia() {
                   </button>
                   <button onClick={() => { if (!zenMode) setBookPickerOpen(!bookPickerOpen); }} className="text-center">
                     <h2 className="font-serif text-lg hover:text-primary transition-colors">{selectedBook.name}</h2>
-                    <p className="text-xs text-muted-foreground">Capítulo {selectedChapter}</p>
+                    <p className="text-xs text-muted-foreground">{t("Capítulo")} {selectedChapter}</p>
                   </button>
                   <button onClick={nextChapter} disabled={!hasNext}
                     className="p-1.5 rounded-lg hover:bg-secondary transition-colors disabled:opacity-30">
@@ -586,7 +586,7 @@ export default function Biblia() {
                       </button>
                       <button onClick={() => setZenMode(false)}
                         className="p-2 rounded-lg hover:bg-secondary transition-colors text-xs font-medium text-muted-foreground">
-                        Sair
+                        {t("Sair")}
                       </button>
                     </>
                   )}
@@ -599,9 +599,9 @@ export default function Biblia() {
                 </div>
               ) : verses.length === 0 ? (
                 <div className="text-center py-16 text-muted-foreground text-sm">
-                  <p>Não foi possível carregar este capítulo.</p>
+                  <p>{t("Não foi possível carregar este capítulo.")}</p>
                   <button onClick={() => fetchVerses(selectedBook, selectedChapter)} className="mt-2 text-primary underline text-xs">
-                    Tentar novamente
+                    {t("Tentar novamente")}
                   </button>
                 </div>
               ) : (
@@ -619,14 +619,14 @@ export default function Biblia() {
                 <div className="flex items-center justify-between mt-8 pt-4 border-t border-border">
                   <button onClick={prevChapter} disabled={!hasPrev}
                     className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors">
-                    <ChevronLeft size={14} /> Anterior
+                    <ChevronLeft size={14} /> {t("Anterior")}
                   </button>
                   <span className="text-xs text-muted-foreground tabular-nums">
                     {selectedBook.name} {selectedChapter} / {selectedBook.chapters}
                   </span>
                   <button onClick={nextChapter} disabled={!hasNext}
                     className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors">
-                    Próximo <ChevronRight size={14} />
+                    {t("Próximo")} <ChevronRight size={14} />
                   </button>
                 </div>
               )}
@@ -638,7 +638,7 @@ export default function Biblia() {
         {selectedChapter === null && !zenMode && (
           <div className="bg-card rounded-xl shadow-executive p-8 text-center">
             <BookOpen size={32} className="mx-auto text-muted-foreground/40 mb-3" />
-            <p className="text-sm text-muted-foreground">Selecione um capítulo acima para começar a leitura</p>
+            <p className="text-sm text-muted-foreground">{t("Selecione um capítulo acima para começar a leitura")}</p>
           </div>
         )}
       </div>
