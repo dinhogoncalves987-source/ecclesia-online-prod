@@ -7,49 +7,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useLanguage } from "@/hooks/useLanguage";
+import { todosOsHinos, categoriasHinos, type HinoData } from "@/data/hinos-cantor-cristao";
 
-interface Hino {
-  numero: number;
-  titulo: string;
-  categoria: string;
-  youtubeId?: string;
-  letra?: string;
-}
-
-// Hinos de domínio público do Cantor Cristão e tradição evangélica
-const hinosPublicos: Hino[] = [
-  { numero: 1, titulo: "Santo, Santo, Santo", categoria: "Adoração", youtubeId: "dQw4w9WgXcQ", letra: "Santo, Santo, Santo! Deus Onipotente!\nSempre te louvamos ao romper da luz;\nSanto, Santo, Santo! Trino e Indulgente,\nDeus em três pessoas, bendito Jesus!" },
-  { numero: 2, titulo: "Grandioso És Tu", categoria: "Louvor", youtubeId: "dQw4w9WgXcQ", letra: "Senhor Deus, quando eu maravilhado\nFico a pensar nas obras de Tuas mãos,\nNo céu azul de estrelas pontilhado,\nNo Teu poder que a natureza traduz." },
-  { numero: 3, titulo: "Castelo Forte", categoria: "Confiança", youtubeId: "dQw4w9WgXcQ", letra: "Castelo forte é nosso Deus,\nEspada e bom escudo.\nCom Seu poder nos protege\nNas lutas deste mundo." },
-  { numero: 4, titulo: "Quão Grande És Tu", categoria: "Adoração", youtubeId: "dQw4w9WgXcQ", letra: "Ó Senhor, meu Deus, quando eu maravilhado\nFico a pensar nas obras de Tuas mãos,\nO céu azul de estrelas pontilhado,\nO Teu poder que se revela no trovão." },
-  { numero: 5, titulo: "A Deus Demos Glória", categoria: "Louvor", youtubeId: "dQw4w9WgXcQ", letra: "A Deus demos glória, com grande fervor;\nO Filho bendito nos deu Seu favor.\nPor nós moribundos Jesus foi morrer;\nAs portas do céu ele veio abrir." },
-  { numero: 6, titulo: "Rude Cruz", categoria: "Redenção", youtubeId: "dQw4w9WgXcQ", letra: "Rude cruz se fez estandarte ao soldado fiel;\nCristo sobre ela morreu pelo mundo tão cruel.\nEu me glorio sim na cruz,\nSempre a minha glória será." },
-  { numero: 7, titulo: "Chuvas de Graça", categoria: "Avivamento", youtubeId: "dQw4w9WgXcQ", letra: "Chuvas de graça, chuvas pedimos,\nManda-nos chuvas salutares;\nChuvas de graça, chuvas pedimos,\nManda-nos grandes e abundantes chuvas." },
-  { numero: 8, titulo: "Sonda-me, Senhor", categoria: "Consagração", youtubeId: "dQw4w9WgXcQ", letra: "Sonda-me, Senhor, e me conhece,\nProva-me, ó Deus, e vê se em mim\nHá algum caminho mau e me conduz\nPelo caminho eterno." },
-  { numero: 9, titulo: "Firme nas Promessas", categoria: "Confiança", youtubeId: "dQw4w9WgXcQ", letra: "Firme nas promessas do meu Salvador,\nPor toda a vida eu hei de confiar;\nQuando a tempestade atroz me rodear,\nEle me sustenta com divino amor." },
-  { numero: 10, titulo: "Graça Excelsa", categoria: "Graça", youtubeId: "dQw4w9WgXcQ", letra: "Graça excelsa do Senhor, maior que meu pecar;\nDeus em Cristo me salvou, imerecida graça!\nGraça, graça, imensa graça,\nGraça que excede nosso pecar." },
-  { numero: 11, titulo: "Ao Deus de Abraão Louvai", categoria: "Adoração", letra: "Ao Deus de Abraão louvai,\nQue reina sempre e reinará;\nEterno e supremo Pai\nQue era, e é, e sempre será." },
-  { numero: 12, titulo: "Vem Sobre Mim", categoria: "Espírito Santo", letra: "Vem sobre mim, Espírito Santo,\nVem sobre mim com Teu poder;\nQuebra as cadeias do pecado,\nVem minha vida socorrer." },
-  { numero: 13, titulo: "Cristo, a Rocha Eterna", categoria: "Confiança", letra: "Cristo, Rocha eterna, em Ti me escondo;\nSeja o meu refúgio, Teu amor profundo;\nDeixa a água e o sangue que do Teu lado correu\nDo pecado ser a cura, da culpa o preço." },
-  { numero: 14, titulo: "Mais Perto Quero Estar", categoria: "Consagração", letra: "Mais perto quero estar, meu Deus, de Ti;\nAinda que seja uma cruz\nQue me transporte aqui,\nMais perto quero estar, meu Deus, de Ti." },
-  { numero: 15, titulo: "Rei dos Reis", categoria: "Adoração", letra: "Majestoso, Soberano,\nCriador de todo o universo;\nPoderoso e infinito,\nRei dos reis e Senhor." },
-  { numero: 16, titulo: "Tão Longe de Mim", categoria: "Evangelismo", letra: "Tão longe de mim vieste, ó Cristo,\nBuscando esta ovelha que a Ti fugiu;\nJá não sou mais perdido, ó bendito Salvador." },
-  { numero: 17, titulo: "Oh! Que Dia Glorioso", categoria: "Segunda Vinda", letra: "Oh! que dia glorioso será quando Jesus voltar!\nVerei face a face o Salvador,\nQue veio me buscar." },
-  { numero: 18, titulo: "Ó Pai, Não Tenho Palavras", categoria: "Oração", letra: "Ó Pai, não tenho palavras pra agradecer Tua bondade;\nDia após dia me cercas com amor e caridade." },
-  { numero: 19, titulo: "Brilha, Jesus", categoria: "Louvor", letra: "Brilha, Jesus, Tua luz sobre nós;\nQue as nações Te vejam através de nós;\nDerrama Teu fogo e Teu poder;\nRios de graça vêm correr." },
-  { numero: 20, titulo: "Sou Feliz com Jesus", categoria: "Testemunho", letra: "Sou feliz com Jesus, sou feliz com Jesus;\nEle é luz, é vida, é caminho e verdade;\nSou feliz, tão feliz com Jesus." },
-];
-
-const categorias = [...new Set(hinosPublicos.map(h => h.categoria))];
+const categorias = categoriasHinos;
 
 export default function Hinario() {
   const { t } = useLanguage();
   const [busca, setBusca] = useState("");
   const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null);
-  const [hinoSelecionado, setHinoSelecionado] = useState<Hino | null>(null);
+  const [hinoSelecionado, setHinoSelecionado] = useState<HinoData | null>(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
 
-  const hinosFiltrados = hinosPublicos.filter(h => {
+  const hinosFiltrados = todosOsHinos.filter(h => {
     const matchBusca = busca === "" || 
       h.titulo.toLowerCase().includes(busca.toLowerCase()) ||
       h.numero.toString().includes(busca);
@@ -116,7 +85,7 @@ export default function Hinario() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card className="bg-card">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-accent">{hinosPublicos.length}</p>
+            <p className="text-2xl font-bold text-accent">{todosOsHinos.length}</p>
             <p className="text-xs text-muted-foreground">{t("Hinos Disponíveis")}</p>
           </CardContent>
         </Card>
@@ -128,7 +97,7 @@ export default function Hinario() {
         </Card>
         <Card className="bg-card">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-accent">{hinosPublicos.filter(h => h.youtubeId).length}</p>
+            <p className="text-2xl font-bold text-accent">{todosOsHinos.filter(h => h.youtubeId).length}</p>
             <p className="text-xs text-muted-foreground">{t("Com Áudio")}</p>
           </CardContent>
         </Card>
