@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { BookOpen, RefreshCw, Sparkles, Sun, CloudSun, Moon } from "lucide-react";
+import { BookOpen, RefreshCw, Sparkles, Sun, CloudSun, Moon, Share2, Copy, Check } from "lucide-react";
+import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 import { motion } from "framer-motion";
 
