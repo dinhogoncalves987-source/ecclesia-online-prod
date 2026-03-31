@@ -248,7 +248,7 @@ export default function Biblia() {
         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
           <div className="bg-card rounded-xl shadow-executive p-5 mb-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-serif text-base">Selecionar Livro</h3>
+              <h3 className="font-serif text-base">{t("Selecionar Livro")}</h3>
                 <div className="flex items-center gap-2">
                 <div className="relative">
                   <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
