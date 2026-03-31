@@ -32,6 +32,7 @@ const navItems = [
   { icon: FileText, label: "Escalas", path: "/admin/escalas" },
   { icon: Shield, label: "Gerenciar Acessos", path: "/admin/gerenciar-acessos" },
   { icon: Building2, label: "Congregações", path: "/admin/congregacoes" },
+  { icon: Globe, label: "Super Admin", path: "/admin/super-admin" },
 ];
 
 const mobileNavItems = [
