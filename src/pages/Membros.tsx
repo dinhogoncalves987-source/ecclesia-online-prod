@@ -8,6 +8,8 @@ import { useChurch } from "@/hooks/useChurch";
 import { useLanguage } from "@/hooks/useLanguage";
 import { toast } from "sonner";
 import { BulkImportModal } from "@/components/BulkImportModal";
+import { AIImportModal } from "@/components/AIImportModal";
+import { Sparkles } from "lucide-react";
 
 type Member = {
   id: string;
@@ -31,6 +33,7 @@ export default function Membros() {
   const [showForm, setShowForm] = useState(false);
   const [newMember, setNewMember] = useState({ name: "", role: "", phone: "", email: "" });
   const [showImport, setShowImport] = useState(false);
+  const [showAIImport, setShowAIImport] = useState(false);
 
   const memberFields = [
     { key: "name", label: t("Nome"), required: true },
@@ -147,6 +150,10 @@ export default function Membros() {
             </p>
           </div>
           <div className="flex gap-2">
+            <button onClick={() => setShowAIImport(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-accent/10 text-accent rounded-lg text-sm font-medium hover:bg-accent/20 transition-colors">
+              <Sparkles size={14} strokeWidth={1.5} /> {t("Importar com IA")}
+            </button>
             <button onClick={() => setShowImport(true)}
               className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
               <Upload size={14} strokeWidth={1.5} /> {t("Importar CSV")}
@@ -302,6 +309,14 @@ export default function Membros() {
         fields={memberFields}
         templateData={memberTemplate}
         title={t("Importar Membros")}
+      />
+      <AIImportModal
+        open={showAIImport}
+        onClose={() => setShowAIImport(false)}
+        onImport={handleBulkImport}
+        fields={memberFields}
+        title={t("Importar Membros com IA")}
+        moduleName="Membros"
       />
     </AdminLayout>
   );

@@ -10,6 +10,8 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { format } from "date-fns";
 import { ptBR, enUS, es } from "date-fns/locale";
 import { BulkImportModal } from "@/components/BulkImportModal";
+import { AIImportModal } from "@/components/AIImportModal";
+import { Sparkles } from "lucide-react";
 
 type Document = {
   id: string; title: string; category: string; description: string | null;
@@ -31,6 +33,7 @@ export default function Documentos() {
   const [category, setCategory] = useState("Geral");
   const [filterCat, setFilterCat] = useState("Todos");
   const [showImport, setShowImport] = useState(false);
+  const [showAIImport, setShowAIImport] = useState(false);
 
   const docFields = [
     { key: "title", label: t("Título"), required: true },
@@ -104,6 +107,9 @@ export default function Documentos() {
             <p className="text-sm text-muted-foreground mt-1">{t("Biblioteca de documentos da igreja")}</p>
           </div>
           <div className="flex gap-2">
+            <button onClick={() => setShowAIImport(true)} className="flex items-center gap-2 px-3 py-2.5 bg-accent/10 text-accent rounded-lg text-sm font-medium hover:bg-accent/20 transition-colors">
+              <Sparkles size={14} /> {t("Importar com IA")}
+            </button>
             <button onClick={() => setShowImport(true)} className="flex items-center gap-2 px-3 py-2.5 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
               <Upload size={14} /> {t("Importar CSV")}
             </button>
@@ -192,6 +198,14 @@ export default function Documentos() {
         fields={docFields}
         templateData={docTemplate}
         title={t("Importar Documentos")}
+      />
+      <AIImportModal
+        open={showAIImport}
+        onClose={() => setShowAIImport(false)}
+        onImport={handleBulkImport}
+        fields={docFields}
+        title={t("Importar Documentos com IA")}
+        moduleName="Documentos"
       />
     </AdminLayout>
   );

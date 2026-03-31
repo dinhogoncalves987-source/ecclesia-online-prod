@@ -9,6 +9,8 @@ import { useChurch } from "@/hooks/useChurch";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 import { BulkImportModal } from "@/components/BulkImportModal";
+import { AIImportModal } from "@/components/AIImportModal";
+import { Sparkles } from "lucide-react";
 
 type Transaction = {
   id: string;
@@ -41,6 +43,7 @@ export default function Financeiro() {
   const [showForm, setShowForm] = useState(false);
   const [newTx, setNewTx] = useState({ desc: "", type: "Entrada" as "Entrada" | "Saída", value: "", category: "" });
   const [showImport, setShowImport] = useState(false);
+  const [showAIImport, setShowAIImport] = useState(false);
 
   const financeFields = [
     { key: "description", label: t("Descrição"), required: true },
@@ -151,6 +154,10 @@ export default function Financeiro() {
           <div className="flex gap-2 flex-wrap">
             <button className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
               <Download size={14} strokeWidth={1.5} /> {t("Exportar")}
+            </button>
+            <button onClick={() => setShowAIImport(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-accent/10 text-accent rounded-lg text-sm font-medium hover:bg-accent/20 transition-colors">
+              <Sparkles size={14} strokeWidth={1.5} /> {t("Importar com IA")}
             </button>
             <button
               onClick={() => setShowImport(true)}
@@ -325,6 +332,14 @@ export default function Financeiro() {
         fields={financeFields}
         templateData={financeTemplate}
         title={t("Importar Lançamentos")}
+      />
+      <AIImportModal
+        open={showAIImport}
+        onClose={() => setShowAIImport(false)}
+        onImport={handleBulkImport}
+        fields={financeFields}
+        title={t("Importar Lançamentos com IA")}
+        moduleName="Financeiro"
       />
     </AdminLayout>
   );
