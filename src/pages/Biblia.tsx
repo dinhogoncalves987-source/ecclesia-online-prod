@@ -347,7 +347,7 @@ export default function Biblia() {
           <div className="p-4 border-b border-border/50 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Sparkles size={16} className="text-accent" />
-              <h3 className="font-serif text-sm">Assistente Bíblico</h3>
+              <h3 className="font-serif text-sm">{t("Assistente Bíblico")}</h3>
             </div>
             <div className="flex items-center gap-1">
               {messages.length > 0 && (
