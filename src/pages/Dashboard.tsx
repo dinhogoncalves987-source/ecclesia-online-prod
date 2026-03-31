@@ -130,22 +130,26 @@ export default function Dashboard() {
             {/* Super Admin global metrics */}
             {isSuperAdmin && superMetrics && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                  className="bg-card rounded-xl p-4 shadow-sm border border-border/50">
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-purple-500/10 mb-2">
-                    <Globe size={18} className="text-purple-600" />
-                  </div>
-                  <p className="text-xl font-bold">{superMetrics.churches}</p>
-                  <p className="text-[10px] text-muted-foreground">{t("Total de Igrejas")}</p>
-                </motion.div>
-                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-                  className="bg-card rounded-xl p-4 shadow-sm border border-border/50">
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-emerald-500/10 mb-2">
-                    <Users size={18} className="text-emerald-600" />
-                  </div>
-                  <p className="text-xl font-bold">{superMetrics.users}</p>
-                  <p className="text-[10px] text-muted-foreground">{t("Total de Usuários")}</p>
-                </motion.div>
+                <Link to="/admin/super-admin">
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                    className="bg-card rounded-xl p-4 shadow-sm border border-border/50 cursor-pointer hover:shadow-md transition-shadow">
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-primary/10 mb-2">
+                      <Globe size={18} className="text-primary" />
+                    </div>
+                    <p className="text-xl font-bold">{superMetrics.churches}</p>
+                    <p className="text-[10px] text-muted-foreground">{t("Total de Igrejas")}</p>
+                  </motion.div>
+                </Link>
+                <Link to="/admin/gerenciar-acessos">
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+                    className="bg-card rounded-xl p-4 shadow-sm border border-border/50 cursor-pointer hover:shadow-md transition-shadow">
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-accent/10 mb-2">
+                      <Users size={18} className="text-accent" />
+                    </div>
+                    <p className="text-xl font-bold">{superMetrics.users}</p>
+                    <p className="text-[10px] text-muted-foreground">{t("Total de Usuários")}</p>
+                  </motion.div>
+                </Link>
               </div>
             )}
 
