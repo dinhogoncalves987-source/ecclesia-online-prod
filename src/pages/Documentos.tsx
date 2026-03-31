@@ -33,6 +33,7 @@ export default function Documentos() {
   const [category, setCategory] = useState("Geral");
   const [filterCat, setFilterCat] = useState("Todos");
   const [showImport, setShowImport] = useState(false);
+  const [showAIImport, setShowAIImport] = useState(false);
 
   const docFields = [
     { key: "title", label: t("Título"), required: true },
