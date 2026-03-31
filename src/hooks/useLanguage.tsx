@@ -77,7 +77,6 @@ const translations: Record<string, Record<Lang, string>> = {
   "Aviso criado com sucesso": { pt: "Aviso criado com sucesso", en: "Notice created successfully", es: "Aviso creado con éxito" },
   "Aviso removido": { pt: "Aviso removido", en: "Notice removed", es: "Aviso eliminado" },
   "Acesso negado": { pt: "Acesso negado", en: "Access denied", es: "Acceso denegado" },
-  "Pastor": { pt: "Pastor", en: "Pastor", es: "Pastor" },
   "Matriz": { pt: "Matriz", en: "Headquarters", es: "Matriz" },
   "membros ativos": { pt: "membros ativos", en: "active members", es: "miembros activos" },
   "Receita do Mês": { pt: "Receita do Mês", en: "Monthly Revenue", es: "Ingresos del Mes" },
