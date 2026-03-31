@@ -226,11 +226,11 @@ export default function Biblia() {
   const shareMessage = async (content: string) => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: "Estudo Bíblico", text: content });
+        await navigator.share({ title: t("Assistente Bíblico"), text: content });
       } catch { /* user cancelled */ }
     } else {
       await navigator.clipboard.writeText(content);
-      alert("Texto copiado!");
+      alert(t("Texto copiado!"));
     }
   };
 
