@@ -372,10 +372,10 @@ export default function Biblia() {
                    <p className="text-xs text-muted-foreground mt-1">{t("Faça perguntas, peça esboços e estudos profundos.")}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-4 w-full max-w-xs">
-                  {quickPrompts.map(qp => (
-                    <button key={qp.label} onClick={() => setInput(qp.prompt + " ")}
+                  {quickPromptKeys.map(qp => (
+                    <button key={qp.labelKey} onClick={() => setInput(t(qp.promptKey) + " ")}
                       className="text-left p-2.5 rounded-lg bg-secondary/50 hover:bg-secondary text-xs text-muted-foreground hover:text-foreground transition-colors">
-                      {qp.label}
+                      {t(qp.labelKey)}
                     </button>
                   ))}
                 </div>
