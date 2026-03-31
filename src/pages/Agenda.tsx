@@ -56,6 +56,7 @@ export default function Agenda() {
       setLoading(false);
       return;
     }
+    const load = async () => {
       setLoading(true);
       const startDate = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`;
       const endDate = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${daysInMonth}`;
