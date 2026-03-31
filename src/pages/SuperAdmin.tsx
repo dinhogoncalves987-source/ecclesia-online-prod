@@ -249,7 +249,8 @@ export default function SuperAdmin() {
     { key: "notices", label: t("Avisos"), icon: Bell },
   ];
 
-  const matrizChurches = flatChurches.filter(c => c.is_matriz);
+  const sedeChurches = flatChurches.filter(c => c.hierarchy_level === "sede");
+  const matrizChurches = flatChurches.filter(c => c.hierarchy_level === "matriz" || (c.is_matriz && c.hierarchy_level !== "sede"));
 
   const renderChurchTree = (items: ChurchSummary[], level = 0) => (
     items.map(c => (
