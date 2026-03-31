@@ -289,7 +289,7 @@ export default function Biblia() {
 
             {filteredNT.length > 0 && (
               <div>
-                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2">Novo Testamento</p>
+                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2">{t("Novo Testamento")}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {filteredNT.map(b => {
                     const idx = bibleBooks.indexOf(b);
