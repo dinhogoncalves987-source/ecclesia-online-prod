@@ -8,6 +8,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
