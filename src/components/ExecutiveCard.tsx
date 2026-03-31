@@ -1,5 +1,6 @@
 import { LucideIcon } from "lucide-react";
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 
 interface ExecutiveCardProps {
   title: string;
@@ -8,17 +9,18 @@ interface ExecutiveCardProps {
   trendLabel?: string;
   icon: LucideIcon;
   index?: number;
+  href?: string;
 }
 
-export function ExecutiveCard({ title, value, trend, trendLabel, icon: Icon, index = 0 }: ExecutiveCardProps) {
+export function ExecutiveCard({ title, value, trend, trendLabel, icon: Icon, index = 0, href }: ExecutiveCardProps) {
   const isNegative = trend?.startsWith("-");
 
-  return (
+  const content = (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1], delay: index * 0.05 }}
-      className="bg-card p-5 sm:p-6 rounded-xl shadow-executive hover:shadow-executive-hover transition-shadow duration-300"
+      className={`bg-card p-5 sm:p-6 rounded-xl shadow-executive hover:shadow-executive-hover transition-shadow duration-300 ${href ? "cursor-pointer" : ""}`}
     >
       <div className="flex justify-between items-start">
         <div className="min-w-0">
@@ -37,4 +39,10 @@ export function ExecutiveCard({ title, value, trend, trendLabel, icon: Icon, ind
       )}
     </motion.div>
   );
+
+  if (href) {
+    return <Link to={href}>{content}</Link>;
+  }
+
+  return content;
 }
