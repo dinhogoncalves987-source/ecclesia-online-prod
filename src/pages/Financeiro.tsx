@@ -9,6 +9,8 @@ import { useChurch } from "@/hooks/useChurch";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 import { BulkImportModal } from "@/components/BulkImportModal";
+import { AIImportModal } from "@/components/AIImportModal";
+import { Sparkles } from "lucide-react";
 
 type Transaction = {
   id: string;
