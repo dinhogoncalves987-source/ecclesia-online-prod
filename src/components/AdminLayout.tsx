@@ -101,6 +101,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const isActive = (path: string) => location.pathname === path;
 
   const handleSignOut = async () => {
+    setShowLogoutConfirm(false);
     await signOut();
     navigate("/");
   };

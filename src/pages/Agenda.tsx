@@ -52,8 +52,10 @@ export default function Agenda() {
   const firstDayOffset = getFirstDayOfWeek(currentMonth, currentYear);
 
   useEffect(() => {
-    if (!user || !church) return;
-    const load = async () => {
+    if (!user || !church) {
+      setLoading(false);
+      return;
+    }
       setLoading(true);
       const startDate = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`;
       const endDate = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${daysInMonth}`;
