@@ -422,6 +422,7 @@ const translations: Record<string, Record<Lang, string>> = {
   "Documento": { pt: "Documento", en: "Document", es: "Documento" },
   "Anexar arquivo": { pt: "Anexar arquivo", en: "Attach file", es: "Adjuntar archivo" },
   "Estudo Bíblico": { pt: "Estudo Bíblico", en: "Bible Study", es: "Estudio Bíblico" },
+  "Ex: Pastor, Diácono, Membro...": { pt: "Ex: Pastor, Diácono, Membro...", en: "E.g.: Pastor, Deacon, Member...", es: "Ej: Pastor, Diácono, Miembro..." },
 };
 
 type LanguageContextType = {
