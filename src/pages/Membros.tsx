@@ -76,7 +76,7 @@ export default function Membros() {
 
   const removeMember = async (id: string) => {
     const { error } = await supabase.from("members").delete().eq("id", id);
-    if (error) { toast.error("Erro ao remover"); console.error(error); }
+    if (error) { toast.error(t("Erro ao remover")); console.error(error); }
     else {
       setMembers(members.filter(m => m.id !== id));
       toast.success("Membro removido");
