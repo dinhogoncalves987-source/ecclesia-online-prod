@@ -30,6 +30,41 @@ export default function Membros() {
   const [filterStatus, setFilterStatus] = useState<"all" | "Ativo" | "Visitante" | "Inativo">("all");
   const [showForm, setShowForm] = useState(false);
   const [newMember, setNewMember] = useState({ name: "", role: "", phone: "", email: "" });
+  const [showImport, setShowImport] = useState(false);
+
+  const memberFields = [
+    { key: "name", label: t("Nome"), required: true },
+    { key: "role", label: t("Função") },
+    { key: "phone", label: t("Telefone") },
+    { key: "email", label: t("E-mail") },
+    { key: "status", label: t("Status") },
+  ];
+
+  const memberTemplate = [
+    { name: "João Silva", role: "Diácono", phone: "(11) 99999-0001", email: "joao@email.com", status: "Ativo" },
+    { name: "Maria Souza", role: "Membro", phone: "(11) 99999-0002", email: "maria@email.com", status: "Ativo" },
+  ];
+
+  const handleBulkImport = async (rows: Record<string, string>[]) => {
+    if (!user || !church) return { success: 0, errors: 0 };
+    let success = 0, errors = 0;
+    for (const row of rows) {
+      if (!row.name) { errors++; continue; }
+      const { error } = await supabase.from("members").insert({
+        user_id: user.id, church_id: church.id,
+        name: row.name, role: row.role || "Membro",
+        phone: row.phone || null, email: row.email || null,
+        since: new Date().getFullYear().toString(),
+        status: row.status || "Ativo",
+      });
+      if (error) errors++; else success++;
+    }
+    if (success > 0) {
+      const { data } = await supabase.from("members").select("*").eq("church_id", church.id).order("name");
+      setMembers(data || []);
+    }
+    return { success, errors };
+  };
 
   useEffect(() => {
     if (!user || !church) { setLoading(false); return; }

@@ -318,6 +318,14 @@ export default function Financeiro() {
           )}
         </div>
       </div>
+      <BulkImportModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImport={handleBulkImport}
+        fields={financeFields}
+        templateData={financeTemplate}
+        title={t("Importar Lançamentos")}
+      />
     </AdminLayout>
   );
 }
