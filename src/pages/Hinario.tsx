@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { Music, Search, Play, Upload, ExternalLink, Youtube, X } from "lucide-react";
+import { Music, Search, Play, Upload, ExternalLink, Youtube } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLanguage } from "@/hooks/useLanguage";
+import { AdminLayout } from "@/components/AdminLayout";
 import { todosOsHinos, categoriasHinos, type HinoData } from "@/data/hinos-cantor-cristao";
 
 const categorias = categoriasHinos;
