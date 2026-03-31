@@ -146,10 +146,16 @@ export default function Membros() {
               {members.length} {t("cadastrados")} · {activeCount} {t("ativos")} · {visitanteCount} {t("visitantes")}
             </p>
           </div>
-          <button onClick={() => setShowForm(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity self-start">
-            <Plus size={16} strokeWidth={1.5} /> {t("Novo Membro")}
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setShowImport(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
+              <Upload size={14} strokeWidth={1.5} /> {t("Importar CSV")}
+            </button>
+            <button onClick={() => setShowForm(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity self-start">
+              <Plus size={16} strokeWidth={1.5} /> {t("Novo Membro")}
+            </button>
+          </div>
         </div>
 
         <AnimatePresence>
