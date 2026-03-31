@@ -30,6 +30,35 @@ export default function Documentos() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Geral");
   const [filterCat, setFilterCat] = useState("Todos");
+  const [showImport, setShowImport] = useState(false);
+
+  const docFields = [
+    { key: "title", label: t("Título"), required: true },
+    { key: "category", label: t("Categoria") },
+    { key: "description", label: t("Descrição") },
+  ];
+
+  const docTemplate = [
+    { title: "Ata de Reunião - Janeiro", category: "Atas", description: "Reunião ordinária" },
+    { title: "Estatuto Social", category: "Estatuto", description: "Documento oficial" },
+  ];
+
+  const handleBulkImport = async (rows: Record<string, string>[]) => {
+    if (!user || !church) return { success: 0, errors: 0 };
+    let success = 0, errors = 0;
+    for (const row of rows) {
+      if (!row.title) { errors++; continue; }
+      const { error } = await supabase.from("documents").insert({
+        user_id: user.id, church_id: church.id,
+        title: row.title,
+        category: row.category || "Geral",
+        description: row.description || null,
+      } as any);
+      if (error) errors++; else success++;
+    }
+    if (success > 0) fetch_();
+    return { success, errors };
+  };
 
   const dateLoc = lang === "en" ? enUS : lang === "es" ? es : ptBR;
 
