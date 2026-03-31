@@ -64,7 +64,7 @@ export default function Membros() {
       since: new Date().getFullYear().toString(),
       status: "Ativo",
     }).select().single();
-    if (error) { toast.error("Erro ao salvar membro"); console.error(error); }
+    if (error) { toast.error(t("Erro ao salvar")); console.error(error); }
     else {
       setMembers([data, ...members]);
       toast.success("Membro cadastrado!");
