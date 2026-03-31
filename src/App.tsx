@@ -17,6 +17,7 @@ import Financeiro from "./pages/Financeiro";
 import Membros from "./pages/Membros";
 import Agenda from "./pages/Agenda";
 import Biblia from "./pages/Biblia";
+import Hinario from "./pages/Hinario";
 import Oracoes from "./pages/Oracoes";
 import Comunicacao from "./pages/Comunicacao";
 import Grupos from "./pages/Grupos";
