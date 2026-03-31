@@ -72,7 +72,7 @@ export default function Financeiro() {
       { title: t("Saldo Atual"), value: formatCurrency(saldo), icon: Wallet },
       { title: t("Reserva"), value: "R$ 85.200", icon: PiggyBank },
     ];
-  }, [transactions]);
+  }, [transactions, t]);
 
   const addTransaction = async () => {
     if (!newTx.desc || !newTx.value || !user || !church) return;

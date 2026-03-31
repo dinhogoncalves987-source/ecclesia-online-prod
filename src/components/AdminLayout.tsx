@@ -350,7 +350,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             }`}
           >
             <item.icon size={20} strokeWidth={1.5} />
-            <span className="text-[10px] font-medium">{item.label}</span>
+            <span className="text-[10px] font-medium">{t(item.label)}</span>
           </Link>
         ))}
       </nav>

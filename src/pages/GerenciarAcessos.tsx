@@ -34,7 +34,7 @@ const ROLE_COLORS: Record<AppRole, string> = {
   membro: "bg-secondary text-muted-foreground",
 };
 
-const ROLE_DESCRIPTIONS: Record<AppRole, string> = {
+const ROLE_DESC_KEYS: Record<AppRole, string> = {
   admin: "Acesso total ao sistema. Pode gerenciar outros usuários.",
   tesoureiro: "Acesso a Financeiro e Relatórios.",
   obreiro: "Acesso a Agenda, Comunicação, Documentos e Escalas.",
