@@ -492,25 +492,25 @@ export default function Biblia() {
           <div className="p-2 border-t border-border/50">
             {/* Voice recording mode */}
             {isChatListening ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-start gap-2">
                 <button
                   onClick={() => stopChatVoice(false)}
-                  className="p-2.5 rounded-full bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors shrink-0"
+                  className="p-2.5 rounded-full bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors shrink-0 mt-0.5"
                   title={t("Cancelar")}
                 >
                   <X size={18} />
                 </button>
-                <div className="flex-1 bg-destructive/5 rounded-2xl px-4 py-2.5 border border-destructive/20">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-destructive rounded-full animate-pulse" />
-                    <p className="text-sm truncate">
+                <div className="flex-1 min-w-0 bg-destructive/5 rounded-2xl px-4 py-2.5 border border-destructive/20 max-h-40 overflow-y-auto">
+                  <div className="flex items-start gap-2">
+                    <span className="w-2 h-2 bg-destructive rounded-full animate-pulse shrink-0 mt-1.5" />
+                    <p className="text-sm break-words whitespace-pre-wrap">
                       {voiceTranscript || t("Ouvindo...")}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => stopChatVoice(true)}
-                  className="p-2.5 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 transition-colors shrink-0"
+                  className="p-2.5 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 transition-colors shrink-0 mt-0.5"
                   title={t("Confirmar")}
                 >
                   <Check size={18} />
