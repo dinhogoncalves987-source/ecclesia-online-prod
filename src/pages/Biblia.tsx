@@ -638,7 +638,7 @@ export default function Biblia() {
         {selectedChapter === null && !zenMode && (
           <div className="bg-card rounded-xl shadow-executive p-8 text-center">
             <BookOpen size={32} className="mx-auto text-muted-foreground/40 mb-3" />
-            <p className="text-sm text-muted-foreground">Selecione um capítulo acima para começar a leitura</p>
+            <p className="text-sm text-muted-foreground">{t("Selecione um capítulo acima para começar a leitura")}</p>
           </div>
         )}
       </div>
