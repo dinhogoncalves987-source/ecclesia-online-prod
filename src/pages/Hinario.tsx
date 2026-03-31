@@ -243,16 +243,22 @@ export default function Hinario() {
                     <Youtube size={16} className="text-destructive" />
                     {t("Ouvir no YouTube")}
                   </h4>
-                  <a
-                    href={`https://www.youtube.com/results?search_query=${encodeURIComponent(hinoSelecionado.titulo + " hino")}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-4 py-3 bg-destructive/10 rounded-lg text-destructive hover:bg-destructive/20 transition-colors"
+                  <button
+                    onClick={() => {
+                      const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(hinoSelecionado.titulo + " hino")}`;
+                      const win = window.open(url, "_blank", "noopener,noreferrer");
+                      if (!win) {
+                        // Fallback: copy URL to clipboard
+                        navigator.clipboard.writeText(url);
+                        alert("Link copiado! Cole no navegador: " + url);
+                      }
+                    }}
+                    className="flex items-center gap-2 px-4 py-3 bg-destructive/10 rounded-lg text-destructive hover:bg-destructive/20 transition-colors w-full"
                   >
                     <Play size={18} />
                     <span className="font-medium text-sm">{t("Buscar no YouTube")}</span>
                     <ExternalLink size={14} className="ml-auto" />
-                  </a>
+                  </button>
                 </div>
               )}
 
