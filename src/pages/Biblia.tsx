@@ -518,7 +518,7 @@ export default function Biblia() {
               </button>
               <button onClick={() => setZenMode(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
-                <Eye size={14} strokeWidth={1.5} /> Modo Zen
+                <Eye size={14} strokeWidth={1.5} /> {t("Modo Zen")}
               </button>
             </div>
           </div>
