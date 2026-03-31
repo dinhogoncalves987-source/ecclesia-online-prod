@@ -500,8 +500,8 @@ export default function Biblia() {
         {!zenMode && (
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">Bíblia Sagrada</h1>
-              <p className="text-sm text-muted-foreground mt-1">Leitura e meditação — Tradução Almeida</p>
+               <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">{t("Bíblia Sagrada")}</h1>
+               <p className="text-sm text-muted-foreground mt-1">{t("Leitura e meditação — Tradução Almeida")}</p>
             </div>
             <div className="flex gap-2 flex-wrap">
               <button onClick={() => setLargeFont(!largeFont)}
