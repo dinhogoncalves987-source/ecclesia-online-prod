@@ -323,7 +323,7 @@ export default function Biblia() {
             ({selectedBook.testament === "AT" ? "AT" : "NT"})
           </span>
         </button>
-        <span className="text-xs text-muted-foreground">{selectedBook.chapters} capítulos</span>
+        <span className="text-xs text-muted-foreground">{selectedBook.chapters} {t("capítulos")}</span>
       </div>
       <div className="flex flex-wrap gap-1">
         {Array.from({ length: selectedBook.chapters }).map((_, i) => (
