@@ -49,7 +49,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { t, lang, setLang } = useLanguage();
-  const { canAccess, isAdmin } = useRole();
+  const { canAccess, isAdmin, isSuperAdmin } = useRole();
+  const { isMatriz } = useChurch();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileName, setProfileName] = useState("");
