@@ -17,6 +17,7 @@ interface ChurchSummary {
   name: string;
   slug: string;
   is_matriz: boolean;
+  hierarchy_level: string;
   city: string | null;
   state: string | null;
   pastor_name: string | null;
@@ -60,7 +61,7 @@ export default function SuperAdmin() {
   const [showChurchForm, setShowChurchForm] = useState(false);
   const [churchForm, setChurchForm] = useState({
     name: "", city: "", state: "", pastor_name: "", email: "", phone: "", address: "",
-    is_matriz: true, parent_church_id: "",
+    hierarchy_level: "matriz" as string, parent_church_id: "",
   });
 
   // Notice form
@@ -105,6 +106,7 @@ export default function SuperAdmin() {
 
     const flat: ChurchSummary[] = allChurches.map(c => ({
       id: c.id, name: c.name, slug: c.slug, is_matriz: c.is_matriz,
+      hierarchy_level: (c as any).hierarchy_level || (c.is_matriz ? "matriz" : "congregacao"),
       city: c.city, state: c.state, pastor_name: c.pastor_name,
       parent_church_id: c.parent_church_id,
       memberCount: profileCounts[c.id] || 0, children: [],
@@ -151,17 +153,19 @@ export default function SuperAdmin() {
   const handleCreateChurch = async () => {
     if (!churchForm.name.trim()) { toast.error(t("Nome é obrigatório")); return; }
     const slug = generateSlug(churchForm.name);
+    const isSede = churchForm.hierarchy_level === "sede";
+    const isMatriz = churchForm.hierarchy_level === "sede" || churchForm.hierarchy_level === "matriz";
     const { error } = await supabase.from("churches").insert({
       name: churchForm.name.trim(), slug,
-      is_matriz: churchForm.is_matriz,
+      is_matriz: isMatriz,
       parent_church_id: churchForm.parent_church_id || null,
       city: churchForm.city || null, state: churchForm.state || null,
       pastor_name: churchForm.pastor_name || null, email: churchForm.email || null,
       phone: churchForm.phone || null, address: churchForm.address || null,
-    });
+    } as any);
     if (error) { toast.error(error.message); return; }
     toast.success(t("Igreja criada com sucesso!"));
-    setChurchForm({ name: "", city: "", state: "", pastor_name: "", email: "", phone: "", address: "", is_matriz: true, parent_church_id: "" });
+    setChurchForm({ name: "", city: "", state: "", pastor_name: "", email: "", phone: "", address: "", hierarchy_level: "matriz", parent_church_id: "" });
     setShowChurchForm(false);
     loadData();
   };
@@ -245,7 +249,8 @@ export default function SuperAdmin() {
     { key: "notices", label: t("Avisos"), icon: Bell },
   ];
 
-  const matrizChurches = flatChurches.filter(c => c.is_matriz);
+  const sedeChurches = flatChurches.filter(c => c.hierarchy_level === "sede");
+  const matrizChurches = flatChurches.filter(c => c.hierarchy_level === "matriz" || (c.is_matriz && c.hierarchy_level !== "sede"));
 
   const renderChurchTree = (items: ChurchSummary[], level = 0) => (
     items.map(c => (
@@ -259,9 +264,19 @@ export default function SuperAdmin() {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium truncate">{c.name}</span>
-                {c.is_matriz && (
+                {c.hierarchy_level === "sede" && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-600 font-semibold shrink-0">
+                    {t("Sede")}
+                  </span>
+                )}
+                {c.hierarchy_level !== "sede" && c.hierarchy_level !== "congregacao" && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/20 text-accent font-semibold shrink-0">
                     {t("Matriz")}
+                  </span>
+                )}
+                {c.hierarchy_level === "congregacao" && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-semibold shrink-0">
+                    {t("Congregação")}
                   </span>
                 )}
               </div>
@@ -412,20 +427,27 @@ export default function SuperAdmin() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-4">
-                      <label className="flex items-center gap-2 text-sm">
-                        <input type="checkbox" checked={churchForm.is_matriz}
-                          onChange={e => setChurchForm(f => ({ ...f, is_matriz: e.target.checked, parent_church_id: e.target.checked ? "" : f.parent_church_id }))}
-                          className="rounded border-border" />
-                        {t("É uma igreja Matriz (sede)")}
-                      </label>
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm font-medium">{t("Nível:")}</label>
+                        <select value={churchForm.hierarchy_level}
+                          onChange={e => setChurchForm(f => ({ ...f, hierarchy_level: e.target.value, parent_church_id: e.target.value === "sede" ? "" : f.parent_church_id }))}
+                          className="px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30">
+                          <option value="sede">{t("Sede Internacional")}</option>
+                          <option value="matriz">{t("Matriz Regional")}</option>
+                          <option value="congregacao">{t("Congregação")}</option>
+                        </select>
+                      </div>
 
-                      {!churchForm.is_matriz && (
+                      {churchForm.hierarchy_level !== "sede" && (
                         <select value={churchForm.parent_church_id}
                           onChange={e => setChurchForm(f => ({ ...f, parent_church_id: e.target.value }))}
                           className="px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30">
                           <option value="">{t("Selecione a igreja mãe...")}</option>
-                          {flatChurches.map(c => (
-                            <option key={c.id} value={c.id}>{c.name} {c.is_matriz ? `(${t("Matriz")})` : ""}</option>
+                          {flatChurches.filter(c => {
+                            if (churchForm.hierarchy_level === "matriz") return c.hierarchy_level === "sede" || (c.is_matriz && !c.parent_church_id);
+                            return true;
+                          }).map(c => (
+                            <option key={c.id} value={c.id}>{c.name} ({c.hierarchy_level === "sede" ? t("Sede") : c.is_matriz ? t("Matriz") : t("Congregação")})</option>
                           ))}
                         </select>
                       )}
