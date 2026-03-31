@@ -65,7 +65,8 @@ export function useRole() {
     return allowed.includes(role);
   };
 
-  const isAdmin = role === "admin";
+  const isAdmin = role === "admin" || role === "superadmin";
+  const isSuperAdmin = role === "superadmin";
 
-  return { role, loading, canAccess, isAdmin };
+  return { role, loading, canAccess, isAdmin, isSuperAdmin };
 }
