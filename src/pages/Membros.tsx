@@ -295,6 +295,14 @@ export default function Membros() {
           </>
         )}
       </div>
+      <BulkImportModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImport={handleBulkImport}
+        fields={memberFields}
+        templateData={memberTemplate}
+        title={t("Importar Membros")}
+      />
     </AdminLayout>
   );
 }
