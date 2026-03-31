@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/AdminLayout";
-import { Archive, Plus, X, FileText, FolderOpen } from "lucide-react";
+import { Archive, Plus, X, FileText, FolderOpen, Upload, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
 import { format } from "date-fns";
 import { ptBR, enUS, es } from "date-fns/locale";
+import { BulkImportModal } from "@/components/BulkImportModal";
 
 type Document = {
   id: string; title: string; category: string; description: string | null;
