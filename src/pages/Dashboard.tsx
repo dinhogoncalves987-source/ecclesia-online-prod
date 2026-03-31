@@ -118,6 +118,9 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Daily Devotional - always visible */}
+        <DailyDevotional />
+
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 size={24} className="animate-spin text-muted-foreground" />
