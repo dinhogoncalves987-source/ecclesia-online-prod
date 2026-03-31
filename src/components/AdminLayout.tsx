@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useRole } from "@/hooks/useRole";
+import { useChurch } from "@/hooks/useChurch";
 import { supabase } from "@/integrations/supabase/client";
 import flagBR from "@/assets/flag-br.png";
 import flagUS from "@/assets/flag-us.png";
