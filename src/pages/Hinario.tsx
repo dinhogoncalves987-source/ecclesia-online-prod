@@ -15,10 +15,10 @@ export default function Hinario() {
   const { t } = useLanguage();
   const [busca, setBusca] = useState("");
   const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null);
-  const [hinoSelecionado, setHinoSelecionado] = useState<Hino | null>(null);
+  const [hinoSelecionado, setHinoSelecionado] = useState<HinoData | null>(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
 
-  const hinosFiltrados = hinosPublicos.filter(h => {
+  const hinosFiltrados = todosOsHinos.filter(h => {
     const matchBusca = busca === "" || 
       h.titulo.toLowerCase().includes(busca.toLowerCase()) ||
       h.numero.toString().includes(busca);
@@ -85,7 +85,7 @@ export default function Hinario() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card className="bg-card">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-accent">{hinosPublicos.length}</p>
+            <p className="text-2xl font-bold text-accent">{todosOsHinos.length}</p>
             <p className="text-xs text-muted-foreground">{t("Hinos Disponíveis")}</p>
           </CardContent>
         </Card>
@@ -97,7 +97,7 @@ export default function Hinario() {
         </Card>
         <Card className="bg-card">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-accent">{hinosPublicos.filter(h => h.youtubeId).length}</p>
+            <p className="text-2xl font-bold text-accent">{todosOsHinos.filter(h => h.youtubeId).length}</p>
             <p className="text-xs text-muted-foreground">{t("Com Áudio")}</p>
           </CardContent>
         </Card>
