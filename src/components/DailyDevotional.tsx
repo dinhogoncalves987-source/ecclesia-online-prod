@@ -50,11 +50,6 @@ export function DailyDevotional() {
   const fetchDevotional = async (period: Period) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("daily-devotional", {
-        body: null,
-        headers: {},
-      });
-      // Use query params via URL construction
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/daily-devotional?period=${period}`;
       const resp = await fetch(url, {
         headers: {
