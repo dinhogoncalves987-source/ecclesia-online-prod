@@ -43,6 +43,7 @@ export default function Financeiro() {
   const [showForm, setShowForm] = useState(false);
   const [newTx, setNewTx] = useState({ desc: "", type: "Entrada" as "Entrada" | "Saída", value: "", category: "" });
   const [showImport, setShowImport] = useState(false);
+  const [showAIImport, setShowAIImport] = useState(false);
 
   const financeFields = [
     { key: "description", label: t("Descrição"), required: true },
