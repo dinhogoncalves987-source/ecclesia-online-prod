@@ -448,7 +448,7 @@ export default function Biblia() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Pergunte sobre a Bíblia..."
+                  placeholder={t("Pergunte sobre a Bíblia...")}
                   rows={1}
                   className="flex-1 resize-none bg-transparent px-4 py-2.5 text-base sm:text-sm placeholder:text-muted-foreground focus-visible:outline-none max-h-24 min-h-[40px]"
                   style={{ scrollbarWidth: "none" }}
