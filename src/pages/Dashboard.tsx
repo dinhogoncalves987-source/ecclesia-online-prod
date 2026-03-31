@@ -14,7 +14,8 @@ import { useRole } from "@/hooks/useRole";
 export default function Dashboard() {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const { church } = useChurch();
+  const { church, isMatriz } = useChurch();
+  const { isAdmin } = useRole();
   const [notices, setNotices] = useState([
     { id: 1, text: t("Bem-vindo ao sistema de gestão da igreja!"), time: t("Agora"), read: false },
   ]);
