@@ -50,7 +50,7 @@ export function DailyDevotional() {
 
   const getShareText = () => {
     if (!devotional) return "";
-    let text = `✝️ ${t(PERIOD_CONFIG[activePeriod].label)}\n\n"${devotional.verse}"\n— ${devotional.reference}`;
+    let text = `✝️ ${t(PERIOD_CONFIG[activePeriod].labelKey)}\n\n"${devotional.verse}"\n— ${devotional.reference}`;
     if (devotional.reflection) text += `\n\n💭 ${devotional.reflection}`;
     text += `\n\n📖 Ecclesia App`;
     return text;
