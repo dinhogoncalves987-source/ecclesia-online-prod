@@ -46,7 +46,7 @@ export function useRole() {
       if (data && data.length > 0) {
         // Priority: admin first
         const roles = (data as any[]).map((r: any) => r.role as AppRole);
-        const priority: AppRole[] = ["admin", "tesoureiro", "obreiro", "lider", "membro"];
+        const priority: AppRole[] = ["superadmin", "admin", "tesoureiro", "obreiro", "lider", "membro"];
         const best = priority.find(p => roles.includes(p)) || "membro";
         setRole(best);
       } else {
