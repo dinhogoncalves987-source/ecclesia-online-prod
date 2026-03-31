@@ -222,23 +222,36 @@ export default function Biblia() {
     try {
       const recognition = new SpeechRecognition();
       recognition.lang = "pt-BR";
-      recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      let finalText = "";
       recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setInput(prev => prev ? prev + " " + transcript : transcript);
-        setIsChatListening(false);
+        let interim = "";
+        finalText = "";
+        for (let i = 0; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalText += event.results[i][0].transcript + " ";
+          } else {
+            interim += event.results[i][0].transcript;
+          }
+        }
+        setVoiceTranscript((finalText + interim).trim());
       };
       recognition.onerror = (event: any) => {
         console.error("Speech recognition error:", event.error);
-        setIsChatListening(false);
         if (event.error === "not-allowed") {
           alert(t("Permissão de microfone negada. Verifique as configurações do seu navegador."));
-        } else if (event.error === "no-speech") {
-          alert(t("Nenhuma fala detectada. Tente novamente."));
+          stopChatVoice(false);
         }
       };
-      recognition.onend = () => setIsChatListening(false);
+      recognition.onend = () => {
+        // If still listening, restart (continuous mode can stop on silence)
+        if (recognitionRef.current && isChatListening) {
+          try { recognitionRef.current.start(); } catch {}
+        }
+      };
+      recognitionRef.current = recognition;
+      setVoiceTranscript("");
       setIsChatListening(true);
       recognition.start();
     } catch (e) {
@@ -247,6 +260,28 @@ export default function Biblia() {
       alert(t("Erro ao iniciar o microfone. Tente usar o Google Chrome."));
     }
   };
+
+  const stopChatVoice = (confirm: boolean) => {
+    if (recognitionRef.current) {
+      const ref = recognitionRef.current;
+      recognitionRef.current = null;
+      ref.onend = null;
+      try { ref.stop(); } catch {}
+    }
+    if (confirm && voiceTranscript.trim()) {
+      setInput(prev => prev ? prev + " " + voiceTranscript.trim() : voiceTranscript.trim());
+    }
+    setVoiceTranscript("");
+    setIsChatListening(false);
+  };
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
+    }
+  }, [input]);
 
   const downloadMessage = (content: string) => {
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
