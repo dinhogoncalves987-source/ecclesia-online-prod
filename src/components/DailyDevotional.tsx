@@ -46,6 +46,36 @@ export function DailyDevotional() {
   const [devotional, setDevotional] = useState<Devotional | null>(null);
   const [loading, setLoading] = useState(true);
   const [activePeriod, setActivePeriod] = useState<Period>(getCurrentPeriod);
+  const [copied, setCopied] = useState(false);
+
+  const getShareText = () => {
+    if (!devotional) return "";
+    let text = `✝️ ${t(PERIOD_CONFIG[activePeriod].label)}\n\n"${devotional.verse}"\n— ${devotional.reference}`;
+    if (devotional.reflection) text += `\n\n💭 ${devotional.reflection}`;
+    text += `\n\n📖 Ecclesia App`;
+    return text;
+  };
+
+  const handleShare = async () => {
+    const text = getShareText();
+    if (navigator.share) {
+      try {
+        await navigator.share({ text });
+      } catch {}
+    } else {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      toast.success(t("Devocional copiado!"));
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(getShareText());
+    setCopied(true);
+    toast.success(t("Devocional copiado!"));
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const fetchDevotional = async (period: Period) => {
     setLoading(true);
