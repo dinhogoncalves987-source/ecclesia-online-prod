@@ -18,13 +18,12 @@ export default function Grupos() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t } = useLanguage();
-  const { church } = useChurch();
+  const { church, loading: churchLoading } = useChurch();
   const [groups, setGroups] = useState<SmallGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", leader: "", meeting_day: "", meeting_time: "", location: "", description: "", max_members: "12" });
 
-  const { loading: churchLoading } = useChurch();
 
   const fetch_ = async () => {
     if (!church) return;

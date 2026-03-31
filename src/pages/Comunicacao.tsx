@@ -29,7 +29,7 @@ export default function Comunicacao() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t, lang } = useLanguage();
-  const { church } = useChurch();
+  const { church, loading: churchLoading } = useChurch();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -39,7 +39,6 @@ export default function Comunicacao() {
 
   const dateLoc = lang === "en" ? enUS : lang === "es" ? es : ptBR;
 
-  const { loading: churchLoading } = useChurch();
 
   const fetch_ = async () => {
     if (!church) return;
