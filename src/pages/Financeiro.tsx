@@ -1,6 +1,6 @@
 import { AdminLayout } from "@/components/AdminLayout";
 import { ExecutiveCard } from "@/components/ExecutiveCard";
-import { Wallet, TrendingUp, TrendingDown, PiggyBank, Plus, Download, X, Search, Loader2, Copy, QrCode } from "lucide-react";
+import { Wallet, TrendingUp, TrendingDown, PiggyBank, Plus, Download, X, Search, Loader2, Copy, QrCode, Upload } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useChurch } from "@/hooks/useChurch";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
+import { BulkImportModal } from "@/components/BulkImportModal";
 
 type Transaction = {
   id: string;
