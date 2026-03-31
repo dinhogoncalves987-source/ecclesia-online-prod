@@ -2,24 +2,25 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 
-export type AppRole = "admin" | "tesoureiro" | "obreiro" | "lider" | "membro";
+export type AppRole = "superadmin" | "admin" | "tesoureiro" | "obreiro" | "lider" | "membro";
 
 // Which roles can access which modules
 const MODULE_ACCESS: Record<string, AppRole[]> = {
-  "/admin": ["admin", "tesoureiro", "obreiro", "lider", "membro"],
-  "/admin/financeiro": ["admin", "tesoureiro"],
-  "/admin/membros": ["admin"],
-  "/admin/agenda": ["admin", "obreiro", "lider"],
-  "/admin/biblia": ["admin", "tesoureiro", "obreiro", "lider", "membro"],
-  "/admin/oracoes": ["admin", "tesoureiro", "obreiro", "lider", "membro"],
-  "/admin/comunicacao": ["admin", "obreiro"],
-  "/admin/grupos": ["admin", "lider"],
-  "/admin/documentos": ["admin", "obreiro"],
-  "/admin/relatorios": ["admin", "tesoureiro"],
-  "/admin/escalas": ["admin", "obreiro"],
-  "/admin/perfil": ["admin", "tesoureiro", "obreiro", "lider", "membro"],
-  "/admin/gerenciar-acessos": ["admin"],
-  "/admin/congregacoes": ["admin"],
+  "/admin": ["superadmin", "admin", "tesoureiro", "obreiro", "lider", "membro"],
+  "/admin/financeiro": ["superadmin", "admin", "tesoureiro"],
+  "/admin/membros": ["superadmin", "admin"],
+  "/admin/agenda": ["superadmin", "admin", "obreiro", "lider"],
+  "/admin/biblia": ["superadmin", "admin", "tesoureiro", "obreiro", "lider", "membro"],
+  "/admin/oracoes": ["superadmin", "admin", "tesoureiro", "obreiro", "lider", "membro"],
+  "/admin/comunicacao": ["superadmin", "admin", "obreiro"],
+  "/admin/grupos": ["superadmin", "admin", "lider"],
+  "/admin/documentos": ["superadmin", "admin", "obreiro"],
+  "/admin/relatorios": ["superadmin", "admin", "tesoureiro"],
+  "/admin/escalas": ["superadmin", "admin", "obreiro"],
+  "/admin/perfil": ["superadmin", "admin", "tesoureiro", "obreiro", "lider", "membro"],
+  "/admin/gerenciar-acessos": ["superadmin", "admin"],
+  "/admin/congregacoes": ["superadmin", "admin"],
+  "/admin/super-admin": ["superadmin"],
 };
 
 export function useRole() {
