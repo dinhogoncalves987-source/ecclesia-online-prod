@@ -106,6 +106,7 @@ export default function SuperAdmin() {
 
     const flat: ChurchSummary[] = allChurches.map(c => ({
       id: c.id, name: c.name, slug: c.slug, is_matriz: c.is_matriz,
+      hierarchy_level: (c as any).hierarchy_level || (c.is_matriz ? "matriz" : "congregacao"),
       city: c.city, state: c.state, pastor_name: c.pastor_name,
       parent_church_id: c.parent_church_id,
       memberCount: profileCounts[c.id] || 0, children: [],
