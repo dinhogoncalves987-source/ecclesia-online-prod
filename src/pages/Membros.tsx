@@ -79,7 +79,7 @@ export default function Membros() {
     if (error) { toast.error(t("Erro ao remover")); console.error(error); }
     else {
       setMembers(members.filter(m => m.id !== id));
-      toast.success("Membro removido");
+      toast.success(t("Membro removido"));
     }
   };
 
