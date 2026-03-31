@@ -11,7 +11,7 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 export default function Relatorios() {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const { church } = useChurch();
+  const { church, loading: churchLoading } = useChurch();
   const [stats, setStats] = useState({
     totalMembers: 0, activeMembers: 0, visitors: 0,
     totalIncome: 0, totalExpense: 0, balance: 0,
@@ -20,8 +20,10 @@ export default function Relatorios() {
   });
   const [loading, setLoading] = useState(true);
 
+
   useEffect(() => {
-    if (!church) return;
+    if (churchLoading) return;
+    if (!church) { setLoading(false); return; }
     const load = async () => {
       const now = new Date();
       const monthStart = format(startOfMonth(now), "yyyy-MM-dd");
@@ -56,7 +58,7 @@ export default function Relatorios() {
       setLoading(false);
     };
     load();
-  }, [church]);
+  }, [church, churchLoading]);
 
   const cards = [
     { title: t("Total de Membros"), value: stats.totalMembers, sub: `${stats.activeMembers} ${t("ativos")} · ${stats.visitors} ${t("visitantes")}`, icon: Users, color: "text-blue-600 bg-blue-500/10" },

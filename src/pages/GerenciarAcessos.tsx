@@ -51,7 +51,8 @@ export default function GerenciarAcessos() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user || roleLoading) return;
+    if (roleLoading) return;
+    if (!user) { setLoading(false); return; }
     loadUsers();
   }, [user, roleLoading]);
 

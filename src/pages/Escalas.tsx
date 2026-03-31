@@ -21,7 +21,7 @@ export default function Escalas() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t, lang } = useLanguage();
-  const { church } = useChurch();
+  const { church, loading: churchLoading } = useChurch();
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -30,6 +30,7 @@ export default function Escalas() {
 
   const dateLoc = lang === "en" ? enUS : lang === "es" ? es : ptBR;
 
+
   const fetch_ = async () => {
     if (!church) return;
     const { data } = await supabase.from("schedules").select("*").eq("church_id", church.id).order("schedule_date", { ascending: true });
@@ -37,7 +38,11 @@ export default function Escalas() {
     setLoading(false);
   };
 
-  useEffect(() => { if (church) fetch_(); }, [church]);
+  useEffect(() => {
+    if (churchLoading) return;
+    if (!church) { setLoading(false); return; }
+    fetch_();
+  }, [church, churchLoading]);
 
   const handleAdd = async () => {
     if (!form.title.trim() || !form.schedule_date || !user || !church) return;

@@ -40,7 +40,8 @@ export default function Congregacoes() {
   });
 
   useEffect(() => {
-    if (!user || roleLoading || !church) return;
+    if (roleLoading) return;
+    if (!user || !church) { setLoading(false); return; }
     loadCongregations();
   }, [user, roleLoading, church]);
 
