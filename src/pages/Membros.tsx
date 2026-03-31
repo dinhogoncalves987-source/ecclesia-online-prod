@@ -67,7 +67,7 @@ export default function Membros() {
     if (error) { toast.error(t("Erro ao salvar")); console.error(error); }
     else {
       setMembers([data, ...members]);
-      toast.success("Membro cadastrado!");
+      toast.success(t("Membro cadastrado!"));
     }
     setNewMember({ name: "", role: "", phone: "", email: "" });
     setShowForm(false);
