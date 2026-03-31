@@ -1,5 +1,6 @@
 import { AdminLayout } from "@/components/AdminLayout";
 import { ExecutiveCard } from "@/components/ExecutiveCard";
+import { MatrizDashboard } from "@/components/MatrizDashboard";
 import { motion } from "framer-motion";
 import { Wallet, Users, TrendingUp, Calendar, Clock, Bell, Plus, ChevronRight, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -8,11 +9,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useChurch } from "@/hooks/useChurch";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useRole } from "@/hooks/useRole";
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const { church } = useChurch();
+  const { church, isMatriz } = useChurch();
+  const { isAdmin } = useRole();
   const [notices, setNotices] = useState([
     { id: 1, text: t("Bem-vindo ao sistema de gestão da igreja!"), time: t("Agora"), read: false },
   ]);
@@ -102,6 +105,9 @@ export default function Dashboard() {
                 <ExecutiveCard key={m.title} {...m} index={i} />
               ))}
             </div>
+
+            {/* Matriz consolidated panel */}
+            {isMatriz && isAdmin && <MatrizDashboard />}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-card rounded-xl shadow-executive p-5 sm:p-6">
