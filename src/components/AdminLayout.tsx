@@ -327,11 +327,15 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               </nav>
 
               <div className="p-3 border-t border-border/50 space-y-0.5">
-                <button className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary w-full">
+                <Link
+                  to="/admin/perfil"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary w-full"
+                >
                   <Settings size={20} strokeWidth={1.5} /> {t("Configurações")}
-                </button>
+                </Link>
                 <button
-                  onClick={handleSignOut}
+                  onClick={() => { setMobileMenuOpen(false); setShowLogoutConfirm(true); }}
                   className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary w-full"
                 >
                   <LogOut size={20} strokeWidth={1.5} /> {t("Sair")}
