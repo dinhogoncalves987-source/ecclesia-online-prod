@@ -5,7 +5,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Curated list of devotional verses (book, chapter, verse, text in Portuguese)
 const VERSES = [
   { ref: "Salmos 23:1", text: "O Senhor é o meu pastor; nada me faltará." },
   { ref: "Provérbios 3:5-6", text: "Confia no Senhor de todo o teu coração e não te estribes no teu próprio entendimento. Reconhece-o em todos os teus caminhos, e ele endireitará as tuas veredas." },
@@ -40,26 +39,39 @@ const VERSES = [
   { ref: "Salmos 139:14", text: "Eu te louvarei, porque de um modo assombroso e tão maravilhoso fui formado; maravilhosas são as tuas obras, e a minha alma o sabe muito bem." },
 ];
 
+// Period contexts for different times of day
+const PERIOD_PROMPTS: Record<string, string> = {
+  manha: "Você é um pastor evangélico sábio e acolhedor. Escreva uma reflexão devocional MATINAL curta (2-3 frases) baseada no versículo fornecido. O tom deve ser de encorajamento para começar o dia com fé e disposição. Seja inspirador e prático. NÃO repita o versículo. NÃO use markdown.",
+  tarde: "Você é um pastor evangélico sábio e acolhedor. Escreva uma reflexão devocional para o meio do dia, curta (2-3 frases) baseada no versículo fornecido. O tom deve ser de renovação de forças e perseverança para continuar o dia. Seja inspirador e prático. NÃO repita o versículo. NÃO use markdown.",
+  noite: "Você é um pastor evangélico sábio e acolhedor. Escreva uma reflexão devocional NOTURNA curta (2-3 frases) baseada no versículo fornecido. O tom deve ser de gratidão pelo dia vivido e paz para o descanso. Seja inspirador e prático. NÃO repita o versículo. NÃO use markdown.",
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Pick verse based on day of year for consistency
+    const url = new URL(req.url);
+    const period = url.searchParams.get("period") || "manha"; // manha | tarde | noite
+
+    // Pick verse based on day of year + period offset for variety
     const now = new Date();
     const start = new Date(now.getFullYear(), 0, 0);
     const dayOfYear = Math.floor((now.getTime() - start.getTime()) / 86400000);
-    const verse = VERSES[dayOfYear % VERSES.length];
+    
+    const periodOffset = period === "manha" ? 0 : period === "tarde" ? 10 : 20;
+    const verse = VERSES[(dayOfYear + periodOffset) % VERSES.length];
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      // Return verse without reflection if no API key
       return new Response(
-        JSON.stringify({ verse: verse.text, reference: verse.ref, reflection: "" }),
+        JSON.stringify({ verse: verse.text, reference: verse.ref, reflection: "", period }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const systemPrompt = PERIOD_PROMPTS[period] || PERIOD_PROMPTS.manha;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -70,14 +82,8 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          {
-            role: "system",
-            content: "Você é um pastor evangélico sábio e acolhedor. Escreva uma reflexão devocional curta (2-3 frases) baseada no versículo fornecido. Seja inspirador, prático e edificante. Use linguagem simples e direta. NÃO repita o versículo na reflexão. NÃO use markdown."
-          },
-          {
-            role: "user",
-            content: `Versículo do dia: "${verse.text}" (${verse.ref}). Escreva uma breve reflexão devocional.`
-          }
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Versículo: "${verse.text}" (${verse.ref}). Escreva a reflexão.` }
         ],
       }),
     });
@@ -87,16 +93,14 @@ serve(async (req) => {
       const aiData = await aiResponse.json();
       reflection = aiData.choices?.[0]?.message?.content || "";
     } else {
-      if (aiResponse.status === 429 || aiResponse.status === 402) {
-        await aiResponse.text();
-      } else {
-        const errText = await aiResponse.text();
+      const errText = await aiResponse.text();
+      if (aiResponse.status !== 429 && aiResponse.status !== 402) {
         console.error("AI error:", aiResponse.status, errText);
       }
     }
 
     return new Response(
-      JSON.stringify({ verse: verse.text, reference: verse.ref, reflection }),
+      JSON.stringify({ verse: verse.text, reference: verse.ref, reflection, period }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {

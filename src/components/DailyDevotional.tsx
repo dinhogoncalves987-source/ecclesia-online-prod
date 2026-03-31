@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BookOpen, RefreshCw, Sparkles } from "lucide-react";
+import { BookOpen, RefreshCw, Sparkles, Sun, CloudSun, Moon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/hooks/useLanguage";
 import { motion } from "framer-motion";
@@ -8,19 +8,63 @@ interface Devotional {
   verse: string;
   reference: string;
   reflection: string;
+  period: string;
+}
+
+type Period = "manha" | "tarde" | "noite";
+
+const PERIOD_CONFIG: Record<Period, { label: string; icon: typeof Sun; gradient: string; borderColor: string }> = {
+  manha: {
+    label: "Devocional da Manhã",
+    icon: Sun,
+    gradient: "from-amber-500/10 via-orange-400/5 to-yellow-300/10",
+    borderColor: "border-amber-400/30",
+  },
+  tarde: {
+    label: "Devocional da Tarde",
+    icon: CloudSun,
+    gradient: "from-sky-500/10 via-blue-400/5 to-cyan-300/10",
+    borderColor: "border-sky-400/30",
+  },
+  noite: {
+    label: "Devocional da Noite",
+    icon: Moon,
+    gradient: "from-indigo-500/10 via-purple-400/5 to-violet-300/10",
+    borderColor: "border-indigo-400/30",
+  },
+};
+
+function getCurrentPeriod(): Period {
+  const hour = new Date().getHours();
+  if (hour < 13) return "manha";      // 00:00 - 12:59 → manhã (starts 07:00)
+  if (hour < 18) return "tarde";       // 13:00 - 17:59 → tarde (starts 13:30)
+  return "noite";                       // 18:00 - 23:59 → noite (starts 19:00)
 }
 
 export function DailyDevotional() {
   const { t } = useLanguage();
   const [devotional, setDevotional] = useState<Devotional | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activePeriod, setActivePeriod] = useState<Period>(getCurrentPeriod);
 
-  const fetchDevotional = async () => {
+  const fetchDevotional = async (period: Period) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("daily-devotional");
-      if (error) throw error;
-      setDevotional(data as Devotional);
+      const { data, error } = await supabase.functions.invoke("daily-devotional", {
+        body: null,
+        headers: {},
+      });
+      // Use query params via URL construction
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/daily-devotional?period=${period}`;
+      const resp = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (!resp.ok) throw new Error("Failed to fetch devotional");
+      const result = await resp.json();
+      setDevotional(result as Devotional);
     } catch (e) {
       console.error("Error fetching devotional:", e);
     } finally {
@@ -29,62 +73,85 @@ export function DailyDevotional() {
   };
 
   useEffect(() => {
-    fetchDevotional();
-  }, []);
+    fetchDevotional(activePeriod);
+  }, [activePeriod]);
 
-  if (loading) {
-    return (
-      <div className="bg-gradient-to-r from-primary/10 via-accent/10 to-primary/5 rounded-xl p-5 sm:p-6 border border-primary/20 animate-pulse">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-8 h-8 rounded-lg bg-primary/20" />
-          <div className="h-5 w-40 bg-primary/20 rounded" />
-        </div>
-        <div className="h-4 w-full bg-primary/10 rounded mb-2" />
-        <div className="h-4 w-3/4 bg-primary/10 rounded" />
-      </div>
-    );
-  }
-
-  if (!devotional) return null;
+  const config = PERIOD_CONFIG[activePeriod];
+  const PeriodIcon = config.icon;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-accent/5 to-secondary/30 rounded-xl p-5 sm:p-6 border border-primary/20"
+      className={`relative overflow-hidden bg-gradient-to-br ${config.gradient} rounded-xl p-5 sm:p-6 border ${config.borderColor}`}
     >
-      {/* Decorative element */}
+      {/* Decorative circle */}
       <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2" />
 
       <div className="relative z-10">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
+        {/* Header with period tabs */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+          <div className="flex items-center gap-2 flex-1">
             <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center">
               <BookOpen size={16} className="text-primary" />
             </div>
-            <h2 className="font-serif text-lg text-foreground">{t("Devocional do Dia")}</h2>
+            <h2 className="font-serif text-lg text-foreground">{t(config.label)}</h2>
           </div>
-          <button
-            onClick={fetchDevotional}
-            className="p-1.5 rounded-lg hover:bg-secondary/50 transition-colors text-muted-foreground hover:text-foreground"
-            title={t("Atualizar")}
-          >
-            <RefreshCw size={14} />
-          </button>
+
+          {/* Period selector */}
+          <div className="flex items-center gap-1 bg-background/60 rounded-lg p-1">
+            {(["manha", "tarde", "noite"] as Period[]).map((p) => {
+              const Icon = PERIOD_CONFIG[p].icon;
+              const isActive = p === activePeriod;
+              return (
+                <button
+                  key={p}
+                  onClick={() => setActivePeriod(p)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                  }`}
+                >
+                  <Icon size={12} />
+                  <span className="hidden sm:inline">
+                    {p === "manha" ? t("Manhã") : p === "tarde" ? t("Tarde") : t("Noite")}
+                  </span>
+                </button>
+              );
+            })}
+            <button
+              onClick={() => fetchDevotional(activePeriod)}
+              className="p-1.5 rounded-md hover:bg-secondary/50 transition-colors text-muted-foreground hover:text-foreground ml-1"
+              title={t("Atualizar")}
+            >
+              <RefreshCw size={12} />
+            </button>
+          </div>
         </div>
 
-        <blockquote className="text-sm sm:text-base italic text-foreground/90 leading-relaxed mb-2 pl-3 border-l-2 border-primary/40">
-          "{devotional.verse}"
-        </blockquote>
-        <p className="text-xs font-semibold text-primary mb-3">— {devotional.reference}</p>
-
-        {devotional.reflection && (
-          <div className="flex gap-2 items-start bg-background/50 rounded-lg p-3">
-            <Sparkles size={14} className="text-accent mt-0.5 flex-shrink-0" />
-            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">{devotional.reflection}</p>
+        {loading ? (
+          <div className="space-y-2 animate-pulse">
+            <div className="h-4 w-full bg-primary/10 rounded" />
+            <div className="h-4 w-3/4 bg-primary/10 rounded" />
+            <div className="h-3 w-1/4 bg-primary/10 rounded mt-1" />
           </div>
-        )}
+        ) : devotional ? (
+          <>
+            <blockquote className="text-sm sm:text-base italic text-foreground/90 leading-relaxed mb-2 pl-3 border-l-2 border-primary/40">
+              "{devotional.verse}"
+            </blockquote>
+            <p className="text-xs font-semibold text-primary mb-3">— {devotional.reference}</p>
+
+            {devotional.reflection && (
+              <div className="flex gap-2 items-start bg-background/50 rounded-lg p-3">
+                <Sparkles size={14} className="text-accent mt-0.5 flex-shrink-0" />
+                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">{devotional.reflection}</p>
+              </div>
+            )}
+          </>
+        ) : null}
       </div>
     </motion.div>
   );
