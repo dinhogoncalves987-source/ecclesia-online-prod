@@ -13,21 +13,21 @@ interface Devotional {
 
 type Period = "manha" | "tarde" | "noite";
 
-const PERIOD_CONFIG: Record<Period, { label: string; icon: typeof Sun; gradient: string; borderColor: string }> = {
+const PERIOD_CONFIG: Record<Period, { labelKey: string; icon: typeof Sun; gradient: string; borderColor: string }> = {
   manha: {
-    label: "Devocional da Manhã",
+    labelKey: "Devocional da Manhã",
     icon: Sun,
     gradient: "from-amber-500/10 via-orange-400/5 to-yellow-300/10",
     borderColor: "border-amber-400/30",
   },
   tarde: {
-    label: "Devocional da Tarde",
+    labelKey: "Devocional da Tarde",
     icon: CloudSun,
     gradient: "from-sky-500/10 via-blue-400/5 to-cyan-300/10",
     borderColor: "border-sky-400/30",
   },
   noite: {
-    label: "Devocional da Noite",
+    labelKey: "Devocional da Noite",
     icon: Moon,
     gradient: "from-indigo-500/10 via-purple-400/5 to-violet-300/10",
     borderColor: "border-indigo-400/30",
@@ -50,7 +50,7 @@ export function DailyDevotional() {
 
   const getShareText = () => {
     if (!devotional) return "";
-    let text = `✝️ ${t(PERIOD_CONFIG[activePeriod].label)}\n\n"${devotional.verse}"\n— ${devotional.reference}`;
+    let text = `✝️ ${t(PERIOD_CONFIG[activePeriod].labelKey)}\n\n"${devotional.verse}"\n— ${devotional.reference}`;
     if (devotional.reflection) text += `\n\n💭 ${devotional.reflection}`;
     text += `\n\n📖 Ecclesia App`;
     return text;
@@ -121,7 +121,7 @@ export function DailyDevotional() {
             <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center">
               <BookOpen size={16} className="text-primary" />
             </div>
-            <h2 className="font-serif text-lg text-foreground">{t(config.label)}</h2>
+            <h2 className="font-serif text-lg text-foreground">{t(config.labelKey)}</h2>
           </div>
 
           {/* Period selector */}

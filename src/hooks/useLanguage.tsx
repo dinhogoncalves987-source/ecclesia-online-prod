@@ -575,9 +575,43 @@ const translations: Record<string, Record<Lang, string>> = {
   "Permissão de microfone negada.": { pt: "Permissão de microfone negada.", en: "Microphone permission denied.", es: "Permiso de micrófono denegado." },
   "Erro ao iniciar microfone.": { pt: "Erro ao iniciar microfone.", en: "Error starting microphone.", es: "Error al iniciar micrófono." },
 
-  // Ex placeholder Hinário
-  "Ex: 2 ou Santo, Santo...": { pt: "Ex: 2 ou Santo, Santo...", en: "E.g.: 2 or Holy, Holy...", es: "Ej: 2 o Santo, Santo..." },
+  // Devocional
+  "Devocional da Manhã": { pt: "Devocional da Manhã", en: "Morning Devotional", es: "Devocional de la Mañana" },
+  "Devocional da Tarde": { pt: "Devocional da Tarde", en: "Afternoon Devotional", es: "Devocional de la Tarde" },
+  "Devocional da Noite": { pt: "Devocional da Noite", en: "Evening Devotional", es: "Devocional de la Noche" },
+  "Manhã": { pt: "Manhã", en: "Morning", es: "Mañana" },
+  "Tarde": { pt: "Tarde", en: "Afternoon", es: "Tarde" },
+  "Noite": { pt: "Noite", en: "Evening", es: "Noche" },
+  "Atualizar": { pt: "Atualizar", en: "Refresh", es: "Actualizar" },
+  "Devocional copiado!": { pt: "Devocional copiado!", en: "Devotional copied!", es: "¡Devocional copiado!" },
+  "Copiado!": { pt: "Copiado!", en: "Copied!", es: "¡Copiado!" },
+  "Copiar": { pt: "Copiar", en: "Copy", es: "Copiar" },
+  "Share": { pt: "Compartilhar", en: "Share", es: "Compartir" },
+
+  // Harpa extras
+  "Nenhum hino encontrado": { pt: "Nenhum hino encontrado", en: "No hymns found", es: "Ningún himno encontrado" },
+  "Uploads da Igreja": { pt: "Uploads da Igreja", en: "Church Uploads", es: "Subidas de la Iglesia" },
+  "Por Categoria": { pt: "Por Categoria", en: "By Category", es: "Por Categoría" },
+  "Ouvir no YouTube": { pt: "Ouvir no YouTube", en: "Listen on YouTube", es: "Escuchar en YouTube" },
+  "Buscar no YouTube": { pt: "Buscar no YouTube", en: "Search on YouTube", es: "Buscar en YouTube" },
+  "Letra": { pt: "Letra", en: "Lyrics", es: "Letra" },
+  "Detalhes do hino": { pt: "Detalhes do hino", en: "Hymn details", es: "Detalles del himno" },
+  "Enviar Hino da Igreja": { pt: "Enviar Hino da Igreja", en: "Upload Church Hymn", es: "Subir Himno de la Iglesia" },
+  "Upload de hinos da igreja": { pt: "Upload de hinos da igreja", en: "Church hymn upload", es: "Subida de himnos de la iglesia" },
+  "Envie hinos e louvores próprios da sua igreja. Formatos aceitos: MP3, MP4, WAV.": { pt: "Envie hinos e louvores próprios da sua igreja. Formatos aceitos: MP3, MP4, WAV.", en: "Upload hymns and worship songs from your church. Accepted formats: MP3, MP4, WAV.", es: "Suba himnos y alabanzas de su iglesia. Formatos aceptados: MP3, MP4, WAV." },
+  "Arraste o arquivo aqui ou clique para selecionar": { pt: "Arraste o arquivo aqui ou clique para selecionar", en: "Drag the file here or click to select", es: "Arrastre el archivo aquí o haga clic para seleccionar" },
+  "Em breve disponível": { pt: "Em breve disponível", en: "Coming soon", es: "Próximamente disponible" },
+  "* O upload de áudio será habilitado em breve. Você poderá enviar gravações de ensaios, louvores próprios da congregação e muito mais.": { pt: "* O upload de áudio será habilitado em breve. Você poderá enviar gravações de ensaios, louvores próprios da congregação e muito mais.", en: "* Audio upload will be available soon. You'll be able to upload rehearsal recordings, congregation's own worship songs and much more.", es: "* La subida de audio estará disponible pronto. Podrá enviar grabaciones de ensayos, alabanzas propias de la congregación y mucho más." },
+
+  // Assembleia extras
+
+  // Admin Matriz label
+  "Admin Matriz": { pt: "Admin Matriz", en: "HQ Admin", es: "Admin Matriz" },
+
+  // Visão geral
+  "Visão geral da administração (placeholder)": { pt: "Visão geral da administração", en: "Administration overview", es: "Visión general de la administración" },
 };
+
 
 type LanguageContextType = {
   lang: Lang;

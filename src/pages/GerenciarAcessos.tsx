@@ -169,7 +169,7 @@ export default function GerenciarAcessos() {
                             value={u.role}
                             onChange={e => handleRoleChange(u.user_id, u.role_id, e.target.value as AppRole)}
                             disabled={isCurrentUser}
-                            className={`appearance-none pl-3 pr-8 py-1.5 rounded-lg text-xs font-semibold border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/30 ${ROLE_COLORS[u.role]} ${isCurrentUser ? "opacity-60 cursor-not-allowed" : ""}`}
+                            className={`appearance-none pl-3 pr-8 py-1.5 rounded-lg text-xs font-semibold border border-border cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent/30 bg-card text-foreground ${isCurrentUser ? "opacity-60 cursor-not-allowed" : ""}`}
                           >
                             {(Object.keys(ROLE_LABEL_KEYS) as AppRole[]).map(r => (
                               <option key={r} value={r}>{t(ROLE_LABEL_KEYS[r])}</option>
