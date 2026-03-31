@@ -25,7 +25,7 @@ export default function Oracoes() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t } = useLanguage();
-  const { church } = useChurch();
+  const { church, loading: churchLoading } = useChurch();
   const [requests, setRequests] = useState<PrayerRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -34,7 +34,6 @@ export default function Oracoes() {
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [filter, setFilter] = useState<"Todos" | "Ativo" | "Respondido">("Todos");
 
-  const { loading: churchLoading } = useChurch();
 
   const fetchRequests = async () => {
     if (!church) return;

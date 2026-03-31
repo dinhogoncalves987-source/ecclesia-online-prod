@@ -11,7 +11,7 @@ import { format, startOfMonth, endOfMonth } from "date-fns";
 export default function Relatorios() {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const { church } = useChurch();
+  const { church, loading: churchLoading } = useChurch();
   const [stats, setStats] = useState({
     totalMembers: 0, activeMembers: 0, visitors: 0,
     totalIncome: 0, totalExpense: 0, balance: 0,
@@ -20,7 +20,6 @@ export default function Relatorios() {
   });
   const [loading, setLoading] = useState(true);
 
-  const { loading: churchLoading } = useChurch();
 
   useEffect(() => {
     if (churchLoading) return;

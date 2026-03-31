@@ -33,7 +33,7 @@ interface PlatformNotice {
 export default function SuperAdmin() {
   const { t } = useLanguage();
   const { user } = useAuth();
-  const { role } = useRole();
+  const { role, loading: roleLoading } = useRole();
   const [churches, setChurches] = useState<ChurchSummary[]>([]);
   const [notices, setNotices] = useState<PlatformNotice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +46,6 @@ export default function SuperAdmin() {
   const [noticeContent, setNoticeContent] = useState("");
   const [noticePriority, setNoticePriority] = useState("Normal");
 
-  const { loading: roleLoading } = useRole();
 
   useEffect(() => {
     if (roleLoading) return;

@@ -21,7 +21,7 @@ export default function Escalas() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { t, lang } = useLanguage();
-  const { church } = useChurch();
+  const { church, loading: churchLoading } = useChurch();
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -30,7 +30,6 @@ export default function Escalas() {
 
   const dateLoc = lang === "en" ? enUS : lang === "es" ? es : ptBR;
 
-  const { loading: churchLoading } = useChurch();
 
   const fetch_ = async () => {
     if (!church) return;
