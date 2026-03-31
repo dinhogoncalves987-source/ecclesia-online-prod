@@ -389,6 +389,10 @@ const translations: Record<string, Record<Lang, string>> = {
   "Erro ao buscar versículos": { pt: "Erro ao buscar versículos", en: "Error fetching verses", es: "Error al buscar versículos" },
   "A definir": { pt: "A definir", en: "TBD", es: "Por definir" },
   "Texto copiado!": { pt: "Texto copiado!", en: "Text copied!", es: "¡Texto copiado!" },
+  "Seu navegador não suporta reconhecimento de voz. Tente usar o Google Chrome.": { pt: "Seu navegador não suporta reconhecimento de voz. Tente usar o Google Chrome.", en: "Your browser does not support voice recognition. Try using Google Chrome.", es: "Su navegador no soporta reconocimiento de voz. Intente usar Google Chrome." },
+  "Permissão de microfone negada. Verifique as configurações do seu navegador.": { pt: "Permissão de microfone negada. Verifique as configurações do seu navegador.", en: "Microphone permission denied. Check your browser settings.", es: "Permiso de micrófono denegado. Verifique la configuración de su navegador." },
+  "Nenhuma fala detectada. Tente novamente.": { pt: "Nenhuma fala detectada. Tente novamente.", en: "No speech detected. Try again.", es: "No se detectó voz. Inténtelo de nuevo." },
+  "Erro ao iniciar o microfone. Tente usar o Google Chrome.": { pt: "Erro ao iniciar o microfone. Tente usar o Google Chrome.", en: "Error starting microphone. Try using Google Chrome.", es: "Error al iniciar el micrófono. Intente usar Google Chrome." },
   "redução": { pt: "redução", en: "reduction", es: "reducción" },
 
   // Congregações
