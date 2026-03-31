@@ -150,6 +150,10 @@ export default function Membros() {
             </p>
           </div>
           <div className="flex gap-2">
+            <button onClick={() => setShowAIImport(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-accent/10 text-accent rounded-lg text-sm font-medium hover:bg-accent/20 transition-colors">
+              <Sparkles size={14} strokeWidth={1.5} /> {t("Importar com IA")}
+            </button>
             <button onClick={() => setShowImport(true)}
               className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
               <Upload size={14} strokeWidth={1.5} /> {t("Importar CSV")}
