@@ -29,7 +29,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user || !church) return;
+    if (!user || !church) { setLoading(false); return; }
     const load = async () => {
       setLoading(true);
       const now = new Date();

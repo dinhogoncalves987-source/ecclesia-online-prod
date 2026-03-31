@@ -41,7 +41,7 @@ export default function Financeiro() {
   const [newTx, setNewTx] = useState({ desc: "", type: "Entrada" as "Entrada" | "Saída", value: "", category: "" });
 
   useEffect(() => {
-    if (!user || !church) return;
+    if (!user || !church) { setLoading(false); return; }
     const load = async () => {
       setLoading(true);
       const { data, error } = await supabase
