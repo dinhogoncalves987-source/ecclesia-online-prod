@@ -351,7 +351,7 @@ export default function Biblia() {
             </div>
             <div className="flex items-center gap-1">
               {messages.length > 0 && (
-                <button onClick={() => setMessages([])} className="p-1.5 rounded-lg hover:bg-secondary transition-colors" title="Limpar conversa">
+                <button onClick={() => setMessages([])} className="p-1.5 rounded-lg hover:bg-secondary transition-colors" title={t("Limpar conversa")}>
                   <Trash2 size={14} strokeWidth={1.5} className="text-muted-foreground" />
                 </button>
               )}
