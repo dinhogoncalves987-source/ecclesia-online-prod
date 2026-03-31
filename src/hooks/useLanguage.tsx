@@ -413,6 +413,13 @@ const translations: Record<string, Record<Lang, string>> = {
   "Total de Congregações": { pt: "Total de Congregações", en: "Total Congregations", es: "Total de Congregaciones" },
   "Editar": { pt: "Editar", en: "Edit", es: "Editar" },
   "Excluir": { pt: "Excluir", en: "Delete", es: "Eliminar" },
+
+  // Biblia extras
+  "Imagem": { pt: "Imagem", en: "Image", es: "Imagen" },
+  "Documento": { pt: "Documento", en: "Document", es: "Documento" },
+  "Anexar arquivo": { pt: "Anexar arquivo", en: "Attach file", es: "Adjuntar archivo" },
+  "Estudo Bíblico": { pt: "Estudo Bíblico", en: "Bible Study", es: "Estudio Bíblico" },
+  "Selecione um capítulo acima para começar a leitura": { pt: "Selecione um capítulo acima para começar a leitura", en: "Select a chapter above to start reading", es: "Seleccione un capítulo arriba para comenzar la lectura" },
 };
 
 type LanguageContextType = {
