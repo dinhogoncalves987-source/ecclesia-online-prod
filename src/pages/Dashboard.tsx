@@ -19,10 +19,10 @@ export default function Dashboard() {
   const { isAdmin, isSuperAdmin } = useRole();
   const [platformNotices, setPlatformNotices] = useState<{ id: string; title: string; content: string; priority: string; created_at: string }[]>([]);
   const [metrics, setMetrics] = useState([
-    { title: t("Receita do Mês"), value: "R$ 0", trend: "", icon: Wallet },
-    { title: t("Despesas do Mês"), value: "R$ 0", trend: "", icon: TrendingUp },
-    { title: t("Membros Ativos"), value: "0", icon: Users },
-    { title: t("Eventos no Mês"), value: "0", icon: Calendar },
+    { title: t("Receita do Mês"), value: "R$ 0", trend: "", icon: Wallet, href: "/admin/financeiro" },
+    { title: t("Despesas do Mês"), value: "R$ 0", trend: "", icon: TrendingUp, href: "/admin/financeiro" },
+    { title: t("Membros Ativos"), value: "0", icon: Users, href: "/admin/membros" },
+    { title: t("Eventos no Mês"), value: "0", icon: Calendar, href: "/admin/agenda" },
   ]);
   const [superMetrics, setSuperMetrics] = useState<{ churches: number; users: number } | null>(null);
   const [upcomingEvents, setUpcomingEvents] = useState<{ id: string; title: string; date: string; time: string | null }[]>([]);
