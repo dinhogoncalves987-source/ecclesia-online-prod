@@ -435,7 +435,7 @@ export default function Biblia() {
                     }
                     e.target.value = "";
                   }}
-                  title="Anexar arquivo"
+                  title={t("Anexar arquivo")}
                 />
                 <div className="p-2 rounded-full text-muted-foreground hover:bg-secondary transition-colors">
                   <Plus size={18} />
