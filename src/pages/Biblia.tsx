@@ -1,5 +1,5 @@
 import { AdminLayout } from "@/components/AdminLayout";
-import { ChevronLeft, ChevronRight, Search, Bookmark, Eye, MessageSquare, Send, X, Sparkles, Trash2, BookOpen, Loader2, Mic, MicOff, Download, Share2, Plus, Image, FileText } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, Bookmark, Eye, MessageSquare, Send, X, Sparkles, Trash2, BookOpen, Loader2, Mic, MicOff, Download, Share2, Plus, Image, FileText, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
@@ -38,6 +38,9 @@ export default function Biblia() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isChatListening, setIsChatListening] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const recognitionRef = useRef<any>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const versesRef = useRef<HTMLDivElement>(null);
   const chatRef = useRef<HTMLDivElement>(null);
@@ -219,23 +222,36 @@ export default function Biblia() {
     try {
       const recognition = new SpeechRecognition();
       recognition.lang = "pt-BR";
-      recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      let finalText = "";
       recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setInput(prev => prev ? prev + " " + transcript : transcript);
-        setIsChatListening(false);
+        let interim = "";
+        finalText = "";
+        for (let i = 0; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalText += event.results[i][0].transcript + " ";
+          } else {
+            interim += event.results[i][0].transcript;
+          }
+        }
+        setVoiceTranscript((finalText + interim).trim());
       };
       recognition.onerror = (event: any) => {
         console.error("Speech recognition error:", event.error);
-        setIsChatListening(false);
         if (event.error === "not-allowed") {
           alert(t("Permissão de microfone negada. Verifique as configurações do seu navegador."));
-        } else if (event.error === "no-speech") {
-          alert(t("Nenhuma fala detectada. Tente novamente."));
+          stopChatVoice(false);
         }
       };
-      recognition.onend = () => setIsChatListening(false);
+      recognition.onend = () => {
+        // If still listening (ref exists), restart (continuous mode can stop on silence)
+        if (recognitionRef.current) {
+          try { recognitionRef.current.start(); } catch {}
+        }
+      };
+      recognitionRef.current = recognition;
+      setVoiceTranscript("");
       setIsChatListening(true);
       recognition.start();
     } catch (e) {
@@ -244,6 +260,28 @@ export default function Biblia() {
       alert(t("Erro ao iniciar o microfone. Tente usar o Google Chrome."));
     }
   };
+
+  const stopChatVoice = (confirm: boolean) => {
+    if (recognitionRef.current) {
+      const ref = recognitionRef.current;
+      recognitionRef.current = null;
+      ref.onend = null;
+      try { ref.stop(); } catch {}
+    }
+    if (confirm && voiceTranscript.trim()) {
+      setInput(prev => prev ? prev + " " + voiceTranscript.trim() : voiceTranscript.trim());
+    }
+    setVoiceTranscript("");
+    setIsChatListening(false);
+  };
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
+    }
+  }, [input]);
 
   const downloadMessage = (content: string) => {
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
@@ -452,64 +490,91 @@ export default function Biblia() {
           </div>
 
           <div className="p-2 border-t border-border/50">
-            <div className="flex items-end gap-1.5">
-              {/* + Attach button */}
-              <div className="relative shrink-0">
-                <input
-                  type="file"
-                  accept="image/*,.pdf,.doc,.docx,.txt"
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const isImage = file.type.startsWith("image/");
-                      setInput(prev => prev + (prev ? " " : "") + `[${isImage ? t("Imagem") : t("Documento")}${": " + file.name}]`);
-                    }
-                    e.target.value = "";
-                  }}
-                  title={t("Anexar arquivo")}
-                />
-                <div className="p-2 rounded-full text-muted-foreground hover:bg-secondary transition-colors">
-                  <Plus size={18} />
+            {/* Voice recording mode */}
+            {isChatListening ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => stopChatVoice(false)}
+                  className="p-2.5 rounded-full bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors shrink-0"
+                  title={t("Cancelar")}
+                >
+                  <X size={18} />
+                </button>
+                <div className="flex-1 bg-destructive/5 rounded-2xl px-4 py-2.5 border border-destructive/20">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 bg-destructive rounded-full animate-pulse" />
+                    <p className="text-sm truncate">
+                      {voiceTranscript || t("Ouvindo...")}
+                    </p>
+                  </div>
                 </div>
+                <button
+                  onClick={() => stopChatVoice(true)}
+                  className="p-2.5 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 transition-colors shrink-0"
+                  title={t("Confirmar")}
+                >
+                  <Check size={18} />
+                </button>
               </div>
+            ) : (
+              <div className="flex items-end gap-1.5">
+                {/* + Attach button */}
+                <div className="relative shrink-0">
+                  <input
+                    type="file"
+                    accept="image/*,.pdf,.doc,.docx,.txt"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const isImage = file.type.startsWith("image/");
+                        setInput(prev => prev + (prev ? " " : "") + `[${isImage ? t("Imagem") : t("Documento")}${": " + file.name}]`);
+                      }
+                      e.target.value = "";
+                    }}
+                    title={t("Anexar arquivo")}
+                  />
+                  <div className="p-2 rounded-full text-muted-foreground hover:bg-secondary transition-colors">
+                    <Plus size={18} />
+                  </div>
+                </div>
 
-              {/* Input + mic + send grouped together */}
-              <div className="flex-1 flex items-end bg-secondary/50 rounded-full border border-input overflow-hidden">
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={t("Pergunte sobre a Bíblia...")}
-                  rows={1}
-                  className="flex-1 resize-none bg-transparent px-4 py-2.5 text-base sm:text-sm placeholder:text-muted-foreground focus-visible:outline-none max-h-24 min-h-[40px]"
-                  style={{ scrollbarWidth: "none" }}
-                />
+                {/* Input + mic grouped */}
+                <div className="flex-1 flex items-end bg-secondary/50 rounded-2xl border border-input overflow-hidden">
+                  <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={t("Pergunte sobre a Bíblia...")}
+                    rows={1}
+                    className="flex-1 resize-none bg-transparent px-4 py-2.5 text-base sm:text-sm placeholder:text-muted-foreground focus-visible:outline-none min-h-[40px]"
+                    style={{ scrollbarWidth: "none", maxHeight: "160px", overflow: "auto" }}
+                  />
 
-                {/* Mic inside the input bar */}
-                {!input.trim() && (
-                  <button
-                    onClick={startChatVoice}
-                    disabled={isLoading}
-                    className={`p-2.5 shrink-0 transition-colors ${
-                      isChatListening ? "text-destructive animate-pulse" : "text-muted-foreground hover:text-foreground"
-                    }`}
-                    title={t("Falar com microfone")}
-                  >
-                    {isChatListening ? <MicOff size={18} /> : <Mic size={18} />}
-                  </button>
-                )}
+                  {/* Mic inside the input bar - shows when no text */}
+                  {!input.trim() && (
+                    <button
+                      onClick={startChatVoice}
+                      disabled={isLoading}
+                      className="p-2.5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                      title={t("Falar com microfone")}
+                    >
+                      <Mic size={18} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Send button */}
+                <button
+                  onClick={() => sendMessage()}
+                  disabled={!input.trim() || isLoading}
+                  className="p-2.5 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 disabled:opacity-30 transition-all shrink-0"
+                >
+                  <Send size={16} />
+                </button>
               </div>
-
-              {/* Send button */}
-              <button
-                onClick={() => sendMessage()}
-                disabled={!input.trim() || isLoading}
-                className="p-2.5 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 disabled:opacity-30 transition-all shrink-0"
-              >
-                <Send size={16} />
-              </button>
-            </div>
+            )}
           </div>
         </motion.div>
       )}
