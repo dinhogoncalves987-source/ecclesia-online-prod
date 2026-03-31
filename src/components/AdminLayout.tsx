@@ -40,7 +40,7 @@ const mobileNavItems = [
   { icon: Wallet, label: "Finanças", path: "/admin/financeiro" },
   { icon: Calendar, label: "Agenda", path: "/admin/agenda" },
   { icon: BookOpen, label: "Bíblia", path: "/admin/biblia" },
-  { icon: Users, label: "Perfil", path: "/admin/membros" },
+  { icon: User, label: "Perfil", path: "/admin/perfil" },
 ];
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
