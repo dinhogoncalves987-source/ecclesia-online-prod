@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Wallet, Users, Calendar, BookOpen, FileText,
   Heart, MessageSquare, UsersRound, Archive, BarChart3, Menu, X,
   Bell, ChevronLeft, Settings, LogOut, Maximize, Minimize, Globe,
-  Shield, User, Building2, Music
+  Shield, User, Building2, Music, Gavel
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -30,6 +30,7 @@ const baseNavItems = [
   { icon: MessageSquare, label: "Comunicação", path: "/admin/comunicacao" },
   { icon: UsersRound, label: "Pequenos Grupos", path: "/admin/grupos" },
   { icon: Archive, label: "Documentos", path: "/admin/documentos" },
+  { icon: Gavel, label: "Assembleia Geral", path: "/admin/assembleia-geral" },
   { icon: BarChart3, label: "Relatórios", path: "/admin/relatorios" },
   { icon: FileText, label: "Escalas", path: "/admin/escalas" },
   { icon: Shield, label: "Gerenciar Acessos", path: "/admin/gerenciar-acessos" },

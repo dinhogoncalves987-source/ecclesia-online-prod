@@ -52,6 +52,89 @@ export type Database = {
           },
         ]
       }
+      assemblies: {
+        Row: {
+          assembly_date: string
+          church_id: string
+          created_at: string
+          description: string | null
+          id: string
+          is_visible: boolean
+          period: string | null
+          title: string
+          updated_at: string
+          user_id: string
+          youtube_url: string | null
+        }
+        Insert: {
+          assembly_date?: string
+          church_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_visible?: boolean
+          period?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+          youtube_url?: string | null
+        }
+        Update: {
+          assembly_date?: string
+          church_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_visible?: boolean
+          period?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+          youtube_url?: string | null
+        }
+        Relationships: []
+      }
+      assembly_attachments: {
+        Row: {
+          assembly_id: string
+          attachment_type: string
+          created_at: string
+          file_type: string | null
+          file_url: string | null
+          id: string
+          title: string
+          youtube_url: string | null
+        }
+        Insert: {
+          assembly_id: string
+          attachment_type?: string
+          created_at?: string
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          title: string
+          youtube_url?: string | null
+        }
+        Update: {
+          assembly_id?: string
+          attachment_type?: string
+          created_at?: string
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          title?: string
+          youtube_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assembly_attachments_assembly_id_fkey"
+            columns: ["assembly_id"]
+            isOneToOne: false
+            referencedRelation: "assemblies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       churches: {
         Row: {
           address: string | null
