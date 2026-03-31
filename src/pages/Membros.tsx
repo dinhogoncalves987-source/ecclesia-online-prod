@@ -33,6 +33,7 @@ export default function Membros() {
   const [showForm, setShowForm] = useState(false);
   const [newMember, setNewMember] = useState({ name: "", role: "", phone: "", email: "" });
   const [showImport, setShowImport] = useState(false);
+  const [showAIImport, setShowAIImport] = useState(false);
 
   const memberFields = [
     { key: "name", label: t("Nome"), required: true },
