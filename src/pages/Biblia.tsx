@@ -586,7 +586,7 @@ export default function Biblia() {
                       </button>
                       <button onClick={() => setZenMode(false)}
                         className="p-2 rounded-lg hover:bg-secondary transition-colors text-xs font-medium text-muted-foreground">
-                        Sair
+                        {t("Sair")}
                       </button>
                     </>
                   )}
