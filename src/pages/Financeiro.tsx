@@ -40,6 +40,42 @@ export default function Financeiro() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [newTx, setNewTx] = useState({ desc: "", type: "Entrada" as "Entrada" | "Saída", value: "", category: "" });
+  const [showImport, setShowImport] = useState(false);
+
+  const financeFields = [
+    { key: "description", label: t("Descrição"), required: true },
+    { key: "amount", label: t("Valor"), required: true },
+    { key: "type", label: t("Tipo (Entrada/Saída)"), required: true },
+    { key: "category", label: t("Categoria") },
+    { key: "date", label: t("Data (AAAA-MM-DD)") },
+  ];
+
+  const financeTemplate = [
+    { description: "Dízimo", amount: "1500", type: "Entrada", category: "Dízimo", date: "2026-03-01" },
+    { description: "Aluguel", amount: "2000", type: "Saída", category: "Infraestrutura", date: "2026-03-05" },
+  ];
+
+  const handleBulkImport = async (rows: Record<string, string>[]) => {
+    if (!user || !church) return { success: 0, errors: 0 };
+    let success = 0, errors = 0;
+    for (const row of rows) {
+      const amount = parseFloat(row.amount?.replace(/[^\d.,]/g, "").replace(",", ".")) || 0;
+      if (!row.description || amount <= 0) { errors++; continue; }
+      const type = row.type?.toLowerCase().includes("sa") ? "Saída" : "Entrada";
+      const { error } = await supabase.from("transactions").insert({
+        user_id: user.id, church_id: church.id,
+        description: row.description, type, amount,
+        category: row.category || "Geral", status: "Pendente",
+        date: row.date || new Date().toISOString().split("T")[0],
+      });
+      if (error) errors++; else success++;
+    }
+    if (success > 0) {
+      const { data } = await supabase.from("transactions").select("*").eq("church_id", church.id).order("date", { ascending: false });
+      setTransactions(data || []);
+    }
+    return { success, errors };
+  };
 
   useEffect(() => {
     if (!user || !church) { setLoading(false); return; }
