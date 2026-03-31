@@ -154,8 +154,8 @@ export default function GerenciarAcessos() {
 
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">
-                        {u.full_name || "Sem nome"}
-                        {isCurrentUser && <span className="text-xs text-muted-foreground ml-1">(você)</span>}
+                        {u.full_name || t("Sem nome")}
+                        {isCurrentUser && <span className="text-xs text-muted-foreground ml-1">{t("(você)")}</span>}
                       </p>
                     </div>
 
