@@ -610,6 +610,43 @@ const translations: Record<string, Record<Lang, string>> = {
 
   // Visão geral
   "Visão geral da administração (placeholder)": { pt: "Visão geral da administração", en: "Administration overview", es: "Visión general de la administración" },
+
+  // Finance system
+  "Visão Geral": { pt: "Visão Geral", en: "Overview", es: "Visión General" },
+  "Lançamentos": { pt: "Lançamentos", en: "Transactions", es: "Movimientos" },
+  "Relatórios Contábeis": { pt: "Relatórios Contábeis", en: "Accounting Reports", es: "Informes Contables" },
+  "PIX / Dízimos": { pt: "PIX / Dízimos", en: "PIX / Tithes", es: "PIX / Diezmos" },
+  "Fluxo Mensal": { pt: "Fluxo Mensal", en: "Monthly Cash Flow", es: "Flujo Mensual" },
+  "Distribuição por Categoria": { pt: "Distribuição por Categoria", en: "Distribution by Category", es: "Distribución por Categoría" },
+  "Receitas vs Despesas por Categoria": { pt: "Receitas vs Despesas por Categoria", en: "Revenue vs Expenses by Category", es: "Ingresos vs Gastos por Categoría" },
+  "Fluxo Acumulado": { pt: "Fluxo Acumulado", en: "Accumulated Flow", es: "Flujo Acumulado" },
+  "Saldo Acumulado": { pt: "Saldo Acumulado", en: "Accumulated Balance", es: "Saldo Acumulado" },
+  "Receitas": { pt: "Receitas", en: "Revenue", es: "Ingresos" },
+  "Despesas": { pt: "Despesas", en: "Expenses", es: "Gastos" },
+  "margem": { pt: "margem", en: "margin", es: "margen" },
+  "pendentes": { pt: "pendentes", en: "pending", es: "pendientes" },
+  "Confirmados": { pt: "Confirmados", en: "Confirmed", es: "Confirmados" },
+  "Sem dados": { pt: "Sem dados", en: "No data", es: "Sin datos" },
+  "Editar Lançamento": { pt: "Editar Lançamento", en: "Edit Transaction", es: "Editar Movimiento" },
+  "Lançamento atualizado!": { pt: "Lançamento atualizado!", en: "Transaction updated!", es: "¡Movimiento actualizado!" },
+  "Removido!": { pt: "Removido!", en: "Removed!", es: "¡Eliminado!" },
+  "Status atualizado!": { pt: "Status atualizado!", en: "Status updated!", es: "¡Estado actualizado!" },
+  "Exportado!": { pt: "Exportado!", en: "Exported!", es: "¡Exportado!" },
+  "Demonstrativo de Resultado": { pt: "Demonstrativo de Resultado", en: "Income Statement", es: "Estado de Resultados" },
+  "Conta": { pt: "Conta", en: "Account", es: "Cuenta" },
+  "RECEITAS": { pt: "RECEITAS", en: "REVENUE", es: "INGRESOS" },
+  "DESPESAS": { pt: "DESPESAS", en: "EXPENSES", es: "GASTOS" },
+  "RESULTADO DO PERÍODO": { pt: "RESULTADO DO PERÍODO", en: "NET RESULT", es: "RESULTADO DEL PERÍODO" },
+  "Balancete": { pt: "Balancete", en: "Trial Balance", es: "Balancete" },
+  "Fluxo de Caixa": { pt: "Fluxo de Caixa", en: "Cash Flow", es: "Flujo de Caja" },
+  "Saldo Anterior": { pt: "Saldo Anterior", en: "Opening Balance", es: "Saldo Anterior" },
+  "(+) Entradas no Período": { pt: "(+) Entradas no Período", en: "(+) Period Income", es: "(+) Ingresos del Período" },
+  "(-) Saídas no Período": { pt: "(-) Saídas no Período", en: "(-) Period Expenses", es: "(-) Gastos del Período" },
+  "(=) Movimentação Líquida": { pt: "(=) Movimentação Líquida", en: "(=) Net Movement", es: "(=) Movimiento Neto" },
+  "SALDO FINAL": { pt: "SALDO FINAL", en: "CLOSING BALANCE", es: "SALDO FINAL" },
+  "Total Lançamentos": { pt: "Total Lançamentos", en: "Total Transactions", es: "Total Movimientos" },
+  "Fluxo de Caixa Diário": { pt: "Fluxo de Caixa Diário", en: "Daily Cash Flow", es: "Flujo de Caja Diario" },
+  "Relatório exportado!": { pt: "Relatório exportado!", en: "Report exported!", es: "¡Informe exportado!" },
 };
 
 
