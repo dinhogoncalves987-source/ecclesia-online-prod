@@ -647,8 +647,6 @@ const translations: Record<string, Record<Lang, string>> = {
   "Total Lançamentos": { pt: "Total Lançamentos", en: "Total Transactions", es: "Total Movimientos" },
   "Fluxo de Caixa Diário": { pt: "Fluxo de Caixa Diário", en: "Daily Cash Flow", es: "Flujo de Caja Diario" },
   "Relatório exportado!": { pt: "Relatório exportado!", en: "Report exported!", es: "¡Informe exportado!" },
-  "Erro ao remover": { pt: "Erro ao remover", en: "Error removing", es: "Error al eliminar" },
-  "Erro ao atualizar": { pt: "Erro ao atualizar", en: "Error updating", es: "Error al actualizar" },
 };
 
 
