@@ -632,7 +632,6 @@ const translations: Record<string, Record<Lang, string>> = {
   "Removido!": { pt: "Removido!", en: "Removed!", es: "¡Eliminado!" },
   "Status atualizado!": { pt: "Status atualizado!", en: "Status updated!", es: "¡Estado actualizado!" },
   "Exportado!": { pt: "Exportado!", en: "Exported!", es: "¡Exportado!" },
-  "registros": { pt: "registros", en: "records", es: "registros" },
   "Demonstrativo de Resultado": { pt: "Demonstrativo de Resultado", en: "Income Statement", es: "Estado de Resultados" },
   "Conta": { pt: "Conta", en: "Account", es: "Cuenta" },
   "RECEITAS": { pt: "RECEITAS", en: "REVENUE", es: "INGRESOS" },
