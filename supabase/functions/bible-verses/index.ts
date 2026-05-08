@@ -1,4 +1,4 @@
-﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,7 +29,7 @@ serve(async (req) => {
       const text = await resp.text();
       console.error("Bible API error:", resp.status, text);
       return new Response(
-        JSON.stringify({ verses: [], error: "CapÃ­tulo nÃ£o encontrado" }),
+        JSON.stringify({ verses: [], error: "Capítulo não encontrado" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -37,7 +37,7 @@ serve(async (req) => {
     const data = await resp.json();
 
     const verses = Array.isArray(data)
-      ? data.map((v: any) => ({ num: v.verse, text: v.text }))
+      ? data.map((v: any) => ({ num: v.verse, text: String(v.text || "").replace(/<S>.*?<\/S>/g, "").replace(/<[^>]+>/g, "").trim() }))
       : [];
 
     return new Response(

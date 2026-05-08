@@ -1,4 +1,4 @@
-﻿import { AdminLayout } from "@/components/AdminLayout";
+import { AdminLayout } from "@/components/AdminLayout";
 import { ChevronLeft, ChevronRight, Search, Bookmark, Eye, MessageSquare, Send, X, Sparkles, Trash2, BookOpen, Loader2, Mic, MicOff, Download, Share2, Plus, Image, FileText, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -16,10 +16,10 @@ const VERSES_URL = `${SUPABASE_URL}/functions/v1/bible-verses`;
 const CHAT_URL = `${SUPABASE_URL}/functions/v1/bible-chat`;
 
 const quickPromptKeys = [
-  { labelKey: "EsboÃ§o de pregaÃ§Ã£o", promptKey: "Crie um esboÃ§o completo de pregaÃ§Ã£o sobre" },
-  { labelKey: "Estudo profundo", promptKey: "FaÃ§a um estudo bÃ­blico profundo sobre" },
-  { labelKey: "Contexto histÃ³rico", promptKey: "Explique o contexto histÃ³rico de" },
-  { labelKey: "AplicaÃ§Ã£o prÃ¡tica", promptKey: "Quais sÃ£o as aplicaÃ§Ãµes prÃ¡ticas de" },
+  { labelKey: "Esboço de pregação", promptKey: "Crie um esboço completo de pregação sobre" },
+  { labelKey: "Estudo profundo", promptKey: "Faça um estudo bíblico profundo sobre" },
+  { labelKey: "Contexto histórico", promptKey: "Explique o contexto histórico de" },
+  { labelKey: "Aplicação prática", promptKey: "Quais são as aplicações práticas de" },
 ];
 
 export default function Biblia() {
@@ -53,11 +53,12 @@ export default function Biblia() {
       const params = new URLSearchParams({
         bookId: book.bookId.toString(),
         chapter: chapter.toString(),
+        locale: lang,
       });
       const resp = await fetch(`${VERSES_URL}?${params}`, {
         headers: { Authorization: `Bearer ${SUPABASE_KEY}` },
       });
-      if (!resp.ok) throw new Error("Erro ao buscar versÃ­culos");
+      if (!resp.ok) throw new Error("Erro ao buscar versículos");
       const data = await resp.json();
       setVerses(data.verses || []);
     } catch (e) {
@@ -66,7 +67,7 @@ export default function Biblia() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [lang]);
 
   useEffect(() => {
     if (selectedChapter !== null) {
@@ -80,7 +81,7 @@ export default function Biblia() {
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, []);
+  }, [lang]);
 
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
 
@@ -173,7 +174,7 @@ export default function Biblia() {
   const startVoiceSearch = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert(t("Seu navegador nÃ£o suporta reconhecimento de voz. Tente usar o Google Chrome."));
+      alert(t("Seu navegador não suporta reconhecimento de voz. Tente usar o Google Chrome."));
       return;
     }
     try {
@@ -188,7 +189,7 @@ export default function Biblia() {
         console.error("Voice search error:", event.error);
         setIsListening(false);
         if (event.error === "not-allowed") {
-          alert(t("PermissÃ£o de microfone negada. Verifique as configuraÃ§Ãµes do seu navegador."));
+          alert(t("Permissão de microfone negada. Verifique as configurações do seu navegador."));
         }
       };
       recognition.onend = () => setIsListening(false);
@@ -204,7 +205,7 @@ export default function Biblia() {
   const startChatVoice = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert(t("Seu navegador nÃ£o suporta reconhecimento de voz. Tente usar o Google Chrome."));
+      alert(t("Seu navegador não suporta reconhecimento de voz. Tente usar o Google Chrome."));
       return;
     }
     try {
@@ -228,7 +229,7 @@ export default function Biblia() {
       recognition.onerror = (event: any) => {
         console.error("Speech recognition error:", event.error);
         if (event.error === "not-allowed") {
-          alert(t("PermissÃ£o de microfone negada. Verifique as configuraÃ§Ãµes do seu navegador."));
+          alert(t("Permissão de microfone negada. Verifique as configurações do seu navegador."));
           stopChatVoice(false);
         }
       };
@@ -284,7 +285,7 @@ export default function Biblia() {
   const shareMessage = async (content: string) => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: t("Assistente BÃ­blico"), text: content });
+        await navigator.share({ title: t("Assistente Bíblico"), text: content });
       } catch { /* user cancelled */ }
     } else {
       await navigator.clipboard.writeText(content);
@@ -381,7 +382,7 @@ export default function Biblia() {
             ({selectedBook.testament === "AT" ? "AT" : "NT"})
           </span>
         </button>
-        <span className="text-xs text-muted-foreground">{selectedBook.chapters} {t("capÃ­tulos")}</span>
+        <span className="text-xs text-muted-foreground">{selectedBook.chapters} {t("capítulos")}</span>
       </div>
       <div className="flex flex-wrap gap-1">
         {Array.from({ length: selectedBook.chapters }).map((_, i) => (
@@ -405,7 +406,7 @@ export default function Biblia() {
           <div className="p-4 border-b border-border/50 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Sparkles size={16} className="text-accent" />
-              <h3 className="font-serif text-sm">{t("Assistente BÃ­blico")}</h3>
+              <h3 className="font-serif text-sm">{t("Assistente Bíblico")}</h3>
             </div>
             <div className="flex items-center gap-1">
               {messages.length > 0 && (
@@ -426,8 +427,8 @@ export default function Biblia() {
                   <Sparkles size={24} className="text-accent" />
                 </div>
                 <div>
-                   <p className="font-serif text-sm font-medium">{t("Assistente BÃ­blico com IA")}</p>
-                   <p className="text-xs text-muted-foreground mt-1">{t("FaÃ§a perguntas, peÃ§a esboÃ§os e estudos profundos.")}</p>
+                   <p className="font-serif text-sm font-medium">{t("Assistente Bíblico com IA")}</p>
+                   <p className="text-xs text-muted-foreground mt-1">{t("Faça perguntas, peça esboços e estudos profundos.")}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-4 w-full max-w-xs">
                   {quickPromptKeys.map(qp => (
@@ -534,7 +535,7 @@ export default function Biblia() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder={t("Pergunte sobre a BÃ­blia...")}
+                    placeholder={t("Pergunte sobre a Bíblia...")}
                     rows={1}
                     className="flex-1 resize-none bg-transparent px-4 py-2.5 text-base sm:text-sm placeholder:text-muted-foreground focus-visible:outline-none min-h-[40px]"
                     style={{ scrollbarWidth: "none", maxHeight: "160px", overflow: "auto" }}
@@ -585,8 +586,8 @@ export default function Biblia() {
         {!zenMode && (
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-               <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">{t("BÃ­blia Sagrada")}</h1>
-               <p className="text-sm text-muted-foreground mt-1">{t("Leitura e meditaÃ§Ã£o â€” TraduÃ§Ã£o Almeida")}</p>
+               <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">{t("Bíblia Sagrada")}</h1>
+               <p className="text-sm text-muted-foreground mt-1">{t("Leitura e meditação — Tradução Almeida")}</p>
             </div>
             <div className="flex gap-2 flex-wrap">
               <button onClick={() => setLargeFont(!largeFont)}
@@ -626,8 +627,8 @@ export default function Biblia() {
                   <Sparkles size={20} className="text-accent" />
                 </div>
                 <div className="text-left flex-1">
-                   <p className="font-serif text-sm font-medium">{t("Assistente BÃ­blico com IA")}</p>
-                   <p className="text-xs text-muted-foreground mt-0.5">{t("Toque para perguntar, pedir esboÃ§os e estudos")}</p>
+                   <p className="font-serif text-sm font-medium">{t("Assistente Bíblico com IA")}</p>
+                   <p className="text-xs text-muted-foreground mt-0.5">{t("Toque para perguntar, pedir esboços e estudos")}</p>
                 </div>
                 <MessageSquare size={18} className="text-muted-foreground" />
               </button>
@@ -635,7 +636,7 @@ export default function Biblia() {
           </div>
         )}
 
-        {/* Scripture â€” only show when a chapter is selected */}
+        {/* Scripture — only show when a chapter is selected */}
         {selectedChapter !== null && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -652,7 +653,7 @@ export default function Biblia() {
                   </button>
                   <button onClick={() => { if (!zenMode) setBookPickerOpen(!bookPickerOpen); }} className="text-center">
                     <h2 className="font-serif text-lg hover:text-primary transition-colors">{selectedBook.name}</h2>
-                    <p className="text-xs text-muted-foreground">{t("CapÃ­tulo")} {selectedChapter}</p>
+                    <p className="text-xs text-muted-foreground">{t("Capítulo")} {selectedChapter}</p>
                   </button>
                   <button onClick={nextChapter} disabled={!hasNext}
                     className="p-1.5 rounded-lg hover:bg-secondary transition-colors disabled:opacity-30">
@@ -684,7 +685,7 @@ export default function Biblia() {
                 </div>
               ) : verses.length === 0 ? (
                 <div className="text-center py-16 text-muted-foreground text-sm">
-                  <p>{t("NÃ£o foi possÃ­vel carregar este capÃ­tulo.")}</p>
+                  <p>{t("Não foi possível carregar este capítulo.")}</p>
                   <button onClick={() => fetchVerses(selectedBook, selectedChapter)} className="mt-2 text-primary underline text-xs">
                     {t("Tentar novamente")}
                   </button>
@@ -711,7 +712,7 @@ export default function Biblia() {
                   </span>
                   <button onClick={nextChapter} disabled={!hasNext}
                     className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 transition-colors">
-                    {t("PrÃ³ximo")} <ChevronRight size={14} />
+                    {t("Próximo")} <ChevronRight size={14} />
                   </button>
                 </div>
               )}
@@ -723,7 +724,7 @@ export default function Biblia() {
         {selectedChapter === null && !zenMode && (
           <div className="bg-card rounded-xl shadow-executive p-8 text-center">
             <BookOpen size={32} className="mx-auto text-muted-foreground/40 mb-3" />
-            <p className="text-sm text-muted-foreground">{t("Selecione um capÃ­tulo acima para comeÃ§ar a leitura")}</p>
+            <p className="text-sm text-muted-foreground">{t("Selecione um capítulo acima para começar a leitura")}</p>
           </div>
         )}
       </div>
@@ -740,6 +741,7 @@ export default function Biblia() {
 
   return <AdminLayout>{content}</AdminLayout>;
 }
+
 
 
 
