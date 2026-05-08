@@ -23,7 +23,7 @@ const quickPromptKeys = [
 ];
 
 export default function Biblia() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [zenMode, setZenMode] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [largeFont, setLargeFont] = useState(false);
@@ -136,7 +136,7 @@ export default function Biblia() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${SUPABASE_KEY}`,
         },
-        body: JSON.stringify({ messages: allMessages }),
+        body: JSON.stringify({ messages: allMessages, locale: lang }),
       });
 
       const data = await resp.json().catch(() => ({}));
@@ -740,5 +740,6 @@ export default function Biblia() {
 
   return <AdminLayout>{content}</AdminLayout>;
 }
+
 
 

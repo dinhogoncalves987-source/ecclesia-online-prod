@@ -34,7 +34,7 @@ const quickPrompts = [
 ];
 
 export default function Hinario() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [busca, setBusca] = useState("");
   const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null);
   const [hinoSelecionado, setHinoSelecionado] = useState<HinoData | null>(null);
@@ -83,7 +83,7 @@ export default function Hinario() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${SUPABASE_KEY}`,
         },
-        body: JSON.stringify({ messages: allMessages }),
+        body: JSON.stringify({ messages: allMessages, locale: lang }),
       });
 
       const data = await resp.json().catch(() => ({}));
