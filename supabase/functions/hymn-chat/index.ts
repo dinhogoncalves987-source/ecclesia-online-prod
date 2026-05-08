@@ -1,8 +1,8 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
@@ -11,84 +11,153 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, hymnCatalog } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const { messages, locale } = await req.json();
 
-    const systemPrompt = `Você é o Assistente de Hinos da Harpa Digital, especializado no hinário cristão evangélico. Você conhece profundamente os hinos do Cantor Cristão e da tradição evangélica brasileira.
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
-CATÁLOGO DE HINOS DISPONÍVEIS NO SISTEMA:
-${hymnCatalog}
-
-SUAS RESPONSABILIDADES:
-- Sugerir hinos por tema, ocasião, sentimento ou passagem bíblica
-- Montar escalas de louvor completas para cultos (com ordem sugerida)
-- Explicar o significado e contexto histórico dos hinos
-- Conectar hinos com passagens bíblicas relevantes
-- Informar se um hino específico está ou não no nosso catálogo
-- Ajudar líderes de louvor a planejar momentos de adoração
-
-REGRAS IMPORTANTES:
-- SEMPRE sugira hinos que existem no nosso catálogo (números 1 a 560)
-- Cite sempre o NÚMERO e o TÍTULO do hino ao sugerir
-- Se o usuário pedir algo que não temos, informe e sugira alternativas do catálogo
-- Responda SEMPRE em português brasileiro
-- Use linguagem pastoral e acolhedora
-- Formate respostas com markdown para boa legibilidade
-- Ao montar escalas de louvor, organize por momentos: abertura, adoração, louvor, ofertório, encerramento
-
-EXEMPLOS DE PERGUNTAS QUE VOCÊ DEVE SABER RESPONDER:
-- "Quais hinos temos sobre graça?" → Liste os hinos da categoria Graça
-- "Monte uma escala para culto de domingo" → Sugira 4-6 hinos organizados por momentos
-- "O hino 35 está no nosso hinário?" → Sim, é "Que Segurança"
-- "Qual hino combina com João 3:16?" → Sugira hinos sobre salvação/amor de Deus
-- "Preciso de hinos para um culto de Natal" → Sugira hinos natalinos e de adoração`;
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-        ],
-        stream: true,
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Muitas requisições. Tente novamente em alguns segundos." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Créditos de IA esgotados. Adicione créditos em Configurações." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
+    if (!GEMINI_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "Erro ao conectar com a IA" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          error: "GEMINI_API_KEY is not configured"
+        }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
       );
     }
 
-    return new Response(response.body, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-    });
-  } catch (e) {
-    console.error("hymn-chat error:", e);
+    const languageInstruction = `
+Idioma do usuário:
+${locale || "auto-detect"}
+
+REGRAS DE IDIOMA:
+- Se locale for pt-BR, responda em português brasileiro.
+- Se locale for en-US, responda em inglês americano.
+- Se locale for es-MX, responda em espanhol mexicano natural e claro.
+- Se não houver locale, responda no mesmo idioma usado pelo usuário.
+- Nunca misture idiomas na mesma resposta.
+`;
+
+    const systemPrompt = `
+Você é o Assistente de Hinos da Harpa Digital integrado ao Ecclesia Admin.
+
+${languageInstruction}
+
+RESPONSABILIDADES:
+- Sugerir hinos da Harpa Cristã.
+- Montar escalas de louvor completas.
+- Relacionar hinos com temas bíblicos.
+- Relacionar hinos com versículos.
+- Sugerir hinos para cultos específicos.
+- Explicar significado dos hinos.
+- Ajudar líderes de louvor.
+- Organizar momentos de culto.
+- Responder sempre em português brasileiro.
+
+COMPORTAMENTO:
+- Linguagem pastoral e acolhedora.
+- Respostas organizadas e práticas.
+- Use markdown simples.
+- Cite número e nome dos hinos quando possível.
+- Não invente hinos inexistentes.
+- Seja direto e útil.
+
+FORMATO:
+- Escalas separadas por momentos do culto.
+- Fácil leitura.
+- Sem excesso de emojis.
+- Linguagem humana.
+`;
+    const userConversation = (messages || [])
+      .map((m) => `${m.role}: ${m.content}`)
+      .join("\n");
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text: `
+${systemPrompt}
+
+CONVERSA:
+${userConversation}
+                  `,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            topP: 0.95,
+            topK: 40,
+            maxOutputTokens: 2048,
+          },
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return new Response(
+        JSON.stringify({
+          error: data.error?.message || "Erro ao conectar com Gemini",
+          details: data
+        }),
+        {
+          status: response.status,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
+    const content =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Erro interno" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({
+        content
+      }),
+      {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+  } catch (error) {
+
+    return new Response(
+      JSON.stringify({
+        error: error instanceof Error
+          ? error.message
+          : "Erro interno da função"
+      }),
+      {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
     );
   }
 });
+

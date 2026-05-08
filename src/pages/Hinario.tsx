@@ -67,65 +67,52 @@ export default function Hinario() {
 
   // Chat logic
   const sendMessage = async (messageText?: string) => {
-    const text = messageText || chatInput.trim();
+    const text = messageText || input.trim();
     if (!text || isLoading) return;
+
     const userMsg: ChatMessage = { role: "user", content: text };
     const allMessages = [...messages, userMsg];
+
     setMessages(allMessages);
-    setChatInput("");
     setIsLoading(true);
-    let assistantSoFar = "";
 
     try {
       const resp = await fetch(CHAT_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_KEY}` },
-        body: JSON.stringify({ messages: allMessages, hymnCatalog }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+        body: JSON.stringify({ messages: allMessages }),
       });
+
+      const data = await resp.json().catch(() => ({}));
+
       if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.error || `Erro ${resp.status}`);
+        throw new Error(data?.error || `Erro ${resp.status}`);
       }
-      if (!resp.body) throw new Error("Sem resposta");
 
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
+      const assistantContent = data?.content || data?.message || data?.text || "Sem resposta da IA";
 
-      const updateAssistant = (content: string) => {
-        assistantSoFar += content;
-        setMessages(prev => {
-          const last = prev[prev.length - 1];
-          if (last?.role === "assistant") return prev.map((m, i) => i === prev.length - 1 ? { ...m, content: assistantSoFar } : m);
-          return [...prev, { role: "assistant", content: assistantSoFar }];
-        });
-      };
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        let nl: number;
-        while ((nl = buf.indexOf("\n")) !== -1) {
-          let line = buf.slice(0, nl);
-          buf = buf.slice(nl + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (!line.startsWith("data: ")) continue;
-          const json = line.slice(6).trim();
-          if (json === "[DONE]") break;
-          try {
-            const c = JSON.parse(json).choices?.[0]?.delta?.content;
-            if (c) updateAssistant(c);
-          } catch { buf = line + "\n" + buf; break; }
-        }
-      }
+      setMessages(prev => [
+        ...prev,
+        {
+          role: "assistant",
+          content: assistantContent,
+        },
+      ]);
     } catch (e) {
-      setMessages(prev => [...prev, { role: "assistant", content: `⚠️ ${e instanceof Error ? e.message : "Erro"}` }]);
+      setMessages(prev => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `Erro: ${e instanceof Error ? e.message : "Falha ao consultar a IA"}`,
+        },
+      ]);
     } finally {
       setIsLoading(false);
     }
   };
-
   const handleChatKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
@@ -570,3 +557,5 @@ export default function Hinario() {
     </AdminLayout>
   );
 }
+
+
