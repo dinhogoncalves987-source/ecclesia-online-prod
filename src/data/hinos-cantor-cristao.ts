@@ -3,7 +3,26 @@ export interface HinoData {
   titulo: string;
   categoria: string;
   letra: string;
+  i18n?: Partial<Record<HymnLocale, Partial<Pick<HinoData, "titulo" | "categoria" | "letra">>>>;
 }
+
+export type HymnLocale = "pt" | "pt-BR" | "en" | "en-US" | "es" | "es-MX";
+
+const normalizeHymnLocale = (locale: string): HymnLocale => {
+  if (locale.startsWith("en")) return "en";
+  if (locale.startsWith("es")) return "es";
+  if (locale.startsWith("pt-BR")) return "pt-BR";
+  return "pt";
+};
+
+export const getHinoTitulo = (hino: HinoData, locale: string) =>
+  hino.i18n?.[normalizeHymnLocale(locale)]?.titulo || hino.i18n?.pt?.titulo || hino.titulo;
+
+export const getHinoCategoria = (hino: HinoData, locale: string) =>
+  hino.i18n?.[normalizeHymnLocale(locale)]?.categoria || hino.i18n?.pt?.categoria || hino.categoria;
+
+export const getHinoLetra = (hino: HinoData, locale: string) =>
+  hino.i18n?.[normalizeHymnLocale(locale)]?.letra || hino.i18n?.pt?.letra || hino.letra;
 
 // Hinos do Cantor Cristão - domínio público (tradição evangélica brasileira)
 // Letras de domínio público, anteriores a 1940
@@ -189,4 +208,8 @@ export const todosOsHinos: HinoData[] = [
   ...generateRemainingHymns()
 ];
 
-export const categoriasHinos = [...new Set(todosOsHinos.map(h => h.categoria))];
+export const getCategoriasHinos = (locale: string) => [
+  ...new Set(todosOsHinos.map(h => getHinoCategoria(h, locale))),
+];
+
+export const categoriasHinos = getCategoriasHinos("pt");

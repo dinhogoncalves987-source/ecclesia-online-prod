@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, locale } = await req.json();
+    const { messages, locale, hymnCatalog } = await req.json();
 
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
@@ -30,15 +30,25 @@ serve(async (req) => {
       );
     }
 
+    const normalizedLocale = typeof locale === "string" ? locale.toLowerCase() : "";
+    const responseLanguage = normalizedLocale.startsWith("en")
+      ? "inglês"
+      : normalizedLocale.startsWith("es")
+        ? "espanhol"
+        : normalizedLocale.startsWith("pt")
+          ? "português brasileiro"
+          : "mesmo idioma usado pelo usuário";
+
     const languageInstruction = `
 Idioma do usuário:
 ${locale || "auto-detect"}
 
 REGRAS DE IDIOMA:
-- Se locale for pt-BR, responda em português brasileiro.
-- Se locale for en-US, responda em inglês americano.
-- Se locale for es-MX, responda em espanhol mexicano natural e claro.
+- Se locale começar com pt, responda em português brasileiro.
+- Se locale começar com en, responda em inglês.
+- Se locale começar com es, responda em espanhol.
 - Se não houver locale, responda no mesmo idioma usado pelo usuário.
+- Idioma obrigatório desta resposta: ${responseLanguage}.
 - Nunca misture idiomas na mesma resposta.
 `;
 
@@ -56,7 +66,6 @@ RESPONSABILIDADES:
 - Explicar significado dos hinos.
 - Ajudar líderes de louvor.
 - Organizar momentos de culto.
-- Responder sempre em português brasileiro.
 
 COMPORTAMENTO:
 - Linguagem pastoral e acolhedora.
@@ -71,6 +80,9 @@ FORMATO:
 - Fácil leitura.
 - Sem excesso de emojis.
 - Linguagem humana.
+
+CATÁLOGO DISPONÍVEL:
+${hymnCatalog || "Catálogo não enviado."}
 `;
     const userConversation = (messages || [])
       .map((m) => `${m.role}: ${m.content}`)

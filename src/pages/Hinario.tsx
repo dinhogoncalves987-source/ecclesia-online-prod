@@ -9,32 +9,87 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLanguage } from "@/hooks/useLanguage";
 import { AdminLayout } from "@/components/AdminLayout";
-import { todosOsHinos, categoriasHinos, type HinoData } from "@/data/hinos-cantor-cristao";
+import {
+  getCategoriasHinos,
+  getHinoCategoria,
+  getHinoLetra,
+  getHinoTitulo,
+  todosOsHinos,
+  type HinoData,
+} from "@/data/hinos-cantor-cristao";
 import ReactMarkdown from "react-markdown";
 import { motion, AnimatePresence } from "framer-motion";
-
-const categorias = categoriasHinos;
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const CHAT_URL = `${SUPABASE_URL}/functions/v1/hymn-chat`;
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
+type SpeechRecognitionResultListLike = {
+  length: number;
+  [index: number]: {
+    isFinal: boolean;
+    [index: number]: { transcript: string };
+  };
+};
+type SpeechRecognitionEventLike = { results: SpeechRecognitionResultListLike };
+type SpeechRecognitionErrorEventLike = { error: string };
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+type SpeechRecognitionWindow = Window & typeof globalThis & {
+  SpeechRecognition?: SpeechRecognitionConstructor;
+  webkitSpeechRecognition?: SpeechRecognitionConstructor;
+};
 
-// Build catalog string for AI context
-const hymnCatalog = todosOsHinos
-  .map(h => `#${h.numero} - ${h.titulo} [${h.categoria}]`)
-  .join("\n");
+const getSpeechLocale = (locale: string) => {
+  if (locale.startsWith("en")) return "en-US";
+  if (locale.startsWith("es")) return "es-MX";
+  return "pt-BR";
+};
 
-const quickPrompts = [
-  { label: "Escala de culto", prompt: "Monte uma escala de louvor completa para um culto de domingo com 5 hinos do nosso catálogo" },
-  { label: "Hinos de adoração", prompt: "Quais são os melhores hinos de adoração que temos no catálogo?" },
-  { label: "Culto temático", prompt: "Sugira hinos para um culto sobre a graça de Deus" },
-  { label: "Conexão bíblica", prompt: "Quais hinos combinam com o Salmo 23?" },
-];
+const getQuickPrompts = (locale: string) => {
+  if (locale.startsWith("en")) {
+    return [
+      { label: "Escala de culto", prompt: "Build a complete worship order for a Sunday service using 5 hymns from our catalog" },
+      { label: "Hinos de adoração", prompt: "What are the best worship hymns available in our catalog?" },
+      { label: "Culto temático", prompt: "Suggest hymns for a service about the grace of God" },
+      { label: "Conexão bíblica", prompt: "Which hymns fit Psalm 23?" },
+    ];
+  }
+
+  if (locale.startsWith("es")) {
+    return [
+      { label: "Escala de culto", prompt: "Arma una escala de alabanza completa para un culto de domingo con 5 himnos de nuestro catálogo" },
+      { label: "Hinos de adoração", prompt: "¿Cuáles son los mejores himnos de adoración que tenemos en el catálogo?" },
+      { label: "Culto temático", prompt: "Sugiere himnos para un culto sobre la gracia de Dios" },
+      { label: "Conexão bíblica", prompt: "¿Qué himnos combinan con el Salmo 23?" },
+    ];
+  }
+
+  return [
+    { label: "Escala de culto", prompt: "Monte uma escala de louvor completa para um culto de domingo com 5 hinos do nosso catálogo" },
+    { label: "Hinos de adoração", prompt: "Quais são os melhores hinos de adoração que temos no catálogo?" },
+    { label: "Culto temático", prompt: "Sugira hinos para um culto sobre a graça de Deus" },
+    { label: "Conexão bíblica", prompt: "Quais hinos combinam com o Salmo 23?" },
+  ];
+};
 
 export default function Hinario() {
   const { t, lang } = useLanguage();
+  const categorias = getCategoriasHinos(lang);
+  const quickPrompts = getQuickPrompts(lang);
+  const hymnCatalog = todosOsHinos
+    .map(h => `#${h.numero} - ${getHinoTitulo(h, lang)} [${getHinoCategoria(h, lang)}]`)
+    .join("\n");
   const [busca, setBusca] = useState("");
   const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null);
   const [hinoSelecionado, setHinoSelecionado] = useState<HinoData | null>(null);
@@ -47,7 +102,7 @@ export default function Hinario() {
   const [isLoading, setIsLoading] = useState(false);
   const [isChatListening, setIsChatListening] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -58,22 +113,25 @@ export default function Hinario() {
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
 
   const hinosFiltrados = todosOsHinos.filter(h => {
+    const titulo = getHinoTitulo(h, lang);
+    const categoria = getHinoCategoria(h, lang);
     const matchBusca = busca === "" ||
-      h.titulo.toLowerCase().includes(busca.toLowerCase()) ||
+      titulo.toLowerCase().includes(busca.toLowerCase()) ||
       h.numero.toString().includes(busca);
-    const matchCategoria = !categoriaFiltro || h.categoria === categoriaFiltro;
+    const matchCategoria = !categoriaFiltro || categoria === categoriaFiltro;
     return matchBusca && matchCategoria;
   });
 
   // Chat logic
   const sendMessage = async (messageText?: string) => {
-    const text = messageText || input.trim();
+    const text = messageText || chatInput.trim();
     if (!text || isLoading) return;
 
     const userMsg: ChatMessage = { role: "user", content: text };
     const allMessages = [...messages, userMsg];
 
     setMessages(allMessages);
+    if (!messageText) setChatInput("");
     setIsLoading(true);
 
     try {
@@ -83,7 +141,7 @@ export default function Hinario() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${SUPABASE_KEY}`,
         },
-        body: JSON.stringify({ messages: allMessages, locale: lang }),
+        body: JSON.stringify({ messages: allMessages, locale: lang, hymnCatalog }),
       });
 
       const data = await resp.json().catch(() => ({}));
@@ -119,15 +177,16 @@ export default function Hinario() {
 
   // Voice for chat
   const startChatVoice = () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const speechWindow = window as SpeechRecognitionWindow;
+    const SpeechRecognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
     if (!SpeechRecognition) { alert(t("Seu navegador não suporta reconhecimento de voz.")); return; }
     try {
       const recognition = new SpeechRecognition();
-      recognition.lang = "pt-BR";
+      recognition.lang = getSpeechLocale(lang);
       recognition.continuous = true;
       recognition.interimResults = true;
       let finalText = "";
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event: SpeechRecognitionEventLike) => {
         let interim = "";
         finalText = "";
         for (let i = 0; i < event.results.length; i++) {
@@ -136,11 +195,18 @@ export default function Hinario() {
         }
         setVoiceTranscript((finalText + interim).trim());
       };
-      recognition.onerror = (event: any) => {
+      recognition.onerror = (event: SpeechRecognitionErrorEventLike) => {
         if (event.error === "not-allowed") alert(t("Permissão de microfone negada."));
         stopChatVoice(false);
       };
-      recognition.onend = () => { if (recognitionRef.current) try { recognitionRef.current.start(); } catch {} };
+      recognition.onend = () => {
+        if (!recognitionRef.current) return;
+        try {
+          recognitionRef.current.start();
+        } catch {
+          recognitionRef.current = null;
+        }
+      };
       recognitionRef.current = recognition;
       setIsChatListening(true);
       setVoiceTranscript("");
@@ -411,8 +477,8 @@ export default function Hinario() {
                         <span className="text-accent font-bold text-sm">{hino.numero}</span>
                       </div>
                       <div>
-                        <p className="font-medium text-foreground">{hino.titulo}</p>
-                        <Badge variant="secondary" className="text-[10px] mt-1">{hino.categoria}</Badge>
+                        <p className="font-medium text-foreground">{getHinoTitulo(hino, lang)}</p>
+                        <Badge variant="secondary" className="text-[10px] mt-1">{getHinoCategoria(hino, lang)}</Badge>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -434,7 +500,7 @@ export default function Hinario() {
           <TabsContent value="categorias" className="mt-4">
             <div className="space-y-6">
               {categorias.map(cat => {
-                const hinos = hinosFiltrados.filter(h => h.categoria === cat);
+                const hinos = hinosFiltrados.filter(h => getHinoCategoria(h, lang) === cat);
                 if (hinos.length === 0) return null;
                 return (
                   <div key={cat}>
@@ -453,7 +519,7 @@ export default function Hinario() {
                           <CardContent className="p-3 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <span className="text-accent font-bold text-sm w-8 text-center">{hino.numero}</span>
-                              <span className="font-medium text-foreground text-sm">{hino.titulo}</span>
+                              <span className="font-medium text-foreground text-sm">{getHinoTitulo(hino, lang)}</span>
                             </div>
                             <Youtube size={16} className="text-destructive" />
                           </CardContent>
@@ -478,8 +544,8 @@ export default function Hinario() {
                       <span className="text-accent font-bold">{hinoSelecionado.numero}</span>
                     </div>
                     <div>
-                      <p className="font-serif">{hinoSelecionado.titulo}</p>
-                      <Badge variant="secondary" className="text-xs mt-1">{hinoSelecionado.categoria}</Badge>
+                      <p className="font-serif">{getHinoTitulo(hinoSelecionado, lang)}</p>
+                      <Badge variant="secondary" className="text-xs mt-1">{getHinoCategoria(hinoSelecionado, lang)}</Badge>
                     </div>
                   </DialogTitle>
                   <DialogDescription className="sr-only">
@@ -495,7 +561,7 @@ export default function Hinario() {
                   </h4>
                   <button
                     onClick={() => {
-                      const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(hinoSelecionado.titulo + " hino cantor cristão")}`;
+                      const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(getHinoTitulo(hinoSelecionado, lang) + " hino cantor cristão")}`;
                       const win = window.open(url, "_blank", "noopener,noreferrer");
                       if (!win) {
                         navigator.clipboard.writeText(url);
@@ -511,12 +577,12 @@ export default function Hinario() {
                 </div>
 
                 {/* Lyrics */}
-                {hinoSelecionado.letra && (
+                {getHinoLetra(hinoSelecionado, lang) && (
                   <div className="mt-4">
                     <h4 className="text-sm font-medium text-muted-foreground mb-2">{t("Letra")}</h4>
                     <div className="bg-secondary/50 rounded-lg p-4">
                       <pre className="whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed">
-                        {hinoSelecionado.letra}
+                        {getHinoLetra(hinoSelecionado, lang)}
                       </pre>
                     </div>
                   </div>
