@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local/staging secrets and Supabase temp
+.env.staging
+supabase/.temp/
+
