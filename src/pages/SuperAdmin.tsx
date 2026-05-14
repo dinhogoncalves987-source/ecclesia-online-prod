@@ -2,13 +2,13 @@ import { AdminLayout } from "@/components/AdminLayout";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ChangeEvent, type DragEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { motion } from "framer-motion";
 import {
   Shield, Building2, Users, Globe, Bell, Plus, Trash2, Loader2,
   ChevronDown, ChevronUp, Eye, EyeOff, Copy, Link2, UserPlus,
-  Crown, Church, MapPin, Share2
+  Crown, Church, MapPin, Share2, Sparkles, Upload, PencilLine
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -17,22 +17,31 @@ interface ChurchSummary {
   name: string;
   slug: string;
   is_matriz: boolean;
-  hierarchy_level: string;
+  organization_type: string;
   city: string | null;
   state: string | null;
   pastor_name: string | null;
-  parent_church_id: string | null;
+  parent_id: string | null;
   memberCount: number;
   children: ChurchSummary[];
 }
 
 interface PlatformNotice {
   id: string;
+  organization_id: string | null;
   title: string;
-  content: string;
-  priority: string;
+  short_description: string;
+  full_content: string;
+  image_url: string | null;
+  button_label: string | null;
+  button_link: string | null;
+  target_type: string;
   is_active: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+  created_by: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 interface TeamMember {
@@ -47,7 +56,7 @@ type TabKey = "overview" | "churches" | "team" | "notices";
 export default function SuperAdmin() {
   const { t } = useLanguage();
   const { user } = useAuth();
-  const { role, loading: roleLoading } = useRole();
+  const { isSuperAdmin, loading: roleLoading } = useRole();
   const [churches, setChurches] = useState<ChurchSummary[]>([]);
   const [flatChurches, setFlatChurches] = useState<ChurchSummary[]>([]);
   const [notices, setNotices] = useState<PlatformNotice[]>([]);
@@ -61,14 +70,23 @@ export default function SuperAdmin() {
   const [showChurchForm, setShowChurchForm] = useState(false);
   const [churchForm, setChurchForm] = useState({
     name: "", city: "", state: "", pastor_name: "", email: "", phone: "", address: "",
-    hierarchy_level: "matriz" as string, parent_church_id: "",
+    organization_type: "matriz" as string, parent_id: "",
   });
 
   // Notice form
   const [showNoticeForm, setShowNoticeForm] = useState(false);
+  const [editingNoticeId, setEditingNoticeId] = useState<string | null>(null);
   const [noticeTitle, setNoticeTitle] = useState("");
-  const [noticeContent, setNoticeContent] = useState("");
-  const [noticePriority, setNoticePriority] = useState("Normal");
+  const [noticeShortDescription, setNoticeShortDescription] = useState("");
+  const [noticeFullContent, setNoticeFullContent] = useState("");
+  const [noticeImageUrl, setNoticeImageUrl] = useState("");
+  const [noticeImagePreview, setNoticeImagePreview] = useState("");
+  const [noticeImageUploading, setNoticeImageUploading] = useState(false);
+  const [noticeBannerGenerating, setNoticeBannerGenerating] = useState(false);
+  const [noticeButtonLabel, setNoticeButtonLabel] = useState("");
+  const [noticeButtonLink, setNoticeButtonLink] = useState("");
+  const [noticeStartsAt, setNoticeStartsAt] = useState("");
+  const [noticeEndsAt, setNoticeEndsAt] = useState("");
 
   // Team form
   const [showTeamForm, setShowTeamForm] = useState(false);
@@ -77,39 +95,41 @@ export default function SuperAdmin() {
 
   useEffect(() => {
     if (roleLoading) return;
-    if (role !== "superadmin") { setLoading(false); return; }
+    if (!isSuperAdmin) { setLoading(false); return; }
     loadData();
-  }, [role, roleLoading]);
+  }, [isSuperAdmin, roleLoading]);
 
   const loadData = async () => {
     setLoading(true);
 
     const [churchesRes, usersCountRes, noticesRes, rolesRes] = await Promise.all([
-      supabase.from("churches").select("*"),
+      supabase.from("organizations" as any).select("*").eq("active", true).order("name"),
       supabase.from("profiles").select("id", { count: "exact", head: true }),
-      supabase.from("platform_notices").select("*").order("created_at", { ascending: false }),
-      supabase.from("user_roles" as any).select("id, user_id, role").eq("role", "superadmin"),
+      supabase.from("platform_announcements" as any).select("*").order("created_at", { ascending: false }),
+      supabase.from("user_roles" as any).select("id, user_id, role").in("role", ["superadmin", "super_admin"]),
     ]);
 
     const allChurches = churchesRes.data || [];
-    const profileCounts: Record<string, number> = {};
+    const memberCounts: Record<string, number> = {};
 
-    // Batch count profiles per church
+    // Batch count memberships per organization
     if (allChurches.length > 0) {
-      const { data: profiles } = await supabase.from("profiles").select("church_id");
-      if (profiles) {
-        for (const p of profiles) {
-          if (p.church_id) profileCounts[p.church_id] = (profileCounts[p.church_id] || 0) + 1;
+      const { data: memberships } = await supabase.from("organization_users" as any).select("organization_id").eq("is_active", true);
+      if (memberships) {
+        for (const membership of memberships as any[]) {
+          if (membership.organization_id) {
+            memberCounts[membership.organization_id] = (memberCounts[membership.organization_id] || 0) + 1;
+          }
         }
       }
     }
 
-    const flat: ChurchSummary[] = allChurches.map(c => ({
-      id: c.id, name: c.name, slug: c.slug, is_matriz: c.is_matriz,
-      hierarchy_level: (c as any).hierarchy_level || (c.is_matriz ? "matriz" : "congregacao"),
-      city: c.city, state: c.state, pastor_name: c.pastor_name,
-      parent_church_id: c.parent_church_id,
-      memberCount: profileCounts[c.id] || 0, children: [],
+    const flat: ChurchSummary[] = (allChurches as any[]).map(c => ({
+      id: c.id, name: c.name, slug: c.slug, is_matriz: c.organization_type === "matriz" || c.organization_type === "sede",
+      organization_type: c.organization_type || "congregacao",
+      city: c.city, state: c.state, pastor_name: null,
+      parent_id: c.parent_id,
+      memberCount: memberCounts[c.id] || 0, children: [],
     }));
     setFlatChurches(flat);
 
@@ -138,8 +158,8 @@ export default function SuperAdmin() {
     flat.forEach(c => map.set(c.id, { ...c, children: [] }));
     const roots: ChurchSummary[] = [];
     map.forEach(c => {
-      if (c.parent_church_id && map.has(c.parent_church_id)) {
-        map.get(c.parent_church_id)!.children.push(c);
+      if (c.parent_id && map.has(c.parent_id)) {
+        map.get(c.parent_id)!.children.push(c);
       } else {
         roots.push(c);
       }
@@ -153,25 +173,24 @@ export default function SuperAdmin() {
   const handleCreateChurch = async () => {
     if (!churchForm.name.trim()) { toast.error(t("Nome é obrigatório")); return; }
     const slug = generateSlug(churchForm.name);
-    const isSede = churchForm.hierarchy_level === "sede";
-    const isMatriz = churchForm.hierarchy_level === "sede" || churchForm.hierarchy_level === "matriz";
-    const { error } = await supabase.from("churches").insert({
+    const { error } = await supabase.from("organizations" as any).insert({
       name: churchForm.name.trim(), slug,
-      is_matriz: isMatriz,
-      parent_church_id: churchForm.parent_church_id || null,
+      organization_type: churchForm.organization_type,
+      parent_id: churchForm.parent_id || null,
       city: churchForm.city || null, state: churchForm.state || null,
-      pastor_name: churchForm.pastor_name || null, email: churchForm.email || null,
-      phone: churchForm.phone || null, address: churchForm.address || null,
+      email: churchForm.email || null,
+      phone: churchForm.phone || null,
+      active: true,
     } as any);
     if (error) { toast.error(error.message); return; }
     toast.success(t("Igreja criada com sucesso!"));
-    setChurchForm({ name: "", city: "", state: "", pastor_name: "", email: "", phone: "", address: "", hierarchy_level: "matriz", parent_church_id: "" });
+    setChurchForm({ name: "", city: "", state: "", pastor_name: "", email: "", phone: "", address: "", organization_type: "matriz", parent_id: "" });
     setShowChurchForm(false);
     loadData();
   };
 
   const handleDeleteChurch = async (id: string) => {
-    const { error } = await supabase.from("churches").delete().eq("id", id);
+    const { error } = await supabase.from("organizations" as any).delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
     toast.success(t("Igreja removida"));
     loadData();
@@ -183,24 +202,197 @@ export default function SuperAdmin() {
     toast.success(`${t("Link copiado para")} ${name}`);
   };
 
-  const createNotice = async () => {
-    if (!noticeTitle.trim() || !noticeContent.trim() || !user) return;
-    const { error } = await supabase.from("platform_notices").insert({
-      user_id: user.id, title: noticeTitle.trim(), content: noticeContent.trim(), priority: noticePriority,
+  const uploadNoticeImage = async (file: File) => {
+    setNoticeImagePreview(URL.createObjectURL(file));
+    setNoticeImageUploading(true);
+
+    const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "-");
+    const filePath = `platform-announcements/${Date.now()}-${safeFileName}`;
+    const { error } = await supabase.storage.from("platform-media").upload(filePath, file, {
+      contentType: file.type,
+      upsert: false,
     });
-    if (error) { toast.error(t("Erro ao criar aviso")); return; }
+
+    if (error) {
+      setNoticeImageUploading(false);
+      toast.error(t("Erro ao enviar imagem"));
+      return;
+    }
+
+    const { data } = supabase.storage.from("platform-media").getPublicUrl(filePath);
+    setNoticeImageUrl(data.publicUrl);
+    setNoticeImagePreview(data.publicUrl);
+    setNoticeImageUploading(false);
+  };
+
+  const handleNoticeImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await uploadNoticeImage(file);
+  };
+
+  const handleNoticeImageDrop = async (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const file = event.dataTransfer.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error(t("Selecione uma imagem"));
+      return;
+    }
+    await uploadNoticeImage(file);
+  };
+
+  const handleGenerateBannerAi = async () => {
+    if (!noticeTitle.trim() || !noticeShortDescription.trim() || !noticeFullContent.trim()) {
+      toast.error(t("Preencha título, resumo e conteúdo da campanha antes de gerar o banner"));
+      return;
+    }
+
+    setNoticeBannerGenerating(true);
+    const generationId = crypto.randomUUID();
+    const { data, error } = await supabase.functions.invoke("generate-campaign-banner", {
+      body: {
+        title: noticeTitle.trim(),
+        short_description: noticeShortDescription.trim(),
+        full_content: noticeFullContent.trim(),
+        generation_id: generationId,
+        announcement_id: editingNoticeId,
+      },
+    });
+    setNoticeBannerGenerating(false);
+
+    if (error) {
+      console.error("Erro ao gerar banner com IA", error);
+      toast.error(error.message || t("Erro ao gerar banner com IA"));
+      return;
+    }
+
+    const result = data as { imageUrl?: string | null; error?: string; details?: string[] } | null;
+    if (result?.error) {
+      console.error("Erro ao gerar banner com IA", result);
+      toast.error(result.error);
+      return;
+    }
+
+    const imageUrl = result?.imageUrl;
+    if (!imageUrl) {
+      toast.error(t("A IA não retornou uma imagem"));
+      return;
+    }
+
+    setNoticeImageUrl(imageUrl);
+    setNoticeImagePreview(`${imageUrl}${imageUrl.includes("?") ? "&" : "?"}preview=${generationId}`);
+    toast.success(t("Banner gerado com sucesso"));
+  };
+
+  const createNotice = async () => {
+    if (!noticeTitle.trim() || !noticeShortDescription.trim() || !noticeFullContent.trim() || !user) return;
+    if (editingNoticeId) {
+      const updatePayload = {
+        title: noticeTitle.trim(),
+        short_description: noticeShortDescription.trim(),
+        full_content: noticeFullContent.trim(),
+        image_url: noticeImageUrl.trim() || null,
+        button_label: noticeButtonLabel.trim() || null,
+        button_link: noticeButtonLink.trim() || null,
+        starts_at: noticeStartsAt || null,
+        ends_at: noticeEndsAt || null,
+        updated_at: new Date().toISOString(),
+      };
+      const { data, error } = await supabase
+        .from("platform_announcements" as any)
+        .update(updatePayload as any)
+        .eq("id", editingNoticeId)
+        .select();
+      if (error) {
+        console.error("Erro ao atualizar aviso", { updatePayload, error });
+        toast.error(error.message || t("Erro ao atualizar aviso"));
+        return;
+      }
+      toast.success(t("Aviso atualizado com sucesso"));
+      setEditingNoticeId(null);
+      setShowNoticeForm(false);
+      loadData();
+      return;
+    }
+    const payload = {
+      title: noticeTitle.trim(),
+      short_description: noticeShortDescription.trim(),
+      full_content: noticeFullContent.trim(),
+      image_url: noticeImageUrl.trim() || null,
+      button_label: noticeButtonLabel.trim() || null,
+      button_link: noticeButtonLink.trim() || null,
+      target_type: "members",
+      is_active: true,
+      created_by: user.id,
+      starts_at: noticeStartsAt || null,
+      ends_at: noticeEndsAt || null,
+    };
+    const { error } = await supabase.from("platform_announcements" as any).insert(payload as any);
+    if (error) {
+      console.error("Erro ao criar campanha", { payload, error });
+      toast.error(error.message || t("Erro ao criar aviso"));
+      return;
+    }
     toast.success(t("Aviso criado com sucesso"));
-    setNoticeTitle(""); setNoticeContent(""); setShowNoticeForm(false);
+    setNoticeTitle("");
+    setNoticeShortDescription("");
+    setNoticeFullContent("");
+    setNoticeImageUrl("");
+    setNoticeImagePreview("");
+    setNoticeImageUploading(false);
+    setNoticeBannerGenerating(false);
+    setEditingNoticeId(null);
+    setNoticeButtonLabel("");
+    setNoticeButtonLink("");
+    setNoticeStartsAt("");
+    setNoticeEndsAt("");
+    setShowNoticeForm(false);
     loadData();
   };
 
+  const truncateText = (text: string, maxLength = 160) =>
+    text.length > maxLength ? `${text.slice(0, maxLength).trim()}...` : text;
+
+  const toDateTimeLocal = (value: string | null) =>
+    value ? new Date(value).toISOString().slice(0, 16) : "";
+
   const toggleNotice = async (id: string, active: boolean) => {
-    await supabase.from("platform_notices").update({ is_active: !active }).eq("id", id);
-    loadData();
+    const nextActive = !active;
+    const { data, error } = await supabase
+      .from("platform_announcements" as any)
+      .update({ is_active: nextActive, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("id, is_active")
+      .single();
+
+    if (error) {
+      console.error("Erro ao alterar status do aviso", { id, nextActive, error });
+      toast.error(error.message || t("Erro ao alterar status do aviso"));
+      return;
+    }
+
+    setNotices(items => items.map(item => item.id === id ? { ...item, is_active: Boolean((data as { is_active?: boolean } | null)?.is_active) } : item));
+    toast.success(nextActive ? t("Aviso ativado") : t("Aviso desativado"));
+  };
+
+  const handleEditAnnouncement = (announcement: PlatformNotice) => {
+    setEditingNoticeId(announcement.id);
+    setNoticeTitle(announcement.title || "");
+    setNoticeShortDescription(announcement.short_description || "");
+    setNoticeFullContent(announcement.full_content || "");
+    setNoticeImageUrl(announcement.image_url || "");
+    setNoticeImagePreview(announcement.image_url || "");
+    setNoticeButtonLabel(announcement.button_label || "");
+    setNoticeButtonLink(announcement.button_link || "");
+    setNoticeStartsAt(toDateTimeLocal(announcement.starts_at));
+    setNoticeEndsAt(toDateTimeLocal(announcement.ends_at));
+    setShowNoticeForm(true);
+    toast(t("Edição visual carregada"));
   };
 
   const deleteNotice = async (id: string) => {
-    await supabase.from("platform_notices").delete().eq("id", id);
+    await supabase.from("platform_announcements" as any).delete().eq("id", id);
     toast.success(t("Aviso removido"));
     loadData();
   };
@@ -232,7 +424,7 @@ export default function SuperAdmin() {
     loadData();
   };
 
-  if (role !== "superadmin") {
+  if (!isSuperAdmin) {
     return (
       <AdminLayout>
         <div className="flex items-center justify-center py-20">
@@ -249,34 +441,54 @@ export default function SuperAdmin() {
     { key: "notices", label: t("Avisos"), icon: Bell },
   ];
 
-  const sedeChurches = flatChurches.filter(c => c.hierarchy_level === "sede");
-  const matrizChurches = flatChurches.filter(c => c.hierarchy_level === "matriz" || (c.is_matriz && c.hierarchy_level !== "sede"));
+  const sedeChurches = flatChurches.filter(c => c.organization_type === "sede");
+  const matrizChurches = flatChurches.filter(c => c.organization_type === "matriz" || (c.is_matriz && c.organization_type !== "sede"));
 
   const renderChurchTree = (items: ChurchSummary[], level = 0) => (
-    items.map(c => (
+    items.map(c => {
+      const iconHighlight =
+        c.organization_type === "matriz" ||
+        c.organization_type === "sede" ||
+        c.organization_type === "convencao";
+      return (
       <div key={c.id}>
         <div className={`flex items-center justify-between p-3 hover:bg-secondary/20 transition-colors ${level > 0 ? "border-l-2 border-accent/20" : ""}`}
           style={{ paddingLeft: `${16 + level * 24}px` }}>
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${c.is_matriz ? "bg-accent/20" : "bg-secondary"}`}>
-              <Church size={16} className={c.is_matriz ? "text-accent" : "text-muted-foreground"} />
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${iconHighlight ? "bg-accent/20" : "bg-secondary"}`}>
+              <Church size={16} className={iconHighlight ? "text-accent" : "text-muted-foreground"} />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium truncate">{c.name}</span>
-                {c.hierarchy_level === "sede" && (
+                {c.organization_type === "sede" && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-600 font-semibold shrink-0">
                     {t("Sede")}
                   </span>
                 )}
-                {c.hierarchy_level !== "sede" && c.hierarchy_level !== "congregacao" && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/20 text-accent font-semibold shrink-0">
-                    {t("Matriz")}
+                {c.organization_type === "convencao" && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-700 font-semibold shrink-0">
+                    Convenção / Regional
                   </span>
                 )}
-                {c.hierarchy_level === "congregacao" && (
+                {c.organization_type === "matriz" && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/20 text-accent font-semibold shrink-0">
+                    Matriz municipal
+                  </span>
+                )}
+                {c.organization_type === "setor" && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/15 text-teal-800 dark:text-teal-200 font-semibold shrink-0">
+                    Setor
+                  </span>
+                )}
+                {c.organization_type === "congregacao" && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-semibold shrink-0">
                     {t("Congregação")}
+                  </span>
+                )}
+                {!["sede", "convencao", "matriz", "setor", "congregacao"].includes(c.organization_type) && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-semibold shrink-0">
+                    {c.organization_type}
                   </span>
                 )}
               </div>
@@ -298,7 +510,8 @@ export default function SuperAdmin() {
         </div>
         {c.children.length > 0 && renderChurchTree(c.children, level + 1)}
       </div>
-    ))
+    );
+    })
   );
 
   return (
@@ -429,25 +642,47 @@ export default function SuperAdmin() {
                     <div className="flex flex-wrap items-center gap-4">
                       <div className="flex items-center gap-2">
                         <label className="text-sm font-medium">{t("Nível:")}</label>
-                        <select value={churchForm.hierarchy_level}
-                          onChange={e => setChurchForm(f => ({ ...f, hierarchy_level: e.target.value, parent_church_id: e.target.value === "sede" ? "" : f.parent_church_id }))}
+                        <select value={churchForm.organization_type}
+                          onChange={e => setChurchForm(f => ({
+                            ...f,
+                            organization_type: e.target.value,
+                            parent_id: e.target.value === "sede" || e.target.value === "convencao" ? "" : f.parent_id,
+                          }))}
                           className="px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30">
                           <option value="sede">{t("Sede Internacional")}</option>
-                          <option value="matriz">{t("Matriz Regional")}</option>
+                          <option value="convencao">Convenção / Regional</option>
+                          <option value="matriz">Matriz municipal</option>
                           <option value="congregacao">{t("Congregação")}</option>
                         </select>
                       </div>
 
-                      {churchForm.hierarchy_level !== "sede" && (
-                        <select value={churchForm.parent_church_id}
-                          onChange={e => setChurchForm(f => ({ ...f, parent_church_id: e.target.value }))}
+                      {churchForm.organization_type !== "sede" && (
+                        <select value={churchForm.parent_id}
+                          onChange={e => setChurchForm(f => ({ ...f, parent_id: e.target.value }))}
                           className="px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30">
                           <option value="">{t("Selecione a igreja mãe...")}</option>
                           {flatChurches.filter(c => {
-                            if (churchForm.hierarchy_level === "matriz") return c.hierarchy_level === "sede" || (c.is_matriz && !c.parent_church_id);
+                            if (churchForm.organization_type === "convencao") {
+                              return c.organization_type === "sede";
+                            }
+                            if (churchForm.organization_type === "matriz") {
+                              return c.organization_type === "sede" || c.organization_type === "convencao";
+                            }
                             return true;
                           }).map(c => (
-                            <option key={c.id} value={c.id}>{c.name} ({c.hierarchy_level === "sede" ? t("Sede") : c.is_matriz ? t("Matriz") : t("Congregação")})</option>
+                            <option key={c.id} value={c.id}>
+                              {c.name} (
+                              {c.organization_type === "sede"
+                                ? t("Sede")
+                                : c.organization_type === "convencao"
+                                  ? "Convenção / Regional"
+                                  : c.organization_type === "matriz"
+                                    ? "Matriz municipal"
+                                    : c.organization_type === "setor"
+                                      ? "Setor"
+                                      : t("Congregação")}
+                              )
+                            </option>
                           ))}
                         </select>
                       )}
@@ -556,7 +791,7 @@ export default function SuperAdmin() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="font-serif text-lg">{t("Avisos da Plataforma")}</h2>
-                  <button onClick={() => setShowNoticeForm(!showNoticeForm)}
+                  <button onClick={() => { setEditingNoticeId(null); setShowNoticeForm(!showNoticeForm); }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:opacity-90">
                     <Plus size={14} /> {t("Novo Aviso")}
                   </button>
@@ -565,55 +800,137 @@ export default function SuperAdmin() {
                 {showNoticeForm && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
                     className="bg-card rounded-xl shadow-sm border border-border/50 p-5 space-y-3">
-                    <input type="text" placeholder={t("Título do aviso")} value={noticeTitle}
-                      onChange={e => setNoticeTitle(e.target.value)}
-                      className="w-full bg-secondary/50 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 ring-accent/30" />
-                    <textarea placeholder={t("Conteúdo do aviso")} value={noticeContent}
-                      onChange={e => setNoticeContent(e.target.value)} rows={3}
-                      className="w-full bg-secondary/50 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 ring-accent/30 resize-none" />
+                    <label className="block space-y-1.5">
+                      <span className="text-xs font-medium text-muted-foreground">{t("Título principal do banner")}</span>
+                      <input type="text" placeholder={t("Título da campanha")} value={noticeTitle}
+                        onChange={e => setNoticeTitle(e.target.value)}
+                        className="w-full bg-secondary/50 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 ring-accent/30" />
+                    </label>
+                    <label className="block space-y-1.5">
+                      <span className="text-xs font-medium text-muted-foreground">{t("Texto/chamada do banner")}</span>
+                      <input type="text" placeholder={t("Resumo curto da campanha")} value={noticeShortDescription}
+                        onChange={e => setNoticeShortDescription(e.target.value)}
+                        className="w-full bg-secondary/50 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 ring-accent/30" />
+                    </label>
+                    <label className="block space-y-1.5">
+                      <span className="text-xs font-medium text-muted-foreground">{t("Prompt visual da IA")}</span>
+                      <textarea placeholder={t("Descreva a campanha, público, missão e atmosfera desejada")} value={noticeFullContent}
+                        onChange={e => setNoticeFullContent(e.target.value)} rows={3}
+                        className="w-full bg-secondary/50 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 ring-accent/30 resize-none" />
+                    </label>
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium">{t("Banner da campanha")}</p>
+                      <div onDrop={handleNoticeImageDrop} onDragOver={e => e.preventDefault()}
+                        className="rounded-xl border border-dashed border-border bg-secondary/30 p-4">
+                        {noticeImagePreview ? (
+                          <div className="flex aspect-video max-h-[360px] w-full items-center justify-center overflow-hidden rounded-lg bg-background/70">
+                            <img src={noticeImagePreview} alt="" className="h-full w-full object-fill" />
+                          </div>
+                        ) : (
+                          <div className="flex min-h-48 flex-col items-center justify-center rounded-lg bg-background/60 px-4 text-center">
+                            <Upload size={28} className="text-muted-foreground mb-3" />
+                            <p className="text-sm font-medium">{t("Arraste uma imagem aqui ou escolha do computador")}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{t("A IA usará título, resumo e conteúdo da campanha para sugerir um banner")}</p>
+                          </div>
+                        )}
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <label className="inline-flex cursor-pointer items-center gap-1.5 px-3 py-2 bg-accent text-accent-foreground rounded-lg text-xs font-medium hover:opacity-90">
+                            <Upload size={14} /> {t("Escolher imagem")}
+                            <input type="file" accept="image/*" onChange={handleNoticeImageUpload} className="hidden" />
+                          </label>
+                          <button type="button" onClick={handleGenerateBannerAi} disabled={noticeBannerGenerating || noticeImageUploading}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary text-foreground rounded-lg text-xs font-medium hover:bg-secondary/80 disabled:opacity-60">
+                            {noticeBannerGenerating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                            {noticeBannerGenerating ? t("Gerando banner...") : t("Gerar banner com IA")}
+                          </button>
+                          {(noticeImageUploading || noticeBannerGenerating) && (
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Loader2 size={12} className="animate-spin" /> {noticeBannerGenerating ? t("Criando imagem com IA...") : t("Enviando imagem...")}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <label className="block space-y-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">{t("Texto do botão")}</span>
+                        <input type="text" placeholder={t("Ex: Doar agora")} value={noticeButtonLabel}
+                          onChange={e => setNoticeButtonLabel(e.target.value)}
+                          className="w-full bg-secondary/50 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 ring-accent/30" />
+                      </label>
+                      <label className="block space-y-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">{t("Link da campanha/doação")}</span>
+                        <input type="url" placeholder={t("https://...")} value={noticeButtonLink}
+                          onChange={e => setNoticeButtonLink(e.target.value)}
+                          className="w-full bg-secondary/50 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 ring-accent/30" />
+                      </label>
+                      <label className="block space-y-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">{t("Data de início")}</span>
+                        <input type="datetime-local" value={noticeStartsAt}
+                          onChange={e => setNoticeStartsAt(e.target.value)}
+                          className="w-full bg-secondary/50 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 ring-accent/30" />
+                      </label>
+                      <label className="block space-y-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">{t("Data de encerramento")}</span>
+                        <input type="datetime-local" value={noticeEndsAt}
+                          onChange={e => setNoticeEndsAt(e.target.value)}
+                          className="w-full bg-secondary/50 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 ring-accent/30" />
+                      </label>
+                    </div>
                     <div className="flex items-center gap-3">
-                      <select value={noticePriority} onChange={e => setNoticePriority(e.target.value)}
-                        className="bg-secondary/50 rounded-lg px-3 py-2 text-sm outline-none">
-                        <option value="Normal">Normal</option>
-                        <option value="Urgente">{t("Urgente")}</option>
-                      </select>
-                      <button onClick={createNotice}
-                        className="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:opacity-90">
-                        {t("Publicar")}
+                      <button onClick={createNotice} disabled={noticeImageUploading || noticeBannerGenerating}
+                        className="px-4 py-2 bg-accent text-accent-foreground rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-60">
+                        {editingNoticeId ? t("Salvar edição") : t("Publicar")}
                       </button>
                     </div>
                   </motion.div>
                 )}
 
                 <div className="bg-card rounded-xl shadow-sm border border-border/50 overflow-hidden divide-y divide-border/30">
-                  {notices.map(n => (
-                    <div key={n.id} className="p-4 flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">{n.title}</span>
-                          {n.priority === "Urgente" && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-600 font-semibold">{t("Urgente")}</span>
-                          )}
-                          {!n.is_active && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-semibold">{t("Inativo")}</span>
+                  {notices.map(n => {
+                    return (
+                      <div key={n.id} className="p-4 flex items-start justify-between gap-3">
+                        {n.image_url && (
+                          <img src={n.image_url} alt="" className="w-16 h-16 rounded-lg object-cover bg-secondary flex-shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{n.title}</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${n.is_active ? "bg-emerald-500/20 text-emerald-600" : "bg-muted text-muted-foreground"}`}>
+                              {n.is_active ? t("Ativo") : t("Inativo")}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {n.starts_at
+                              ? new Date(n.starts_at).toLocaleDateString("pt-BR")
+                              : new Date(n.created_at).toLocaleDateString("pt-BR")}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">{truncateText(n.full_content)}</p>
+                          {(n.button_label || n.button_link) && (
+                            <p className="text-xs text-accent font-medium mt-1 flex items-center gap-1 truncate">
+                              <Link2 size={12} /> {n.button_label || t("Link")} {n.button_link ? `- ${n.button_link}` : ""}
+                            </p>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">{n.content}</p>
-                        <p className="text-[10px] text-muted-foreground mt-1">{new Date(n.created_at).toLocaleDateString("pt-BR")}</p>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => toggleNotice(n.id, n.is_active)}
+                            className="p-1.5 rounded-lg hover:bg-secondary transition-colors"
+                            title={n.is_active ? t("Desativar") : t("Ativar")}>
+                            {n.is_active ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                          <button onClick={() => handleEditAnnouncement(n)}
+                            className="p-1.5 rounded-lg text-foreground/70 hover:text-accent hover:bg-accent/10 transition-colors"
+                            title={t("Editar")}>
+                            <PencilLine size={14} />
+                          </button>
+                          <button onClick={() => deleteNotice(n.id)}
+                            className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-destructive">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button onClick={() => toggleNotice(n.id, n.is_active)}
-                          className="p-1.5 rounded-lg hover:bg-secondary transition-colors"
-                          title={n.is_active ? t("Desativar") : t("Ativar")}>
-                          {n.is_active ? <EyeOff size={14} /> : <Eye size={14} />}
-                        </button>
-                        <button onClick={() => deleteNotice(n.id)}
-                          className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-destructive">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {notices.length === 0 && (
                     <p className="p-8 text-sm text-muted-foreground text-center">{t("Nenhum aviso criado")}</p>
                   )}
