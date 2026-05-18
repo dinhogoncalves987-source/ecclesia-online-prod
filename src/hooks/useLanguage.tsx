@@ -336,6 +336,17 @@ const translations: Record<string, Record<Lang, string>> = {
   "Sem nome": { pt: "Sem nome", en: "No name", es: "Sin nombre" },
   "(você)": { pt: "(você)", en: "(you)", es: "(tú)" },
   "Função atualizada para": { pt: "Função atualizada para", en: "Role updated to", es: "Función actualizada a" },
+  "Admin": { pt: "Admin", en: "Admin", es: "Admin" },
+  "Secretário": { pt: "Secretário", en: "Secretary", es: "Secretario" },
+  "Contador": { pt: "Contador", en: "Accountant", es: "Contador" },
+  "Usuários vinculados a": { pt: "Usuários vinculados a", en: "Users linked to", es: "Usuarios vinculados a" },
+  "Nenhum usuário vinculado a esta organização": {
+    pt: "Nenhum usuário vinculado a esta organização",
+    en: "No users linked to this organization",
+    es: "Ningún usuario vinculado a esta organización",
+  },
+  "Selecione uma organização": { pt: "Selecione uma organização", en: "Select an organization", es: "Seleccione una organización" },
+  "inativo": { pt: "inativo", en: "inactive", es: "inactivo" },
 
   // Landing
   "Entrar": { pt: "Entrar", en: "Sign in", es: "Entrar" },
