@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -6,12 +6,22 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
+import {
+  buildSignupMetadata,
+  loginPathWithChurch,
+  persistPendingChurchSlug,
+  resolveInviteChurchSlug,
+} from "@/lib/organizationMembership";
 
 export default function Signup() {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const [searchParams] = useSearchParams();
   const churchSlug = searchParams.get("church");
+
+  useEffect(() => {
+    persistPendingChurchSlug(churchSlug);
+  }, [churchSlug]);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,20 +33,29 @@ export default function Signup() {
     if (!email || !password || !fullName) return;
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
+    const inviteSlug = resolveInviteChurchSlug(churchSlug);
+    const metadata = buildSignupMetadata(fullName, inviteSlug);
+    const emailRedirectTo = inviteSlug
+      ? `${window.location.origin}/login?church=${encodeURIComponent(inviteSlug)}`
+      : `${window.location.origin}/login`;
+
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { full_name: fullName, ...(churchSlug ? { church_slug: churchSlug } : {}) },
-        emailRedirectTo: window.location.origin,
+        data: metadata,
+        emailRedirectTo,
       },
     });
 
     if (error) {
       toast({ title: t("Erro ao criar conta"), description: error.message, variant: "destructive" });
     } else {
+      if (inviteSlug && data.session) {
+        await supabase.auth.updateUser({ data: { church_slug: inviteSlug, full_name: metadata.full_name } });
+      }
       toast({ title: t("Conta criada!"), description: t("Verifique seu e-mail para confirmar o cadastro.") });
-      navigate("/login");
+      navigate(loginPathWithChurch(inviteSlug));
     }
     setLoading(false);
   };
@@ -54,7 +73,7 @@ export default function Signup() {
           </Link>
           <h1 className="text-2xl font-serif tracking-tight">{t("Criar conta")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{t("Preencha os dados para começar")}</p>
-          {churchSlug && (
+          {resolveInviteChurchSlug(churchSlug) && (
             <p className="text-xs text-accent mt-2 font-medium">{t("Você foi convidado para uma congregação")}</p>
           )}
         </div>
@@ -62,7 +81,7 @@ export default function Signup() {
         <form onSubmit={handleSignup} className="bg-card rounded-xl shadow-executive p-6 space-y-4">
           <div>
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("Nome completo")}</label>
-            <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Pastor João Silva" required
+            <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={t("Ex: Pastor João Silva")} required
               className="mt-1.5 w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30" />
           </div>
 
@@ -97,6 +116,7 @@ export default function Signup() {
 
           <button type="button"
             onClick={async () => {
+              persistPendingChurchSlug(churchSlug);
               const { error } = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
               if (error) toast({ title: t("Erro"), description: String(error), variant: "destructive" });
             }}
@@ -107,7 +127,7 @@ export default function Signup() {
 
           <p className="text-center text-xs text-muted-foreground">
             {t("Já tem conta?")}{" "}
-            <Link to="/login" className="text-accent hover:underline font-medium">{t("Entrar")}</Link>
+            <Link to={loginPathWithChurch(churchSlug)} className="text-accent hover:underline font-medium">{t("Entrar")}</Link>
           </p>
         </form>
       </div>

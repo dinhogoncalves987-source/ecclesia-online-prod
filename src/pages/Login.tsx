@@ -1,15 +1,22 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
+import { persistPendingChurchSlug, signupPathWithChurch } from "@/lib/organizationMembership";
 
 export default function Login() {
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const [searchParams] = useSearchParams();
+  const churchSlug = searchParams.get("church");
+
+  useEffect(() => {
+    persistPendingChurchSlug(churchSlug);
+  }, [churchSlug]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -91,7 +98,7 @@ export default function Login() {
 
           <p className="text-center text-xs text-muted-foreground">
             {t("Não tem conta?")}{" "}
-            <Link to="/signup" className="text-accent hover:underline font-medium">{t("Criar conta")}</Link>
+            <Link to={signupPathWithChurch(churchSlug)} className="text-accent hover:underline font-medium">{t("Criar conta")}</Link>
           </p>
         </form>
       </div>
