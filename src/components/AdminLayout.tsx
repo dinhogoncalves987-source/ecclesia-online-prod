@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useRole } from "@/hooks/useRole";
-import { useChurch } from "@/hooks/useChurch";
+import { useChurch } from "@/hooks/useChurchContext";
 import { supabase } from "@/integrations/supabase/client";
 import flagBR from "@/assets/flag-br.png";
 import flagUS from "@/assets/flag-us.png";
@@ -46,18 +46,35 @@ const mobileNavItems = [
   { icon: User, label: "Perfil", path: "/admin/perfil" },
 ];
 
+type FullscreenDocument = Document & {
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => Promise<void>;
+};
+
+type FullscreenElement = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void>;
+};
+
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { t, lang, setLang } = useLanguage();
   const { canAccess, isAdmin, isSuperAdmin } = useRole();
-  const { isMatriz } = useChurch();
+  const { church } = useChurch();
 
-  // Build nav items - rename "Congregações" to "Admin Matriz" for matriz admins
+  const childUnitsNavLabel = (): string => {
+    const orgType = church?.organization_type;
+    if (orgType === "convencao") return "Matrizes";
+    if (orgType === "matriz") return "Setores";
+    if (orgType === "setor") return "Congregações";
+    if (orgType === "congregacao") return "Congregações";
+    return "Congregações";
+  };
+
   const navItems = baseNavItems.map(item => {
-    if (item.path === "/admin/congregacoes" && isMatriz && isAdmin) {
-      return { ...item, label: "Admin Matriz" };
+    if (item.path === "/admin/congregacoes" && isAdmin) {
+      return { ...item, label: childUnitsNavLabel() };
     }
     return item;
   });
@@ -72,8 +89,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
   const toggleFullscreen = useCallback(async () => {
     try {
-      const doc = document as any;
-      const el = document.documentElement as any;
+      const doc = document as FullscreenDocument;
+      const el = document.documentElement as FullscreenElement;
       if (!doc.fullscreenElement && !doc.webkitFullscreenElement) {
         if (el.requestFullscreen) await el.requestFullscreen();
         else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
@@ -86,7 +103,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handler = () => {
-      const doc = document as any;
+      const doc = document as FullscreenDocument;
       setIsFullscreen(!!(doc.fullscreenElement || doc.webkitFullscreenElement));
     };
     document.addEventListener("fullscreenchange", handler);
@@ -360,7 +377,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile bottom nav */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-card/95 backdrop-blur-md shadow-[0_-1px_0_0_hsl(var(--border)/0.5)] flex justify-around items-center z-30">
-        {mobileNavItems.map((item) => (
+        {mobileNavItems.filter(item => canAccess(item.path)).map((item) => (
           <Link
             key={item.path}
             to={item.path}

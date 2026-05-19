@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useChurch } from "@/hooks/useChurch";
+import { useChurch } from "@/hooks/useChurchContext";
 import { useLanguage } from "@/hooks/useLanguage";
 import { motion } from "framer-motion";
 import {
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import { runScopedOrganizationQuery } from "@/lib/organizationScope";
 
 interface CongregationStats {
   id: string;
@@ -26,6 +27,16 @@ interface CongregationStats {
 export function MatrizDashboard() {
   const { church, congregations } = useChurch();
   const { t } = useLanguage();
+
+  const orgType = church?.organization_type;
+  const panelTitle = orgType === "convencao"
+    ? "Painel Consolidado da Convenção"
+    : orgType === "setor"
+      ? "Painel Consolidado do Setor"
+      : "Painel Consolidado da Matriz";
+  const childUnitLabel = orgType === "convencao" ? "Matriz" : orgType === "matriz" ? "Setor" : "Congregação";
+  const childUnitLabelPlural = orgType === "convencao" ? "Matrizes" : orgType === "matriz" ? "Setores" : "Congregações";
+  const parentBadgeLabel = orgType === "convencao" ? "Convenção" : orgType === "setor" ? "Setor" : "Matriz";
   const [stats, setStats] = useState<CongregationStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -53,11 +64,17 @@ export function MatrizDashboard() {
       const c = cId === church!.id ? church! : congregations.find(x => x.id === cId)!;
 
       const [membersRes, incomeRes, expenseRes, eventsRes, prayersRes] = await Promise.all([
-        supabase.from("members").select("status").eq("church_id", cId),
-        supabase.from("transactions").select("amount").eq("type", "Entrada").eq("church_id", cId).gte("date", monthStart).lte("date", monthEnd),
-        supabase.from("transactions").select("amount").eq("type", "Saída").eq("church_id", cId).gte("date", monthStart).lte("date", monthEnd),
-        supabase.from("events").select("id").eq("church_id", cId).gte("event_date", monthStart).lte("event_date", monthEnd),
-        supabase.from("prayer_requests").select("id").eq("church_id", cId),
+        runScopedOrganizationQuery<Array<{ status: string }>>("members", cId, query => query.select("status")),
+        runScopedOrganizationQuery<Array<{ amount: number }>>("transactions", cId, query =>
+          query.select("amount").eq("type", "Entrada").gte("date", monthStart).lte("date", monthEnd)
+        ),
+        runScopedOrganizationQuery<Array<{ amount: number }>>("transactions", cId, query =>
+          query.select("amount").eq("type", "Saída").gte("date", monthStart).lte("date", monthEnd)
+        ),
+        runScopedOrganizationQuery<Array<{ id: string }>>("events", cId, query =>
+          query.select("id").gte("event_date", monthStart).lte("event_date", monthEnd)
+        ),
+        runScopedOrganizationQuery<Array<{ id: string }>>("prayer_requests", cId, query => query.select("id")),
       ]);
 
       const membersData = membersRes.data || [];
@@ -109,7 +126,7 @@ export function MatrizDashboard() {
           <Building2 size={24} className="text-accent" />
         </div>
         <div>
-          <h2 className="font-serif text-lg font-semibold">{t("Painel Consolidado da Matriz")}</h2>
+          <h2 className="font-serif text-lg font-semibold">{t(panelTitle)}</h2>
           <p className="text-xs text-muted-foreground">
             {stats.length} {t("unidades")} · {format(new Date(), "MMMM yyyy")}
           </p>
@@ -146,7 +163,7 @@ export function MatrizDashboard() {
       {/* Per-congregation breakdown */}
       <div className="bg-card rounded-xl shadow-executive overflow-hidden">
         <div className="p-5 border-b border-border/50 flex items-center justify-between">
-          <h3 className="font-serif text-base">{t("Detalhamento por Congregação")}</h3>
+          <h3 className="font-serif text-base">{t(`Detalhamento por ${childUnitLabel}`)}</h3>
           <Link to="/admin/congregacoes" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
             {t("Gerenciar")} <ArrowRight size={12} />
           </Link>
@@ -157,7 +174,7 @@ export function MatrizDashboard() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border/50 text-left text-xs text-muted-foreground">
-                <th className="px-5 py-3 font-medium">{t("Congregação")}</th>
+                <th className="px-5 py-3 font-medium">{t(childUnitLabel)}</th>
                 <th className="px-5 py-3 font-medium text-right">{t("Membros")}</th>
                 <th className="px-5 py-3 font-medium text-right">{t("Receita")}</th>
                 <th className="px-5 py-3 font-medium text-right">{t("Despesa")}</th>
@@ -177,7 +194,7 @@ export function MatrizDashboard() {
                         <span className="font-medium">{s.name}</span>
                         {isMatriz && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/20 text-accent font-semibold">
-                            {t("Matriz")}
+                            {parentBadgeLabel}
                           </span>
                         )}
                       </div>
@@ -215,7 +232,7 @@ export function MatrizDashboard() {
                       <span className="text-sm font-medium">{s.name}</span>
                       {isMatriz && (
                         <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-accent/20 text-accent font-semibold">
-                          {t("Matriz")}
+                          {parentBadgeLabel}
                         </span>
                       )}
                     </div>

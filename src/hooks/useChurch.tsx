@@ -28,6 +28,7 @@ const mapOrganizationToChurch = (org: OrganizationRow): Church => ({
   primary_color: null,
   parent_church_id: org.parent_id,
   is_matriz: org.organization_type === "matriz" || org.organization_type === "sede",
+  organization_type: org.organization_type ?? null,
   address: null,
   city: org.city,
   state: org.state,

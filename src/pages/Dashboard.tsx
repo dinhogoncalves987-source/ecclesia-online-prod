@@ -8,17 +8,78 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useChurch } from "@/hooks/useChurch";
+import { useChurch } from "@/hooks/useChurchContext";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useRole } from "@/hooks/useRole";
+import { runScopedOrganizationQuery } from "@/lib/organizationScope";
+
+interface PlatformCampaign {
+  id: string;
+  title: string;
+  short_description: string | null;
+  image_url: string | null;
+  button_label: string | null;
+  button_link: string | null;
+  is_active: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+  created_at: string;
+}
+
+type PlatformCampaignSelect = Pick<
+  PlatformCampaign,
+  "id" | "title" | "short_description" | "image_url" | "button_label" | "button_link" | "is_active" | "starts_at" | "ends_at" | "created_at"
+>;
+
+const isPlatformCampaign = (value: unknown): value is PlatformCampaign => {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Record<string, unknown>;
+  return (
+    typeof item.id === "string" &&
+    typeof item.title === "string" &&
+    typeof item.is_active === "boolean" &&
+    typeof item.created_at === "string"
+  );
+};
+
+const loadPlatformAnnouncements = async (nowIso: string): Promise<PlatformCampaignSelect[]> => {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/platform_announcements`);
+
+  url.searchParams.set("select", "id,title,short_description,image_url,button_label,button_link,is_active,starts_at,ends_at,created_at");
+  url.searchParams.set("is_active", "eq.true");
+  url.searchParams.set("and", `(or(starts_at.is.null,starts_at.lte.${nowIso}),or(ends_at.is.null,ends_at.gte.${nowIso}))`);
+  url.searchParams.set("order", "created_at.desc");
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      Authorization: `Bearer ${sessionData.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    if (!errorText.includes("platform_announcements")) {
+      console.error("Erro ao carregar anúncios da plataforma", errorText);
+    }
+    return [];
+  }
+
+  const data: unknown = await response.json();
+  return Array.isArray(data) ? data.filter(isPlatformCampaign) : [];
+};
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const { church, isMatriz } = useChurch();
-  const { isAdmin, isSuperAdmin, role } = useRole();
-  const isMembro = role === "membro" || role === "lider" || role === "obreiro";
-  const [platformNotices, setPlatformNotices] = useState<{ id: string; title: string; content: string; priority: string; created_at: string }[]>([]);
+  const { canonicalRole, isAdmin, isSuperAdmin, role } = useRole();
+  const isMembro = canonicalRole === "member" || canonicalRole === "leader" || role === "membro" || role === "lider" || role === "obreiro";
+  const canViewPlatformCampaigns = isSuperAdmin || canonicalRole === "member";
+  const [platformNotices, setPlatformNotices] = useState<PlatformCampaign[]>([]);
+  const platformCampaigns = platformNotices;
+  const [activeCampaignIndex, setActiveCampaignIndex] = useState(0);
   const [metrics, setMetrics] = useState([
     { title: t("Receita do Mês"), value: "R$ 0", trend: "", icon: Wallet, href: "/admin/financeiro" },
     { title: t("Despesas do Mês"), value: "R$ 0", trend: "", icon: TrendingUp, href: "/admin/financeiro" },
@@ -33,18 +94,15 @@ export default function Dashboard() {
     if (!user) { setLoading(false); return; }
     const load = async () => {
       setLoading(true);
+      const nowIso = new Date().toISOString();
 
-      const { data: noticesData } = await supabase
-        .from("platform_notices")
-        .select("id, title, content, priority, created_at")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .limit(5);
-      setPlatformNotices(noticesData || []);
+      const activeAnnouncements = await loadPlatformAnnouncements(nowIso);
+      setPlatformNotices(activeAnnouncements);
+      setActiveCampaignIndex(0);
 
       if (isSuperAdmin) {
         const [churchCount, userCount] = await Promise.all([
-          supabase.from("churches").select("id", { count: "exact", head: true }),
+          supabase.from("organizations").select("id", { count: "exact", head: true }),
           supabase.from("profiles").select("id", { count: "exact", head: true }),
         ]);
         setSuperMetrics({ churches: churchCount.count || 0, users: userCount.count || 0 });
@@ -61,9 +119,15 @@ export default function Dashboard() {
       const todayStr = now.toISOString().split("T")[0];
 
       const [txRes, membersRes, eventsRes] = await Promise.all([
-        supabase.from("transactions").select("type, amount").eq("church_id", church.id).gte("date", startDate).lte("date", endDate),
-        supabase.from("members").select("id, status").eq("church_id", church.id),
-        supabase.from("events").select("id, title, event_date, time").eq("church_id", church.id).gte("event_date", todayStr).order("event_date").limit(5),
+        runScopedOrganizationQuery<Array<{ type: string; amount: number }>>("transactions", church.id, query =>
+          query.select("type, amount").gte("date", startDate).lte("date", endDate)
+        ),
+        runScopedOrganizationQuery<Array<{ id: string; status: string }>>("members", church.id, query =>
+          query.select("id, status")
+        ),
+        runScopedOrganizationQuery<Array<{ id: string; title: string; starts_at: string }>>("events", church.id, query =>
+          query.select("id, title, starts_at").gte("starts_at", `${todayStr}T00:00:00`).order("starts_at").limit(5)
+        ),
       ]);
 
       const txData = txRes.data || [];
@@ -71,7 +135,9 @@ export default function Dashboard() {
       const despesa = txData.filter(t => t.type === "Saída").reduce((s, t) => s + Number(t.amount), 0);
       const activeMembers = (membersRes.data || []).filter(m => m.status === "Ativo").length;
 
-      const eventsThisMonthRes = await supabase.from("events").select("id").eq("church_id", church.id).gte("event_date", startDate).lte("event_date", endDate);
+      const eventsThisMonthRes = await runScopedOrganizationQuery<Array<{ id: string }>>("events", church.id, query =>
+        query.select("id").gte("starts_at", `${startDate}T00:00:00`).lte("starts_at", `${endDate}T23:59:59`)
+      );
       const eventsCount = (eventsThisMonthRes.data || []).length;
 
       const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}`;
@@ -86,14 +152,86 @@ export default function Dashboard() {
       setUpcomingEvents((eventsRes.data || []).map(e => ({
         id: e.id,
         title: e.title,
-        date: new Date(e.event_date + "T00:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "short" }),
-        time: e.time,
+        date: new Date(e.starts_at).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "short" }),
+        time: new Date(e.starts_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
       })));
 
       setLoading(false);
     };
     load();
   }, [user, church, t, isSuperAdmin]);
+
+  useEffect(() => {
+    if (platformCampaigns.length <= 1) return;
+
+    const timer = window.setInterval(() => {
+      setActiveCampaignIndex(index => (index + 1) % platformCampaigns.length);
+    }, 6000);
+
+    return () => window.clearInterval(timer);
+  }, [platformCampaigns.length]);
+
+  const formatAnnouncementDate = (date: string) =>
+    new Date(date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+
+  const getAnnouncementSummary = (announcement: PlatformCampaign) =>
+    announcement.short_description || "";
+
+  const renderCampaignBanner = () => {
+    if (platformCampaigns.length === 0) return null;
+
+    const campaign = platformCampaigns[activeCampaignIndex] || platformCampaigns[0];
+    const actionLabel = campaign.button_label || t("Saiba mais");
+
+    return (
+      <motion.section
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        className="overflow-hidden rounded-2xl shadow-executive bg-card border border-border/50"
+      >
+        {campaign.image_url ? (
+          <div className="aspect-[16/9] max-h-[420px] min-h-[190px] w-full overflow-hidden bg-foreground">
+            <img src={campaign.image_url} alt={campaign.title} className="h-full w-full object-fill" />
+          </div>
+        ) : (
+          <div className="flex aspect-[16/9] max-h-[420px] min-h-[190px] w-full items-center justify-center bg-gradient-to-br from-foreground via-foreground/90 to-accent/50 px-5 text-center">
+            <Heart size={36} className="text-white/75" />
+          </div>
+        )}
+
+        <div className="p-5 sm:p-6">
+          <div className="max-w-3xl">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-accent">
+              <Heart size={12} /> {t("Campanha missionária")}
+            </span>
+            <h2 className="mt-3 font-serif text-2xl sm:text-3xl text-foreground leading-tight">{campaign.title}</h2>
+            {campaign.short_description && (
+              <p className="mt-2 max-w-2xl text-sm sm:text-base text-muted-foreground">{campaign.short_description}</p>
+            )}
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              {campaign.button_link && (
+                <a href={campaign.button_link} target="_blank" rel="noreferrer"
+                  className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground hover:opacity-90">
+                  {actionLabel} <ChevronRight size={16} />
+                </a>
+              )}
+              {platformCampaigns.length > 1 && (
+                <div className="flex items-center gap-1.5">
+                  {platformCampaigns.map((item, index) => (
+                    <button key={item.id} type="button" onClick={() => setActiveCampaignIndex(index)}
+                      className={`h-1.5 rounded-full transition-all ${index === activeCampaignIndex ? "w-6 bg-accent" : "w-2 bg-muted-foreground/35"}`}
+                      aria-label={`${t("Campanha")} ${index + 1}`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </motion.section>
+    );
+  };
 
   // Member-only dashboard
   const renderMembroDashboard = () => (
@@ -142,14 +280,14 @@ export default function Dashboard() {
           <div className="space-y-2">
             {platformNotices.map((n) => (
               <div key={n.id}
-                className={`p-3 rounded-lg transition-colors ${n.priority === "Urgente" ? "bg-destructive/10 border-l-2 border-destructive" : "bg-secondary/30"}`}>
+                className="p-3 rounded-lg transition-colors bg-secondary/30">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-medium">{n.title}</p>
-                  {n.priority === "Urgente" && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/20 text-destructive font-semibold">{t("Urgente")}</span>
-                  )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">{n.content}</p>
+                {getAnnouncementSummary(n) && (
+                  <p className="text-xs text-muted-foreground mt-1">{getAnnouncementSummary(n)}</p>
+                )}
+                <p className="text-[10px] text-muted-foreground mt-1">{formatAnnouncementDate(n.created_at)}</p>
               </div>
             ))}
           </div>
@@ -280,15 +418,14 @@ export default function Dashboard() {
             )}
             {platformNotices.map((n) => (
               <div key={n.id}
-                className={`p-3 rounded-lg transition-colors ${n.priority === "Urgente" ? "bg-destructive/10 border-l-2 border-destructive" : "bg-secondary/30"}`}>
+                className="p-3 rounded-lg transition-colors bg-secondary/30">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-medium">{n.title}</p>
-                  {n.priority === "Urgente" && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/20 text-destructive font-semibold">{t("Urgente")}</span>
-                  )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">{n.content}</p>
-                <p className="text-[10px] text-muted-foreground mt-1">{new Date(n.created_at).toLocaleDateString("pt-BR")}</p>
+                {getAnnouncementSummary(n) && (
+                  <p className="text-xs text-muted-foreground mt-1">{getAnnouncementSummary(n)}</p>
+                )}
+                <p className="text-[10px] text-muted-foreground mt-1">{formatAnnouncementDate(n.created_at)}</p>
               </div>
             ))}
           </div>
@@ -304,7 +441,16 @@ export default function Dashboard() {
             { label: t("Financeiro"), desc: t("Controle financeiro e relatórios"), path: "/admin/financeiro", icon: Wallet },
             { label: t("Membros"), desc: t("Cadastro e gestão de membros"), path: "/admin/membros", icon: Users },
             { label: t("Agenda"), desc: t("Calendário e eventos da igreja"), path: "/admin/agenda", icon: Calendar },
-            ...(isAdmin ? [{ label: t("Congregações"), desc: t("Gerenciar congregações"), path: "/admin/congregacoes", icon: Building2 }] : []),
+            ...(isAdmin ? [{
+              label: church?.organization_type === "convencao" ? "Matrizes"
+                : church?.organization_type === "matriz" ? "Setores"
+                : "Congregações",
+              desc: church?.organization_type === "convencao" ? "Gerenciar matrizes municipais"
+                : church?.organization_type === "matriz" ? "Gerenciar setores"
+                : "Gerenciar congregações",
+              path: "/admin/congregacoes",
+              icon: Building2,
+            }] : []),
           ].map((item, i) => (
             <Link key={item.path} to={item.path}>
               <motion.div
@@ -331,7 +477,7 @@ export default function Dashboard() {
       <div className="space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">Dashboard</h1>
+            <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">{t("Dashboard")}</h1>
             <p className="text-sm text-muted-foreground mt-1">
               {isSuperAdmin ? t("Visão global da plataforma") : isMembro ? t("Bem-vindo à sua igreja") : t("Visão geral da administração")}
             </p>
@@ -352,6 +498,7 @@ export default function Dashboard() {
 
         {/* Daily Devotional - always visible */}
         <DailyDevotional />
+        {!loading && canViewPlatformCampaigns && renderCampaignBanner()}
 
         {loading ? (
           <div className="flex items-center justify-center py-12">

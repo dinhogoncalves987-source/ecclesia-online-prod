@@ -57,6 +57,13 @@ export default function Congregacoes() {
   const isConvencaoContext = activeOrgType === "convencao";
   const canManageChildUnits = isAdmin && (isMatriz || isSetorContext || isConvencaoContext);
 
+  const pageTitle = (): string => {
+    if (isConvencaoContext) return "Matrizes Municipais";
+    if (isMatriz) return "Setores";
+    if (isSetorContext) return "Congregações";
+    return "Congregações";
+  };
+
   useEffect(() => {
     if (!church?.id) {
       setActiveOrgType(null);
@@ -293,7 +300,7 @@ export default function Congregacoes() {
   };
 
   const handleShareInvite = (c: ChildOrganization) => {
-    const url = `${window.location.origin}/signup?church=${c.slug}`;
+    const url = `${window.location.origin}/signup?church=${encodeURIComponent(c.slug)}`;
     navigator.clipboard.writeText(url);
     toast({
       title: t("Link copiado!"),
@@ -361,7 +368,7 @@ export default function Congregacoes() {
           <div>
             <h1 className="text-2xl sm:text-3xl font-serif tracking-tight flex items-center gap-2">
               <Building2 size={28} className="text-accent" />
-              {t("Congregações")}
+              {pageTitle()}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">{pageSubtitle()}</p>
           </div>
