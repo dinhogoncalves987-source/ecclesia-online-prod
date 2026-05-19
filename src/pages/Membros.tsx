@@ -4,21 +4,20 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useChurch } from "@/hooks/useChurch";
+import { useChurch } from "@/hooks/useChurchContext";
 import { useLanguage } from "@/hooks/useLanguage";
 import { toast } from "sonner";
 import { BulkImportModal } from "@/components/BulkImportModal";
-import { AIImportModal } from "@/components/AIImportModal";
-import { Sparkles } from "lucide-react";
+import { insertWithOrganizationScope, runScopedOrganizationQuery } from "@/lib/organizationScope";
 
 type Member = {
   id: string;
-  name: string;
-  role: string | null;
+  full_name: string;
+  member_role: string | null;
   status: string;
   phone: string | null;
   email: string | null;
-  since: string | null;
+  joined_at: string | null;
 };
 
 export default function Membros() {
@@ -33,7 +32,6 @@ export default function Membros() {
   const [showForm, setShowForm] = useState(false);
   const [newMember, setNewMember] = useState({ name: "", role: "", phone: "", email: "" });
   const [showImport, setShowImport] = useState(false);
-  const [showAIImport, setShowAIImport] = useState(false);
 
   const memberFields = [
     { key: "name", label: t("Nome"), required: true },
@@ -53,17 +51,18 @@ export default function Membros() {
     let success = 0, errors = 0;
     for (const row of rows) {
       if (!row.name) { errors++; continue; }
-      const { error } = await supabase.from("members").insert({
-        user_id: user.id, church_id: church.id,
-        name: row.name, role: row.role || "Membro",
+      const { error } = await insertWithOrganizationScope("members", church.id, {
+        created_by: user.id,
+        full_name: row.name,
+        member_role: row.role || "Membro",
         phone: row.phone || null, email: row.email || null,
-        since: new Date().getFullYear().toString(),
+        joined_at: new Date().toISOString().split("T")[0],
         status: row.status || "Ativo",
       });
       if (error) errors++; else success++;
     }
     if (success > 0) {
-      const { data } = await supabase.from("members").select("*").eq("church_id", church.id).order("name");
+      const { data } = await runScopedOrganizationQuery<Member[]>("members", church.id, query => query.select("*").order("full_name"));
       setMembers(data || []);
     }
     return { success, errors };
@@ -73,7 +72,7 @@ export default function Membros() {
     if (!user || !church) { setLoading(false); return; }
     const load = async () => {
       setLoading(true);
-      const { data, error } = await supabase.from("members").select("*").eq("church_id", church.id).order("name");
+      const { data, error } = await runScopedOrganizationQuery<Member[]>("members", church.id, query => query.select("*").order("full_name"));
       if (error) { console.error(error); toast.error(t("Erro ao carregar membros")); }
       else setMembers(data || []);
       setLoading(false);
@@ -85,7 +84,7 @@ export default function Membros() {
     if (filterStatus !== "all" && m.status !== filterStatus) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      return m.name.toLowerCase().includes(q) || (m.role || "").toLowerCase().includes(q) || (m.email || "").toLowerCase().includes(q);
+      return m.full_name.toLowerCase().includes(q) || (m.member_role || "").toLowerCase().includes(q) || (m.email || "").toLowerCase().includes(q);
     }
     return true;
   });
@@ -93,16 +92,15 @@ export default function Membros() {
   const addMember = async () => {
     if (!newMember.name || !user || !church) return;
     setSaving(true);
-    const { data, error } = await supabase.from("members").insert({
-      user_id: user.id,
-      church_id: church.id,
-      name: newMember.name,
-      role: newMember.role || "Membro",
+    const { data, error } = await insertWithOrganizationScope<Member>("members", church.id, {
+      created_by: user.id,
+      full_name: newMember.name,
+      member_role: newMember.role || "Membro",
       phone: newMember.phone || null,
       email: newMember.email || null,
-      since: new Date().getFullYear().toString(),
+      joined_at: new Date().toISOString().split("T")[0],
       status: "Ativo",
-    }).select().single();
+    }, query => query.select().single());
     if (error) { toast.error(t("Erro ao salvar")); console.error(error); }
     else {
       setMembers([data, ...members]);
@@ -114,7 +112,7 @@ export default function Membros() {
   };
 
   const removeMember = async (id: string) => {
-    const { error } = await supabase.from("members").delete().eq("id", id);
+    const { error } = await supabase.from("members").delete().eq("id", id).eq("organization_id", church?.id || "");
     if (error) { toast.error(t("Erro ao remover")); console.error(error); }
     else {
       setMembers(members.filter(m => m.id !== id));
@@ -127,7 +125,7 @@ export default function Membros() {
     if (!member) return;
     const next: Record<string, string> = { Ativo: "Inativo", Inativo: "Ativo", Visitante: "Ativo" };
     const newStatus = next[member.status] || "Ativo";
-    const { error } = await supabase.from("members").update({ status: newStatus }).eq("id", id);
+    const { error } = await supabase.from("members").update({ status: newStatus }).eq("id", id).eq("organization_id", church?.id || "");
     if (error) { toast.error(t("Erro ao atualizar")); }
     else setMembers(members.map(m => m.id === id ? { ...m, status: newStatus } : m));
   };
@@ -150,13 +148,9 @@ export default function Membros() {
             </p>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setShowAIImport(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-accent/10 text-accent rounded-lg text-sm font-medium hover:bg-accent/20 transition-colors">
-              <Sparkles size={14} strokeWidth={1.5} /> {t("Importar com IA")}
-            </button>
             <button onClick={() => setShowImport(true)}
               className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
-              <Upload size={14} strokeWidth={1.5} /> {t("Importar CSV")}
+              <Upload size={14} strokeWidth={1.5} /> {t("Importar")}
             </button>
             <button onClick={() => setShowForm(true)}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity self-start">
@@ -233,12 +227,12 @@ export default function Membros() {
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-xs font-medium text-accent">
-                            {m.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                            {m.full_name.split(" ").map(n => n[0]).join("").slice(0, 2)}
                           </div>
-                          <span className="font-medium">{m.name}</span>
+                          <span className="font-medium">{m.full_name}</span>
                         </div>
                       </td>
-                      <td className="px-5 py-3 text-muted-foreground">{m.role}</td>
+                      <td className="px-5 py-3 text-muted-foreground">{m.member_role}</td>
                       <td className="px-5 py-3 text-muted-foreground">{m.phone}</td>
                       <td className="px-5 py-3">
                         <button onClick={() => toggleStatus(m.id)}
@@ -248,9 +242,9 @@ export default function Membros() {
                           "bg-muted text-muted-foreground hover:bg-muted/80"
                         }`}>{m.status}</button>
                       </td>
-                      <td className="px-5 py-3 text-muted-foreground tabular-nums">{m.since}</td>
+                      <td className="px-5 py-3 text-muted-foreground tabular-nums">{m.joined_at}</td>
                       <td className="px-5 py-3">
-                        <button onClick={() => removeMember(m.id)} className="p-1 rounded hover:bg-destructive/10 transition-colors" title="Remover">
+                        <button onClick={() => removeMember(m.id)} className="p-1 rounded hover:bg-destructive/10 transition-colors" title={t("Remover")}>
                           <Trash2 size={14} className="text-muted-foreground" />
                         </button>
                       </td>
@@ -268,11 +262,11 @@ export default function Membros() {
                 <motion.div key={m.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
                   <div className="bg-card rounded-xl shadow-executive p-4 flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-sm font-medium text-accent flex-shrink-0">
-                      {m.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                      {m.full_name.split(" ").map(n => n[0]).join("").slice(0, 2)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium truncate">{m.name}</p>
+                        <p className="text-sm font-medium truncate">{m.full_name}</p>
                         <button onClick={() => toggleStatus(m.id)}
                           className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
                           m.status === "Ativo" ? "bg-success/10 text-success" :
@@ -280,7 +274,7 @@ export default function Membros() {
                           "bg-muted text-muted-foreground"
                         }`}>{m.status}</button>
                       </div>
-                      <p className="text-xs text-muted-foreground">{m.role}</p>
+                      <p className="text-xs text-muted-foreground">{m.member_role}</p>
                       {m.phone && (
                         <div className="flex items-center gap-2 mt-1">
                           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
@@ -289,7 +283,7 @@ export default function Membros() {
                         </div>
                       )}
                     </div>
-                    <button onClick={() => removeMember(m.id)} className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors flex-shrink-0" title="Remover">
+                    <button onClick={() => removeMember(m.id)} className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors flex-shrink-0" title={t("Remover")}>
                       <Trash2 size={14} className="text-muted-foreground" />
                     </button>
                   </div>
@@ -309,14 +303,6 @@ export default function Membros() {
         fields={memberFields}
         templateData={memberTemplate}
         title={t("Importar Membros")}
-      />
-      <AIImportModal
-        open={showAIImport}
-        onClose={() => setShowAIImport(false)}
-        onImport={handleBulkImport}
-        fields={memberFields}
-        title={t("Importar Membros com IA")}
-        moduleName="Membros"
       />
     </AdminLayout>
   );

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useChurch } from "@/hooks/useChurch";
+import { useChurch } from "@/hooks/useChurchContext";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
 import { format } from "date-fns";
@@ -12,7 +12,7 @@ import { ptBR, enUS, es } from "date-fns/locale";
 
 type Schedule = {
   id: string; title: string; schedule_date: string; ministry: string;
-  assigned_to: string | null; notes: string | null; status: string; user_id: string;
+  assigned_to: string | null; notes: string | null; status: string; created_by: string | null;
 };
 
 const ministries = ["Louvor", "Infantil", "Mídia", "Recepção", "Intercessão", "Pregação", "Geral"];
@@ -33,7 +33,7 @@ export default function Escalas() {
 
   const fetch_ = async () => {
     if (!church) return;
-    const { data } = await supabase.from("schedules").select("*").eq("church_id", church.id).order("schedule_date", { ascending: true });
+    const { data } = await supabase.from("schedules").select("*").eq("organization_id", church.id).order("schedule_date", { ascending: true });
     setSchedules((data as Schedule[]) || []);
     setLoading(false);
   };
@@ -47,7 +47,7 @@ export default function Escalas() {
   const handleAdd = async () => {
     if (!form.title.trim() || !form.schedule_date || !user || !church) return;
     const { error } = await supabase.from("schedules").insert({
-      user_id: user.id, church_id: church.id, title: form.title.trim(), schedule_date: form.schedule_date,
+      created_by: user.id, organization_id: church.id, title: form.title.trim(), schedule_date: form.schedule_date,
       ministry: form.ministry, assigned_to: form.assigned_to || null, notes: form.notes || null,
     } as any);
     if (error) { toast({ title: t("Erro"), description: error.message, variant: "destructive" }); return; }
@@ -94,9 +94,23 @@ export default function Escalas() {
         {loading ? (
           <div className="text-center py-12 text-muted-foreground">{t("Carregando...")}</div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-12">
-            <FileText size={48} className="mx-auto text-muted-foreground/30 mb-4" />
-            <p className="text-muted-foreground">{t("Nenhuma escala encontrada")}</p>
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+              <FileText size={32} className="text-primary/60" />
+            </div>
+            <h3 className="font-serif text-lg font-semibold text-foreground mb-1">
+              {filterMinistry === "Todos" ? t("Nenhuma escala cadastrada") : t("Nenhuma escala neste ministério")}
+            </h3>
+            <p className="text-sm text-muted-foreground max-w-xs mb-5">
+              {filterMinistry === "Todos"
+                ? t("Organize os voluntários e ministérios com escalas de serviço.")
+                : t("Tente outro ministério ou crie uma nova escala.")}
+            </p>
+            {filterMinistry === "Todos" && (
+              <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+                <Plus size={16} /> {t("Criar Primeira Escala")}
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
@@ -115,7 +129,7 @@ export default function Escalas() {
                   </div>
                   {s.notes && <p className="text-xs text-muted-foreground mt-1">{s.notes}</p>}
                 </div>
-                {s.user_id === user?.id && (
+                {s.created_by === user?.id && (
                   <button onClick={() => handleDelete(s.id)} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
                     <X size={16} />
                   </button>

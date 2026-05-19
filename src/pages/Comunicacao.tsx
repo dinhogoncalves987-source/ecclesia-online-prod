@@ -4,19 +4,20 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useChurch } from "@/hooks/useChurch";
+import { useChurch } from "@/hooks/useChurchContext";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
 import { format } from "date-fns";
 import { ptBR, enUS, es } from "date-fns/locale";
+import { insertWithOrganizationScope, runScopedOrganizationQuery } from "@/lib/organizationScope";
 
 type Announcement = {
   id: string;
   title: string;
   content: string;
-  priority: string;
-  created_at: string;
-  user_id: string;
+  communication_type: string | null;
+  created_at: string | null;
+  created_by: string | null;
 };
 
 const priorityConfig: Record<string, { icon: any; color: string }> = {
@@ -42,7 +43,9 @@ export default function Comunicacao() {
 
   const fetch_ = async () => {
     if (!church) return;
-    const { data } = await supabase.from("announcements").select("*").eq("church_id", church.id).order("created_at", { ascending: false });
+    const { data } = await runScopedOrganizationQuery<Announcement[]>("communications", church.id, query =>
+      query.select("*").order("created_at", { ascending: false })
+    );
     setAnnouncements((data as Announcement[]) || []);
     setLoading(false);
   };
@@ -55,7 +58,14 @@ export default function Comunicacao() {
 
   const handleAdd = async () => {
     if (!title.trim() || !content.trim() || !user || !church) return;
-    const { error } = await supabase.from("announcements").insert({ user_id: user.id, church_id: church.id, title: title.trim(), content: content.trim(), priority } as any);
+    const { error } = await insertWithOrganizationScope("communications", church.id, {
+      created_by: user.id,
+      title: title.trim(),
+      content: content.trim(),
+      communication_type: priority,
+      is_public: false,
+      published_at: new Date().toISOString(),
+    });
     if (error) { toast({ title: t("Erro"), description: error.message, variant: "destructive" }); return; }
     setTitle(""); setContent(""); setPriority("Normal"); setShowForm(false);
     toast({ title: t("Comunicado publicado!") });
@@ -63,7 +73,7 @@ export default function Comunicacao() {
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from("announcements").delete().eq("id", id);
+    await supabase.from("communications").delete().eq("id", id).eq("organization_id", church?.id || "");
     fetch_();
   };
 
@@ -83,14 +93,21 @@ export default function Comunicacao() {
         {loading ? (
           <div className="text-center py-12 text-muted-foreground">{t("Carregando...")}</div>
         ) : announcements.length === 0 ? (
-          <div className="text-center py-12">
-            <MessageSquare size={48} className="mx-auto text-muted-foreground/30 mb-4" />
-            <p className="text-muted-foreground">{t("Nenhum comunicado publicado")}</p>
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+              <MessageSquare size={32} className="text-primary/60" />
+            </div>
+            <h3 className="font-serif text-lg font-semibold text-foreground mb-1">{t("Nenhum comunicado publicado")}</h3>
+            <p className="text-sm text-muted-foreground max-w-xs mb-5">{t("Publique avisos, informes e notícias para manter sua comunidade informada.")}</p>
+            <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+              <Plus size={16} /> {t("Criar Comunicado")}
+            </button>
           </div>
         ) : (
           <div className="space-y-4">
             {announcements.map((ann, i) => {
-              const cfg = priorityConfig[ann.priority] || priorityConfig.Normal;
+              const priorityValue = ann.communication_type || "Normal";
+              const cfg = priorityConfig[priorityValue] || priorityConfig.Normal;
               const Icon = cfg.icon;
               return (
                 <motion.div key={ann.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
@@ -99,16 +116,16 @@ export default function Comunicacao() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${cfg.color}`}>
-                          <Icon size={12} /> {t(ann.priority)}
+                          <Icon size={12} /> {t(priorityValue)}
                         </span>
                         <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Clock size={12} /> {format(new Date(ann.created_at), "dd MMM yyyy", { locale: dateLoc })}
+                          <Clock size={12} /> {format(new Date(ann.created_at || Date.now()), "dd MMM yyyy", { locale: dateLoc })}
                         </span>
                       </div>
                       <h3 className="font-semibold text-foreground text-lg">{ann.title}</h3>
                       <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{ann.content}</p>
                     </div>
-                    {ann.user_id === user?.id && (
+                    {ann.created_by === user?.id && (
                       <button onClick={() => handleDelete(ann.id)} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
                         <X size={16} />
                       </button>

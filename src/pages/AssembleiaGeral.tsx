@@ -2,7 +2,7 @@ import { AdminLayout } from "@/components/AdminLayout";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useChurch } from "@/hooks/useChurch";
+import { useChurch } from "@/hooks/useChurchContext";
 import { useRole } from "@/hooks/useRole";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -16,8 +16,8 @@ import {
 
 type Assembly = {
   id: string;
-  church_id: string;
-  user_id: string;
+  organization_id: string;
+  created_by: string | null;
   title: string;
   description: string | null;
   period: string | null;
@@ -80,7 +80,7 @@ export default function AssembleiaGeral() {
     const { data } = await supabase
       .from("assemblies")
       .select("*")
-      .eq("church_id", church.id)
+      .eq("organization_id", church.id)
       .order("assembly_date", { ascending: false });
     if (data) {
       // Members only see visible ones
@@ -119,8 +119,8 @@ export default function AssembleiaGeral() {
   const handleCreate = async () => {
     if (!formTitle.trim() || !user || !church) return;
     const { error } = await supabase.from("assemblies").insert({
-      user_id: user.id,
-      church_id: church.id,
+      created_by: user.id,
+      organization_id: church.id,
       title: formTitle.trim(),
       description: formDesc.trim() || null,
       period: formPeriod.trim() || null,
@@ -232,11 +232,16 @@ export default function AssembleiaGeral() {
         {loading ? (
           <div className="text-center py-12 text-muted-foreground">{t("Carregando...")}</div>
         ) : assemblies.length === 0 ? (
-          <div className="text-center py-16">
-            <Gavel size={48} className="mx-auto text-muted-foreground/30 mb-4" />
-            <p className="text-muted-foreground">{t("Nenhuma assembleia registrada")}</p>
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+              <Gavel size={32} className="text-primary/60" />
+            </div>
+            <h3 className="font-serif text-lg font-semibold text-foreground mb-1">{t("Nenhuma assembleia registrada")}</h3>
+            <p className="text-sm text-muted-foreground max-w-xs mb-5">{t("Registre assembleias gerais com atas, relatórios e vídeos para consulta da comunidade.")}</p>
             {isAdmin && (
-              <p className="text-xs text-muted-foreground mt-1">{t("Clique em 'Nova Assembleia' para começar")}</p>
+              <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+                <Plus size={16} /> {t("Registrar Assembleia")}
+              </button>
             )}
           </div>
         ) : (
