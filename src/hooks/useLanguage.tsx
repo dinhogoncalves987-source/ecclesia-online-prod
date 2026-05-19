@@ -892,6 +892,15 @@ const translations: Record<string, Record<Lang, string>> = {
     es: "Intenta cambiar el filtro para ver otras peticiones.",
   },
   "Todos os pedidos": { pt: "Todos os pedidos", en: "All requests", es: "Todas las peticiones" },
+
+  // Sidebar section labels
+  "Secretaria": { pt: "Secretaria", en: "Administration", es: "Secretaría" },
+  "Administração": { pt: "Administração", en: "Management", es: "Gestión" },
+
+  // SuperAdmin — notice scope (new keys only)
+  "Escopo": { pt: "Escopo", en: "Scope", es: "Alcance" },
+  "Global (todas as organizações)": { pt: "Global (todas as organizações)", en: "Global (all organizations)", es: "Global (todas las organizaciones)" },
+  "Membros (interno)": { pt: "Membros (interno)", en: "Members (internal)", es: "Miembros (interno)" },
 };
 
 

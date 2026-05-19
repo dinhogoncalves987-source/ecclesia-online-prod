@@ -87,6 +87,7 @@ export default function SuperAdmin() {
   const [noticeButtonLink, setNoticeButtonLink] = useState("");
   const [noticeStartsAt, setNoticeStartsAt] = useState("");
   const [noticeEndsAt, setNoticeEndsAt] = useState("");
+  const [noticeTargetType, setNoticeTargetType] = useState<"global" | "national" | "regional" | "members">("global");
 
   // Team form
   const [showTeamForm, setShowTeamForm] = useState(false);
@@ -197,7 +198,7 @@ export default function SuperAdmin() {
   };
 
   const handleCopyInvite = (slug: string, name: string) => {
-    const url = `${window.location.origin}/signup?church=${slug}`;
+    const url = `${window.location.origin}/signup?church=${encodeURIComponent(slug)}`;
     navigator.clipboard.writeText(url);
     toast.success(`${t("Link copiado para")} ${name}`);
   };
@@ -322,7 +323,7 @@ export default function SuperAdmin() {
       image_url: noticeImageUrl.trim() || null,
       button_label: noticeButtonLabel.trim() || null,
       button_link: noticeButtonLink.trim() || null,
-      target_type: "members",
+      target_type: noticeTargetType,
       is_active: true,
       created_by: user.id,
       starts_at: noticeStartsAt || null,
@@ -347,6 +348,7 @@ export default function SuperAdmin() {
     setNoticeButtonLink("");
     setNoticeStartsAt("");
     setNoticeEndsAt("");
+    setNoticeTargetType("global");
     setShowNoticeForm(false);
     loadData();
   };
@@ -387,8 +389,8 @@ export default function SuperAdmin() {
     setNoticeButtonLink(announcement.button_link || "");
     setNoticeStartsAt(toDateTimeLocal(announcement.starts_at));
     setNoticeEndsAt(toDateTimeLocal(announcement.ends_at));
+    setNoticeTargetType((announcement.target_type as typeof noticeTargetType) || "global");
     setShowNoticeForm(true);
-    toast(t("Edição visual carregada"));
   };
 
   const deleteNotice = async (id: string) => {
@@ -400,17 +402,21 @@ export default function SuperAdmin() {
   const searchUsersForTeam = async (query: string) => {
     setTeamUserSearch(query);
     if (query.length < 2) { setSearchResults([]); return; }
-    const { data } = await supabase.from("profiles").select("user_id, full_name").ilike("full_name", `%${query}%`).limit(5);
+    const { data } = await supabase.from("profiles")
+      .select("user_id, full_name, email")
+      .or(`full_name.ilike.%${query}%,email.ilike.%${query}%`)
+      .limit(8);
     const existingIds = teamMembers.map(m => m.user_id);
     setSearchResults((data || []).filter(p => !existingIds.includes(p.user_id)));
   };
 
   const promoteToSuperAdmin = async (userId: string) => {
-    // Update role to superadmin
-    const { error: roleError } = await supabase.from("user_roles" as any).update({ role: "superadmin" } as any).eq("user_id", userId);
+    const { error: roleError } = await supabase.from("user_roles" as any).upsert(
+      { user_id: userId, role: "superadmin" } as any,
+      { onConflict: "user_id" }
+    );
     if (roleError) { toast.error(roleError.message); return; }
-    // Add to super_admins table
-    await supabase.from("super_admins").insert({ user_id: userId } as any);
+    await supabase.from("super_admins").upsert({ user_id: userId } as any, { onConflict: "user_id" });
     toast.success(t("Membro promovido a Super Admin!"));
     setTeamUserSearch(""); setSearchResults([]); setShowTeamForm(false);
     loadData();
@@ -468,17 +474,17 @@ export default function SuperAdmin() {
                 )}
                 {c.organization_type === "convencao" && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-700 font-semibold shrink-0">
-                    Convenção / Regional
+                    {t("Convenção / Regional")}
                   </span>
                 )}
                 {c.organization_type === "matriz" && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/20 text-accent font-semibold shrink-0">
-                    Matriz municipal
+                    {t("Matriz municipal")}
                   </span>
                 )}
                 {c.organization_type === "setor" && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-teal-500/15 text-teal-800 dark:text-teal-200 font-semibold shrink-0">
-                    Setor
+                    {t("Setor")}
                   </span>
                 )}
                 {c.organization_type === "congregacao" && (
@@ -852,6 +858,30 @@ export default function SuperAdmin() {
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <label className="block space-y-1.5 sm:col-span-2">
+                        <span className="text-xs font-medium text-muted-foreground">{t("Escopo")}</span>
+                        <div className="flex flex-wrap gap-2">
+                          {(["global", "national", "regional", "members"] as const).map(scope => {
+                            const scopeLabel: Record<string, string> = {
+                              global: t("Global (todas as organizações)"),
+                              national: t("Nacional"),
+                              regional: t("Regional"),
+                              members: t("Membros (interno)"),
+                            };
+                            return (
+                              <button key={scope} type="button"
+                                onClick={() => setNoticeTargetType(scope)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                                  noticeTargetType === scope
+                                    ? "bg-accent text-accent-foreground border-accent"
+                                    : "bg-secondary/50 border-border text-muted-foreground hover:bg-secondary"
+                                }`}>
+                                {scopeLabel[scope]}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </label>
                       <label className="block space-y-1.5">
                         <span className="text-xs font-medium text-muted-foreground">{t("Texto do botão")}</span>
                         <input type="text" placeholder={t("Ex: Doar agora")} value={noticeButtonLabel}
@@ -886,24 +916,39 @@ export default function SuperAdmin() {
                   </motion.div>
                 )}
 
-                <div className="bg-card rounded-xl shadow-sm border border-border/50 overflow-hidden divide-y divide-border/30">
+                        <div className="bg-card rounded-xl shadow-sm border border-border/50 overflow-hidden divide-y divide-border/30">
                   {notices.map(n => {
+                    const scopeColors: Record<string, string> = {
+                      global: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
+                      national: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+                      regional: "bg-teal-500/15 text-teal-700 dark:text-teal-300",
+                      members: "bg-secondary text-muted-foreground",
+                    };
+                    const scopeLabels: Record<string, string> = {
+                      global: t("Global"),
+                      national: t("Nacional"),
+                      regional: t("Regional"),
+                      members: t("Membros (interno)"),
+                    };
                     return (
                       <div key={n.id} className="p-4 flex items-start justify-between gap-3">
                         {n.image_url && (
                           <img src={n.image_url} alt="" className="w-16 h-16 rounded-lg object-cover bg-secondary flex-shrink-0" />
                         )}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className="text-sm font-medium">{n.title}</span>
                             <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${n.is_active ? "bg-emerald-500/20 text-emerald-600" : "bg-muted text-muted-foreground"}`}>
                               {n.is_active ? t("Ativo") : t("Inativo")}
                             </span>
+                            {n.target_type && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${scopeColors[n.target_type] ?? "bg-muted text-muted-foreground"}`}>
+                                {scopeLabels[n.target_type] ?? n.target_type}
+                              </span>
+                            )}
                           </div>
                           <p className="text-[10px] text-muted-foreground mt-1">
-                            {n.starts_at
-                              ? new Date(n.starts_at).toLocaleDateString("pt-BR")
-                              : new Date(n.created_at).toLocaleDateString("pt-BR")}
+                            {new Date(n.starts_at ?? n.created_at).toLocaleDateString()}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">{truncateText(n.full_content)}</p>
                           {(n.button_label || n.button_link) && (

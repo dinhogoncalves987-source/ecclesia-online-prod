@@ -3,8 +3,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Wallet, Users, Calendar, BookOpen, FileText,
   Heart, MessageSquare, UsersRound, Archive, BarChart3, Menu, X,
-  Bell, ChevronLeft, Settings, LogOut, Maximize, Minimize, Globe,
-  Shield, User, Building2, Music, Gavel
+  Bell, ChevronLeft, ChevronDown, Settings, LogOut, Maximize, Minimize, Globe,
+  Shield, User, Building2, Music, Gavel, Briefcase
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -19,23 +19,68 @@ import flagES from "@/assets/flag-es.png";
 
 const flagMap = { pt: flagBR, en: flagUS, es: flagES } as const;
 
-const baseNavItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
-  { icon: BookOpen, label: "Bíblia Sagrada", path: "/admin/biblia" },
-  { icon: Music, label: "Harpa", path: "/admin/hinario" },
-  { icon: Wallet, label: "Financeiro", path: "/admin/financeiro" },
-  { icon: Users, label: "Membros", path: "/admin/membros" },
-  { icon: Calendar, label: "Agenda", path: "/admin/agenda" },
-  { icon: Heart, label: "Pedidos de Oração", path: "/admin/oracoes" },
-  { icon: MessageSquare, label: "Comunicação", path: "/admin/comunicacao" },
-  { icon: UsersRound, label: "Pequenos Grupos", path: "/admin/grupos" },
-  { icon: Archive, label: "Documentos", path: "/admin/documentos" },
-  { icon: Gavel, label: "Assembleia Geral", path: "/admin/assembleia-geral" },
-  { icon: BarChart3, label: "Relatórios", path: "/admin/relatorios" },
-  { icon: FileText, label: "Escalas", path: "/admin/escalas" },
-  { icon: Shield, label: "Gerenciar Acessos", path: "/admin/gerenciar-acessos" },
-  { icon: Building2, label: "Congregações", path: "/admin/congregacoes" },
-  { icon: Globe, label: "Super Admin", path: "/admin/super-admin" },
+type NavItem = { icon: React.ElementType; label: string; path: string };
+type NavSection = {
+  id: string;
+  labelKey?: string;
+  collapsible?: boolean;
+  separator?: boolean;
+  items: NavItem[];
+};
+
+const SECRETARIA_PATHS = [
+  "/admin/membros", "/admin/agenda", "/admin/comunicacao",
+  "/admin/grupos", "/admin/escalas", "/admin/documentos",
+  "/admin/assembleia-geral", "/admin/oracoes",
+];
+
+const navSections: NavSection[] = [
+  {
+    id: "main",
+    items: [{ icon: LayoutDashboard, label: "Dashboard", path: "/admin" }],
+  },
+  {
+    id: "espiritual",
+    separator: true,
+    items: [
+      { icon: BookOpen, label: "Bíblia Sagrada", path: "/admin/biblia" },
+      { icon: Music, label: "Harpa", path: "/admin/hinario" },
+    ],
+  },
+  {
+    id: "secretaria",
+    labelKey: "Secretaria",
+    collapsible: true,
+    separator: true,
+    items: [
+      { icon: Users, label: "Membros", path: "/admin/membros" },
+      { icon: Calendar, label: "Agenda", path: "/admin/agenda" },
+      { icon: MessageSquare, label: "Comunicação", path: "/admin/comunicacao" },
+      { icon: UsersRound, label: "Pequenos Grupos", path: "/admin/grupos" },
+      { icon: FileText, label: "Escalas", path: "/admin/escalas" },
+      { icon: Archive, label: "Documentos", path: "/admin/documentos" },
+      { icon: Gavel, label: "Assembleia Geral", path: "/admin/assembleia-geral" },
+      { icon: Heart, label: "Pedidos de Oração", path: "/admin/oracoes" },
+    ],
+  },
+  {
+    id: "financeiro",
+    separator: true,
+    items: [
+      { icon: Wallet, label: "Financeiro", path: "/admin/financeiro" },
+      { icon: BarChart3, label: "Relatórios", path: "/admin/relatorios" },
+    ],
+  },
+  {
+    id: "admin",
+    labelKey: "Administração",
+    separator: true,
+    items: [
+      { icon: Building2, label: "Congregações", path: "/admin/congregacoes" },
+      { icon: Shield, label: "Gerenciar Acessos", path: "/admin/gerenciar-acessos" },
+      { icon: Globe, label: "Super Admin", path: "/admin/super-admin" },
+    ],
+  },
 ];
 
 const mobileNavItems = [
@@ -65,20 +110,25 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
   const childUnitsNavLabel = (): string => {
     const orgType = church?.organization_type;
-    if (orgType === "convencao") return "Matrizes";
-    if (orgType === "matriz") return "Setores";
-    if (orgType === "setor") return "Congregações";
-    if (orgType === "congregacao") return "Congregações";
-    return "Congregações";
+    if (orgType === "convencao") return t("Matrizes");
+    if (orgType === "matriz") return t("Setores");
+    return t("Congregações");
   };
 
-  const navItems = baseNavItems.map(item => {
-    if (item.path === "/admin/congregacoes" && isAdmin) {
-      return { ...item, label: childUnitsNavLabel() };
-    }
-    return item;
-  });
+  // Build resolved sections (applying dynamic Congregações label)
+  const resolvedSections: NavSection[] = navSections.map(section => ({
+    ...section,
+    items: section.items.map(item =>
+      item.path === "/admin/congregacoes" && isAdmin
+        ? { ...item, label: childUnitsNavLabel() }
+        : item
+    ),
+  }));
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [secretariaExpanded, setSecretariaExpanded] = useState(() =>
+    SECRETARIA_PATHS.includes(location.pathname)
+  );
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileName, setProfileName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -129,6 +179,91 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
   const isActive = (path: string) => location.pathname === path;
 
+  const renderNavSections = (collapsed: boolean, onLinkClick?: () => void) => (
+    <nav className="flex-1 px-3 py-2 overflow-y-auto">
+      {resolvedSections.map(section => {
+        const visibleItems = section.items.filter(item => canAccess(item.path));
+        if (visibleItems.length === 0) return null;
+
+        const isSecretaria = section.id === "secretaria";
+        const sectionHasActive = visibleItems.some(i => isActive(i.path));
+        const expanded = isSecretaria ? (sidebarCollapsed || secretariaExpanded) : true;
+
+        return (
+          <div key={section.id}>
+            {section.separator && <div className="my-2 border-t border-border/40" />}
+
+            {/* Section header (label or collapsible trigger) */}
+            {section.labelKey && !collapsed && (
+              isSecretaria ? (
+                <button
+                  onClick={() => setSecretariaExpanded(v => !v)}
+                  className="w-full flex items-center justify-between px-3 py-1.5 mb-0.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:bg-secondary/50 transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <Briefcase size={13} strokeWidth={2} />
+                    {t(section.labelKey)}
+                  </span>
+                  <ChevronDown
+                    size={13}
+                    className={`transition-transform duration-200 ${secretariaExpanded ? "rotate-0" : "-rotate-90"}`}
+                  />
+                </button>
+              ) : (
+                <p className="px-3 pt-1 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                  {t(section.labelKey)}
+                </p>
+              )
+            )}
+
+            {/* Items */}
+            <AnimatePresence initial={false}>
+              {expanded && (
+                <motion.div
+                  key="sec-items"
+                  initial={isSecretaria ? { height: 0, opacity: 0 } : false}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2, ease: "easeInOut" }}
+                  style={{ overflow: "hidden" }}
+                >
+                  <div className={`space-y-0.5 ${isSecretaria && !collapsed ? "pl-1" : ""}`}>
+                    {visibleItems.map(item => (
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        onClick={onLinkClick}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${
+                          isActive(item.path)
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        }`}
+                      >
+                        <item.icon
+                          size={18}
+                          strokeWidth={1.5}
+                          className={`flex-shrink-0 ${
+                            isActive(item.path) ? "text-accent" : "group-hover:text-foreground"
+                          }`}
+                        />
+                        {!collapsed && <span>{t(item.label)}</span>}
+                      </Link>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Collapsed: show secretaria icon trigger */}
+            {isSecretaria && collapsed && sectionHasActive && (
+              <div className="w-2 h-2 rounded-full bg-accent mx-auto my-1" />
+            )}
+          </div>
+        );
+      })}
+    </nav>
+  );
+
   const handleSignOut = async () => {
     setShowLogoutConfirm(false);
     await signOut();
@@ -155,28 +290,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           )}
         </Link>
 
-        <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
-          {navItems.filter(item => canAccess(item.path)).map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${
-                isActive(item.path)
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-              }`}
-            >
-              <item.icon
-                size={20}
-                strokeWidth={1.5}
-                className={`flex-shrink-0 ${
-                  isActive(item.path) ? "text-accent" : "group-hover:text-foreground"
-                }`}
-              />
-              {!sidebarCollapsed && <span>{t(item.label)}</span>}
-            </Link>
-          ))}
-        </nav>
+        {renderNavSections(sidebarCollapsed)}
 
         <div className="p-3 border-t border-border/50">
           <button
@@ -332,23 +446,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                 </button>
               </div>
 
-              <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
-                {navItems.filter(item => canAccess(item.path)).map((item) => (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                      isActive(item.path)
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                    }`}
-                  >
-                    <item.icon size={20} strokeWidth={1.5} className={isActive(item.path) ? "text-accent" : ""} />
-                    <span>{t(item.label)}</span>
-                  </Link>
-                ))}
-              </nav>
+              {renderNavSections(false, () => setMobileMenuOpen(false))}
 
               <div className="p-3 border-t border-border/50 space-y-0.5">
                 <Link
