@@ -8,7 +8,7 @@ import { useChurch } from "@/hooks/useChurchContext";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { ptBR, enUS, es } from "date-fns/locale";
 
 type PrayerRequest = {
   id: string;
@@ -23,7 +23,7 @@ type PrayerRequest = {
 export default function Oracoes() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { church, loading: churchLoading } = useChurch();
   const [requests, setRequests] = useState<PrayerRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,12 +131,12 @@ export default function Oracoes() {
                     {req.description && <p className="text-sm text-muted-foreground mt-1">{req.description}</p>}
                   </div>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${req.status === "Respondido" ? "bg-green-500/10 text-green-600" : "bg-accent/10 text-accent"}`}>
-                    {req.status ?? "Ativo"}
+                    {t(req.status ?? "Ativo")}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1"><User size={12} />{req.is_private ? t("Anônimo") : t("Membro")}</span>
-                  <span className="flex items-center gap-1"><Clock size={12} />{format(new Date(req.created_at), "dd MMM", { locale: ptBR })}</span>
+                  <span className="flex items-center gap-1"><Clock size={12} />{format(new Date(req.created_at), "dd MMM", { locale: lang === "en" ? enUS : lang === "es" ? es : ptBR })}</span>
                 </div>
                 <div className="flex gap-2 mt-auto pt-2 border-t border-border/30">
                   <button onClick={() => handlePray(req)} className="flex-1 text-xs py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors font-medium">

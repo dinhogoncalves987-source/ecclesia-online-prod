@@ -680,6 +680,218 @@ const translations: Record<string, Record<Lang, string>> = {
   "Total Lançamentos": { pt: "Total Lançamentos", en: "Total Transactions", es: "Total Movimientos" },
   "Fluxo de Caixa Diário": { pt: "Fluxo de Caixa Diário", en: "Daily Cash Flow", es: "Flujo de Caja Diario" },
   "Relatório exportado!": { pt: "Relatório exportado!", en: "Report exported!", es: "¡Informe exportado!" },
+
+  // Institutional hierarchy
+  "Matrizes": { pt: "Matrizes", en: "Main Churches", es: "Matrices" },
+  "Setores": { pt: "Setores", en: "Districts", es: "Sectores" },
+  "Matrizes Municipais": { pt: "Matrizes Municipais", en: "Municipal Main Churches", es: "Sedes Municipales" },
+  "Painel da Convenção / Regional": { pt: "Painel da Convenção / Regional", en: "Convention / Regional Panel", es: "Panel de la Convención / Regional" },
+  "Painel da Matriz Municipal": { pt: "Painel da Matriz Municipal", en: "Municipal Headquarters Panel", es: "Panel de la Sede Municipal" },
+  "Painel do Setor": { pt: "Painel do Setor", en: "District Panel", es: "Panel del Sector" },
+  "Gerenciar matrizes municipais": { pt: "Gerenciar matrizes municipais", en: "Manage main churches", es: "Gestionar sedes municipales" },
+  "Gerenciar setores": { pt: "Gerenciar setores", en: "Manage districts", es: "Gestionar sectores" },
+  "Convenção / Regional": { pt: "Convenção / Regional", en: "Convention / Regional", es: "Convención / Regional" },
+  "Matriz municipal": { pt: "Matriz municipal", en: "Main Church", es: "Sede municipal" },
+  "Setor": { pt: "Setor", en: "District", es: "Sector" },
+  "Sede": { pt: "Sede", en: "Headquarters", es: "Sede" },
+
+  // Congregation page
+  "Cadastre matrizes municipais vinculadas a esta convenção ou regional. Unidades são permanentes; responsáveis serão atribuídos separadamente da estrutura.": {
+    pt: "Cadastre matrizes municipais vinculadas a esta convenção ou regional. Unidades são permanentes; responsáveis serão atribuídos separadamente da estrutura.",
+    en: "Register main churches linked to this convention or regional body. Units are permanent; managers are assigned separately.",
+    es: "Registre sedes municipales vinculadas a esta convención o regional. Las unidades son permanentes; los responsables se asignan por separado.",
+  },
+  "Cadastre setores vinculados a esta matriz. Unidades são permanentes; pastores, supervisores e tesoureiros podem mudar sem recriar a unidade.": {
+    pt: "Cadastre setores vinculados a esta matriz. Unidades são permanentes; pastores, supervisores e tesoureiros podem mudar sem recriar a unidade.",
+    en: "Register districts linked to this headquarters. Units are permanent; pastors and supervisors can change without recreating the unit.",
+    es: "Registre sectores vinculados a esta sede. Las unidades son permanentes; pastores y supervisores pueden cambiar sin recrear la unidad.",
+  },
+  "Cadastre congregações vinculadas a este setor. Unidades são permanentes; responsáveis serão atribuídos separadamente da estrutura.": {
+    pt: "Cadastre congregações vinculadas a este setor. Unidades são permanentes; responsáveis serão atribuídos separadamente da estrutura.",
+    en: "Register congregations linked to this district. Units are permanent; managers are assigned separately.",
+    es: "Registre congregaciones vinculadas a este sector. Las unidades son permanentes; los responsables se asignan por separado.",
+  },
+  "Esta congregação não cria novas unidades. Membros, tesouraria e histórico permanecem na unidade quando os responsáveis mudam.": {
+    pt: "Esta congregação não cria novas unidades. Membros, tesouraria e histórico permanecem na unidade quando os responsáveis mudam.",
+    en: "This congregation does not create new units. Members, treasury, and history remain when managers change.",
+    es: "Esta congregación no crea nuevas unidades. Los miembros, tesorería e historial permanecen cuando cambian los responsables.",
+  },
+  "Nenhuma matriz municipal cadastrada.": { pt: "Nenhuma matriz municipal cadastrada.", en: "No main churches registered.", es: "Ninguna sede municipal registrada." },
+  "Nenhum setor cadastrado.": { pt: "Nenhum setor cadastrado.", en: "No districts registered.", es: "Ningún sector registrado." },
+  "Não há unidades filhas neste nível.": { pt: "Não há unidades filhas neste nível.", en: "No child units at this level.", es: "No hay unidades hijas en este nivel." },
+  "Nova matriz municipal": { pt: "Nova matriz municipal", en: "New Main Church", es: "Nueva sede municipal" },
+  "Novo setor": { pt: "Novo setor", en: "New District", es: "Nuevo sector" },
+  "Nova congregação": { pt: "Nova congregação", en: "New Congregation", es: "Nueva congregación" },
+  "Editar unidade": { pt: "Editar unidade", en: "Edit unit", es: "Editar unidad" },
+  "Criar matriz municipal": { pt: "Criar matriz municipal", en: "Create Main Church", es: "Crear sede municipal" },
+  "Criar setor": { pt: "Criar setor", en: "Create District", es: "Crear sector" },
+  "Criar congregação": { pt: "Criar congregação", en: "Create Congregation", es: "Crear congregación" },
+  "Os dados abaixo identificam a unidade (nome e contatos institucionais). Gestores e histórico de gestão não são alterados ao editar este cadastro.": {
+    pt: "Os dados abaixo identificam a unidade (nome e contatos institucionais). Gestores e histórico de gestão não são alterados ao editar este cadastro.",
+    en: "The fields below identify the unit (name and institutional contacts). Managers and management history are not changed when editing this record.",
+    es: "Los datos a continuación identifican la unidad (nombre y contactos institucionales). Los gestores y el historial de gestión no se modifican al editar este registro.",
+  },
+  "Dados da unidade atualizados.": { pt: "Dados da unidade atualizados.", en: "Unit data updated.", es: "Datos de la unidad actualizados." },
+  "Setor criado.": { pt: "Setor criado.", en: "District created.", es: "Sector creado." },
+  "Matriz municipal criada.": { pt: "Matriz municipal criada.", en: "Main church created.", es: "Sede municipal creada." },
+  "Congregação criada.": { pt: "Congregação criada.", en: "Congregation created.", es: "Congregación creada." },
+  "Unidade excluída.": { pt: "Unidade excluída.", en: "Unit deleted.", es: "Unidad eliminada." },
+  "A unidade permanece no sistema; responsáveis serão definidos em outro fluxo.": {
+    pt: "A unidade permanece no sistema; responsáveis serão definidos em outro fluxo.",
+    en: "The unit remains in the system; managers will be assigned through a separate flow.",
+    es: "La unidad permanece en el sistema; los responsables se definirán en otro flujo.",
+  },
+  "Link de cadastro nesta unidade. Membros e convites não substituem a definição de gestores no sistema.": {
+    pt: "Link de cadastro nesta unidade. Membros e convites não substituem a definição de gestores no sistema.",
+    en: "Registration link for this unit. Memberships and invites do not replace the assignment of managers in the system.",
+    es: "Enlace de registro de esta unidad. Las membresías e invitaciones no reemplazan la asignación de gestores.",
+  },
+  "Nome da matriz municipal *": { pt: "Nome da matriz municipal *", en: "Main church name *", es: "Nombre de la sede municipal *" },
+  "Nome do setor *": { pt: "Nome do setor *", en: "District name *", es: "Nombre del sector *" },
+  "Erro ao carregar": { pt: "Erro ao carregar", en: "Error loading", es: "Error al cargar" },
+  "Sem pastor": { pt: "Sem pastor", en: "No pastor", es: "Sin pastor" },
+
+  // Dashboard campaign
+  "Campanha missionária": { pt: "Campanha missionária", en: "Missionary Campaign", es: "Campaña Misionera" },
+  "Campanha": { pt: "Campanha", en: "Campaign", es: "Campaña" },
+  "Saiba mais": { pt: "Saiba mais", en: "Learn more", es: "Más información" },
+  "Eventos e cultos": { pt: "Eventos e cultos", en: "Events & services", es: "Eventos y cultos" },
+
+  // Group types
+  "Jovens": { pt: "Jovens", en: "Youth", es: "Jóvenes" },
+  "Casais": { pt: "Casais", en: "Couples", es: "Parejas" },
+  "Mulheres": { pt: "Mulheres", en: "Women", es: "Mujeres" },
+  "Homens": { pt: "Homens", en: "Men", es: "Hombres" },
+  "Missões": { pt: "Missões", en: "Missions", es: "Misiones" },
+  "Crie grupos de comunhão, estudo bíblico ou ministérios para organizar sua comunidade.": {
+    pt: "Crie grupos de comunhão, estudo bíblico ou ministérios para organizar sua comunidade.",
+    en: "Create fellowship, Bible study, or ministry groups to organize your community.",
+    es: "Cree grupos de comunión, estudio bíblico o ministerios para organizar su comunidad.",
+  },
+  "Criar Primeiro Grupo": { pt: "Criar Primeiro Grupo", en: "Create First Group", es: "Crear Primer Grupo" },
+
+  // Escalas empty states
+  "Nenhuma escala cadastrada": { pt: "Nenhuma escala cadastrada", en: "No schedules registered", es: "Ninguna escala registrada" },
+  "Nenhuma escala neste ministério": { pt: "Nenhuma escala neste ministério", en: "No schedules in this ministry", es: "Ninguna escala en este ministerio" },
+  "Organize os voluntários e ministérios com escalas de serviço.": {
+    pt: "Organize os voluntários e ministérios com escalas de serviço.",
+    en: "Organize volunteers and ministries with service schedules.",
+    es: "Organice los voluntarios y ministerios con escalas de servicio.",
+  },
+  "Tente outro ministério ou crie uma nova escala.": {
+    pt: "Tente outro ministério ou crie uma nova escala.",
+    en: "Try another ministry or create a new schedule.",
+    es: "Intente otro ministerio o cree una nueva escala.",
+  },
+  "Criar Primeira Escala": { pt: "Criar Primeira Escala", en: "Create First Schedule", es: "Crear Primera Escala" },
+
+  // Comunicação empty state
+  "Publique avisos, informes e notícias para manter sua comunidade informada.": {
+    pt: "Publique avisos, informes e notícias para manter sua comunidade informada.",
+    en: "Publish notices, updates, and news to keep your community informed.",
+    es: "Publique avisos, informes y noticias para mantener su comunidad informada.",
+  },
+  "Criar Comunicado": { pt: "Criar Comunicado", en: "Create Announcement", es: "Crear Comunicado" },
+
+  // Assembleia empty state
+  "Registre assembleias gerais com atas, relatórios e vídeos para consulta da comunidade.": {
+    pt: "Registre assembleias gerais com atas, relatórios e vídeos para consulta da comunidade.",
+    en: "Register general assemblies with minutes, reports, and videos for community reference.",
+    es: "Registre asambleas generales con actas, informes y videos para consulta de la comunidad.",
+  },
+  "Registrar Assembleia": { pt: "Registrar Assembleia", en: "Register Assembly", es: "Registrar Asamblea" },
+
+  // Super Admin
+  "Igrejas": { pt: "Igrejas", en: "Churches", es: "Iglesias" },
+  "Equipe": { pt: "Equipe", en: "Team", es: "Equipo" },
+  "Gestão global — visível apenas para sua equipe": { pt: "Gestão global — visível apenas para sua equipe", en: "Global management — visible only to your team", es: "Gestión global — visible solo para su equipo" },
+  "Igreja criada com sucesso!": { pt: "Igreja criada com sucesso!", en: "Church created successfully!", es: "¡Iglesia creada con éxito!" },
+  "Igreja removida": { pt: "Igreja removida", en: "Church removed", es: "Iglesia eliminada" },
+  "Link copiado para": { pt: "Link copiado para", en: "Link copied for", es: "Enlace copiado para" },
+  "Selecione uma imagem": { pt: "Selecione uma imagem", en: "Select an image", es: "Seleccione una imagen" },
+  "Preencha título, resumo e conteúdo da campanha antes de gerar o banner": {
+    pt: "Preencha título, resumo e conteúdo da campanha antes de gerar o banner",
+    en: "Fill in the title, summary and content before generating the banner",
+    es: "Complete el título, resumen y contenido de la campaña antes de generar el banner",
+  },
+  "Erro ao gerar banner com IA": { pt: "Erro ao gerar banner com IA", en: "Error generating AI banner", es: "Error al generar banner con IA" },
+  "A IA não retornou uma imagem": { pt: "A IA não retornou uma imagem", en: "AI did not return an image", es: "La IA no devolvió una imagen" },
+  "Banner gerado com sucesso": { pt: "Banner gerado com sucesso", en: "Banner generated successfully", es: "Banner generado con éxito" },
+  "Erro ao atualizar aviso": { pt: "Erro ao atualizar aviso", en: "Error updating notice", es: "Error al actualizar aviso" },
+  "Aviso atualizado com sucesso": { pt: "Aviso atualizado com sucesso", en: "Notice updated successfully", es: "Aviso actualizado con éxito" },
+  "Membro promovido a Super Admin!": { pt: "Membro promovido a Super Admin!", en: "Member promoted to Super Admin!", es: "¡Miembro promovido a Super Admin!" },
+  "Você não pode remover a si mesmo": { pt: "Você não pode remover a si mesmo", en: "You cannot remove yourself", es: "No puede eliminarse a sí mismo" },
+  "Super Admin removido da equipe": { pt: "Super Admin removido da equipe", en: "Super Admin removed from team", es: "Super Admin eliminado del equipo" },
+  "Edição visual carregada": { pt: "Edição visual carregada", en: "Visual editing loaded", es: "Edición visual cargada" },
+  "Aviso ativado": { pt: "Aviso ativado", en: "Notice activated", es: "Aviso activado" },
+  "Aviso desativado": { pt: "Aviso desativado", en: "Notice deactivated", es: "Aviso desactivado" },
+  "Igrejas Matriz": { pt: "Igrejas Matriz", en: "Main Churches", es: "Iglesias Principales" },
+  "Equipe SA": { pt: "Equipe SA", en: "SA Team", es: "Equipo SA" },
+  "Criar Nova Igreja": { pt: "Criar Nova Igreja", en: "Create New Church", es: "Crear Nueva Iglesia" },
+  "Matriz ou congregação": { pt: "Matriz ou congregação", en: "Main church or congregation", es: "Sede o congregación" },
+  "Adicionar à Equipe": { pt: "Adicionar à Equipe", en: "Add to Team", es: "Agregar al Equipo" },
+  "Promover Super Admin": { pt: "Promover Super Admin", en: "Promote Super Admin", es: "Promover Super Admin" },
+  "Enviar Aviso": { pt: "Enviar Aviso", en: "Send Notice", es: "Enviar Aviso" },
+  "Para todas as igrejas": { pt: "Para todas as igrejas", en: "To all churches", es: "Para todas las iglesias" },
+  "Nova Igreja": { pt: "Nova Igreja", en: "New Church", es: "Nueva Iglesia" },
+  "Nome da igreja *": { pt: "Nome da igreja *", en: "Church name *", es: "Nombre de la iglesia *" },
+  "Nome do pastor": { pt: "Nome do pastor", en: "Pastor name", es: "Nombre del pastor" },
+  "Estado / País": { pt: "Estado / País", en: "State / Country", es: "Estado / País" },
+  "Usuários": { pt: "Usuários", en: "Users", es: "Usuarios" },
+  "Erro ao alterar status do aviso": { pt: "Erro ao alterar status do aviso", en: "Error changing notice status", es: "Error al cambiar estado del aviso" },
+
+  // GerenciarAcessos — role descriptions
+  "Acesso total à organização. Pode gerenciar usuários e módulos administrativos.": {
+    pt: "Acesso total à organização. Pode gerenciar usuários e módulos administrativos.",
+    en: "Full organization access. Can manage users and administrative modules.",
+    es: "Acceso total a la organización. Puede gestionar usuarios y módulos administrativos.",
+  },
+  "Acesso a Membros, Comunicação e gestão pastoral.": {
+    pt: "Acesso a Membros, Comunicação e gestão pastoral.",
+    en: "Access to Members, Communication, and pastoral management.",
+    es: "Acceso a Miembros, Comunicación y gestión pastoral.",
+  },
+  "Acesso a Membros, Comunicação e documentos.": {
+    pt: "Acesso a Membros, Comunicação e documentos.",
+    en: "Access to Members, Communication, and Documents.",
+    es: "Acceso a Miembros, Comunicación y Documentos.",
+  },
+  "Acesso a Agenda, Grupos e módulos de liderança.": {
+    pt: "Acesso a Agenda, Grupos e módulos de liderança.",
+    en: "Access to Calendar, Groups, and leadership modules.",
+    es: "Acceso a Agenda, Grupos y módulos de liderazgo.",
+  },
+  "Acesso aos módulos básicos da comunidade.": {
+    pt: "Acesso aos módulos básicos da comunidade.",
+    en: "Access to basic community modules.",
+    es: "Acceso a los módulos básicos de la comunidad.",
+  },
+  "Digite o nome do usuário...": { pt: "Digite o nome do usuário...", en: "Type the user's name...", es: "Escriba el nombre del usuario..." },
+  "Título da campanha": { pt: "Título da campanha", en: "Campaign title", es: "Título de la campaña" },
+  "Resumo curto da campanha": { pt: "Resumo curto da campanha", en: "Short campaign summary", es: "Resumen corto de la campaña" },
+  "Descreva a campanha, público, missão e atmosfera desejada": {
+    pt: "Descreva a campanha, público, missão e atmosfera desejada",
+    en: "Describe the campaign, audience, mission, and desired atmosphere",
+    es: "Describa la campaña, el público, la misión y la atmósfera deseada",
+  },
+  "Ex: Doar agora": { pt: "Ex: Doar agora", en: "E.g.: Donate now", es: "Ej: Donar ahora" },
+  "E-mail (opcional)": { pt: "E-mail (opcional)", en: "Email (optional)", es: "Correo (opcional)" },
+  "Lider": { pt: "Líder", en: "Leader", es: "Líder" },
+
+  // Orações — new keys only (others already exist earlier in this file)
+  "Nenhum pedido ainda": { pt: "Nenhum pedido ainda", en: "No requests yet", es: "No hay peticiones aún" },
+  "Nenhum pedido com este filtro": { pt: "Nenhum pedido com este filtro", en: "No requests match this filter", es: "No hay peticiones con este filtro" },
+  "Seja o primeiro a compartilhar um pedido de oração com a comunidade.": {
+    pt: "Seja o primeiro a compartilhar um pedido de oração com a comunidade.",
+    en: "Be the first to share a prayer request with the community.",
+    es: "Sé el primero en compartir una petición de oración con la comunidad.",
+  },
+  "Tente mudar o filtro para ver outros pedidos.": {
+    pt: "Tente mudar o filtro para ver outros pedidos.",
+    en: "Try changing the filter to see other requests.",
+    es: "Intenta cambiar el filtro para ver otras peticiones.",
+  },
+  "Todos os pedidos": { pt: "Todos os pedidos", en: "All requests", es: "Todas las peticiones" },
 };
 
 

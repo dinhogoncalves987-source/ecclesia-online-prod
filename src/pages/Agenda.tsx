@@ -4,17 +4,18 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useChurch } from "@/hooks/useChurch";
+import { useChurch } from "@/hooks/useChurchContext";
 import { useLanguage } from "@/hooks/useLanguage";
 import { toast } from "sonner";
+import { insertWithOrganizationScope, runScopedOrganizationQuery } from "@/lib/organizationScope";
 
 type Event = {
   id: string;
-  event_date: string;
+  starts_at: string;
   title: string;
-  time: string | null;
+  ends_at?: string | null;
   location: string | null;
-  color: string | null;
+  event_type: string | null;
 };
 
 const colorOptions = [
@@ -32,7 +33,7 @@ const dayKeys = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 export default function Agenda() {
   const now = new Date();
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { church } = useChurch();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,10 +61,12 @@ export default function Agenda() {
       setLoading(true);
       const startDate = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`;
       const endDate = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${daysInMonth}`;
-      const { data, error } = await supabase.from("events").select("*")
-        .eq("church_id", church.id)
-        .gte("event_date", startDate).lte("event_date", endDate)
-        .order("event_date");
+      const { data, error } = await runScopedOrganizationQuery<Event[]>("events", church.id, query =>
+        query.select("*")
+          .gte("starts_at", `${startDate}T00:00:00`)
+          .lte("starts_at", `${endDate}T23:59:59`)
+          .order("starts_at")
+      );
       if (error) { console.error(error); toast.error(t("Erro ao carregar eventos")); }
       else setEvents(data || []);
       setLoading(false);
@@ -71,7 +74,9 @@ export default function Agenda() {
     load();
   }, [user, church, currentMonth, currentYear, daysInMonth, t]);
 
-  const getDay = (e: Event) => new Date(e.event_date + "T00:00:00").getDate();
+  const getDay = (e: Event) => new Date(e.starts_at).getDate();
+  const getTime = (e: Event) => new Date(e.starts_at).toLocaleTimeString(lang === "en" ? "en-US" : lang === "es" ? "es-MX" : "pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const getColor = (e: Event) => e.event_type || "bg-accent";
 
   const sortedEvents = [...events].sort((a, b) => getDay(a) - getDay(b));
   const upcomingEvents = isCurrentMonth ? sortedEvents.filter(e => getDay(e) >= todayDay) : sortedEvents;
@@ -93,11 +98,16 @@ export default function Agenda() {
     if (!newEvent.title || !newEvent.time || !user || !church) return;
     const day = selectedDay || (isCurrentMonth ? todayDay : 1);
     const eventDate = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const startTime = newEvent.time.split(/\s|-/)[0] || "09:00";
     setSaving(true);
-    const { data, error } = await supabase.from("events").insert({
-      user_id: user.id, church_id: church.id, title: newEvent.title, event_date: eventDate,
-      time: newEvent.time, location: newEvent.location || t("A definir"), color: newEvent.color,
-    }).select().single();
+    const { data, error } = await insertWithOrganizationScope<Event>("events", church.id, {
+      created_by: user.id,
+      title: newEvent.title,
+      starts_at: `${eventDate}T${startTime}:00`,
+      location: newEvent.location || t("A definir"),
+      event_type: newEvent.color,
+      is_public: false,
+    }, query => query.select().single());
     if (error) { toast.error(t("Erro ao salvar")); console.error(error); }
     else { setEvents([...events, data]); toast.success(t("Evento salvo!")); }
     setNewEvent({ title: "", time: "", location: "", color: "bg-accent" });
@@ -105,7 +115,7 @@ export default function Agenda() {
   };
 
   const removeEvent = async (id: string) => {
-    const { error } = await supabase.from("events").delete().eq("id", id);
+    const { error } = await supabase.from("events").delete().eq("id", id).eq("organization_id", church?.id || "");
     if (error) toast.error(t("Erro ao remover evento"));
     else { setEvents(events.filter(e => e.id !== id)); toast.success(t("Evento removido")); }
   };
@@ -189,7 +199,7 @@ export default function Agenda() {
               const day = getDay(e);
               return (
                 <div key={e.id} className={`flex items-center gap-3 p-4 bg-card rounded-xl shadow-executive hover:shadow-executive-hover transition-shadow ${isPast(day) ? "opacity-60" : ""}`}>
-                  <div className={`w-1 h-12 ${e.color || "bg-accent"} rounded-full flex-shrink-0`} />
+                  <div className={`w-1 h-12 ${getColor(e)} rounded-full flex-shrink-0`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm font-medium">{e.title}</p>
@@ -199,7 +209,7 @@ export default function Agenda() {
                       </span>
                     </div>
                     <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                      {e.time && <span className="inline-flex items-center gap-1"><Clock size={12} /> {e.time}</span>}
+                      <span className="inline-flex items-center gap-1"><Clock size={12} /> {getTime(e)}</span>
                       {e.location && <span className="inline-flex items-center gap-1"><MapPin size={12} /> {e.location}</span>}
                     </div>
                   </div>
@@ -237,7 +247,7 @@ export default function Agenda() {
                     {dayEvents.length > 0 && (
                       <div className="flex justify-center gap-0.5 mt-0.5">
                         {dayEvents.slice(0, 3).map((e, j) => (
-                          <div key={j} className={`w-1 h-1 rounded-full ${e.color || "bg-accent"}`} />
+                          <div key={j} className={`w-1 h-1 rounded-full ${getColor(e)}`} />
                         ))}
                       </div>
                     )}
@@ -258,10 +268,10 @@ export default function Agenda() {
                     {events.filter(e => getDay(e) === selectedDay).map(e => (
                       <div key={e.id} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-secondary/30">
                         <div className="flex items-center gap-2">
-                          <div className={`w-1 h-8 ${e.color || "bg-accent"} rounded-full`} />
+                          <div className={`w-1 h-8 ${getColor(e)} rounded-full`} />
                           <div>
                             <p className="text-sm font-medium">{e.title}</p>
-                            <p className="text-xs text-muted-foreground">{e.time} · {e.location}</p>
+                            <p className="text-xs text-muted-foreground">{getTime(e)} · {e.location}</p>
                           </div>
                         </div>
                         <button onClick={() => removeEvent(e.id)} className="p-1 rounded hover:bg-destructive/10">

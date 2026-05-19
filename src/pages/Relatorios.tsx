@@ -1,16 +1,17 @@
-import { AdminLayout } from "@/components/AdminLayout";
+﻿import { AdminLayout } from "@/components/AdminLayout";
 import { BarChart3, Users, Wallet, Calendar, Heart, TrendingUp, TrendingDown } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useChurch } from "@/hooks/useChurch";
+import { useChurch } from "@/hooks/useChurchContext";
 import { useLanguage } from "@/hooks/useLanguage";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import { ptBR, enUS, es } from "date-fns/locale";
+import { runScopedOrganizationQuery } from "@/lib/organizationScope";
 
 export default function Relatorios() {
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { church, loading: churchLoading } = useChurch();
   const [stats, setStats] = useState({
     totalMembers: 0, activeMembers: 0, visitors: 0,
@@ -30,13 +31,13 @@ export default function Relatorios() {
       const monthEnd = format(endOfMonth(now), "yyyy-MM-dd");
 
       const [members, income, expense, events, prayers, groups, docs] = await Promise.all([
-        supabase.from("members").select("status").eq("church_id", church.id),
-        supabase.from("transactions").select("amount").eq("type", "Entrada").eq("church_id", church.id).gte("date", monthStart).lte("date", monthEnd),
-        supabase.from("transactions").select("amount").eq("type", "Saída").eq("church_id", church.id).gte("date", monthStart).lte("date", monthEnd),
-        supabase.from("events").select("id").eq("church_id", church.id).gte("event_date", monthStart).lte("event_date", monthEnd),
-        supabase.from("prayer_requests").select("status").eq("church_id", church.id),
-        supabase.from("small_groups").select("id").eq("church_id", church.id),
-        supabase.from("documents").select("id").eq("church_id", church.id),
+        runScopedOrganizationQuery<Array<{ status: string }>>("members", church.id, query => query.select("status")),
+        runScopedOrganizationQuery<Array<{ amount: number }>>("transactions", church.id, query => query.select("amount").eq("type", "Entrada").gte("date", monthStart).lte("date", monthEnd)),
+        runScopedOrganizationQuery<Array<{ amount: number }>>("transactions", church.id, query => query.select("amount").in("type", ["Saida", "Saída"]).gte("date", monthStart).lte("date", monthEnd)),
+        runScopedOrganizationQuery<Array<{ id: string }>>("events", church.id, query => query.select("id").gte("starts_at", `${monthStart}T00:00:00`).lte("starts_at", `${monthEnd}T23:59:59`)),
+        runScopedOrganizationQuery<Array<{ status: string | null }>>("prayer_requests", church.id, query => query.select("status")),
+        runScopedOrganizationQuery<Array<{ id: string }>>("groups", church.id, query => query.select("id")),
+        runScopedOrganizationQuery<Array<{ id: string }>>("documents", church.id, query => query.select("id")),
       ]);
 
       const membersData = members.data || [];
@@ -76,7 +77,7 @@ export default function Relatorios() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-serif font-bold text-foreground">{t("Relatórios")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{t("Visão geral de")} {format(new Date(), "MMMM yyyy")}</p>
+          <p className="text-sm text-muted-foreground mt-1">{t("Visão geral de")} {format(new Date(), "MMMM yyyy", { locale: lang === "en" ? enUS : lang === "es" ? es : ptBR })}</p>
         </div>
 
         {loading ? (
@@ -105,3 +106,5 @@ export default function Relatorios() {
     </AdminLayout>
   );
 }
+
+

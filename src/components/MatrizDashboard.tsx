@@ -69,10 +69,10 @@ export function MatrizDashboard() {
           query.select("amount").eq("type", "Entrada").gte("date", monthStart).lte("date", monthEnd)
         ),
         runScopedOrganizationQuery<Array<{ amount: number }>>("transactions", cId, query =>
-          query.select("amount").eq("type", "Saída").gte("date", monthStart).lte("date", monthEnd)
+          query.select("amount").in("type", ["Saída", "Saida"]).gte("date", monthStart).lte("date", monthEnd)
         ),
         runScopedOrganizationQuery<Array<{ id: string }>>("events", cId, query =>
-          query.select("id").gte("event_date", monthStart).lte("event_date", monthEnd)
+          query.select("id").gte("starts_at", `${monthStart}T00:00:00`).lte("starts_at", `${monthEnd}T23:59:59`)
         ),
         runScopedOrganizationQuery<Array<{ id: string }>>("prayer_requests", cId, query => query.select("id")),
       ]);
