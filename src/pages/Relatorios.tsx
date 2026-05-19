@@ -7,6 +7,12 @@ import { useChurch } from "@/hooks/useChurchContext";
 import { useLanguage } from "@/hooks/useLanguage";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR, enUS, es } from "date-fns/locale";
+
+const CURRENCY_LOCALE: Record<string, { locale: string; currency: string }> = {
+  pt: { locale: "pt-BR", currency: "BRL" },
+  en: { locale: "en-US", currency: "USD" },
+  es: { locale: "es-MX", currency: "MXN" },
+};
 import { runScopedOrganizationQuery } from "@/lib/organizationScope";
 
 export default function Relatorios() {
@@ -63,9 +69,9 @@ export default function Relatorios() {
 
   const cards = [
     { title: t("Total de Membros"), value: stats.totalMembers, sub: `${stats.activeMembers} ${t("ativos")} · ${stats.visitors} ${t("visitantes")}`, icon: Users, color: "text-blue-600 bg-blue-500/10" },
-    { title: t("Receita do Mês"), value: `R$ ${stats.totalIncome.toLocaleString("pt-BR")}`, icon: TrendingUp, color: "text-green-600 bg-green-500/10" },
-    { title: t("Despesa do Mês"), value: `R$ ${stats.totalExpense.toLocaleString("pt-BR")}`, icon: TrendingDown, color: "text-red-600 bg-red-500/10" },
-    { title: t("Saldo"), value: `R$ ${stats.balance.toLocaleString("pt-BR")}`, icon: Wallet, color: stats.balance >= 0 ? "text-green-600 bg-green-500/10" : "text-red-600 bg-red-500/10" },
+    { title: t("Receita do Mês"), value: stats.totalIncome.toLocaleString((CURRENCY_LOCALE[lang] ?? CURRENCY_LOCALE.pt).locale, { style: "currency", currency: (CURRENCY_LOCALE[lang] ?? CURRENCY_LOCALE.pt).currency, minimumFractionDigits: 0 }), icon: TrendingUp, color: "text-green-600 bg-green-500/10" },
+    { title: t("Despesa do Mês"), value: stats.totalExpense.toLocaleString((CURRENCY_LOCALE[lang] ?? CURRENCY_LOCALE.pt).locale, { style: "currency", currency: (CURRENCY_LOCALE[lang] ?? CURRENCY_LOCALE.pt).currency, minimumFractionDigits: 0 }), icon: TrendingDown, color: "text-red-600 bg-red-500/10" },
+    { title: t("Saldo"), value: stats.balance.toLocaleString((CURRENCY_LOCALE[lang] ?? CURRENCY_LOCALE.pt).locale, { style: "currency", currency: (CURRENCY_LOCALE[lang] ?? CURRENCY_LOCALE.pt).currency, minimumFractionDigits: 0 }), icon: Wallet, color: stats.balance >= 0 ? "text-green-600 bg-green-500/10" : "text-red-600 bg-red-500/10" },
     { title: t("Eventos no Mês"), value: stats.totalEvents, icon: Calendar, color: "text-purple-600 bg-purple-500/10" },
     { title: t("Pedidos de Oração"), value: stats.totalPrayers, sub: `${stats.answeredPrayers} ${t("respondidos")}`, icon: Heart, color: "text-pink-600 bg-pink-500/10" },
     { title: t("Pequenos Grupos"), value: stats.totalGroups, icon: Users, color: "text-amber-600 bg-amber-500/10" },

@@ -17,9 +17,10 @@ type BulkImportModalProps = {
   fields: { key: string; label: string; required?: boolean }[];
   templateData?: Record<string, string>[];
   title?: string;
+  onTextFile?: (file: File) => void;
 };
 
-export function BulkImportModal({ open, onClose, onImport, fields, templateData, title }: BulkImportModalProps) {
+export function BulkImportModal({ open, onClose, onImport, fields, templateData, title, onTextFile }: BulkImportModalProps) {
   const { t } = useLanguage();
   const fileRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<"upload" | "map" | "preview" | "done">("upload");
@@ -46,6 +47,12 @@ export function BulkImportModal({ open, onClose, onImport, fields, templateData,
   };
 
   const handleFile = (file: File) => {
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if ((ext === "txt" || ext === "md") && onTextFile) {
+      onTextFile(file);
+      handleClose();
+      return;
+    }
     setFileName(file.name);
     Papa.parse(file, {
       header: false,
@@ -77,9 +84,7 @@ export function BulkImportModal({ open, onClose, onImport, fields, templateData,
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (file && (file.name.endsWith(".csv") || file.name.endsWith(".txt"))) {
-      handleFile(file);
-    }
+    if (file) handleFile(file);
   };
 
   const getMappedRows = (): Record<string, string>[] => {
@@ -170,11 +175,12 @@ export function BulkImportModal({ open, onClose, onImport, fields, templateData,
                       <input
                         ref={fileRef}
                         type="file"
-                        accept=".csv,.txt"
+                        accept=".csv,.txt,.md"
                         className="hidden"
                         onChange={e => {
                           const f = e.target.files?.[0];
                           if (f) handleFile(f);
+                          e.target.value = "";
                         }}
                       />
                     </div>
@@ -203,20 +209,24 @@ export function BulkImportModal({ open, onClose, onImport, fields, templateData,
                     <p className="text-sm text-muted-foreground">{t("Associe as colunas do CSV aos campos do sistema:")}</p>
                     <div className="space-y-2">
                       {fields.map(f => (
-                        <div key={f.key} className="flex items-center gap-3">
-                          <span className="text-sm w-32 truncate flex-shrink-0">
-                            {f.label} {f.required && <span className="text-destructive">*</span>}
+                        <div key={f.key} className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm w-28 flex-shrink-0 truncate">
+                            {f.label}{f.required && <span className="text-destructive ml-0.5">*</span>}
                           </span>
-                          <select
-                            value={mapping[f.key] || ""}
-                            onChange={e => setMapping(prev => ({ ...prev, [f.key]: e.target.value }))}
-                            className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm"
-                          >
-                            <option value="">{t("— Não importar —")}</option>
-                            {csvHeaders.map(h => (
-                              <option key={h} value={h}>{h}</option>
-                            ))}
-                          </select>
+                          <div className="flex-1 min-w-0">
+                            <select
+                              value={mapping[f.key] || ""}
+                              onChange={e => setMapping(prev => ({ ...prev, [f.key]: e.target.value }))}
+                              className="w-full max-w-full px-2 py-2 rounded-lg border border-border bg-background text-sm truncate"
+                            >
+                              <option value="">{t("— Não importar —")}</option>
+                              {csvHeaders.map(h => (
+                                <option key={h} value={h} title={h}>
+                                  {h.length > 40 ? h.slice(0, 40) + "…" : h}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
                       ))}
                     </div>

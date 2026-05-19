@@ -100,7 +100,7 @@ export default function Comunicacao() {
             <h3 className="font-serif text-lg font-semibold text-foreground mb-1">{t("Nenhum comunicado publicado")}</h3>
             <p className="text-sm text-muted-foreground max-w-xs mb-5">{t("Publique avisos, informes e notícias para manter sua comunidade informada.")}</p>
             <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
-              <Plus size={16} /> {t("Criar Comunicado")}
+              <Plus size={16} />{t("Criar Comunicado")}
             </button>
           </div>
         ) : (

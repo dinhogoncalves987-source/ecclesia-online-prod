@@ -36,9 +36,9 @@ export default function ResetPassword() {
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      toast({ title: t("Erro"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Senha atualizada!", description: "Você já pode entrar com a nova senha." });
+      toast({ title: t("Senha atualizada!"), description: t("Você já pode entrar com a nova senha.") });
       navigate("/admin");
     }
     setLoading(false);
@@ -57,13 +57,13 @@ export default function ResetPassword() {
               <span className="text-accent font-serif text-2xl">Ω</span>
             </div>
           </Link>
-          <h1 className="text-2xl font-serif tracking-tight">Nova senha</h1>
-          <p className="text-sm text-muted-foreground mt-1">Defina sua nova senha</p>
+          <h1 className="text-2xl font-serif tracking-tight">{t("Nova senha")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t("Defina sua nova senha")}</p>
         </div>
 
         <form onSubmit={handleReset} className="bg-card rounded-xl shadow-executive p-6 space-y-4">
           <div>
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Nova senha</label>
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("Nova senha")}</label>
             <div className="relative mt-1.5">
               <input
                 type={showPassword ? "text" : "password"}
@@ -83,7 +83,7 @@ export default function ResetPassword() {
           <button type="submit" disabled={loading}
             className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2">
             {loading && <Loader2 size={16} className="animate-spin" />}
-            Salvar nova senha
+            {t("Salvar nova senha")}
           </button>
         </form>
       </div>

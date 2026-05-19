@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import { bibleBooks, oldTestamentBooks, newTestamentBooks, type BibleBook } from "@/data/bible-books";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLanguage } from "@/hooks/useLanguage";
+import { supabase } from "@/integrations/supabase/client";
 
 type Verse = { num: number; text: string };
 type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -15,12 +16,40 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const VERSES_URL = `${SUPABASE_URL}/functions/v1/bible-verses`;
 const CHAT_URL = `${SUPABASE_URL}/functions/v1/bible-chat`;
 
-const quickPromptKeys = [
-  { labelKey: "Esboço de pregação", promptKey: "Crie um esboço completo de pregação sobre" },
-  { labelKey: "Estudo profundo", promptKey: "Faça um estudo bíblico profundo sobre" },
-  { labelKey: "Contexto histórico", promptKey: "Explique o contexto histórico de" },
-  { labelKey: "Aplicação prática", promptKey: "Quais são as aplicações práticas de" },
-];
+const QUICK_PROMPTS: Record<string, { labelKey: string; prompts: Record<string, string> }> = {
+  sermon: {
+    labelKey: "Esboço de pregação",
+    prompts: {
+      pt: "Crie um esboço completo de pregação sobre ",
+      en: "Create a complete sermon outline about ",
+      es: "Crea un esquema completo de sermón sobre ",
+    },
+  },
+  study: {
+    labelKey: "Estudo profundo",
+    prompts: {
+      pt: "Faça um estudo bíblico profundo sobre ",
+      en: "Create an in-depth Bible study about ",
+      es: "Haz un estudio bíblico profundo sobre ",
+    },
+  },
+  context: {
+    labelKey: "Contexto histórico",
+    prompts: {
+      pt: "Explique o contexto histórico de ",
+      en: "Explain the historical context of ",
+      es: "Explica el contexto histórico de ",
+    },
+  },
+  practical: {
+    labelKey: "Aplicação prática",
+    prompts: {
+      pt: "Quais são as aplicações práticas de ",
+      en: "What are the practical applications of ",
+      es: "¿Cuáles son las aplicaciones prácticas de ",
+    },
+  },
+};
 
 export default function Biblia() {
   const { t, lang } = useLanguage();
@@ -31,6 +60,7 @@ export default function Biblia() {
   const [selectedBookIndex, setSelectedBookIndex] = useState(0);
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
   const [verses, setVerses] = useState<Verse[]>([]);
+  const [verseError, setVerseError] = useState("");
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -47,27 +77,44 @@ export default function Biblia() {
 
   const selectedBook = bibleBooks[selectedBookIndex];
 
+  const getAccessToken = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
+
+    if (!accessToken) {
+      throw new Error(t("Sessão expirada. Faça login novamente para usar o assistente."));
+    }
+
+    return accessToken;
+  }, [t]);
+
   const fetchVerses = useCallback(async (book: BibleBook, chapter: number) => {
     setLoading(true);
+    setVerseError("");
     try {
+      const accessToken = await getAccessToken();
       const params = new URLSearchParams({
         bookId: book.bookId.toString(),
         chapter: chapter.toString(),
         locale: lang,
       });
       const resp = await fetch(`${VERSES_URL}?${params}`, {
-        headers: { Authorization: `Bearer ${SUPABASE_KEY}` },
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${accessToken}`,
+        },
       });
-      if (!resp.ok) throw new Error("Erro ao buscar versículos");
+      if (!resp.ok) throw new Error(t("Erro ao buscar versículos"));
       const data = await resp.json();
       setVerses(data.verses || []);
     } catch (e) {
       console.error("Fetch verses error:", e);
+      setVerseError(e instanceof Error ? e.message : t("Erro ao buscar versículos"));
       setVerses([]);
     } finally {
       setLoading(false);
     }
-  }, [lang]);
+  }, [getAccessToken, lang, t]);
 
   useEffect(() => {
     if (selectedChapter !== null) {
@@ -81,7 +128,7 @@ export default function Biblia() {
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [lang]);
+  }, []);
 
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
 
@@ -131,13 +178,19 @@ export default function Biblia() {
     setIsLoading(true);
 
     try {
+      const accessToken = await getAccessToken();
+      const context = selectedChapter !== null
+        ? { book: selectedBook.name, chapter: selectedChapter, bookId: selectedBook.bookId }
+        : undefined;
+
       const resp = await fetch(CHAT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_KEY}`,
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({ messages: allMessages, locale: lang }),
+        body: JSON.stringify({ messages: allMessages, locale: lang, context }),
       });
 
       const data = await resp.json().catch(() => ({}));
@@ -146,7 +199,7 @@ export default function Biblia() {
         throw new Error(data?.error || `Erro ${resp.status}`);
       }
 
-      const assistantContent = data?.content || data?.message || data?.text || "Sem resposta da IA";
+      const assistantContent = data?.content || data?.message || data?.text || t("Sem resposta da IA. Tente novamente.");
 
       setMessages(prev => [
         ...prev,
@@ -156,11 +209,12 @@ export default function Biblia() {
         },
       ]);
     } catch (e) {
+      const errMsg = e instanceof Error ? e.message : t("Falha ao consultar a IA");
       setMessages(prev => [
         ...prev,
         {
           role: "assistant",
-          content: `Erro: ${e instanceof Error ? e.message : "Falha ao consultar a IA"}`,
+          content: t("Erro ao conectar com o assistente") + ": " + errMsg,
         },
       ]);
     } finally {
@@ -171,6 +225,8 @@ export default function Biblia() {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
 
+  const speechLang = lang === "en" ? "en-US" : lang === "es" ? "es-MX" : "pt-BR";
+
   const startVoiceSearch = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -179,7 +235,7 @@ export default function Biblia() {
     }
     try {
       const recognition = new SpeechRecognition();
-      recognition.lang = "pt-BR";
+      recognition.lang = speechLang;
       recognition.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
         setSearchQuery(transcript);
@@ -210,7 +266,7 @@ export default function Biblia() {
     }
     try {
       const recognition = new SpeechRecognition();
-      recognition.lang = "pt-BR";
+      recognition.lang = speechLang;
       recognition.continuous = true;
       recognition.interimResults = true;
       let finalText = "";
@@ -236,7 +292,9 @@ export default function Biblia() {
       recognition.onend = () => {
         // If still listening (ref exists), restart (continuous mode can stop on silence)
         if (recognitionRef.current) {
-          try { recognitionRef.current.start(); } catch {}
+          try { recognitionRef.current.start(); } catch {
+            return;
+          }
         }
       };
       recognitionRef.current = recognition;
@@ -255,7 +313,9 @@ export default function Biblia() {
       const ref = recognitionRef.current;
       recognitionRef.current = null;
       ref.onend = null;
-      try { ref.stop(); } catch {}
+      try { ref.stop(); } catch {
+        return;
+      }
     }
     if (confirm && voiceTranscript.trim()) {
       setInput(prev => prev ? prev + " " + voiceTranscript.trim() : voiceTranscript.trim());
@@ -431,8 +491,8 @@ export default function Biblia() {
                    <p className="text-xs text-muted-foreground mt-1">{t("Faça perguntas, peça esboços e estudos profundos.")}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-4 w-full max-w-xs">
-                  {quickPromptKeys.map(qp => (
-                    <button key={qp.labelKey} onClick={() => setInput(t(qp.promptKey) + " ")}
+                  {Object.entries(QUICK_PROMPTS).map(([key, qp]) => (
+                    <button key={key} onClick={() => setInput((qp.prompts[lang] ?? qp.prompts.pt))}
                       className="text-left p-2.5 rounded-lg bg-secondary/50 hover:bg-secondary text-xs text-muted-foreground hover:text-foreground transition-colors">
                       {t(qp.labelKey)}
                     </button>
@@ -685,7 +745,7 @@ export default function Biblia() {
                 </div>
               ) : verses.length === 0 ? (
                 <div className="text-center py-16 text-muted-foreground text-sm">
-                  <p>{t("Não foi possível carregar este capítulo.")}</p>
+                  <p>{verseError || t("Não foi possível carregar este capítulo.")}</p>
                   <button onClick={() => fetchVerses(selectedBook, selectedChapter)} className="mt-2 text-primary underline text-xs">
                     {t("Tentar novamente")}
                   </button>

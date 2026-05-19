@@ -240,7 +240,7 @@ export default function AssembleiaGeral() {
             <p className="text-sm text-muted-foreground max-w-xs mb-5">{t("Registre assembleias gerais com atas, relatórios e vídeos para consulta da comunidade.")}</p>
             {isAdmin && (
               <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
-                <Plus size={16} /> {t("Registrar Assembleia")}
+                <Plus size={16} />{t("Registrar Assembleia")}
               </button>
             )}
           </div>

@@ -1,7 +1,9 @@
 import { Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export function ThemeToggle() {
+  const { t } = useLanguage();
   const [dark, setDark] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("theme");
@@ -20,7 +22,7 @@ export function ThemeToggle() {
     <button
       onClick={() => setDark(!dark)}
       className="p-2 rounded-lg hover:bg-secondary transition-colors"
-      aria-label="Alternar tema"
+      aria-label={t("Alternar tema")}
     >
       {dark ? <Sun size={18} strokeWidth={1.5} /> : <Moon size={18} strokeWidth={1.5} />}
     </button>

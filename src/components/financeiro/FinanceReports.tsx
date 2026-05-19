@@ -1,23 +1,49 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
-import { FileText, Download } from "lucide-react";
+import { FileText, Download, Lock, Printer } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { useChurch } from "@/hooks/useChurchContext";
+import { useRole } from "@/hooks/useRole";
+import { insertWithOrganizationScope, runScopedOrganizationQuery } from "@/lib/organizationScope";
+import { getTransactionMonth, isExpense, type FinanceMonthlyClosing, type TreasuryTransaction } from "@/lib/finance";
 
-type Transaction = {
-  id: string; date: string; description: string; type: string; amount: number; status: string; category: string;
+const CURRENCY_LOCALE: Record<string, { locale: string; currency: string }> = {
+  pt: { locale: "pt-BR", currency: "BRL" },
+  en: { locale: "en-US", currency: "USD" },
+  es: { locale: "es-MX", currency: "MXN" },
 };
 
-const formatCurrency = (v: number) =>
-  `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const makeCurrencyFormatter = (lang: string) => (v: number) => {
+  const { locale, currency } = CURRENCY_LOCALE[lang] ?? CURRENCY_LOCALE.pt;
+  return v.toLocaleString(locale, { style: "currency", currency, minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
 
-const RECEITA_CATS = ["Dízimo", "Oferta", "Campanha", "Doação", "Missões"];
-const DESPESA_CATS = ["Aluguel", "Água/Luz", "Material", "Salário", "Manutenção", "Infraestrutura", "Eventos", "Ação Social"];
-
-export function FinanceReports({ transactions }: { transactions: Transaction[] }) {
-  const { t } = useLanguage();
+export function FinanceReports({ transactions }: { transactions: TreasuryTransaction[] }) {
+  const { t, lang } = useLanguage();
+  const formatCurrency = makeCurrencyFormatter(lang);
+  const { user } = useAuth();
+  const { church } = useChurch();
+  const { hasRole } = useRole();
+  const canWriteFinance = hasRole(["super_admin", "church_admin", "tesoureiro"]);
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
-  const [reportType, setReportType] = useState<"dre" | "balancete" | "fluxo">("dre");
+  const [reportType, setReportType] = useState<"prestacao" | "dre" | "balancete" | "fluxo">("prestacao");
+  const [closings, setClosings] = useState<FinanceMonthlyClosing[]>([]);
+  const [closing, setClosing] = useState(false);
+
+  useEffect(() => {
+    if (!church) return;
+    const loadClosings = async () => {
+      const { data } = await runScopedOrganizationQuery<FinanceMonthlyClosing[]>("finance_monthly_closings", church.id, query =>
+        query.select("*").order("month", { ascending: false }),
+      );
+      setClosings(data || []);
+    };
+    loadClosings();
+  }, [church]);
+
+  const isMonthClosed = closings.some(closingItem => closingItem.month === selectedMonth);
 
   const monthTxs = useMemo(() => {
     return transactions.filter(tx => tx.date?.startsWith(selectedMonth));
@@ -25,20 +51,21 @@ export function FinanceReports({ transactions }: { transactions: Transaction[] }
 
   const months = useMemo(() => {
     const set = new Set<string>();
-    transactions.forEach(tx => { if (tx.date) set.add(tx.date.substring(0, 7)); });
+    transactions.forEach(tx => { if (tx.date) set.add(getTransactionMonth(tx.date)); });
+    closings.forEach(closingItem => set.add(closingItem.month));
     return [...set].sort().reverse();
-  }, [transactions]);
+  }, [transactions, closings]);
 
-  // DRE
   const dre = useMemo(() => {
     const receitaByCategory: Record<string, number> = {};
     const despesaByCategory: Record<string, number> = {};
-    let totalReceita = 0, totalDespesa = 0;
+    let totalReceita = 0;
+    let totalDespesa = 0;
 
     monthTxs.forEach(tx => {
       const cat = tx.category || "Geral";
       const amt = Number(tx.amount);
-      if (tx.type === "Entrada") {
+      if (!isExpense(tx.type)) {
         receitaByCategory[cat] = (receitaByCategory[cat] || 0) + amt;
         totalReceita += amt;
       } else {
@@ -50,20 +77,18 @@ export function FinanceReports({ transactions }: { transactions: Transaction[] }
     return { receitaByCategory, despesaByCategory, totalReceita, totalDespesa, resultado: totalReceita - totalDespesa };
   }, [monthTxs]);
 
-  // Balancete
   const balancete = useMemo(() => {
     const prevTxs = transactions.filter(tx => tx.date && tx.date < selectedMonth + "-01");
-    const saldoAnterior = prevTxs.reduce((s, tx) => s + Number(tx.amount) * (tx.type === "Entrada" ? 1 : -1), 0);
+    const saldoAnterior = prevTxs.reduce((s, tx) => s + Number(tx.amount) * (isExpense(tx.type) ? -1 : 1), 0);
     const movimentacao = dre.totalReceita - dre.totalDespesa;
     return { saldoAnterior, entradas: dre.totalReceita, saidas: dre.totalDespesa, movimentacao, saldoFinal: saldoAnterior + movimentacao };
   }, [transactions, selectedMonth, dre]);
 
-  // Fluxo de Caixa
   const fluxoCaixa = useMemo(() => {
     const days: Record<string, { date: string; entradas: number; saidas: number }> = {};
     monthTxs.forEach(tx => {
       if (!days[tx.date]) days[tx.date] = { date: tx.date, entradas: 0, saidas: 0 };
-      if (tx.type === "Entrada") days[tx.date].entradas += Number(tx.amount);
+      if (!isExpense(tx.type)) days[tx.date].entradas += Number(tx.amount);
       else days[tx.date].saidas += Number(tx.amount);
     });
     const sorted = Object.values(days).sort((a, b) => a.date.localeCompare(b.date));
@@ -76,7 +101,17 @@ export function FinanceReports({ transactions }: { transactions: Transaction[] }
 
   const exportReport = () => {
     let csv = "";
-    if (reportType === "dre") {
+    if (reportType === "prestacao") {
+      csv = "Item,Valor\n";
+      csv += `"Saldo inicial",${balancete.saldoAnterior}\n`;
+      csv += `"Entradas",${balancete.entradas}\n`;
+      csv += `"Saidas",${balancete.saidas}\n`;
+      csv += `"Saldo final",${balancete.saldoFinal}\n`;
+      csv += "\nData,Descricao,Tipo,Categoria,Forma,Valor,Status\n";
+      monthTxs.forEach(tx => {
+        csv += `${tx.date},"${tx.description}",${tx.type},"${tx.category || ""}",${tx.payment_method || ""},${tx.amount},${tx.status}\n`;
+      });
+    } else if (reportType === "dre") {
       csv = "Categoria,Tipo,Valor\n";
       Object.entries(dre.receitaByCategory).forEach(([cat, val]) => { csv += `"${cat}",Receita,${val}\n`; });
       Object.entries(dre.despesaByCategory).forEach(([cat, val]) => { csv += `"${cat}",Despesa,${val}\n`; });
@@ -84,31 +119,61 @@ export function FinanceReports({ transactions }: { transactions: Transaction[] }
       csv += `"TOTAL DESPESAS",Despesa,${dre.totalDespesa}\n`;
       csv += `"RESULTADO",,${dre.resultado}\n`;
     } else if (reportType === "fluxo") {
-      csv = "Data,Entradas,Saídas,Saldo\n";
+      csv = "Data,Entradas,Saidas,Saldo\n";
       fluxoCaixa.forEach(d => { csv += `${d.date},${d.entradas},${d.saidas},${d.saldo}\n`; });
+    } else {
+      csv = "Conta,Valor\n";
+      csv += `"Saldo anterior",${balancete.saldoAnterior}\n`;
+      csv += `"Entradas",${balancete.entradas}\n`;
+      csv += `"Saidas",${balancete.saidas}\n`;
+      csv += `"Movimentacao liquida",${balancete.movimentacao}\n`;
+      csv += `"Saldo final",${balancete.saldoFinal}\n`;
     }
+
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = `${reportType}_${selectedMonth}.csv`; a.click();
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${reportType}_${selectedMonth}.csv`;
+    a.click();
     URL.revokeObjectURL(url);
-    toast.success(t("Relatório exportado!"));
+    toast.success(t("Relatorio exportado!"));
+  };
+
+  const closeMonth = async () => {
+    if (!user || !church || isMonthClosed || !canWriteFinance) return;
+    setClosing(true);
+    const { data, error } = await insertWithOrganizationScope<FinanceMonthlyClosing>("finance_monthly_closings", church.id, {
+      month: selectedMonth,
+      closed_by: user.id,
+      notes: `Fechamento com saldo final ${balancete.saldoFinal}`,
+    }, query => query.select().single());
+
+    if (error) {
+      toast.error(t("Erro ao fechar mes"));
+    } else if (data) {
+      setClosings([data, ...closings]);
+      toast.success(t("Mes fechado"));
+    }
+    setClosing(false);
   };
 
   const formatMonth = (m: string) => {
     const [y, mo] = m.split("-");
-    const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-    return `${months[parseInt(mo) - 1]}/${y}`;
+    const date = new Date(parseInt(y), parseInt(mo) - 1, 1);
+    const locale = lang === "en" ? "en-US" : lang === "es" ? "es-MX" : "pt-BR";
+    const monthName = date.toLocaleDateString(locale, { month: "short" });
+    return `${monthName}/${y.slice(2)}`;
   };
 
   return (
     <div className="space-y-4">
-      {/* Controls */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex bg-secondary/50 rounded-lg p-0.5">
-          {(["dre", "balancete", "fluxo"] as const).map(r => (
+          {(["prestacao", "dre", "balancete", "fluxo"] as const).map(r => (
             <button key={r} onClick={() => setReportType(r)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${reportType === r ? "bg-card shadow-sm" : "text-muted-foreground"}`}>
-              {r === "dre" ? "DRE" : r === "balancete" ? t("Balancete") : t("Fluxo de Caixa")}
+              {r === "prestacao" ? t("Prestacao") : r === "dre" ? "DRE" : r === "balancete" ? t("Balancete") : t("Fluxo de Caixa")}
             </button>
           ))}
         </div>
@@ -117,28 +182,80 @@ export function FinanceReports({ transactions }: { transactions: Transaction[] }
           {months.map(m => <option key={m} value={m}>{formatMonth(m)}</option>)}
           {months.length === 0 && <option value={selectedMonth}>{formatMonth(selectedMonth)}</option>}
         </select>
-        <button onClick={exportReport} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-secondary rounded-lg text-xs font-medium hover:bg-secondary/80 transition-colors ml-auto">
-          <Download size={13} /> {t("Exportar")}
+        {canWriteFinance && (
+          <button onClick={closeMonth} disabled={closing || isMonthClosed || monthTxs.length === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-secondary rounded-lg text-xs font-medium hover:bg-secondary/80 transition-colors disabled:opacity-50">
+            <Lock size={13} /> {isMonthClosed ? t("Mes fechado") : t("Fechar mes")}
+          </button>
+        )}
+        <button onClick={() => window.print()} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-secondary rounded-lg text-xs font-medium hover:bg-secondary/80 transition-colors ml-auto">
+          <Printer size={13} /> PDF
+        </button>
+        <button onClick={exportReport} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-secondary rounded-lg text-xs font-medium hover:bg-secondary/80 transition-colors">
+          <Download size={13} /> CSV
         </button>
       </div>
 
-      {/* DRE */}
+      {reportType === "prestacao" && (
+        <div className="bg-card rounded-xl shadow-executive overflow-hidden">
+          <div className="p-5 border-b border-border/50">
+            <div className="flex items-center gap-2">
+              <FileText size={18} className="text-primary" />
+              <h3 className="font-serif text-lg font-semibold">{t("Prestacao de Contas")} - {formatMonth(selectedMonth)}</h3>
+              {isMonthClosed && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">{t("Fechado")}</span>}
+            </div>
+          </div>
+          <div className="p-5 space-y-5">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {[
+                { label: t("Saldo inicial"), value: balancete.saldoAnterior },
+                { label: t("Entradas"), value: balancete.entradas, cls: "text-success" },
+                { label: t("Saidas"), value: balancete.saidas, cls: "text-destructive" },
+                { label: t("Saldo final"), value: balancete.saldoFinal, cls: balancete.saldoFinal >= 0 ? "text-success" : "text-destructive" },
+              ].map(item => (
+                <div key={item.label} className="p-3 rounded-lg bg-secondary/30">
+                  <p className="text-[10px] text-muted-foreground uppercase font-medium">{item.label}</p>
+                  <p className={`text-lg font-bold tabular-nums ${item.cls || ""}`}>{formatCurrency(item.value)}</p>
+                </div>
+              ))}
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border/50 text-xs text-muted-foreground">
+                  <th className="text-left py-2 font-medium">{t("Data")}</th>
+                  <th className="text-left py-2 font-medium">{t("Descricao")}</th>
+                  <th className="text-left py-2 font-medium">{t("Categoria")}</th>
+                  <th className="text-right py-2 font-medium">{t("Valor")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthTxs.map(tx => (
+                  <tr key={tx.id} className="border-b border-border/20">
+                    <td className="py-1.5 text-xs">{tx.date}</td>
+                    <td className="py-1.5 text-xs">{tx.description}</td>
+                    <td className="py-1.5 text-xs">{tx.category}</td>
+                    <td className={`py-1.5 text-right text-xs tabular-nums ${isExpense(tx.type) ? "text-destructive" : "text-success"}`}>
+                      {isExpense(tx.type) ? "-" : "+"}{formatCurrency(Number(tx.amount))}
+                    </td>
+                  </tr>
+                ))}
+                {monthTxs.length === 0 && <tr><td colSpan={4} className="text-center py-8 text-sm text-muted-foreground">{t("Nenhuma movimentacao encontrada.")}</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {reportType === "dre" && (
         <div className="bg-card rounded-xl shadow-executive overflow-hidden">
           <div className="p-5 border-b border-border/50">
             <div className="flex items-center gap-2">
               <FileText size={18} className="text-primary" />
-              <h3 className="font-serif text-lg font-semibold">{t("Demonstrativo de Resultado")} — {formatMonth(selectedMonth)}</h3>
+              <h3 className="font-serif text-lg font-semibold">{t("Demonstrativo de Resultado")} - {formatMonth(selectedMonth)}</h3>
             </div>
           </div>
           <div className="p-5">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border/50 text-xs text-muted-foreground">
-                  <th className="text-left py-2 font-medium">{t("Conta")}</th>
-                  <th className="text-right py-2 font-medium">{t("Valor")}</th>
-                </tr>
-              </thead>
               <tbody>
                 <tr className="font-semibold text-success bg-success/5">
                   <td className="py-2 pl-2">{t("RECEITAS")}</td>
@@ -150,7 +267,6 @@ export function FinanceReports({ transactions }: { transactions: Transaction[] }
                     <td className="py-1.5 pr-2 text-right text-xs tabular-nums">{formatCurrency(val)}</td>
                   </tr>
                 ))}
-                <tr className="h-3" />
                 <tr className="font-semibold text-destructive bg-destructive/5">
                   <td className="py-2 pl-2">{t("DESPESAS")}</td>
                   <td className="py-2 pr-2 text-right">{formatCurrency(dre.totalDespesa)}</td>
@@ -161,9 +277,8 @@ export function FinanceReports({ transactions }: { transactions: Transaction[] }
                     <td className="py-1.5 pr-2 text-right text-xs tabular-nums">{formatCurrency(val)}</td>
                   </tr>
                 ))}
-                <tr className="h-3" />
                 <tr className={`font-bold text-base border-t-2 border-border ${dre.resultado >= 0 ? "text-success" : "text-destructive"}`}>
-                  <td className="py-3 pl-2">{t("RESULTADO DO PERÍODO")}</td>
+                  <td className="py-3 pl-2">{t("RESULTADO DO PERIODO")}</td>
                   <td className="py-3 pr-2 text-right">{formatCurrency(dre.resultado)}</td>
                 </tr>
               </tbody>
@@ -172,61 +287,32 @@ export function FinanceReports({ transactions }: { transactions: Transaction[] }
         </div>
       )}
 
-      {/* Balancete */}
       {reportType === "balancete" && (
-        <div className="bg-card rounded-xl shadow-executive overflow-hidden">
-          <div className="p-5 border-b border-border/50">
-            <div className="flex items-center gap-2">
-              <FileText size={18} className="text-primary" />
-              <h3 className="font-serif text-lg font-semibold">{t("Balancete")} — {formatMonth(selectedMonth)}</h3>
-            </div>
-          </div>
-          <div className="p-5">
-            <table className="w-full text-sm">
-              <tbody>
-                {[
-                  { label: t("Saldo Anterior"), value: balancete.saldoAnterior, cls: "" },
-                  { label: t("(+) Entradas no Período"), value: balancete.entradas, cls: "text-success" },
-                  { label: t("(-) Saídas no Período"), value: balancete.saidas, cls: "text-destructive" },
-                  { label: t("(=) Movimentação Líquida"), value: balancete.movimentacao, cls: balancete.movimentacao >= 0 ? "text-success" : "text-destructive" },
-                ].map((row, i) => (
-                  <tr key={i} className="border-b border-border/30">
-                    <td className="py-3 font-medium">{row.label}</td>
-                    <td className={`py-3 text-right font-medium tabular-nums ${row.cls}`}>{formatCurrency(row.value)}</td>
-                  </tr>
-                ))}
-                <tr className={`font-bold text-base border-t-2 border-border ${balancete.saldoFinal >= 0 ? "text-success" : "text-destructive"}`}>
-                  <td className="py-4">{t("SALDO FINAL")}</td>
-                  <td className="py-4 text-right">{formatCurrency(balancete.saldoFinal)}</td>
+        <div className="bg-card rounded-xl shadow-executive overflow-hidden p-5">
+          <h3 className="font-serif text-lg font-semibold mb-4">{t("Balancete")} - {formatMonth(selectedMonth)}</h3>
+          <table className="w-full text-sm">
+            <tbody>
+              {[
+                { label: t("Saldo Anterior"), value: balancete.saldoAnterior },
+                { label: t("(+) Entradas no Periodo"), value: balancete.entradas, cls: "text-success" },
+                { label: t("(-) Saidas no Periodo"), value: balancete.saidas, cls: "text-destructive" },
+                { label: t("(=) Movimentacao Liquida"), value: balancete.movimentacao, cls: balancete.movimentacao >= 0 ? "text-success" : "text-destructive" },
+                { label: t("SALDO FINAL"), value: balancete.saldoFinal, cls: balancete.saldoFinal >= 0 ? "text-success" : "text-destructive" },
+              ].map(row => (
+                <tr key={row.label} className="border-b border-border/30">
+                  <td className="py-3 font-medium">{row.label}</td>
+                  <td className={`py-3 text-right font-medium tabular-nums ${row.cls || ""}`}>{formatCurrency(row.value)}</td>
                 </tr>
-              </tbody>
-            </table>
-            <div className="mt-4 grid grid-cols-3 gap-3">
-              <div className="p-3 rounded-lg bg-secondary/30 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase font-medium">{t("Total Lançamentos")}</p>
-                <p className="text-lg font-bold">{monthTxs.length}</p>
-              </div>
-              <div className="p-3 rounded-lg bg-success/10 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase font-medium">{t("Confirmados")}</p>
-                <p className="text-lg font-bold text-success">{monthTxs.filter(tx => tx.status === "Confirmado" || tx.status === "Pago").length}</p>
-              </div>
-              <div className="p-3 rounded-lg bg-accent/10 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase font-medium">{t("Pendentes")}</p>
-                <p className="text-lg font-bold text-accent">{monthTxs.filter(tx => tx.status === "Pendente").length}</p>
-              </div>
-            </div>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* Fluxo de Caixa */}
       {reportType === "fluxo" && (
         <div className="bg-card rounded-xl shadow-executive overflow-hidden">
           <div className="p-5 border-b border-border/50">
-            <div className="flex items-center gap-2">
-              <FileText size={18} className="text-primary" />
-              <h3 className="font-serif text-lg font-semibold">{t("Fluxo de Caixa Diário")} — {formatMonth(selectedMonth)}</h3>
-            </div>
+            <h3 className="font-serif text-lg font-semibold">{t("Fluxo de Caixa Diario")} - {formatMonth(selectedMonth)}</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -234,7 +320,7 @@ export function FinanceReports({ transactions }: { transactions: Transaction[] }
                 <tr className="border-b border-border/50 text-xs text-muted-foreground">
                   <th className="px-4 py-2 text-left font-medium">{t("Data")}</th>
                   <th className="px-4 py-2 text-right font-medium text-success">{t("Entradas")}</th>
-                  <th className="px-4 py-2 text-right font-medium text-destructive">{t("Saídas")}</th>
+                  <th className="px-4 py-2 text-right font-medium text-destructive">{t("Saidas")}</th>
                   <th className="px-4 py-2 text-right font-medium">{t("Saldo Acumulado")}</th>
                 </tr>
               </thead>
@@ -247,14 +333,14 @@ export function FinanceReports({ transactions }: { transactions: Transaction[] }
                 </tr>
                 {fluxoCaixa.map(d => (
                   <tr key={d.date} className="border-b border-border/20 hover:bg-secondary/30">
-                    <td className="px-4 py-2 text-xs tabular-nums">{new Date(d.date + "T00:00:00").toLocaleDateString("pt-BR")}</td>
+                    <td className="px-4 py-2 text-xs tabular-nums">{d.date}</td>
                     <td className="px-4 py-2 text-right text-xs tabular-nums text-success">{d.entradas > 0 ? formatCurrency(d.entradas) : "-"}</td>
                     <td className="px-4 py-2 text-right text-xs tabular-nums text-destructive">{d.saidas > 0 ? formatCurrency(d.saidas) : "-"}</td>
                     <td className={`px-4 py-2 text-right text-xs font-medium tabular-nums ${d.saldo >= 0 ? "text-success" : "text-destructive"}`}>{formatCurrency(d.saldo)}</td>
                   </tr>
                 ))}
                 {fluxoCaixa.length === 0 && (
-                  <tr><td colSpan={4} className="text-center py-8 text-sm text-muted-foreground">{t("Nenhuma movimentação encontrada.")}</td></tr>
+                  <tr><td colSpan={4} className="text-center py-8 text-sm text-muted-foreground">{t("Nenhuma movimentacao encontrada.")}</td></tr>
                 )}
               </tbody>
             </table>

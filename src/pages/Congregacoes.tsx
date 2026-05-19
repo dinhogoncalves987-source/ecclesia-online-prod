@@ -60,10 +60,9 @@ export default function Congregacoes() {
     && (isMatriz || activeOrgTypeResolved);
 
   const pageTitle = (): string => {
-    if (isConvencaoContext) return "Matrizes Municipais";
-    if (isMatriz) return "Setores";
-    if (isSetorContext) return "Congregações";
-    return "Congregações";
+    if (isConvencaoContext) return t("Matrizes Municipais");
+    if (isMatriz) return t("Setores");
+    return t("Congregações");
   };
 
   useEffect(() => {
@@ -245,7 +244,7 @@ export default function Congregacoes() {
       if (error) {
         toast({ title: t("Erro ao atualizar"), description: error.message, variant: "destructive" });
       } else {
-        toast({ title: "Dados da unidade atualizados." });
+        toast({ title: t("Dados da unidade atualizados.") });
       }
     } else {
       const orgType = insertOrganizationType();
@@ -265,10 +264,10 @@ export default function Congregacoes() {
         toast({ title: t("Erro ao criar congregação"), description: error.message, variant: "destructive" });
       } else {
         const createdTitle =
-          orgType === "setor" ? "Setor criado." : orgType === "matriz" ? "Matriz municipal criada." : "Congregação criada.";
+          orgType === "setor" ? t("Setor criado.") : orgType === "matriz" ? t("Matriz municipal criada.") : t("Congregação criada.");
         toast({
           title: createdTitle,
-          description: "A unidade permanece no sistema; responsáveis serão definidos em outro fluxo.",
+          description: t("A unidade permanece no sistema; responsáveis serão definidos em outro fluxo."),
         });
       }
     }
@@ -296,7 +295,7 @@ export default function Congregacoes() {
     if (error) {
       toast({ title: t("Erro ao excluir"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Unidade excluída." });
+      toast({ title: t("Unidade excluída.") });
       void loadChildOrganizations();
     }
   };
@@ -306,57 +305,50 @@ export default function Congregacoes() {
     navigator.clipboard.writeText(url);
     toast({
       title: t("Link copiado!"),
-      description:
-        "Link de cadastro nesta unidade. Membros e convites não substituem a definição de gestores no sistema.",
+      description: t("Link de cadastro nesta unidade. Membros e convites não substituem a definição de gestores no sistema."),
     });
   };
 
   const typeBadgeLabel = (orgType: string) => {
-    if (orgType === "convencao") return "Convenção / Regional";
-    if (orgType === "matriz") return "Matriz municipal";
-    if (orgType === "setor") return "Setor";
+    if (orgType === "convencao") return t("Convenção / Regional");
+    if (orgType === "matriz") return t("Matriz municipal");
+    if (orgType === "setor") return t("Setor");
     if (orgType === "congregacao") return t("Congregação");
     return orgType;
   };
 
   const pageSubtitle = () => {
-    if (isConvencaoContext) {
-      return "Cadastre matrizes municipais vinculadas a esta convenção ou regional. Unidades são permanentes; responsáveis serão atribuídos separadamente da estrutura.";
-    }
-    if (isMatriz) {
-      return "Cadastre setores vinculados a esta matriz. Unidades são permanentes; pastores, supervisores e tesoureiros podem mudar sem recriar a unidade.";
-    }
-    if (isSetorContext) {
-      return "Cadastre congregações vinculadas a este setor. Unidades são permanentes; responsáveis serão atribuídos separadamente da estrutura.";
-    }
-    return "Esta congregação não cria novas unidades. Membros, tesouraria e histórico permanecem na unidade quando os responsáveis mudam.";
+    if (isConvencaoContext) return t("Cadastre matrizes municipais vinculadas a esta convenção ou regional. Unidades são permanentes; responsáveis serão atribuídos separadamente da estrutura.");
+    if (isMatriz) return t("Cadastre setores vinculados a esta matriz. Unidades são permanentes; pastores, supervisores e tesoureiros podem mudar sem recriar a unidade.");
+    if (isSetorContext) return t("Cadastre congregações vinculadas a este setor. Unidades são permanentes; responsáveis serão atribuídos separadamente da estrutura.");
+    return t("Esta congregação não cria novas unidades. Membros, tesouraria e histórico permanecem na unidade quando os responsáveis mudam.");
   };
 
   const emptyListMessage = () => {
-    if (isConvencaoContext) return "Nenhuma matriz municipal cadastrada.";
-    if (isMatriz) return "Nenhum setor cadastrado.";
+    if (isConvencaoContext) return t("Nenhuma matriz municipal cadastrada.");
+    if (isMatriz) return t("Nenhum setor cadastrado.");
     if (isSetorContext) return t("Nenhuma congregação cadastrada");
-    return "Não há unidades filhas neste nível.";
+    return t("Não há unidades filhas neste nível.");
   };
 
   const newUnitButtonLabel = () => {
-    if (isConvencaoContext) return "Nova matriz municipal";
-    if (isMatriz) return "Novo setor";
-    return "Nova congregação";
+    if (isConvencaoContext) return t("Nova matriz municipal");
+    if (isMatriz) return t("Novo setor");
+    return t("Nova congregação");
   };
 
   const formTitle = () => {
-    if (editingId) return "Editar unidade";
-    if (isConvencaoContext) return "Nova matriz municipal";
-    if (isMatriz) return "Novo setor";
-    return "Nova congregação";
+    if (editingId) return t("Editar unidade");
+    if (isConvencaoContext) return t("Nova matriz municipal");
+    if (isMatriz) return t("Novo setor");
+    return t("Nova congregação");
   };
 
   const primarySaveLabel = () => {
     if (editingId) return t("Salvar Alterações");
-    if (isConvencaoContext) return "Criar matriz municipal";
-    if (isMatriz) return "Criar setor";
-    return "Criar congregação";
+    if (isConvencaoContext) return t("Criar matriz municipal");
+    if (isMatriz) return t("Criar setor");
+    return t("Criar congregação");
   };
 
   if (!roleLoading && !isAdmin) {
@@ -393,15 +385,14 @@ export default function Congregacoes() {
           <div className="bg-card rounded-xl shadow-executive p-5 space-y-4">
             <h2 className="font-medium text-sm">{formTitle()}</h2>
             <p className="text-xs text-muted-foreground">
-              Os dados abaixo identificam a unidade (nome e contatos institucionais). Gestores e histórico de gestão não
-              são alterados ao editar este cadastro.
+              {t("Os dados abaixo identificam a unidade (nome e contatos institucionais). Gestores e histórico de gestão não são alterados ao editar este cadastro.")}
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder={
-                  isConvencaoContext ? "Nome da matriz municipal *" : isMatriz ? "Nome do setor *" : "Nome da congregação *"
+                  isConvencaoContext ? t("Nome da matriz municipal *") : isMatriz ? t("Nome do setor *") : t("Nome da congregação *")
                 }
                 className="px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
               />

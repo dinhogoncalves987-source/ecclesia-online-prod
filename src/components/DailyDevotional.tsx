@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { BookOpen, RefreshCw, Sparkles, Sun, CloudSun, Moon, Share2, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
+import { supabase } from "@/integrations/supabase/client";
 import { motion } from "framer-motion";
 
 interface Devotional {
@@ -42,9 +43,10 @@ function getCurrentPeriod(): Period {
 }
 
 export function DailyDevotional() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [devotional, setDevotional] = useState<Devotional | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [activePeriod, setActivePeriod] = useState<Period>(getCurrentPeriod);
   const [copied, setCopied] = useState(false);
 
@@ -61,7 +63,9 @@ export function DailyDevotional() {
     if (navigator.share) {
       try {
         await navigator.share({ text });
-      } catch {}
+      } catch {
+        return;
+      }
     } else {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -79,19 +83,27 @@ export function DailyDevotional() {
 
   const fetchDevotional = async (period: Period) => {
     setLoading(true);
+    setError(false);
+    setDevotional(null);
     try {
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/daily-devotional?period=${period}`;
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const locale = lang === "en" ? "en" : lang === "es" ? "es" : "pt";
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/daily-devotional?period=${period}&locale=${locale}`;
       const resp = await fetch(url, {
         headers: {
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       });
-      if (!resp.ok) throw new Error("Failed to fetch devotional");
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const result = await resp.json();
+      if (result.error) throw new Error(result.error);
       setDevotional(result as Devotional);
     } catch (e) {
       console.error("Error fetching devotional:", e);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -99,7 +111,8 @@ export function DailyDevotional() {
 
   useEffect(() => {
     fetchDevotional(activePeriod);
-  }, [activePeriod]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePeriod, lang]);
 
   const config = PERIOD_CONFIG[activePeriod];
   const PeriodIcon = config.icon;
@@ -161,6 +174,16 @@ export function DailyDevotional() {
             <div className="h-4 w-full bg-primary/10 rounded" />
             <div className="h-4 w-3/4 bg-primary/10 rounded" />
             <div className="h-3 w-1/4 bg-primary/10 rounded mt-1" />
+          </div>
+        ) : error ? (
+          <div className="flex items-center gap-3 py-2">
+            <p className="text-xs text-muted-foreground flex-1">{t("Não foi possível carregar o devocional.")}</p>
+            <button
+              onClick={() => fetchDevotional(activePeriod)}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-secondary/50 hover:bg-secondary text-xs font-medium transition-colors"
+            >
+              <RefreshCw size={11} /> {t("Tentar novamente")}
+            </button>
           </div>
         ) : devotional ? (
           <>

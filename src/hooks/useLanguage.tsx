@@ -901,6 +901,15 @@ const translations: Record<string, Record<Lang, string>> = {
   "Escopo": { pt: "Escopo", en: "Scope", es: "Alcance" },
   "Global (todas as organizações)": { pt: "Global (todas as organizações)", en: "Global (all organizations)", es: "Global (todas las organizaciones)" },
   "Membros (interno)": { pt: "Membros (interno)", en: "Members (internal)", es: "Miembros (interno)" },
+
+  // Bible assistant error messages
+  "Sem resposta da IA. Tente novamente.": { pt: "Sem resposta da IA. Tente novamente.", en: "No response from AI. Please try again.", es: "Sin respuesta de la IA. Inténtalo de nuevo." },
+  "Falha ao consultar a IA": { pt: "Falha ao consultar a IA", en: "Failed to connect to AI", es: "Error al conectar con la IA" },
+  "Erro ao conectar com o assistente": { pt: "Erro ao conectar com o assistente", en: "Error connecting to the assistant", es: "Error al conectar con el asistente" },
+  "Não foi possível carregar o devocional.": { pt: "Não foi possível carregar o devocional.", en: "Could not load the devotional.", es: "No se pudo cargar el devocional." },
+
+  // Dashboard onboarding / no-church state
+  "Bem-vindo ao Ecclesia Admin": { pt: "Bem-vindo ao Ecclesia Admin", en: "Welcome to Ecclesia Admin", es: "Bienvenido a Ecclesia Admin" },
 };
 
 

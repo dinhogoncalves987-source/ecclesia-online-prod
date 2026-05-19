@@ -10,95 +10,648 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.4"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
-      announcements: {
+      // ??? Staging-generated tables ?????????????????????????????????????????
+      documents: {
         Row: {
-          church_id: string | null
-          content: string
+          content: string | null
           created_at: string
+          created_by: string | null
+          document_type: string
+          file_url: string | null
           id: string
-          priority: string
+          organization_id: string
           title: string
-          user_id: string
+          updated_at: string
         }
         Insert: {
-          church_id?: string | null
-          content: string
+          content?: string | null
           created_at?: string
+          created_by?: string | null
+          document_type?: string
+          file_url?: string | null
           id?: string
-          priority?: string
+          organization_id: string
           title: string
-          user_id: string
+          updated_at?: string
         }
         Update: {
-          church_id?: string | null
-          content?: string
+          content?: string | null
           created_at?: string
+          created_by?: string | null
+          document_type?: string
+          file_url?: string | null
           id?: string
-          priority?: string
+          organization_id?: string
           title?: string
-          user_id?: string
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "announcements_church_id_fkey"
-            columns: ["church_id"]
+            foreignKeyName: "documents_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "churches"
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
       }
+      finance_account_categories: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_system: boolean
+          name: string
+          organization_id: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          name: string
+          organization_id: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          name?: string
+          organization_id?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_account_categories_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_accounts: {
+        Row: {
+          created_at: string
+          current_balance: number
+          id: string
+          is_active: boolean
+          name: string
+          opening_balance: number
+          organization_id: string
+          pix_key: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_balance?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          opening_balance?: number
+          organization_id: string
+          pix_key?: string | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_balance?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          opening_balance?: number
+          organization_id?: string
+          pix_key?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_accounts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_cost_centers: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          organization_id: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          organization_id: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          organization_id?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_cost_centers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_monthly_closings: {
+        Row: {
+          closed_at: string
+          closed_by: string | null
+          id: string
+          month: string
+          notes: string | null
+          organization_id: string
+        }
+        Insert: {
+          closed_at?: string
+          closed_by?: string | null
+          id?: string
+          month: string
+          notes?: string | null
+          organization_id: string
+        }
+        Update: {
+          closed_at?: string
+          closed_by?: string | null
+          id?: string
+          month?: string
+          notes?: string | null
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_monthly_closings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_transaction_audit_logs: {
+        Row: {
+          action: string
+          changed_at: string
+          changed_by: string | null
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          organization_id: string
+          transaction_id: string | null
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          organization_id: string
+          transaction_id?: string | null
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          organization_id?: string
+          transaction_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_transaction_audit_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_transaction_audit_logs_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_users: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          organization_id: string
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          organization_id: string
+          role?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          organization_id?: string
+          role?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_users_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          active: boolean
+          city: string | null
+          country_code: string | null
+          created_at: string
+          email: string | null
+          id: string
+          language_code: string | null
+          logo_url: string | null
+          name: string
+          organization_type: string
+          parent_id: string | null
+          phone: string | null
+          slug: string | null
+          state: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          city?: string | null
+          country_code?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          language_code?: string | null
+          logo_url?: string | null
+          name: string
+          organization_type?: string
+          parent_id?: string | null
+          phone?: string | null
+          slug?: string | null
+          state?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          city?: string | null
+          country_code?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          language_code?: string | null
+          logo_url?: string | null
+          name?: string
+          organization_type?: string
+          parent_id?: string | null
+          phone?: string | null
+          slug?: string | null
+          state?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organizations_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          phone: string | null
+          platform_role: string | null
+          role_title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          platform_role?: string | null
+          role_title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          platform_role?: string | null
+          role_title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      schedules: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          ministry: string | null
+          notes: string | null
+          organization_id: string
+          schedule_date: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          ministry?: string | null
+          notes?: string | null
+          organization_id: string
+          schedule_date?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          ministry?: string | null
+          notes?: string | null
+          organization_id?: string
+          schedule_date?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transactions: {
+        Row: {
+          account_category_id: string | null
+          amount: number
+          category: string
+          cost_center_id: string | null
+          created_at: string
+          created_by: string | null
+          date: string
+          description: string
+          financial_account_id: string | null
+          id: string
+          notes: string | null
+          organization_id: string
+          payment_method: string | null
+          receipt_url: string | null
+          responsible_id: string | null
+          status: string
+          type: string
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+        }
+        Insert: {
+          account_category_id?: string | null
+          amount: number
+          category: string
+          cost_center_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          description: string
+          financial_account_id?: string | null
+          id?: string
+          notes?: string | null
+          organization_id: string
+          payment_method?: string | null
+          receipt_url?: string | null
+          responsible_id?: string | null
+          status?: string
+          type: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+        }
+        Update: {
+          account_category_id?: string | null
+          amount?: number
+          category?: string
+          cost_center_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          description?: string
+          financial_account_id?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          payment_method?: string | null
+          receipt_url?: string | null
+          responsible_id?: string | null
+          status?: string
+          type?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_account_category_id_fkey"
+            columns: ["account_category_id"]
+            isOneToOne: false
+            referencedRelation: "finance_account_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_cost_center_id_fkey"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "finance_cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_financial_account_id_fkey"
+            columns: ["financial_account_id"]
+            isOneToOne: false
+            referencedRelation: "finance_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          organization_id: string | null
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          organization_id?: string | null
+          role: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          organization_id?: string | null
+          role?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      // ??? Tables used by codebase (not yet in staging schema) ???????????????
       assemblies: {
         Row: {
           assembly_date: string
-          church_id: string
-          created_at: string
+          created_at: string | null
+          created_by: string | null
           description: string | null
+          ends_at: string | null
           id: string
-          is_visible: boolean
-          period: string | null
+          is_visible: boolean | null
+          organization_id: string
+          starts_at: string | null
           title: string
-          updated_at: string
-          user_id: string
+          updated_at: string | null
           youtube_url: string | null
         }
         Insert: {
           assembly_date?: string
-          church_id: string
-          created_at?: string
+          created_at?: string | null
+          created_by?: string | null
           description?: string | null
+          ends_at?: string | null
           id?: string
-          is_visible?: boolean
-          period?: string | null
+          is_visible?: boolean | null
+          organization_id: string
+          starts_at?: string | null
           title: string
-          updated_at?: string
-          user_id: string
+          updated_at?: string | null
           youtube_url?: string | null
         }
         Update: {
           assembly_date?: string
-          church_id?: string
-          created_at?: string
+          created_at?: string | null
+          created_by?: string | null
           description?: string | null
+          ends_at?: string | null
           id?: string
-          is_visible?: boolean
-          period?: string | null
+          is_visible?: boolean | null
+          organization_id?: string
+          starts_at?: string | null
           title?: string
-          updated_at?: string
-          user_id?: string
+          updated_at?: string | null
           youtube_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "assemblies_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       assembly_attachments: {
         Row: {
           assembly_id: string
-          attachment_type: string
-          created_at: string
+          attachment_type: string | null
+          created_at: string | null
           file_type: string | null
           file_url: string | null
           id: string
@@ -107,8 +660,8 @@ export type Database = {
         }
         Insert: {
           assembly_id: string
-          attachment_type?: string
-          created_at?: string
+          attachment_type?: string | null
+          created_at?: string | null
           file_type?: string | null
           file_url?: string | null
           id?: string
@@ -117,8 +670,8 @@ export type Database = {
         }
         Update: {
           assembly_id?: string
-          attachment_type?: string
-          created_at?: string
+          attachment_type?: string | null
+          created_at?: string | null
           file_type?: string | null
           file_url?: string | null
           id?: string
@@ -135,566 +688,594 @@ export type Database = {
           },
         ]
       }
-      churches: {
+      communications: {
         Row: {
-          address: string | null
-          city: string | null
-          created_at: string
-          email: string | null
-          hierarchy_level: string | null
+          communication_type: string | null
+          content: string
+          created_at: string | null
+          created_by: string | null
           id: string
-          is_matriz: boolean
-          logo_url: string | null
-          name: string
-          parent_church_id: string | null
-          pastor_name: string | null
-          phone: string | null
-          primary_color: string | null
-          slug: string
-          state: string | null
-          updated_at: string
+          is_public: boolean | null
+          organization_id: string
+          published_at: string | null
+          target_role: string | null
+          title: string
+          updated_at: string | null
         }
         Insert: {
-          address?: string | null
-          city?: string | null
-          created_at?: string
-          email?: string | null
-          hierarchy_level?: string | null
+          communication_type?: string | null
+          content: string
+          created_at?: string | null
+          created_by?: string | null
           id?: string
-          is_matriz?: boolean
-          logo_url?: string | null
-          name: string
-          parent_church_id?: string | null
-          pastor_name?: string | null
-          phone?: string | null
-          primary_color?: string | null
-          slug: string
-          state?: string | null
-          updated_at?: string
+          is_public?: boolean | null
+          organization_id: string
+          published_at?: string | null
+          target_role?: string | null
+          title: string
+          updated_at?: string | null
         }
         Update: {
-          address?: string | null
-          city?: string | null
-          created_at?: string
-          email?: string | null
-          hierarchy_level?: string | null
+          communication_type?: string | null
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
           id?: string
-          is_matriz?: boolean
-          logo_url?: string | null
-          name?: string
-          parent_church_id?: string | null
-          pastor_name?: string | null
-          phone?: string | null
-          primary_color?: string | null
-          slug?: string
-          state?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "churches_parent_church_id_fkey"
-            columns: ["parent_church_id"]
-            isOneToOne: false
-            referencedRelation: "churches"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      documents: {
-        Row: {
-          category: string
-          church_id: string | null
-          created_at: string
-          description: string | null
-          file_type: string | null
-          file_url: string | null
-          id: string
-          title: string
-          user_id: string
-        }
-        Insert: {
-          category?: string
-          church_id?: string | null
-          created_at?: string
-          description?: string | null
-          file_type?: string | null
-          file_url?: string | null
-          id?: string
-          title: string
-          user_id: string
-        }
-        Update: {
-          category?: string
-          church_id?: string | null
-          created_at?: string
-          description?: string | null
-          file_type?: string | null
-          file_url?: string | null
-          id?: string
+          is_public?: boolean | null
+          organization_id?: string
+          published_at?: string | null
+          target_role?: string | null
           title?: string
-          user_id?: string
+          updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "documents_church_id_fkey"
-            columns: ["church_id"]
+            foreignKeyName: "communications_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "churches"
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
       }
       events: {
         Row: {
-          church_id: string | null
-          color: string | null
-          created_at: string
-          event_date: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          ends_at: string | null
+          event_type: string | null
           id: string
+          is_public: boolean | null
           location: string | null
-          time: string | null
+          organization_id: string
+          starts_at: string
           title: string
-          user_id: string
+          updated_at: string | null
         }
         Insert: {
-          church_id?: string | null
-          color?: string | null
-          created_at?: string
-          event_date: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          ends_at?: string | null
+          event_type?: string | null
           id?: string
+          is_public?: boolean | null
           location?: string | null
-          time?: string | null
+          organization_id: string
+          starts_at: string
           title: string
-          user_id: string
+          updated_at?: string | null
         }
         Update: {
-          church_id?: string | null
-          color?: string | null
-          created_at?: string
-          event_date?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          ends_at?: string | null
+          event_type?: string | null
           id?: string
+          is_public?: boolean | null
           location?: string | null
-          time?: string | null
+          organization_id?: string
+          starts_at?: string
           title?: string
-          user_id?: string
+          updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "events_church_id_fkey"
-            columns: ["church_id"]
+            foreignKeyName: "events_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "churches"
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_members: {
+        Row: {
+          created_at: string | null
+          group_id: string
+          id: string
+          joined_at: string | null
+          member_id: string
+          role: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          group_id: string
+          id?: string
+          joined_at?: string | null
+          member_id: string
+          role?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          group_id?: string
+          id?: string
+          joined_at?: string | null
+          member_id?: string
+          role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      groups: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          group_type: string | null
+          id: string
+          is_active: boolean | null
+          leader_member_id: string | null
+          location: string | null
+          meeting_day: string | null
+          meeting_time: string | null
+          name: string
+          organization_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          group_type?: string | null
+          id?: string
+          is_active?: boolean | null
+          leader_member_id?: string | null
+          location?: string | null
+          meeting_day?: string | null
+          meeting_time?: string | null
+          name: string
+          organization_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          group_type?: string | null
+          id?: string
+          is_active?: boolean | null
+          leader_member_id?: string | null
+          location?: string | null
+          meeting_day?: string | null
+          meeting_time?: string | null
+          name?: string
+          organization_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "groups_leader_member_id_fkey"
+            columns: ["leader_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "groups_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_history: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          history_type: string
+          id: string
+          member_id: string
+          organization_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          history_type: string
+          id?: string
+          member_id: string
+          organization_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          history_type?: string
+          id?: string
+          member_id?: string
+          organization_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_history_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
       }
       members: {
         Row: {
-          church_id: string | null
-          created_at: string
+          address: string | null
+          baptized_at: string | null
+          birth_date: string | null
+          city: string | null
+          country_code: string | null
+          created_at: string | null
+          created_by: string | null
           email: string | null
+          full_name: string
           id: string
-          name: string
+          joined_at: string | null
+          member_role: string | null
+          notes: string | null
+          organization_id: string
           phone: string | null
-          role: string | null
-          since: string | null
+          state: string | null
           status: string
-          updated_at: string
-          user_id: string
+          updated_at: string | null
         }
         Insert: {
-          church_id?: string | null
-          created_at?: string
+          address?: string | null
+          baptized_at?: string | null
+          birth_date?: string | null
+          city?: string | null
+          country_code?: string | null
+          created_at?: string | null
+          created_by?: string | null
           email?: string | null
+          full_name: string
           id?: string
-          name: string
+          joined_at?: string | null
+          member_role?: string | null
+          notes?: string | null
+          organization_id: string
           phone?: string | null
-          role?: string | null
-          since?: string | null
+          state?: string | null
           status?: string
-          updated_at?: string
-          user_id: string
+          updated_at?: string | null
         }
         Update: {
-          church_id?: string | null
-          created_at?: string
+          address?: string | null
+          baptized_at?: string | null
+          birth_date?: string | null
+          city?: string | null
+          country_code?: string | null
+          created_at?: string | null
+          created_by?: string | null
           email?: string | null
+          full_name?: string
           id?: string
-          name?: string
+          joined_at?: string | null
+          member_role?: string | null
+          notes?: string | null
+          organization_id?: string
           phone?: string | null
-          role?: string | null
-          since?: string | null
+          state?: string | null
           status?: string
-          updated_at?: string
-          user_id?: string
+          updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "members_church_id_fkey"
-            columns: ["church_id"]
+            foreignKeyName: "members_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "churches"
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
       }
-      platform_notices: {
+      platform_announcements: {
         Row: {
-          content: string
+          button_label: string | null
+          button_link: string | null
           created_at: string
+          created_by: string | null
+          ends_at: string | null
+          full_content: string
           id: string
+          image_url: string | null
           is_active: boolean
-          priority: string
+          organization_id: string | null
+          short_description: string
+          starts_at: string | null
+          target_type: string
           title: string
-          user_id: string
+          updated_at: string
         }
         Insert: {
-          content: string
+          button_label?: string | null
+          button_link?: string | null
           created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          full_content: string
           id?: string
+          image_url?: string | null
           is_active?: boolean
-          priority?: string
+          organization_id?: string | null
+          short_description: string
+          starts_at?: string | null
+          target_type?: string
           title: string
-          user_id: string
+          updated_at?: string
         }
         Update: {
-          content?: string
+          button_label?: string | null
+          button_link?: string | null
           created_at?: string
+          created_by?: string | null
+          ends_at?: string | null
+          full_content?: string
           id?: string
+          image_url?: string | null
           is_active?: boolean
-          priority?: string
+          organization_id?: string | null
+          short_description?: string
+          starts_at?: string | null
+          target_type?: string
           title?: string
-          user_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      platform_campaign_media: {
+        Row: {
+          campaign_id: string
+          created_at: string | null
+          id: string
+          media_type: string
+          url: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string | null
+          id?: string
+          media_type: string
+          url: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string | null
+          id?: string
+          media_type?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_campaign_media_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "platform_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_campaigns: {
+        Row: {
+          body: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          subtitle: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          subtitle?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          body?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          subtitle?: string | null
+          title?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
       prayer_requests: {
         Row: {
-          church_id: string | null
           created_at: string
+          created_by: string | null
           description: string | null
           id: string
-          is_anonymous: boolean
-          praying_count: number
-          status: string
+          is_private: boolean | null
+          organization_id: string
+          status: string | null
           title: string
-          user_id: string
+          updated_at: string | null
+          user_id: string | null
         }
         Insert: {
-          church_id?: string | null
           created_at?: string
+          created_by?: string | null
           description?: string | null
           id?: string
-          is_anonymous?: boolean
-          praying_count?: number
-          status?: string
+          is_private?: boolean | null
+          organization_id: string
+          status?: string | null
           title: string
-          user_id: string
+          updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
-          church_id?: string | null
           created_at?: string
+          created_by?: string | null
           description?: string | null
           id?: string
-          is_anonymous?: boolean
-          praying_count?: number
-          status?: string
+          is_private?: boolean | null
+          organization_id?: string
+          status?: string | null
           title?: string
-          user_id?: string
+          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "prayer_requests_church_id_fkey"
-            columns: ["church_id"]
+            foreignKeyName: "prayer_requests_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "churches"
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
       }
-      profiles: {
+      signatures: {
         Row: {
-          avatar_url: string | null
-          church_id: string | null
-          created_at: string
-          full_name: string | null
+          created_at: string | null
+          document_id: string
           id: string
-          phone: string | null
-          role_title: string | null
-          updated_at: string
-          user_id: string
+          signature_data: string | null
+          signed_at: string | null
+          signer_id: string
         }
         Insert: {
-          avatar_url?: string | null
-          church_id?: string | null
-          created_at?: string
-          full_name?: string | null
+          created_at?: string | null
+          document_id: string
           id?: string
-          phone?: string | null
-          role_title?: string | null
-          updated_at?: string
-          user_id: string
+          signature_data?: string | null
+          signed_at?: string | null
+          signer_id: string
         }
         Update: {
-          avatar_url?: string | null
-          church_id?: string | null
-          created_at?: string
-          full_name?: string | null
+          created_at?: string | null
+          document_id?: string
           id?: string
-          phone?: string | null
-          role_title?: string | null
-          updated_at?: string
-          user_id?: string
+          signature_data?: string | null
+          signed_at?: string | null
+          signer_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "profiles_church_id_fkey"
-            columns: ["church_id"]
+            foreignKeyName: "signatures_document_id_fkey"
+            columns: ["document_id"]
             isOneToOne: false
-            referencedRelation: "churches"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      schedules: {
-        Row: {
-          assigned_to: string | null
-          church_id: string | null
-          created_at: string
-          id: string
-          ministry: string
-          notes: string | null
-          schedule_date: string
-          status: string
-          title: string
-          user_id: string
-        }
-        Insert: {
-          assigned_to?: string | null
-          church_id?: string | null
-          created_at?: string
-          id?: string
-          ministry?: string
-          notes?: string | null
-          schedule_date: string
-          status?: string
-          title: string
-          user_id: string
-        }
-        Update: {
-          assigned_to?: string | null
-          church_id?: string | null
-          created_at?: string
-          id?: string
-          ministry?: string
-          notes?: string | null
-          schedule_date?: string
-          status?: string
-          title?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "schedules_church_id_fkey"
-            columns: ["church_id"]
-            isOneToOne: false
-            referencedRelation: "churches"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      small_groups: {
-        Row: {
-          church_id: string | null
-          created_at: string
-          current_members: number
-          description: string | null
-          id: string
-          leader: string
-          location: string | null
-          max_members: number
-          meeting_day: string | null
-          meeting_time: string | null
-          name: string
-          status: string
-          user_id: string
-        }
-        Insert: {
-          church_id?: string | null
-          created_at?: string
-          current_members?: number
-          description?: string | null
-          id?: string
-          leader: string
-          location?: string | null
-          max_members?: number
-          meeting_day?: string | null
-          meeting_time?: string | null
-          name: string
-          status?: string
-          user_id: string
-        }
-        Update: {
-          church_id?: string | null
-          created_at?: string
-          current_members?: number
-          description?: string | null
-          id?: string
-          leader?: string
-          location?: string | null
-          max_members?: number
-          meeting_day?: string | null
-          meeting_time?: string | null
-          name?: string
-          status?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "small_groups_church_id_fkey"
-            columns: ["church_id"]
-            isOneToOne: false
-            referencedRelation: "churches"
+            referencedRelation: "documents"
             referencedColumns: ["id"]
           },
         ]
       }
       super_admins: {
         Row: {
-          created_at: string
+          created_at: string | null
           id: string
-          notes: string | null
           user_id: string
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           id?: string
-          notes?: string | null
           user_id: string
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           id?: string
-          notes?: string | null
           user_id?: string
         }
         Relationships: []
-      }
-      transactions: {
-        Row: {
-          amount: number
-          category: string | null
-          church_id: string | null
-          created_at: string
-          date: string
-          description: string
-          id: string
-          status: string
-          type: string
-          user_id: string
-        }
-        Insert: {
-          amount?: number
-          category?: string | null
-          church_id?: string | null
-          created_at?: string
-          date?: string
-          description: string
-          id?: string
-          status?: string
-          type: string
-          user_id: string
-        }
-        Update: {
-          amount?: number
-          category?: string | null
-          church_id?: string | null
-          created_at?: string
-          date?: string
-          description?: string
-          id?: string
-          status?: string
-          type?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "transactions_church_id_fkey"
-            columns: ["church_id"]
-            isOneToOne: false
-            referencedRelation: "churches"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      user_roles: {
-        Row: {
-          church_id: string | null
-          created_at: string
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          church_id?: string | null
-          created_at?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          church_id?: string | null
-          created_at?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_roles_church_id_fkey"
-            columns: ["church_id"]
-            isOneToOne: false
-            referencedRelation: "churches"
-            referencedColumns: ["id"]
-          },
-        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      can_view_church_data: {
-        Args: { _church_id: string; _user_id: string }
+      has_org_finance_role: {
+        Args: { _organization_id: string; _roles: string[]; _user_id: string }
         Returns: boolean
       }
-      get_user_church_id: { Args: { _user_id: string }; Returns: string }
-      get_user_role: {
+      has_org_role: {
+        Args: { _organization_id: string; _roles: string[]; _user_id: string }
+        Returns: boolean
+      }
+      is_finance_month_closed: {
+        Args: { _date: string; _organization_id: string }
+        Returns: boolean
+      }
+      is_org_finance_reader: {
+        Args: { _organization_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_org_finance_writer: {
+        Args: { _organization_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_org_user: {
+        Args: { _organization_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_platform_finance_admin: {
         Args: { _user_id: string }
-        Returns: Database["public"]["Enums"]["app_role"]
-      }
-      get_visible_church_ids: { Args: { _user_id: string }; Returns: string[] }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
         Returns: boolean
       }
-      is_matriz_admin: {
-        Args: { _church_id: string; _user_id: string }
+      is_valid_organization_hierarchy: {
+        Args: { _child_type: string; _parent_type: string }
         Returns: boolean
       }
-      is_superadmin: { Args: { _user_id: string }; Returns: boolean }
+      join_organization_by_slug: { Args: { _slug: string }; Returns: Json }
     }
     Enums: {
-      app_role:
-        | "admin"
-        | "tesoureiro"
-        | "obreiro"
-        | "lider"
-        | "membro"
-        | "superadmin"
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
@@ -821,15 +1402,6 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {
-      app_role: [
-        "admin",
-        "tesoureiro",
-        "obreiro",
-        "lider",
-        "membro",
-        "superadmin",
-      ],
-    },
+    Enums: {},
   },
 } as const

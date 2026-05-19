@@ -84,7 +84,7 @@ export default function Grupos() {
             <h3 className="font-serif text-lg font-semibold text-foreground mb-1">{t("Nenhum grupo cadastrado")}</h3>
             <p className="text-sm text-muted-foreground max-w-xs mb-5">{t("Crie grupos de comunhão, estudo bíblico ou ministérios para organizar sua comunidade.")}</p>
             <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
-              <Plus size={16} /> {t("Criar Primeiro Grupo")}
+              <Plus size={16} />{t("Criar Primeiro Grupo")}
             </button>
           </div>
         ) : (

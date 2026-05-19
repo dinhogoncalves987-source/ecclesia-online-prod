@@ -1,8 +1,7 @@
 import { AdminLayout } from "@/components/AdminLayout";
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useChurch } from "@/hooks/useChurch";
+import { useChurch } from "@/hooks/useChurchContext";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 import { FinanceOverview } from "@/components/financeiro/FinanceOverview";
@@ -10,10 +9,8 @@ import { TransactionList } from "@/components/financeiro/TransactionList";
 import { FinanceReports } from "@/components/financeiro/FinanceReports";
 import { PixCard } from "@/components/financeiro/PixCard";
 import { BarChart3, List, FileText, CreditCard } from "lucide-react";
-
-type Transaction = {
-  id: string; date: string; description: string; type: string; amount: number; status: string; category: string;
-};
+import { runScopedOrganizationQuery } from "@/lib/organizationScope";
+import type { TreasuryTransaction } from "@/lib/finance";
 
 const TABS = [
   { key: "overview", icon: BarChart3, labelKey: "Visão Geral" },
@@ -28,7 +25,7 @@ export default function Financeiro() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const { church } = useChurch();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<TreasuryTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
 
@@ -36,17 +33,15 @@ export default function Financeiro() {
     if (!user || !church) { setLoading(false); return; }
     const load = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("*")
-        .eq("church_id", church.id)
-        .order("date", { ascending: false });
+      const { data, error } = await runScopedOrganizationQuery<TreasuryTransaction[]>("transactions", church.id, query =>
+        query.select("*").order("date", { ascending: false })
+      );
       if (error) { console.error(error); toast.error(t("Erro ao carregar transações")); }
       else setTransactions(data || []);
       setLoading(false);
     };
     load();
-  }, [user, church]);
+  }, [user, church, t]);
 
   return (
     <AdminLayout>

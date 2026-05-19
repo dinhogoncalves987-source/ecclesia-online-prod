@@ -3,14 +3,17 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff, BookOpen, Users, Wallet } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
 import { persistPendingChurchSlug, signupPathWithChurch } from "@/lib/organizationMembership";
+import flagBR from "@/assets/flag-br.png";
+import flagUS from "@/assets/flag-us.png";
+import flagES from "@/assets/flag-es.png";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, lang, setLang } = useLanguage();
   const [searchParams] = useSearchParams();
   const churchSlug = searchParams.get("church");
 
@@ -37,19 +40,50 @@ export default function Login() {
     setLoading(false);
   };
 
+  const FEATURES = [
+    { icon: BookOpen, label: lang === "en" ? "AI Bible Assistant" : lang === "es" ? "Asistente Bíblico IA" : "Assistente Bíblico IA" },
+    { icon: Users,    label: lang === "en" ? "Institutional Management" : lang === "es" ? "Gestión Institucional" : "Gestão Institucional" },
+    { icon: Wallet,   label: lang === "en" ? "Integrated Treasury" : lang === "es" ? "Tesorería Integrada" : "Tesouraria Integrada" },
+  ];
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      {/* Top bar */}
+      <div className="absolute top-4 left-4 flex items-center gap-1.5">
+        {([["pt", flagBR], ["en", flagUS], ["es", flagES]] as const).map(([l, flag]) => (
+          <button key={l} onClick={() => setLang(l)}
+            className={`w-7 h-5 rounded overflow-hidden transition-opacity ${lang === l ? "opacity-100 ring-2 ring-accent ring-offset-1 ring-offset-background" : "opacity-40 hover:opacity-70"}`}
+          >
+            <img src={flag} alt={l} className="w-full h-full object-cover" />
+          </button>
+        ))}
+      </div>
       <div className="absolute top-4 right-4"><ThemeToggle /></div>
 
       <div className="w-full max-w-md">
+        {/* Brand header */}
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center">
-              <span className="text-accent font-serif text-2xl">Ω</span>
+          <Link to="/" className="inline-flex flex-col items-center gap-3 mb-2">
+            <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center shadow-executive">
+              <span className="text-accent font-serif text-3xl">Ω</span>
+            </div>
+            <div>
+              <p className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">
+                {lang === "en" ? "Church Management Platform" : lang === "es" ? "Plataforma de Gestión Pastoral" : "Plataforma de Gestão Pastoral"}
+              </p>
             </div>
           </Link>
-          <h1 className="text-2xl font-serif tracking-tight">{t("Bem-vindo de volta")}</h1>
+          <h1 className="text-2xl font-serif tracking-tight mt-4">{t("Bem-vindo de volta")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{t("Entre com suas credenciais")}</p>
+
+          {/* Feature pills */}
+          <div className="flex items-center justify-center gap-3 mt-4 flex-wrap">
+            {FEATURES.map(({ icon: Icon, label }) => (
+              <span key={label} className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground bg-secondary/60 rounded-full px-2.5 py-1">
+                <Icon size={11} className="text-accent" /> {label}
+              </span>
+            ))}
+          </div>
         </div>
 
         <form onSubmit={handleLogin} className="bg-card rounded-xl shadow-executive p-6 space-y-4">

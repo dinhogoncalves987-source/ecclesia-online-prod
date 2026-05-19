@@ -48,7 +48,7 @@ export default function Perfil() {
       .upload(path, file, { upsert: true });
 
     if (uploadError) {
-      toast({ title: "Erro ao enviar foto", description: uploadError.message, variant: "destructive" });
+      toast({ title: t("Erro ao enviar foto"), description: uploadError.message, variant: "destructive" });
       setUploading(false);
       return;
     }
@@ -59,7 +59,7 @@ export default function Perfil() {
     await supabase.from("profiles").update({ avatar_url: url }).eq("user_id", user.id);
     setAvatarUrl(url);
     setUploading(false);
-    toast({ title: "Foto atualizada!" });
+    toast({ title: t("Foto atualizada!") });
   };
 
   const handleSave = async () => {
@@ -72,9 +72,9 @@ export default function Perfil() {
       .eq("user_id", user.id);
 
     if (error) {
-      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
+      toast({ title: t("Erro ao salvar"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Perfil atualizado com sucesso!" });
+      toast({ title: t("Perfil atualizado com sucesso!") });
     }
     setSaving(false);
   };
@@ -105,7 +105,7 @@ export default function Perfil() {
         <div className="bg-card rounded-xl shadow-executive p-6 flex flex-col items-center gap-4">
           <div className="relative">
             {avatarUrl ? (
-              <img src={avatarUrl} alt="Avatar" className="w-24 h-24 rounded-full object-cover border-4 border-accent/30" />
+              <img src={avatarUrl} alt={t("Avatar")} className="w-24 h-24 rounded-full object-cover border-4 border-accent/30" />
             ) : (
               <div className="w-24 h-24 rounded-full bg-accent/20 border-4 border-accent/30 flex items-center justify-center text-2xl font-bold text-accent">
                 {initials}
@@ -136,7 +136,7 @@ export default function Perfil() {
           </div>
 
           <div>
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">E-mail</label>
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("E-mail")}</label>
             <input
               type="email"
               value={user?.email || ""}

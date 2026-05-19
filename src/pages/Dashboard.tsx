@@ -72,7 +72,7 @@ const loadPlatformAnnouncements = async (nowIso: string): Promise<PlatformCampai
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { church, isMatriz } = useChurch();
   const { canonicalRole, isAdmin, isSuperAdmin, role } = useRole();
   const isMembro = canonicalRole === "member" || canonicalRole === "leader" || role === "membro" || role === "lider" || role === "obreiro";
@@ -140,7 +140,12 @@ export default function Dashboard() {
       );
       const eventsCount = (eventsThisMonthRes.data || []).length;
 
-      const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}`;
+      const dateLocale = lang === "en" ? "en-US" : lang === "es" ? "es-MX" : "pt-BR";
+      const fmt = (v: number) => {
+        if (lang === "en") return v.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+        if (lang === "es") return v.toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
+        return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+      };
 
       setMetrics([
         { title: t("Receita do Mês"), value: fmt(receita), trend: "", icon: Wallet, href: "/admin/financeiro" },
@@ -152,8 +157,8 @@ export default function Dashboard() {
       setUpcomingEvents((eventsRes.data || []).map(e => ({
         id: e.id,
         title: e.title,
-        date: new Date(e.starts_at).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "short" }),
-        time: new Date(e.starts_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+        date: new Date(e.starts_at).toLocaleDateString(dateLocale, { weekday: "long", day: "numeric", month: "short" }),
+        time: new Date(e.starts_at).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" }),
       })));
 
       setLoading(false);
@@ -171,8 +176,10 @@ export default function Dashboard() {
     return () => window.clearInterval(timer);
   }, [platformCampaigns.length]);
 
-  const formatAnnouncementDate = (date: string) =>
-    new Date(date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+  const formatAnnouncementDate = (date: string) => {
+    const locale = lang === "en" ? "en-US" : lang === "es" ? "es-MX" : "pt-BR";
+    return new Date(date).toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" });
+  };
 
   const getAnnouncementSummary = (announcement: PlatformCampaign) =>
     announcement.short_description || "";
@@ -442,12 +449,12 @@ export default function Dashboard() {
             { label: t("Membros"), desc: t("Cadastro e gestão de membros"), path: "/admin/membros", icon: Users },
             { label: t("Agenda"), desc: t("Calendário e eventos da igreja"), path: "/admin/agenda", icon: Calendar },
             ...(isAdmin ? [{
-              label: church?.organization_type === "convencao" ? "Matrizes"
-                : church?.organization_type === "matriz" ? "Setores"
-                : "Congregações",
-              desc: church?.organization_type === "convencao" ? "Gerenciar matrizes municipais"
-                : church?.organization_type === "matriz" ? "Gerenciar setores"
-                : "Gerenciar congregações",
+              label: church?.organization_type === "convencao" ? t("Matrizes")
+                : church?.organization_type === "matriz" ? t("Setores")
+                : t("Congregações"),
+              desc: church?.organization_type === "convencao" ? t("Gerenciar matrizes municipais")
+                : church?.organization_type === "matriz" ? t("Gerenciar setores")
+                : t("Gerenciar congregações"),
               path: "/admin/congregacoes",
               icon: Building2,
             }] : []),
@@ -484,11 +491,11 @@ export default function Dashboard() {
               {isSuperAdmin
                 ? t("Visão global da plataforma")
                 : church?.organization_type === "convencao"
-                  ? "Painel da Convenção / Regional"
+                  ? t("Painel da Convenção / Regional")
                   : church?.organization_type === "matriz"
-                    ? "Painel da Matriz Municipal"
+                    ? t("Painel da Matriz Municipal")
                     : church?.organization_type === "setor"
-                      ? "Painel do Setor"
+                      ? t("Painel do Setor")
                       : isMembro
                         ? t("Bem-vindo à sua igreja")
                         : t("Visão geral da administração")}
@@ -516,6 +523,39 @@ export default function Dashboard() {
           <div className="flex items-center justify-center py-12">
             <Loader2 size={24} className="animate-spin text-muted-foreground" />
           </div>
+        ) : !church && !isSuperAdmin ? (
+          /* No church assigned — welcome/onboarding state */
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-2xl border border-accent/20 bg-card shadow-executive p-8 text-center max-w-2xl mx-auto"
+          >
+            <div className="w-16 h-16 bg-accent/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <span className="text-accent font-serif text-3xl">Ω</span>
+            </div>
+            <h2 className="font-serif text-xl mb-2">{t("Bem-vindo ao Ecclesia Admin")}</h2>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">
+              {lang === "en"
+                ? "Your account is not linked to a church yet. Ask your administrator to send you an invitation link, or use an existing invite to join your organization."
+                : lang === "es"
+                  ? "Tu cuenta aún no está vinculada a una iglesia. Pide a tu administrador que te envíe un enlace de invitación o usa uno existente para unirte a tu organización."
+                  : "Sua conta ainda não está vinculada a uma igreja. Peça ao seu administrador que envie um link de convite, ou utilize um convite existente para ingressar na sua organização."}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-left mt-2">
+              {[
+                { icon: BookOpen, title: lang === "en" ? "AI Bible Assistant" : lang === "es" ? "Asistente Bíblico IA" : "Assistente Bíblico IA", desc: lang === "en" ? "Chat with a pastoral AI guide" : lang === "es" ? "Conversa con un guía pastoral IA" : "Converse com um guia pastoral IA", href: "/admin/biblia" },
+                { icon: Music,    title: lang === "en" ? "Digital Hymnal" : lang === "es" ? "Himnario Digital" : "Harpa Digital", desc: lang === "en" ? "Full digital hymnal" : lang === "es" ? "Himnario digital completo" : "Hinário digital completo", href: "/admin/hinario" },
+                { icon: Heart,    title: lang === "en" ? "Prayer Requests" : lang === "es" ? "Pedidos de Oración" : "Pedidos de Oração", desc: lang === "en" ? "Pray with your community" : lang === "es" ? "Ora con tu comunidad" : "Ore com sua comunidade", href: "/admin/oracoes" },
+              ].map(item => (
+                <Link key={item.href} to={item.href}
+                  className="p-4 rounded-xl bg-secondary/40 hover:bg-secondary/70 transition-colors flex flex-col gap-2">
+                  <item.icon size={18} className="text-accent" strokeWidth={1.5} />
+                  <p className="text-sm font-medium">{item.title}</p>
+                  <p className="text-xs text-muted-foreground">{item.desc}</p>
+                </Link>
+              ))}
+            </div>
+          </motion.div>
         ) : (
           isAdmin ? renderAdminDashboard() : renderMembroDashboard()
         )}

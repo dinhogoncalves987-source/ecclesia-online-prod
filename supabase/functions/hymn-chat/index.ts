@@ -32,24 +32,24 @@ serve(async (req) => {
 
     const normalizedLocale = typeof locale === "string" ? locale.toLowerCase() : "";
     const responseLanguage = normalizedLocale.startsWith("en")
-      ? "inglês"
+      ? "English"
       : normalizedLocale.startsWith("es")
-        ? "espanhol"
+        ? "español"
         : normalizedLocale.startsWith("pt")
           ? "português brasileiro"
           : "mesmo idioma usado pelo usuário";
 
     const languageInstruction = `
-Idioma do usuário:
+Locale recebido:
 ${locale || "auto-detect"}
 
-REGRAS DE IDIOMA:
-- Se locale começar com pt, responda em português brasileiro.
-- Se locale começar com en, responda em inglês.
-- Se locale começar com es, responda em espanhol.
-- Se não houver locale, responda no mesmo idioma usado pelo usuário.
-- Idioma obrigatório desta resposta: ${responseLanguage}.
-- Nunca misture idiomas na mesma resposta.
+LANGUAGE OUTPUT RULES - HIGHEST PRIORITY:
+- If locale starts with en, respond only in English, even if the user writes in another language.
+- Si locale empieza con es, responder solo en español, aunque el usuario escriba en otro idioma.
+- Se locale começar com pt ou pt-BR, responder apenas em português brasileiro, mesmo se o usuário escrever em outro idioma.
+- If locale is missing, respond in the same language used by the user.
+- Required output language for this answer: ${responseLanguage}.
+- Do not mix languages in the same answer.
 `;
 
     const systemPrompt = `

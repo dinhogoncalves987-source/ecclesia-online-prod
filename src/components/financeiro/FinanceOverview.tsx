@@ -1,29 +1,35 @@
 import { useMemo } from "react";
-import { TrendingUp, TrendingDown, Wallet, PiggyBank, Target, BarChart3 } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, Target, BarChart3 } from "lucide-react";
 import { ExecutiveCard } from "@/components/ExecutiveCard";
 import { useLanguage } from "@/hooks/useLanguage";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend } from "recharts";
+import { isExpense, type TreasuryTransaction } from "@/lib/finance";
 
-type Transaction = {
-  id: string; date: string; description: string; type: string; amount: number; status: string; category: string;
+const CURRENCY_LOCALE: Record<string, { locale: string; currency: string }> = {
+  pt: { locale: "pt-BR", currency: "BRL" },
+  en: { locale: "en-US", currency: "USD" },
+  es: { locale: "es-MX", currency: "MXN" },
 };
 
-const formatCurrency = (v: number) =>
-  `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+const makeCurrencyFormatter = (lang: string) => (v: number) => {
+  const { locale, currency } = CURRENCY_LOCALE[lang] ?? CURRENCY_LOCALE.pt;
+  return v.toLocaleString(locale, { style: "currency", currency, minimumFractionDigits: 0, maximumFractionDigits: 0 });
+};
 
 const COLORS = [
   "hsl(var(--primary))", "hsl(var(--accent))", "hsl(var(--destructive))",
   "hsl(142 76% 36%)", "hsl(280 65% 60%)", "hsl(30 90% 55%)", "hsl(200 80% 50%)", "hsl(350 70% 50%)"
 ];
 
-export function FinanceOverview({ transactions }: { transactions: Transaction[] }) {
-  const { t } = useLanguage();
+export function FinanceOverview({ transactions }: { transactions: TreasuryTransaction[] }) {
+  const { t, lang } = useLanguage();
+  const formatCurrency = makeCurrencyFormatter(lang);
 
   const summary = useMemo(() => {
-    const totalReceita = transactions.filter(tx => tx.type === "Entrada").reduce((s, tx) => s + Number(tx.amount), 0);
-    const totalDespesa = transactions.filter(tx => tx.type === "Saída").reduce((s, tx) => s + Number(tx.amount), 0);
+    const totalReceita = transactions.filter(tx => !isExpense(tx.type)).reduce((s, tx) => s + Number(tx.amount), 0);
+    const totalDespesa = transactions.filter(tx => isExpense(tx.type)).reduce((s, tx) => s + Number(tx.amount), 0);
     const saldo = totalReceita - totalDespesa;
-    const confirmed = transactions.filter(tx => tx.status === "Confirmado" || tx.status === "Pago").reduce((s, tx) => s + Number(tx.amount) * (tx.type === "Entrada" ? 1 : -1), 0);
+    const confirmed = transactions.filter(tx => tx.status === "Confirmado" || tx.status === "Pago").reduce((s, tx) => s + Number(tx.amount) * (isExpense(tx.type) ? -1 : 1), 0);
     const pending = transactions.filter(tx => tx.status === "Pendente").length;
     const margin = totalReceita > 0 ? ((saldo / totalReceita) * 100).toFixed(1) : "0";
     return { totalReceita, totalDespesa, saldo, confirmed, pending, margin };
@@ -41,7 +47,7 @@ export function FinanceOverview({ transactions }: { transactions: Transaction[] 
     transactions.forEach(tx => {
       const m = tx.date?.substring(0, 7) || "N/A";
       if (!months[m]) months[m] = { month: m, receita: 0, despesa: 0 };
-      if (tx.type === "Entrada") months[m].receita += Number(tx.amount);
+      if (!isExpense(tx.type)) months[m].receita += Number(tx.amount);
       else months[m].despesa += Number(tx.amount);
     });
     return Object.values(months).sort((a, b) => a.month.localeCompare(b.month)).slice(-12).map(m => ({
@@ -55,7 +61,7 @@ export function FinanceOverview({ transactions }: { transactions: Transaction[] 
     transactions.forEach(tx => {
       const cat = tx.category || "Geral";
       if (!cats[cat]) cats[cat] = { name: cat, receita: 0, despesa: 0 };
-      if (tx.type === "Entrada") cats[cat].receita += Number(tx.amount);
+      if (!isExpense(tx.type)) cats[cat].receita += Number(tx.amount);
       else cats[cat].despesa += Number(tx.amount);
     });
     return Object.values(cats).sort((a, b) => (b.receita + b.despesa) - (a.receita + a.despesa));
