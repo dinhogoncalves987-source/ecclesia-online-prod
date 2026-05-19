@@ -238,9 +238,15 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               )}
             </div>
             <ThemeToggle />
-            <button className="p-2 rounded-lg hover:bg-secondary transition-colors relative">
+            <button
+              onClick={toggleFullscreen}
+              className="hidden sm:flex p-2 rounded-lg hover:bg-secondary transition-colors"
+              title={isFullscreen ? t("Sair da tela cheia") : t("Tela cheia")}
+            >
+              {isFullscreen ? <Minimize size={18} className="text-foreground" /> : <Maximize size={18} className="text-foreground" />}
+            </button>
+            <button className="p-2 rounded-lg hover:bg-secondary transition-colors">
               <Bell size={18} strokeWidth={1.5} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent rounded-full" />
             </button>
             {/* Profile avatar with dropdown */}
             <div className="relative">
@@ -287,17 +293,6 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </header>
-
-        {/* Fullscreen button below header */}
-        <div className="flex justify-end px-4 lg:px-8 pt-2">
-          <button
-            onClick={toggleFullscreen}
-            className="p-2 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors"
-            title={isFullscreen ? t("Sair da tela cheia") : t("Tela cheia")}
-          >
-            {isFullscreen ? <Minimize size={18} className="text-foreground" /> : <Maximize size={18} className="text-foreground" />}
-          </button>
-        </div>
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">

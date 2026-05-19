@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLanguage } from "@/hooks/useLanguage";
 import { AdminLayout } from "@/components/AdminLayout";
+import { supabase } from "@/integrations/supabase/client";
 import {
   getCategoriasHinos,
   getHinoCategoria,
@@ -135,11 +136,19 @@ export default function Hinario() {
     setIsLoading(true);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+
+      if (!accessToken) {
+        throw new Error(t("Sessão expirada. Faça login novamente para usar o assistente."));
+      }
+
       const resp = await fetch(CHAT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_KEY}`,
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ messages: allMessages, locale: lang, hymnCatalog }),
       });
@@ -243,14 +252,6 @@ export default function Hinario() {
             >
               <Sparkles size={16} />
               {t("Assistente IA")}
-            </Button>
-            <Button
-              onClick={() => setShowUploadDialog(true)}
-              variant="outline"
-              className="gap-2"
-            >
-              <Upload size={16} />
-              {t("Enviar Hino")}
             </Button>
           </div>
         </div>
@@ -565,7 +566,7 @@ export default function Hinario() {
                       const win = window.open(url, "_blank", "noopener,noreferrer");
                       if (!win) {
                         navigator.clipboard.writeText(url);
-                        alert("Link copiado! Cole no navegador: " + url);
+                        alert(`${t("Link copiado! Cole no navegador:")} ${url}`);
                       }
                     }}
                     className="flex items-center gap-2 px-4 py-3 bg-destructive/10 rounded-lg text-destructive hover:bg-destructive/20 transition-colors w-full"

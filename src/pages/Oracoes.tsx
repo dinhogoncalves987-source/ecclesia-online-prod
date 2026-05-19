@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useChurch } from "@/hooks/useChurch";
+import { useChurch } from "@/hooks/useChurchContext";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -14,11 +14,10 @@ type PrayerRequest = {
   id: string;
   title: string;
   description: string | null;
-  is_anonymous: boolean;
-  status: string;
-  praying_count: number;
+  is_private: boolean | null;
+  status: string | null;
   created_at: string;
-  user_id: string;
+  user_id: string | null;
 };
 
 export default function Oracoes() {
@@ -37,7 +36,7 @@ export default function Oracoes() {
 
   const fetchRequests = async () => {
     if (!church) return;
-    const query = supabase.from("prayer_requests").select("*").eq("church_id", church.id).order("created_at", { ascending: false });
+    const query = supabase.from("prayer_requests").select("*").eq("organization_id", church.id).order("created_at", { ascending: false });
     const { data } = await query;
     setRequests((data as PrayerRequest[]) || []);
     setLoading(false);
@@ -52,21 +51,20 @@ export default function Oracoes() {
   const handleAdd = async () => {
     if (!title.trim() || !user || !church) return;
     const { error } = await supabase.from("prayer_requests").insert({
-      user_id: user.id, church_id: church.id, title: title.trim(), description: description.trim() || null, is_anonymous: isAnonymous,
+      user_id: user.id, organization_id: church.id, title: title.trim(), description: description.trim() || null, is_private: isAnonymous,
     } as any);
-    if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
+    if (error) { toast({ title: t("Erro"), description: error.message, variant: "destructive" }); return; }
     setTitle(""); setDescription(""); setIsAnonymous(false); setShowForm(false);
-    toast({ title: "Pedido registrado!" });
+    toast({ title: t("Pedido registrado!") });
     fetchRequests();
   };
 
-  const handlePray = async (req: PrayerRequest) => {
-    await supabase.from("prayer_requests").update({ praying_count: req.praying_count + 1 } as any).eq("id", req.id);
-    fetchRequests();
+  const handlePray = async (_req: PrayerRequest) => {
+    toast({ title: t("Orando por este pedido!") });
   };
 
   const handleMarkAnswered = async (id: string) => {
-    await supabase.from("prayer_requests").update({ status: "Respondido" } as any).eq("id", id);
+    await supabase.from("prayer_requests").update({ status: "Respondido" }).eq("id", id);
     fetchRequests();
   };
 
@@ -75,7 +73,7 @@ export default function Oracoes() {
     fetchRequests();
   };
 
-  const filtered = filter === "Todos" ? requests : requests.filter(r => r.status === filter);
+  const filtered = filter === "Todos" ? requests : requests.filter(r => (r.status ?? "Ativo") === filter);
 
   return (
     <AdminLayout>
@@ -101,9 +99,26 @@ export default function Oracoes() {
         {loading ? (
           <div className="text-center py-12 text-muted-foreground">{t("Carregando...")}</div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-12">
-            <Heart size={48} className="mx-auto text-muted-foreground/30 mb-4" />
-            <p className="text-muted-foreground">{t("Nenhum pedido de oração encontrado")}</p>
+          <div className="text-center py-16 max-w-sm mx-auto">
+            <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-4">
+              <Heart size={28} className="text-accent/50" />
+            </div>
+            <h3 className="font-serif text-lg font-semibold text-foreground mb-2">
+              {filter === "Todos" ? t("Nenhum pedido ainda") : t("Nenhum pedido com este filtro")}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              {filter === "Todos"
+                ? t("Seja o primeiro a compartilhar um pedido de oração com a comunidade.")
+                : t("Tente mudar o filtro para ver outros pedidos.")}
+            </p>
+            {filter === "Todos" && (
+              <button
+                onClick={() => setShowForm(true)}
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-accent/10 text-accent rounded-lg text-sm font-medium hover:bg-accent/20 transition-colors"
+              >
+                <Plus size={14} /> {t("Novo Pedido")}
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -116,18 +131,13 @@ export default function Oracoes() {
                     {req.description && <p className="text-sm text-muted-foreground mt-1">{req.description}</p>}
                   </div>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${req.status === "Respondido" ? "bg-green-500/10 text-green-600" : "bg-accent/10 text-accent"}`}>
-                    {req.status}
+                    {req.status ?? "Ativo"}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1"><User size={12} />{req.is_anonymous ? t("Anônimo") : t("Membro")}</span>
+                  <span className="flex items-center gap-1"><User size={12} />{req.is_private ? t("Anônimo") : t("Membro")}</span>
                   <span className="flex items-center gap-1"><Clock size={12} />{format(new Date(req.created_at), "dd MMM", { locale: ptBR })}</span>
-                  <span className="flex items-center gap-1"><Heart size={12} />{req.praying_count} {t("orando")}</span>
                 </div>
-                <button onClick={() => handlePray(req)}
-                  className="w-full py-3 rounded-xl bg-accent/10 text-accent hover:bg-accent/20 transition-colors font-bold text-lg tracking-wide mt-1">
-                  {t("AMÉM")}
-                </button>
                 <div className="flex gap-2 mt-auto pt-2 border-t border-border/30">
                   <button onClick={() => handlePray(req)} className="flex-1 text-xs py-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors font-medium">
                     {t("Estou orando")}
@@ -155,7 +165,8 @@ export default function Oracoes() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-40" onClick={() => setShowForm(false)} />
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="w-full max-w-md bg-card rounded-2xl p-6 shadow-xl max-h-[85vh] overflow-y-auto">
-                <h2 className="text-lg font-serif font-bold mb-4">{t("Novo Pedido de Oração")}</h2>
+                <h2 className="text-lg font-serif font-bold mb-1">{t("Novo Pedido de Oração")}</h2>
+                <p className="text-xs text-muted-foreground mb-4">{t("Seu pedido será compartilhado com a comunidade da igreja.")}</p>
                 <div className="space-y-3">
                   <input value={title} onChange={e => setTitle(e.target.value)} placeholder={t("Título do pedido")} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
                   <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder={t("Descrição (opcional)")} rows={3} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm resize-none" />

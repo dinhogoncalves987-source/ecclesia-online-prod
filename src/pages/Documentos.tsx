@@ -1,21 +1,19 @@
 import { AdminLayout } from "@/components/AdminLayout";
-import { Archive, Plus, X, FileText, FolderOpen, Upload, Loader2 } from "lucide-react";
+import { Plus, X, FileText, FolderOpen, Upload, Eye } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useChurch } from "@/hooks/useChurch";
+import { useChurch } from "@/hooks/useChurchContext";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
 import { format } from "date-fns";
 import { ptBR, enUS, es } from "date-fns/locale";
 import { BulkImportModal } from "@/components/BulkImportModal";
-import { AIImportModal } from "@/components/AIImportModal";
-import { Sparkles } from "lucide-react";
 
 type Document = {
-  id: string; title: string; category: string; description: string | null;
-  file_url: string | null; file_type: string | null; created_at: string; user_id: string;
+  id: string; title: string; document_type: string; content: string | null;
+  file_url: string | null; created_at: string; created_by: string | null;
 };
 
 const categories = ["Geral", "Atas", "Estatuto", "Financeiro", "Eventos", "Ministerial"];
@@ -33,7 +31,7 @@ export default function Documentos() {
   const [category, setCategory] = useState("Geral");
   const [filterCat, setFilterCat] = useState("Todos");
   const [showImport, setShowImport] = useState(false);
-  const [showAIImport, setShowAIImport] = useState(false);
+  const [viewDoc, setViewDoc] = useState<Document | null>(null);
 
   const docFields = [
     { key: "title", label: t("Título"), required: true },
@@ -52,10 +50,10 @@ export default function Documentos() {
     for (const row of rows) {
       if (!row.title) { errors++; continue; }
       const { error } = await supabase.from("documents").insert({
-        user_id: user.id, church_id: church.id,
+        created_by: user.id, organization_id: church.id,
         title: row.title,
-        category: row.category || "Geral",
-        description: row.description || null,
+        document_type: row.category || "Geral",
+        content: row.description || null,
       } as any);
       if (error) errors++; else success++;
     }
@@ -63,12 +61,34 @@ export default function Documentos() {
     return { success, errors };
   };
 
-  const dateLoc = lang === "en" ? enUS : lang === "es" ? es : ptBR;
+  const handleTextFile = (file: File) => {
+    if (!user || !church) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const text = (e.target?.result as string) ?? "";
+      const docTitle = file.name.replace(/\.[^.]+$/, "");
+      const { error } = await supabase.from("documents").insert({
+        created_by: user.id,
+        organization_id: church.id,
+        title: docTitle,
+        document_type: "Geral",
+        content: text || null,
+      } as any);
+      if (error) {
+        toast({ title: t("Erro"), description: error.message, variant: "destructive" });
+      } else {
+        toast({ title: t("Documento importado!"), description: docTitle });
+        fetch_();
+      }
+    };
+    reader.readAsText(file, "UTF-8");
+  };
 
+  const dateLoc = lang === "en" ? enUS : lang === "es" ? es : ptBR;
 
   const fetch_ = async () => {
     if (!church) return;
-    const { data } = await supabase.from("documents").select("*").eq("church_id", church.id).order("created_at", { ascending: false });
+    const { data } = await supabase.from("documents").select("*").eq("organization_id", church.id).order("created_at", { ascending: false });
     setDocs((data as Document[]) || []);
     setLoading(false);
   };
@@ -82,7 +102,7 @@ export default function Documentos() {
   const handleAdd = async () => {
     if (!title.trim() || !user || !church) return;
     const { error } = await supabase.from("documents").insert({
-      user_id: user.id, church_id: church.id, title: title.trim(), category, description: description.trim() || null,
+      created_by: user.id, organization_id: church.id, title: title.trim(), document_type: category, content: description.trim() || null,
     } as any);
     if (error) { toast({ title: t("Erro"), description: error.message, variant: "destructive" }); return; }
     setTitle(""); setDescription(""); setCategory("Geral"); setShowForm(false);
@@ -92,11 +112,12 @@ export default function Documentos() {
 
   const handleDelete = async (id: string) => {
     await supabase.from("documents").delete().eq("id", id);
+    if (viewDoc?.id === id) setViewDoc(null);
     fetch_();
   };
 
-  const filtered = filterCat === "Todos" ? docs : docs.filter(d => d.category === filterCat);
-  const uniqueCats = ["Todos", ...new Set(docs.map(d => d.category))];
+  const filtered = filterCat === "Todos" ? docs : docs.filter(d => d.document_type === filterCat);
+  const uniqueCats = ["Todos", ...new Set(docs.map(d => d.document_type))];
 
   return (
     <AdminLayout>
@@ -106,12 +127,9 @@ export default function Documentos() {
             <h1 className="text-2xl font-serif font-bold text-foreground">{t("Documentos")}</h1>
             <p className="text-sm text-muted-foreground mt-1">{t("Biblioteca de documentos da igreja")}</p>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => setShowAIImport(true)} className="flex items-center gap-2 px-3 py-2.5 bg-accent/10 text-accent rounded-lg text-sm font-medium hover:bg-accent/20 transition-colors">
-              <Sparkles size={14} /> {t("Importar com IA")}
-            </button>
+          <div className="flex gap-2 flex-wrap">
             <button onClick={() => setShowImport(true)} className="flex items-center gap-2 px-3 py-2.5 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
-              <Upload size={14} /> {t("Importar CSV")}
+              <Upload size={14} /> {t("Importar")}
             </button>
             <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
               <Plus size={16} /> {t("Novo Documento")}
@@ -137,30 +155,92 @@ export default function Documentos() {
         ) : (
           <div className="space-y-3">
             {filtered.map((doc, i) => (
-              <motion.div key={doc.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }}
-                className="bg-card rounded-xl p-4 shadow-sm border border-border/50 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+              <motion.div
+                key={doc.id}
+                initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }}
+                onClick={() => setViewDoc(doc)}
+                className="bg-card rounded-xl p-4 shadow-sm border border-border/50 flex items-center gap-4 cursor-pointer hover:border-accent/40 hover:shadow-md transition-all group"
+              >
+                <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0 group-hover:bg-accent/20 transition-colors">
                   <FileText size={20} className="text-accent" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-medium text-foreground truncate">{doc.title}</h3>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                    <span className="px-1.5 py-0.5 rounded bg-secondary">{t(doc.category)}</span>
-                    <span>{format(new Date(doc.created_at), "dd MMM yyyy", { locale: dateLoc })}</span>
+                    <span className="px-1.5 py-0.5 rounded bg-secondary shrink-0">{t(doc.document_type)}</span>
+                    <span className="shrink-0">{format(new Date(doc.created_at), "dd MMM yyyy", { locale: dateLoc })}</span>
                   </div>
-                  {doc.description && <p className="text-xs text-muted-foreground mt-1 truncate">{doc.description}</p>}
+                  {doc.content && (
+                    <p className="text-xs text-muted-foreground mt-1 overflow-hidden" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                      {doc.content}
+                    </p>
+                  )}
                 </div>
-                {doc.user_id === user?.id && (
-                  <button onClick={() => handleDelete(doc.id)} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
-                    <X size={16} />
-                  </button>
-                )}
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <span className="p-1.5 rounded-lg text-muted-foreground/40 group-hover:text-accent transition-colors">
+                    <Eye size={15} />
+                  </span>
+                  {doc.created_by === user?.id && (
+                    <button
+                      onClick={e => { e.stopPropagation(); handleDelete(doc.id); }}
+                      className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
               </motion.div>
             ))}
           </div>
         )}
       </div>
 
+      {/* ── Viewer modal ── */}
+      <AnimatePresence>
+        {viewDoc && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-40" onClick={() => setViewDoc(null)} />
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+                className="w-full max-w-lg bg-card rounded-2xl shadow-xl flex flex-col max-h-[85vh]"
+              >
+                <div className="flex items-start justify-between p-5 border-b border-border/50 gap-3">
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-serif font-bold truncate">{viewDoc.title}</h2>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                      <span className="px-1.5 py-0.5 rounded bg-secondary">{t(viewDoc.document_type)}</span>
+                      <span>{format(new Date(viewDoc.created_at), "dd MMM yyyy", { locale: dateLoc })}</span>
+                    </div>
+                  </div>
+                  <button onClick={() => setViewDoc(null)} className="p-1.5 rounded-lg hover:bg-secondary flex-shrink-0">
+                    <X size={18} />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-5">
+                  {viewDoc.content ? (
+                    <pre className="text-sm text-foreground whitespace-pre-wrap font-sans leading-relaxed">{viewDoc.content}</pre>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">{t("Sem conteúdo disponível.")}</p>
+                  )}
+                </div>
+                {viewDoc.created_by === user?.id && (
+                  <div className="p-4 border-t border-border/50">
+                    <button
+                      onClick={() => handleDelete(viewDoc.id)}
+                      className="w-full py-2 rounded-lg bg-destructive/10 text-destructive text-sm font-medium hover:bg-destructive/20 transition-colors"
+                    >
+                      {t("Excluir documento")}
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── New document form ── */}
       <AnimatePresence>
         {showForm && (
           <>
@@ -170,7 +250,7 @@ export default function Documentos() {
                 <h2 className="text-lg font-serif font-bold mb-4">{t("Novo Documento")}</h2>
                 <div className="space-y-3">
                   <input value={title} onChange={e => setTitle(e.target.value)} placeholder={t("Título do documento")} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm" />
-                  <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder={t("Descrição (opcional)")} rows={2} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm resize-none" />
+                  <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder={t("Conteúdo (opcional)")} rows={4} className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm resize-none" />
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">{t("Categoria")}</label>
                     <div className="flex gap-2 flex-wrap">
@@ -191,21 +271,15 @@ export default function Documentos() {
           </>
         )}
       </AnimatePresence>
+
       <BulkImportModal
         open={showImport}
         onClose={() => setShowImport(false)}
         onImport={handleBulkImport}
+        onTextFile={handleTextFile}
         fields={docFields}
         templateData={docTemplate}
         title={t("Importar Documentos")}
-      />
-      <AIImportModal
-        open={showAIImport}
-        onClose={() => setShowAIImport(false)}
-        onImport={handleBulkImport}
-        fields={docFields}
-        title={t("Importar Documentos com IA")}
-        moduleName="Documentos"
       />
     </AdminLayout>
   );

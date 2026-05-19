@@ -55,7 +55,9 @@ export default function Congregacoes() {
 
   const isSetorContext = activeOrgType === "setor";
   const isConvencaoContext = activeOrgType === "convencao";
-  const canManageChildUnits = isAdmin && (isMatriz || isSetorContext || isConvencaoContext);
+  const canManageChildUnits = isAdmin
+    && (isMatriz || isSetorContext || isConvencaoContext)
+    && (isMatriz || activeOrgTypeResolved);
 
   const pageTitle = (): string => {
     if (isConvencaoContext) return "Matrizes Municipais";

@@ -477,9 +477,21 @@ export default function Dashboard() {
       <div className="space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">{t("Dashboard")}</h1>
+            <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">
+              {church?.name ?? t("Dashboard")}
+            </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {isSuperAdmin ? t("Visão global da plataforma") : isMembro ? t("Bem-vindo à sua igreja") : t("Visão geral da administração")}
+              {isSuperAdmin
+                ? t("Visão global da plataforma")
+                : church?.organization_type === "convencao"
+                  ? "Painel da Convenção / Regional"
+                  : church?.organization_type === "matriz"
+                    ? "Painel da Matriz Municipal"
+                    : church?.organization_type === "setor"
+                      ? "Painel do Setor"
+                      : isMembro
+                        ? t("Bem-vindo à sua igreja")
+                        : t("Visão geral da administração")}
             </p>
           </div>
           {isAdmin && (
