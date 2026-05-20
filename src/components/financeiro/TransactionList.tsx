@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 import { BulkImportModal } from "@/components/BulkImportModal";
 import { AIImportModal } from "@/components/AIImportModal";
+import { OperationalAssistant } from "@/components/OperationalAssistant";
 import { insertWithOrganizationScope, runScopedOrganizationQuery } from "@/lib/organizationScope";
 import {
   DEFAULT_ACCOUNT_CATEGORIES,
@@ -370,7 +371,31 @@ export function TransactionList({
         </button>
         {canWriteFinance && (
           <>
-            <button onClick={() => setShowAIImport(true)} className="inline-flex items-center gap-1.5 px-3 py-2 bg-accent/10 text-accent rounded-lg text-sm font-medium hover:bg-accent/20 transition-colors">
+            <OperationalAssistant
+              module="financial"
+              fields={[
+                { key: "desc", label: t("Descrição"), required: true },
+                { key: "value", label: t("Valor"), required: true, type: "number" },
+                { key: "type", label: t("Tipo"), options: ["Entrada", "Saida"] },
+                { key: "category", label: t("Categoria"), options: accountCategories.map(c => c.name) },
+                { key: "date", label: t("Data") },
+                { key: "notes", label: t("Observações") },
+              ]}
+              onEdit={(data) => {
+                setNewTx(prev => ({
+                  ...prev,
+                  desc: data.desc || "",
+                  value: data.value || "",
+                  type: (data.type === "Saida" || data.type === "Saída") ? "Saida" : "Entrada",
+                  category: data.category || DEFAULT_ACCOUNT_CATEGORIES[0].name,
+                  date: data.date || today(),
+                  notes: data.notes || "",
+                }));
+                setEditingId(null);
+                setShowForm(true);
+              }}
+            />
+            <button onClick={() => setShowAIImport(true)} className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
               <Sparkles size={14} strokeWidth={1.5} /> {t("Importar com IA")}
             </button>
             <button onClick={() => setShowImport(true)} className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">

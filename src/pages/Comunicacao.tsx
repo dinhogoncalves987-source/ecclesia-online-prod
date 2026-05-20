@@ -10,6 +10,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { format } from "date-fns";
 import { ptBR, enUS, es } from "date-fns/locale";
 import { insertWithOrganizationScope, runScopedOrganizationQuery } from "@/lib/organizationScope";
+import { OperationalAssistant } from "@/components/OperationalAssistant";
 
 type Announcement = {
   id: string;
@@ -85,9 +86,39 @@ export default function Comunicacao() {
             <h1 className="text-2xl font-serif font-bold text-foreground">{t("Comunicação")}</h1>
             <p className="text-sm text-muted-foreground mt-1">{t("Avisos e comunicados para a comunidade")}</p>
           </div>
-          <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
-            <Plus size={16} /> {t("Novo Comunicado")}
-          </button>
+          <div className="flex gap-2 flex-wrap">
+            <OperationalAssistant
+              module="communication"
+              fields={[
+                { key: "title", label: t("Título"), required: true },
+                { key: "content", label: t("Mensagem"), required: true, type: "textarea" },
+                { key: "communication_type", label: t("Prioridade"), options: ["Normal", "Importante", "Urgente"] },
+              ]}
+              onConfirm={async (data) => {
+                if (!data.title || !data.content || !user || !church) throw new Error(t("Campos obrigatórios ausentes"));
+                const { error } = await insertWithOrganizationScope("communications", church.id, {
+                  created_by: user.id,
+                  title: data.title.trim(),
+                  content: data.content.trim(),
+                  communication_type: data.communication_type || "Normal",
+                  is_public: false,
+                  published_at: new Date().toISOString(),
+                });
+                if (error) throw new Error(error.message);
+                fetch_();
+                toast({ title: t("Comunicado criado!") });
+              }}
+              onEdit={(data) => {
+                setTitle(data.title || "");
+                setContent(data.content || "");
+                setPriority(data.communication_type || "Normal");
+                setShowForm(true);
+              }}
+            />
+            <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+              <Plus size={16} /> {t("Novo Comunicado")}
+            </button>
+          </div>
         </div>
 
         {loading ? (

@@ -29,6 +29,7 @@ import GerenciarAcessos from "./pages/GerenciarAcessos";
 import Congregacoes from "./pages/Congregacoes";
 import SuperAdmin from "./pages/SuperAdmin";
 import AssembleiaGeral from "./pages/AssembleiaGeral";
+import SharePublic from "./pages/SharePublic";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,6 +49,7 @@ const App = () => (
             <Route path="/signup" element={<Signup />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/share" element={<SharePublic />} />
             <Route path="/admin" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/admin/financeiro" element={<ProtectedRoute><Financeiro /></ProtectedRoute>} />
             <Route path="/admin/membros" element={<ProtectedRoute><Membros /></ProtectedRoute>} />

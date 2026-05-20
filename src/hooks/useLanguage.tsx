@@ -910,6 +910,33 @@ const translations: Record<string, Record<Lang, string>> = {
 
   // Dashboard onboarding / no-church state
   "Bem-vindo ao Ecclesia Admin": { pt: "Bem-vindo ao Ecclesia Admin", en: "Welcome to Ecclesia Admin", es: "Bienvenido a Ecclesia Admin" },
+
+  // OperationalAssistant component
+  "Analisar com IA": { pt: "Analisar com IA", en: "Analyze with AI", es: "Analizar con IA" },
+  "Analisando...": { pt: "Analisando...", en: "Analyzing...", es: "Analizando..." },
+  "A IA está extraindo os campos": { pt: "A IA está extraindo os campos", en: "AI is extracting the fields", es: "La IA está extrayendo los campos" },
+  "Campos extraídos com IA": { pt: "Campos extraídos com IA", en: "Fields extracted by AI", es: "Campos extraídos con IA" },
+  "campo(s) pendente(s)": { pt: "campo(s) pendente(s)", en: "pending field(s)", es: "campo(s) pendiente(s)" },
+  "Preencher": { pt: "Preencher", en: "Fill in", es: "Completar" },
+  "Editar no formulário": { pt: "Editar no formulário", en: "Edit in form", es: "Editar en formulario" },
+  "Confirmar e salvar": { pt: "Confirmar e salvar", en: "Confirm & save", es: "Confirmar y guardar" },
+  "Salvo com sucesso!": { pt: "Salvo com sucesso!", en: "Saved successfully!", es: "¡Guardado con éxito!" },
+  "Cadastro realizado pelo assistente IA": { pt: "Cadastro realizado pelo assistente IA", en: "Registration completed by AI assistant", es: "Registro realizado por el asistente IA" },
+  "A IA vai extrair os campos automaticamente. Você revisa antes de salvar.": {
+    pt: "A IA vai extrair os campos automaticamente. Você revisa antes de salvar.",
+    en: "AI will extract fields automatically. You review before saving.",
+    es: "La IA extraerá los campos automáticamente. Revisa antes de guardar.",
+  },
+  "Em breve: entrada por voz": { pt: "Em breve: entrada por voz", en: "Coming soon: voice input", es: "Próximamente: entrada de voz" },
+  "para analisar": { pt: "para analisar", en: "to analyze", es: "para analizar" },
+  "Salvando...": { pt: "Salvando...", en: "Saving...", es: "Guardando..." },
+
+  // Module-level feedback
+  "Documento criado!": { pt: "Documento criado!", en: "Document created!", es: "¡Documento creado!" },
+  "Comunicado criado!": { pt: "Comunicado criado!", en: "Announcement created!", es: "¡Comunicado creado!" },
+  "Campos obrigatórios ausentes": { pt: "Campos obrigatórios ausentes", en: "Required fields are missing", es: "Faltan campos obligatorios" },
+  "Nome obrigatório": { pt: "Nome obrigatório", en: "Name is required", es: "El nombre es obligatorio" },
+  "Título obrigatório": { pt: "Título obrigatório", en: "Title is required", es: "El título es obligatorio" },
 };
 
 

@@ -10,6 +10,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { format } from "date-fns";
 import { ptBR, enUS, es } from "date-fns/locale";
 import { BulkImportModal } from "@/components/BulkImportModal";
+import { OperationalAssistant } from "@/components/OperationalAssistant";
 
 type Document = {
   id: string; title: string; document_type: string; content: string | null;
@@ -128,6 +129,32 @@ export default function Documentos() {
             <p className="text-sm text-muted-foreground mt-1">{t("Biblioteca de documentos da igreja")}</p>
           </div>
           <div className="flex gap-2 flex-wrap">
+            <OperationalAssistant
+              module="document"
+              fields={[
+                { key: "title", label: t("Título"), required: true },
+                { key: "document_type", label: t("Categoria"), options: categories },
+                { key: "content", label: t("Conteúdo"), type: "textarea" },
+              ]}
+              onConfirm={async (data) => {
+                if (!data.title || !user || !church) throw new Error(t("Título obrigatório"));
+                const { error } = await supabase.from("documents").insert({
+                  created_by: user.id, organization_id: church.id,
+                  title: data.title,
+                  document_type: data.document_type || "Geral",
+                  content: data.content || null,
+                } as any);
+                if (error) throw new Error(error.message);
+                fetch_();
+                toast({ title: t("Documento criado!") });
+              }}
+              onEdit={(data) => {
+                setTitle(data.title || "");
+                setDescription(data.content || "");
+                setCategory(data.document_type || "Geral");
+                setShowForm(true);
+              }}
+            />
             <button onClick={() => setShowImport(true)} className="flex items-center gap-2 px-3 py-2.5 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
               <Upload size={14} /> {t("Importar")}
             </button>

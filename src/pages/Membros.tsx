@@ -8,6 +8,7 @@ import { useChurch } from "@/hooks/useChurchContext";
 import { useLanguage } from "@/hooks/useLanguage";
 import { toast } from "sonner";
 import { BulkImportModal } from "@/components/BulkImportModal";
+import { OperationalAssistant } from "@/components/OperationalAssistant";
 import { insertWithOrganizationScope, runScopedOrganizationQuery } from "@/lib/organizationScope";
 
 type Member = {
@@ -147,7 +148,36 @@ export default function Membros() {
               {members.length} {t("cadastrados")} · {activeCount} {t("ativos")} · {visitanteCount} {t("visitantes")}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <OperationalAssistant
+              module="member"
+              fields={[
+                { key: "name", label: t("Nome"), required: true },
+                { key: "role", label: t("Função"), options: ["Pastor", "Diácono", "Diaconisa", "Obreiro", "Membro", "Visitante"] },
+                { key: "phone", label: t("Telefone") },
+                { key: "email", label: t("E-mail") },
+              ]}
+              onConfirm={async (data) => {
+                if (!data.name || !user || !church) throw new Error(t("Nome obrigatório"));
+                const { error } = await insertWithOrganizationScope("members", church.id, {
+                  created_by: user.id,
+                  full_name: data.name,
+                  member_role: data.role || "Membro",
+                  phone: data.phone || null,
+                  email: data.email || null,
+                  joined_at: new Date().toISOString().split("T")[0],
+                  status: "Ativo",
+                });
+                if (error) throw new Error(error.message);
+                const { data: fresh } = await runScopedOrganizationQuery<Member[]>("members", church.id, q => q.select("*").order("full_name"));
+                setMembers(fresh || []);
+                toast.success(t("Membro cadastrado!"));
+              }}
+              onEdit={(data) => {
+                setNewMember({ name: data.name || "", role: data.role || "", phone: data.phone || "", email: data.email || "" });
+                setShowForm(true);
+              }}
+            />
             <button onClick={() => setShowImport(true)}
               className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
               <Upload size={14} strokeWidth={1.5} /> {t("Importar")}

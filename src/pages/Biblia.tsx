@@ -7,6 +7,9 @@ import { bibleBooks, oldTestamentBooks, newTestamentBooks, type BibleBook } from
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
+import { buildShareUrl, triggerShare } from "@/lib/share";
+import { useChurch } from "@/hooks/useChurchContext";
+import { toast } from "sonner";
 
 type Verse = { num: number; text: string };
 type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -53,6 +56,7 @@ const QUICK_PROMPTS: Record<string, { labelKey: string; prompts: Record<string, 
 
 export default function Biblia() {
   const { t, lang } = useLanguage();
+  const { church } = useChurch();
   const [zenMode, setZenMode] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [largeFont, setLargeFont] = useState(false);
@@ -343,13 +347,25 @@ export default function Biblia() {
   };
 
   const shareMessage = async (content: string) => {
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: t("Assistente Bíblico"), text: content });
-      } catch { /* user cancelled */ }
-    } else {
-      await navigator.clipboard.writeText(content);
-      alert(t("Texto copiado!"));
+    const selectedBook = bibleBooks[selectedBookIndex];
+    const locale = lang === "en" ? "en" : lang === "es" ? "es" : "pt";
+    const url = buildShareUrl({
+      type: "bible",
+      title: t("Assistente Bíblico"),
+      text: content,
+      church: church?.slug || church?.id || "",
+      lang: locale,
+      ...(selectedBook && selectedChapter
+        ? { ref: `${selectedBook.name} ${selectedChapter}` }
+        : {}),
+    });
+    const result = await triggerShare({
+      url,
+      title: t("Assistente Bíblico"),
+      text: content.slice(0, 200),
+    });
+    if (result === "copied") {
+      toast.success(t("Link copiado!"));
     }
   };
 

@@ -3,6 +3,8 @@ import { BookOpen, RefreshCw, Sparkles, Sun, CloudSun, Moon, Share2, Copy, Check
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
+import { buildShareUrl, triggerShare } from "@/lib/share";
+import { useChurch } from "@/hooks/useChurchContext";
 import { motion } from "framer-motion";
 
 interface Devotional {
@@ -44,40 +46,51 @@ function getCurrentPeriod(): Period {
 
 export function DailyDevotional() {
   const { t, lang } = useLanguage();
+  const { church } = useChurch();
   const [devotional, setDevotional] = useState<Devotional | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [activePeriod, setActivePeriod] = useState<Period>(getCurrentPeriod);
   const [copied, setCopied] = useState(false);
 
-  const getShareText = () => {
-    if (!devotional) return "";
-    let text = `✝️ ${t(PERIOD_CONFIG[activePeriod].labelKey)}\n\n"${devotional.verse}"\n— ${devotional.reference}`;
-    if (devotional.reflection) text += `\n\n💭 ${devotional.reflection}`;
-    text += `\n\n📖 Ecclesia App`;
-    return text;
+  const buildUrl = () => {
+    if (!devotional) return window.location.origin + "/share?type=devotional";
+    const locale = lang === "en" ? "en" : lang === "es" ? "es" : "pt";
+    return buildShareUrl({
+      type: "devotional",
+      title: t(PERIOD_CONFIG[activePeriod].labelKey),
+      verse: devotional.verse,
+      ref: devotional.reference,
+      text: devotional.reflection || "",
+      church: church?.slug || church?.id || "",
+      lang: locale,
+    });
   };
 
   const handleShare = async () => {
-    const text = getShareText();
-    if (navigator.share) {
-      try {
-        await navigator.share({ text });
-      } catch {
-        return;
-      }
-    } else {
-      await navigator.clipboard.writeText(text);
+    if (!devotional) return;
+    const url = buildUrl();
+    const result = await triggerShare({
+      url,
+      title: t(PERIOD_CONFIG[activePeriod].labelKey),
+      text: `"${devotional.verse}" — ${devotional.reference}`,
+    });
+    if (result === "copied") {
       setCopied(true);
-      toast.success(t("Devocional copiado!"));
+      toast.success(t("Link copiado!"));
       setTimeout(() => setCopied(false), 2000);
     }
   };
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(getShareText());
+    const url = buildUrl();
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      await navigator.clipboard.writeText(`"${devotional?.verse}" — ${devotional?.reference}`);
+    }
     setCopied(true);
-    toast.success(t("Devocional copiado!"));
+    toast.success(t("Link copiado!"));
     setTimeout(() => setCopied(false), 2000);
   };
 

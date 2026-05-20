@@ -297,8 +297,12 @@ serve(async (req) => {
           generationConfig: {
             temperature: 0.8,
             topP: 0.95,
-            maxOutputTokens: 512, // short reflection — intentionally limited
+            maxOutputTokens: 1024,
           },
+          // Disable thinking tokens for this simple generation task.
+          // gemini-2.5-flash shares maxOutputTokens between thinking and output;
+          // with thinkingBudget=0 the full budget goes to the reflection text.
+          thinkingConfig: { thinkingBudget: 0 },
         }),
       },
     );
