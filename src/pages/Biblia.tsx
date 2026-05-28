@@ -9,6 +9,9 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
 import { buildShareUrl, triggerShare } from "@/lib/share";
 import { useChurch } from "@/hooks/useChurchContext";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { getCachedBibleChapter, cacheBibleChapter } from "@/lib/offlineCache";
+import { fetchEdgeFunction, getPublicEdgeHeaders } from "@/lib/edgeFetch";
 import { toast } from "sonner";
 
 type Verse = { num: number; text: string };
@@ -16,8 +19,30 @@ type ChatMessage = { role: "user" | "assistant"; content: string };
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-const VERSES_URL = `${SUPABASE_URL}/functions/v1/bible-verses`;
 const CHAT_URL = `${SUPABASE_URL}/functions/v1/bible-chat`;
+const FETCH_TIMEOUT_MS = 40_000;
+
+function getBibleTranslation(locale: string): string {
+  if (locale.startsWith("en")) return "KJV";
+  if (locale.startsWith("es")) return "NVI";
+  return "ARA";
+}
+
+function mapFetchError(err: unknown, t: (k: string) => string): string {
+  if (!(err instanceof Error)) return t("Erro ao buscar versículos");
+  const msg = err.message.toLowerCase();
+  if (msg.includes("failed to fetch") || msg.includes("network") || msg.includes("aborted") || msg.includes("abort")) {
+    return t("Sem conexão. Verifique sua internet e tente novamente.");
+  }
+  if (msg.includes("sessão") || msg.includes("session") || msg.includes("401")) {
+    return t("Sessão expirada. Faça login novamente para ler a Bíblia.");
+  }
+  return err.message || t("Erro ao buscar versículos");
+}
+
+async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 const QUICK_PROMPTS: Record<string, { labelKey: string; prompts: Record<string, string> }> = {
   sermon: {
@@ -57,6 +82,7 @@ const QUICK_PROMPTS: Record<string, { labelKey: string; prompts: Record<string, 
 export default function Biblia() {
   const { t, lang } = useLanguage();
   const { church } = useChurch();
+  const isOnline = useOnlineStatus();
   const [zenMode, setZenMode] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [largeFont, setLargeFont] = useState(false);
@@ -65,6 +91,7 @@ export default function Biblia() {
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
   const [verses, setVerses] = useState<Verse[]>([]);
   const [verseError, setVerseError] = useState("");
+  const [versesFromCache, setVersesFromCache] = useState(false);
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -81,44 +108,101 @@ export default function Biblia() {
 
   const selectedBook = bibleBooks[selectedBookIndex];
 
-  const getAccessToken = useCallback(async () => {
+  const getAuthHeaders = useCallback(async (): Promise<Record<string, string>> => {
+    // Chat da Bíblia pode usar JWT do usuário; versículos usam fetchEdgeFunction.
     const { data: { session } } = await supabase.auth.getSession();
-    const accessToken = session?.access_token;
-
-    if (!accessToken) {
-      throw new Error(t("Sessão expirada. Faça login novamente para usar o assistente."));
+    let token = session?.access_token;
+    if (!token) {
+      const { data: refreshed } = await supabase.auth.refreshSession();
+      token = refreshed.session?.access_token;
     }
+    return {
+      ...getPublicEdgeHeaders(),
+      Authorization: `Bearer ${token ?? SUPABASE_KEY}`,
+    };
+  }, []);
 
-    return accessToken;
-  }, [t]);
+  const fetchVerses = useCallback(async (book: BibleBook, chapter: number, options?: { retry?: boolean }) => {
+    const translation = getBibleTranslation(lang);
+    const cacheKey = { translation, bookId: String(book.bookId), chapter };
 
-  const fetchVerses = useCallback(async (book: BibleBook, chapter: number) => {
     setLoading(true);
     setVerseError("");
-    try {
-      const accessToken = await getAccessToken();
-      const params = new URLSearchParams({
-        bookId: book.bookId.toString(),
-        chapter: chapter.toString(),
-        locale: lang,
-      });
-      const resp = await fetch(`${VERSES_URL}?${params}`, {
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-      if (!resp.ok) throw new Error(t("Erro ao buscar versículos"));
-      const data = await resp.json();
-      setVerses(data.verses || []);
-    } catch (e) {
-      console.error("Fetch verses error:", e);
-      setVerseError(e instanceof Error ? e.message : t("Erro ao buscar versículos"));
+    setVersesFromCache(false);
+
+    // Offline or while loading: show cached chapter immediately if available
+    const cached = getCachedBibleChapter(cacheKey.translation, cacheKey.bookId, chapter);
+    if (cached && cached.length > 0) {
+      setVerses(cached);
+      setVersesFromCache(true);
+      if (!isOnline) {
+        setLoading(false);
+        return;
+      }
+    } else if (!options?.retry) {
       setVerses([]);
-    } finally {
-      setLoading(false);
     }
-  }, [getAccessToken, lang, t]);
+
+    if (!isOnline) {
+      if (!cached?.length) {
+        setVerseError(t("Sem conexão. Este capítulo ainda não foi salvo no cache."));
+        setVerses([]);
+      }
+      setLoading(false);
+      return;
+    }
+
+    const params = {
+      bookId: book.bookId.toString(),
+      chapter: chapter.toString(),
+      locale: lang,
+    };
+
+    let lastError: unknown = null;
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const data = await fetchEdgeFunction<{ verses?: Verse[]; error?: string; version?: string }>(
+          "bible-verses",
+          params,
+          { timeoutMs: FETCH_TIMEOUT_MS },
+        );
+
+        const fetched: Verse[] = Array.isArray(data.verses) ? data.verses : [];
+
+        if (fetched.length === 0) {
+          throw new Error(data.error || t("Não foi possível carregar este capítulo."));
+        }
+
+        setVerses(fetched);
+        setVersesFromCache(false);
+        cacheBibleChapter(
+          data.version ?? translation,
+          String(book.bookId),
+          chapter,
+          fetched,
+        );
+        setLoading(false);
+        return;
+      } catch (e) {
+        lastError = e;
+        console.error(`Fetch verses attempt ${attempt + 1}:`, e);
+        if (attempt === 0) await sleep(800);
+      }
+    }
+
+    // All attempts failed — keep cached content if we have it
+    if (cached && cached.length > 0) {
+      setVerses(cached);
+      setVersesFromCache(true);
+      setVerseError("");
+      toast.message(t("Exibindo capítulo salvo offline"));
+    } else {
+      setVerses([]);
+      setVerseError(mapFetchError(lastError, t));
+    }
+    setLoading(false);
+  }, [getAuthHeaders, isOnline, lang]);
 
   useEffect(() => {
     if (selectedChapter !== null) {
@@ -182,18 +266,14 @@ export default function Biblia() {
     setIsLoading(true);
 
     try {
-      const accessToken = await getAccessToken();
+      const headers = await getAuthHeaders();
       const context = selectedChapter !== null
         ? { book: selectedBook.name, chapter: selectedChapter, bookId: selectedBook.bookId }
         : undefined;
 
       const resp = await fetch(CHAT_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${accessToken}`,
-        },
+        headers,
         body: JSON.stringify({ messages: allMessages, locale: lang, context }),
       });
 
@@ -729,7 +809,12 @@ export default function Biblia() {
                   </button>
                   <button onClick={() => { if (!zenMode) setBookPickerOpen(!bookPickerOpen); }} className="text-center">
                     <h2 className="font-serif text-lg hover:text-primary transition-colors">{selectedBook.name}</h2>
-                    <p className="text-xs text-muted-foreground">{t("Capítulo")} {selectedChapter}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t("Capítulo")} {selectedChapter}
+                      {versesFromCache && (
+                        <span className="ml-2 text-[10px] text-muted-foreground/70">· {t("Capítulo em cache")}</span>
+                      )}
+                    </p>
                   </button>
                   <button onClick={nextChapter} disabled={!hasNext}
                     className="p-1.5 rounded-lg hover:bg-secondary transition-colors disabled:opacity-30">
@@ -755,19 +840,31 @@ export default function Biblia() {
                 </div>
               </div>
 
-              {loading ? (
+              {loading && verses.length === 0 ? (
                 <div className="flex items-center justify-center py-16">
                   <Loader2 size={24} className="animate-spin text-muted-foreground" />
                 </div>
               ) : verses.length === 0 ? (
-                <div className="text-center py-16 text-muted-foreground text-sm">
+                <div className="text-center py-16 text-muted-foreground text-sm space-y-3">
+                  <BookOpen size={32} className="mx-auto opacity-30" />
                   <p>{verseError || t("Não foi possível carregar este capítulo.")}</p>
-                  <button onClick={() => fetchVerses(selectedBook, selectedChapter)} className="mt-2 text-primary underline text-xs">
-                    {t("Tentar novamente")}
-                  </button>
+                  {selectedChapter !== null && (
+                    <button
+                      type="button"
+                      onClick={() => fetchVerses(selectedBook, selectedChapter, { retry: true })}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20"
+                    >
+                      {t("Tentar novamente")}
+                    </button>
+                  )}
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-4 relative">
+                  {loading && (
+                    <div className="absolute top-0 right-0">
+                      <Loader2 size={16} className="animate-spin text-muted-foreground" />
+                    </div>
+                  )}
                   {verses.map(v => (
                     <p key={v.num} className={`font-serif leading-relaxed ${largeFont ? "text-2xl sm:text-3xl" : "text-lg sm:text-xl"}`}>
                       <sup className={`text-accent font-sans font-bold mr-1.5 tabular-nums ${largeFont ? "text-sm" : "text-xs"}`}>{v.num}</sup>
