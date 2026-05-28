@@ -3,7 +3,7 @@ import { ExecutiveCard } from "@/components/ExecutiveCard";
 import { MatrizDashboard } from "@/components/MatrizDashboard";
 import { DailyDevotional } from "@/components/DailyDevotional";
 import { motion } from "framer-motion";
-import { Wallet, Users, TrendingUp, Calendar, Clock, Bell, Plus, ChevronRight, Loader2, Shield, Building2, Globe, BookOpen, Heart, Music, MessageSquare, FileText } from "lucide-react";
+import { Wallet, Users, TrendingUp, Calendar, Clock, Bell, Plus, ChevronRight, Loader2, Shield, Building2, Globe, BookOpen, Heart, Music2, MessageSquare, FileText } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -192,8 +192,8 @@ export default function Dashboard() {
 
     return (
       <motion.section
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ duration: 0.35 }}
         className="overflow-hidden rounded-2xl shadow-executive bg-card border border-border/50"
       >
@@ -307,7 +307,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {[
             { label: t("Bíblia Sagrada"), desc: t("Leia e medite na Palavra"), path: "/admin/biblia", icon: BookOpen },
-            { label: t("Harpa"), desc: t("Hinário digital com áudio"), path: "/admin/hinario", icon: Music },
+            { label: t("Culto & Louvor"), desc: t("Hinos, roteiros e louvor"), path: "/admin/culto", icon: Music2 },
             { label: t("Agenda"), desc: t("Eventos e cultos"), path: "/admin/agenda", icon: Calendar },
             { label: t("Pedidos de Oração"), desc: t("Ore pela igreja"), path: "/admin/oracoes", icon: Heart },
             { label: t("Comunicação"), desc: t("Comunicados da igreja"), path: "/admin/comunicacao", icon: MessageSquare },
@@ -315,8 +315,8 @@ export default function Dashboard() {
           ].map((item, i) => (
             <Link key={item.path} to={item.path}>
               <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1], delay: i * 0.05 }}
                 className="bg-card p-5 rounded-xl shadow-executive hover:shadow-executive-hover transition-shadow duration-300 h-full"
               >
@@ -340,7 +340,7 @@ export default function Dashboard() {
       {isSuperAdmin && superMetrics && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Link to="/admin/super-admin">
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               className="bg-card rounded-xl p-4 shadow-sm border border-border/50 cursor-pointer hover:shadow-md transition-shadow">
               <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-primary/10 mb-2">
                 <Globe size={18} className="text-primary" />
@@ -350,7 +350,7 @@ export default function Dashboard() {
             </motion.div>
           </Link>
           <Link to="/admin/gerenciar-acessos">
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.05 }}
               className="bg-card rounded-xl p-4 shadow-sm border border-border/50 cursor-pointer hover:shadow-md transition-shadow">
               <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-accent/10 mb-2">
                 <Users size={18} className="text-accent" />
@@ -461,8 +461,8 @@ export default function Dashboard() {
           ].map((item, i) => (
             <Link key={item.path} to={item.path}>
               <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1], delay: i * 0.05 }}
                 className="bg-card p-5 rounded-xl shadow-executive hover:shadow-executive-hover transition-shadow duration-300 h-full"
               >
@@ -526,8 +526,8 @@ export default function Dashboard() {
         ) : !church && !isSuperAdmin ? (
           /* No church assigned — welcome/onboarding state */
           <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             className="rounded-2xl border border-accent/20 bg-card shadow-executive p-8 text-center max-w-2xl mx-auto"
           >
             <div className="w-16 h-16 bg-accent/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -544,7 +544,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-left mt-2">
               {[
                 { icon: BookOpen, title: lang === "en" ? "AI Bible Assistant" : lang === "es" ? "Asistente Bíblico IA" : "Assistente Bíblico IA", desc: lang === "en" ? "Chat with a pastoral AI guide" : lang === "es" ? "Conversa con un guía pastoral IA" : "Converse com um guia pastoral IA", href: "/admin/biblia" },
-                { icon: Music,    title: lang === "en" ? "Digital Hymnal" : lang === "es" ? "Himnario Digital" : "Harpa Digital", desc: lang === "en" ? "Full digital hymnal" : lang === "es" ? "Himnario digital completo" : "Hinário digital completo", href: "/admin/hinario" },
+                { icon: Music2,   title: lang === "en" ? "Worship" : lang === "es" ? "Culto y Alabanza" : "Culto & Louvor", desc: lang === "en" ? "Hymns, worship orders & AI" : lang === "es" ? "Himnos, roteiros y IA" : "Hinos, roteiros e IA", href: "/admin/culto" },
                 { icon: Heart,    title: lang === "en" ? "Prayer Requests" : lang === "es" ? "Pedidos de Oración" : "Pedidos de Oração", desc: lang === "en" ? "Pray with your community" : lang === "es" ? "Ora con tu comunidad" : "Ore com sua comunidade", href: "/admin/oracoes" },
               ].map(item => (
                 <Link key={item.href} to={item.href}

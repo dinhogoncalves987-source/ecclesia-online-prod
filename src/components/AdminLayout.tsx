@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Wallet, Users, Calendar, BookOpen, FileText,
   Heart, MessageSquare, UsersRound, Archive, BarChart3, Menu, X,
   Bell, ChevronLeft, ChevronDown, Settings, LogOut, Maximize, Minimize, Globe,
-  Shield, User, Building2, Music, Gavel, Briefcase
+  Shield, User, Building2, Music2, Gavel, Briefcase
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -44,7 +44,7 @@ const navSections: NavSection[] = [
     separator: true,
     items: [
       { icon: BookOpen, label: "Bíblia Sagrada", path: "/admin/biblia" },
-      { icon: Music, label: "Harpa", path: "/admin/hinario" },
+      { icon: Music2, label: "Culto & Louvor", path: "/admin/culto" },
     ],
   },
   {
@@ -310,7 +310,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="h-16 bg-card/80 backdrop-blur-md shadow-[var(--shadow-sm)] flex items-center justify-between px-4 lg:px-8 sticky top-0 z-30">
+        <header className="h-16 bg-card/95 lg:bg-card/80 lg:backdrop-blur-md shadow-[var(--shadow-sm)] flex items-center justify-between px-4 lg:px-8 sticky top-0 z-30">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(true)}
@@ -424,7 +424,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-40 lg:hidden"
+              className="fixed inset-0 bg-foreground/30 z-50 lg:hidden"
               onClick={() => setMobileMenuOpen(false)}
             />
             <motion.div
@@ -469,7 +469,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       </AnimatePresence>
 
       {/* Mobile bottom nav */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-card/95 backdrop-blur-md shadow-[0_-1px_0_0_hsl(var(--border)/0.5)] flex justify-around items-center z-30">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-card shadow-[0_-1px_0_0_hsl(var(--border)/0.5)] flex justify-around items-center z-30">
         {mobileNavItems.filter(item => canAccess(item.path)).map((item) => (
           <Link
             key={item.path}
@@ -492,7 +492,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50"
+              className="fixed inset-0 bg-foreground/30 z-50"
               onClick={() => setShowLogoutConfirm(false)}
             />
             <motion.div
