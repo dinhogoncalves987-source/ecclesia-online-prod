@@ -13,6 +13,7 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { getCachedBibleChapter, cacheBibleChapter } from "@/lib/offlineCache";
 import { fetchEdgeFunction, getPublicEdgeHeaders } from "@/lib/edgeFetch";
 import { toast } from "sonner";
+import { scrollElementIntoView } from "@/lib/mobileScroll";
 
 type Verse = { num: number; text: string };
 type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -103,7 +104,7 @@ export default function Biblia() {
   const recognitionRef = useRef<any>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const versesRef = useRef<HTMLDivElement>(null);
+  const versesSectionRef = useRef<HTMLDivElement>(null);
   const chatRef = useRef<HTMLDivElement>(null);
 
   const selectedBook = bibleBooks[selectedBookIndex];
@@ -211,7 +212,8 @@ export default function Biblia() {
   }, [selectedBookIndex, selectedChapter, fetchVerses]);
 
   useEffect(() => {
-    if (versesRef.current) versesRef.current.scrollTop = 0;
+    if (selectedChapter === null) return;
+    scrollElementIntoView(versesSectionRef.current, { block: "start", delay: 350 });
   }, [selectedBookIndex, selectedChapter]);
 
   const scrollToBottom = useCallback(() => {
@@ -795,12 +797,13 @@ export default function Biblia() {
         {/* Scripture — only show when a chapter is selected */}
         {selectedChapter !== null && (
           <motion.div
+            ref={versesSectionRef}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             key={`${selectedBookIndex}-${selectedChapter}`}
             className={`bg-card rounded-xl shadow-executive ${zenMode ? "max-w-2xl mx-auto" : ""}`}
           >
-            <div className="p-5 sm:p-8" ref={versesRef}>
+            <div className="p-5 sm:p-8">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
                   <button onClick={prevChapter} disabled={!hasPrev}

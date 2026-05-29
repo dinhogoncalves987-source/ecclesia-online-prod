@@ -263,6 +263,9 @@ export function DailyDevotional() {
   const config = PERIOD_CONFIG[activePeriod];
   const showSkeleton = loading && !devotional;
   const reflectionText = devotional?.reflection?.trim() ?? "";
+  const displayReflection = (reflectionText || STATIC_REFLECTION[activePeriod][locale])
+    .replace(/\s*\n+\s*/g, " ")
+    .trim();
 
   return (
     <div
@@ -340,8 +343,8 @@ export function DailyDevotional() {
 
             <div className="flex gap-2 items-start bg-background/50 rounded-lg p-3">
               <Sparkles size={14} className="text-accent mt-0.5 flex-shrink-0" />
-              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                {reflectionText || STATIC_REFLECTION[activePeriod][locale]}
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed line-clamp-4 sm:line-clamp-5">
+                {displayReflection}
               </p>
             </div>
 

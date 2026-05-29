@@ -2,6 +2,8 @@ import { AdminLayout } from "@/components/AdminLayout";
 import { Clock, MapPin, Plus, ChevronLeft, ChevronRight, X, Trash2, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
+import { useMobileFocusScroll } from "@/hooks/useMobileFocusScroll";
+import { scrollElementIntoView } from "@/lib/mobileScroll";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useChurch } from "@/hooks/useChurchContext";
@@ -44,6 +46,11 @@ export default function Agenda() {
   const [currentMonth, setCurrentMonth] = useState(now.getMonth());
   const [currentYear, setCurrentYear] = useState(now.getFullYear());
   const [newEvent, setNewEvent] = useState({ title: "", time: "", location: "", color: "bg-accent" });
+  const formRef = useMobileFocusScroll<HTMLDivElement>();
+
+  useEffect(() => {
+    if (showForm) scrollElementIntoView(formRef.current, { block: "start", delay: 400 });
+  }, [showForm]);
 
   const todayDay = now.getDate();
   const todayMonth = now.getMonth();
@@ -160,7 +167,7 @@ export default function Agenda() {
         <AnimatePresence>
           {showForm && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-              <div className="bg-card rounded-xl shadow-executive p-5">
+              <div ref={formRef} className="bg-card rounded-xl shadow-executive p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-serif text-base">{t("Novo Evento —")} {selectedDay} {t("de")} {t(monthKeys[currentMonth])}</h3>
                   <button onClick={() => { setShowForm(false); setSelectedDay(null); }} className="p-1.5 rounded-lg hover:bg-secondary"><X size={16} strokeWidth={1.5} /></button>

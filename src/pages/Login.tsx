@@ -5,6 +5,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { Loader2, Eye, EyeOff, BookOpen, Users, Wallet } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useMobileFocusScroll } from "@/hooks/useMobileFocusScroll";
 import { persistPendingChurchSlug, signupPathWithChurch } from "@/lib/organizationMembership";
 import flagBR from "@/assets/flag-br.png";
 import flagUS from "@/assets/flag-us.png";
@@ -23,6 +24,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const formRef = useMobileFocusScroll<HTMLFormElement>();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +87,7 @@ export default function Login() {
           </div>
         </div>
 
-        <form onSubmit={handleLogin} className="bg-card rounded-xl shadow-executive p-6 space-y-4">
+        <form ref={formRef} onSubmit={handleLogin} className="bg-card rounded-xl shadow-executive p-6 space-y-4">
           <div>
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("E-mail")}</label>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seu@email.com" required

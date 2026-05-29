@@ -5,6 +5,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useMobileFocusScroll } from "@/hooks/useMobileFocusScroll";
 import {
   buildSignupMetadata,
   loginPathWithChurch,
@@ -26,6 +27,7 @@ export default function Signup() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const formRef = useMobileFocusScroll<HTMLFormElement>();
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +79,7 @@ export default function Signup() {
           )}
         </div>
 
-        <form onSubmit={handleSignup} className="bg-card rounded-xl shadow-executive p-6 space-y-4">
+        <form ref={formRef} onSubmit={handleSignup} className="bg-card rounded-xl shadow-executive p-6 space-y-4">
           <div>
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("Nome completo")}</label>
             <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={t("Ex: Pastor João Silva")} required
