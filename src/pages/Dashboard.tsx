@@ -1,4 +1,4 @@
-import { AdminLayout } from "@/components/AdminLayout";
+﻿import { AdminLayout } from "@/components/AdminLayout";
 import { ExecutiveCard } from "@/components/ExecutiveCard";
 import { MatrizDashboard } from "@/components/MatrizDashboard";
 import { DailyDevotional } from "@/components/DailyDevotional";
@@ -199,7 +199,7 @@ export default function Dashboard() {
       >
         {campaign.image_url ? (
           <div className="aspect-[16/9] max-h-[420px] min-h-[190px] w-full overflow-hidden bg-foreground">
-            <img src={campaign.image_url} alt={campaign.title} className="h-full w-full object-fill" />
+            <img src={campaign.image_url} alt={campaign.title} className="h-full w-full object-cover" />
           </div>
         ) : (
           <div className="flex aspect-[16/9] max-h-[420px] min-h-[190px] w-full items-center justify-center bg-gradient-to-br from-foreground via-foreground/90 to-accent/50 px-5 text-center">
@@ -370,7 +370,7 @@ export default function Dashboard() {
       </div>
 
       {/* Matriz consolidated panel */}
-      {isMatriz && isAdmin && <MatrizDashboard />}
+      {false && isMatriz && isAdmin && <MatrizDashboard />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Events - clickable */}
@@ -517,7 +517,7 @@ export default function Dashboard() {
 
         {/* Daily Devotional - always visible */}
         <DailyDevotional />
-        {!loading && canViewPlatformCampaigns && renderCampaignBanner()}
+        {false && !loading && canViewPlatformCampaigns && renderCampaignBanner()}
 
         {loading ? (
           <div className="flex items-center justify-center py-12">

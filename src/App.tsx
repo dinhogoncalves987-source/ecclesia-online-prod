@@ -38,6 +38,8 @@ import ResetPassword from "./pages/ResetPassword";
 
 import SharePublic from "./pages/SharePublic";
 
+import DevocionalPublic from "./pages/DevocionalPublic";
+
 import NotFound from "./pages/NotFound";
 
 
@@ -86,6 +88,10 @@ const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
 
 const AssembleiaGeral = lazy(() => import("./pages/AssembleiaGeral"));
 
+const Marketplace = lazy(() => import("./pages/Marketplace"));
+
+const Comunidade = lazy(() => import("./pages/Comunidade"));
+
 
 
 const queryClient = new QueryClient();
@@ -128,6 +134,8 @@ const App = () => (
 
               <Route path="/share" element={<SharePublic />} />
 
+              <Route path="/devocional" element={<DevocionalPublic />} />
+
               <Route path="/admin" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
 
               <Route path="/admin/financeiro" element={<ProtectedRoute><Financeiro /></ProtectedRoute>} />
@@ -169,6 +177,10 @@ const App = () => (
               <Route path="/admin/assembleia-geral" element={<ProtectedRoute><AssembleiaGeral /></ProtectedRoute>} />
 
               <Route path="/admin/super-admin" element={<ProtectedRoute><SuperAdmin /></ProtectedRoute>} />
+
+              <Route path="/admin/marketplace" element={<ProtectedRoute><Marketplace /></ProtectedRoute>} />
+
+              <Route path="/admin/comunidade" element={<ProtectedRoute><Comunidade /></ProtectedRoute>} />
 
               <Route path="*" element={<NotFound />} />
 

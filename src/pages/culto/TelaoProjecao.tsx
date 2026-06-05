@@ -6,19 +6,22 @@ import { useChurch } from "@/hooks/useChurchContext";
 import {
   Monitor, ArrowLeft, ChevronLeft, ChevronRight, Maximize, Minimize, Type,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
+  ensureWorshipLoaded,
   getSongs,
   getSetlists,
   getSetlistById,
   lyricsToSlides,
   setlistToSlides,
+  worshipLoadErrorMessage,
   type ProjectionSlide,
 } from "@/lib/worshipStorage";
 
 export default function TelaoProjecao() {
   const { t } = useLanguage();
   const { church } = useChurch();
-  const churchId = church?.id ?? "local";
+  const organizationId = church?.id;
   const [searchParams] = useSearchParams();
 
   const [presenting, setPresenting] = useState(false);
@@ -29,22 +32,45 @@ export default function TelaoProjecao() {
   const [source, setSource] = useState<"manual" | "song" | "setlist">("manual");
   const [selectedSongId, setSelectedSongId] = useState("");
   const [selectedSetlistId, setSelectedSetlistId] = useState(searchParams.get("setlist") ?? "");
+  const [hydrated, setHydrated] = useState(0);
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  const songs = getSongs(churchId);
-  const setlists = getSetlists(churchId);
+  useEffect(() => {
+    if (!organizationId) {
+      setHydrated(0);
+      setLoadFailed(false);
+      return;
+    }
+    setLoadFailed(false);
+    void ensureWorshipLoaded(organizationId)
+      .then(() => {
+        setHydrated((n) => n + 1);
+        setLoadFailed(false);
+      })
+      .catch((err) => {
+        setLoadFailed(true);
+        toast.error(
+          worshipLoadErrorMessage(err, t("Erro ao carregar dados para o telão")),
+        );
+      });
+  }, [organizationId, t]);
+
+  const songs = organizationId ? getSongs(organizationId) : [];
+  const setlists = organizationId ? getSetlists(organizationId) : [];
+  void hydrated;
 
   const slides: ProjectionSlide[] = useMemo(() => {
     if (source === "song" && selectedSongId) {
       const song = songs.find((s) => s.id === selectedSongId);
       if (song) return lyricsToSlides(song.title, song.lyrics);
     }
-    if (source === "setlist" && selectedSetlistId) {
-      const setlist = getSetlistById(churchId, selectedSetlistId);
-      if (setlist) return setlistToSlides(churchId, setlist);
+    if (source === "setlist" && selectedSetlistId && organizationId) {
+      const setlist = getSetlistById(organizationId, selectedSetlistId);
+      if (setlist) return setlistToSlides(organizationId, setlist);
     }
     if (manualText.trim()) return lyricsToSlides(manualTitle || t("Telão de Projeção"), manualText);
     return [];
-  }, [source, selectedSongId, selectedSetlistId, manualText, manualTitle, songs, churchId, t]);
+  }, [source, selectedSongId, selectedSetlistId, manualText, manualTitle, songs, organizationId, t]);
 
   const current = slides[slideIndex];
 
@@ -129,6 +155,12 @@ export default function TelaoProjecao() {
           </h1>
           <p className="text-sm text-muted-foreground mt-1">{t("Projete letras e leituras em tela cheia")}</p>
         </div>
+
+        {loadFailed && (
+          <p className="text-sm text-destructive rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+            {t("Não foi possível carregar músicas e roteiros. O modo manual ainda funciona.")}
+          </p>
+        )}
 
         <div className="flex gap-2 flex-wrap">
           {(["manual", "song", "setlist"] as const).map((s) => (

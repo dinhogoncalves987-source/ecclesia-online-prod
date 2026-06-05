@@ -58,7 +58,7 @@ export default function Relatorios() {
         totalIncome: incomeTotal, totalExpense: expenseTotal, balance: incomeTotal - expenseTotal,
         totalEvents: (events.data || []).length,
         totalPrayers: prayersData.length,
-        answeredPrayers: prayersData.filter(p => p.status === "Respondido").length,
+        answeredPrayers: prayersData.filter(p => (p.status ?? "Ativo") === "Respondido").length,
         totalGroups: (groups.data || []).length,
         totalDocs: (docs.data || []).length,
       });

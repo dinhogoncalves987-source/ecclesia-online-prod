@@ -1,0 +1,278 @@
+﻿import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { motion, useReducedMotion } from "framer-motion";
+import {
+  BookOpen, Sparkles, Sun, CloudSun, Moon, ArrowRight, Loader2,
+  Calendar, Music2, Users, Wallet, MessageSquare,
+} from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { fetchEdgeFunction } from "@/lib/edgeFetch";
+import { getCachedDevotional } from "@/lib/offlineCache";
+import {
+  normalizeReflection,
+  parseDevotionalShareParams,
+  type DevotionalLocale,
+} from "@/lib/devotionalShare";
+
+type Period = "manha" | "tarde" | "noite";
+
+const PERIOD_CONFIG: Record<Period, {
+  label: Record<DevotionalLocale, string>;
+  subtitle: Record<DevotionalLocale, string>;
+  icon: typeof Sun;
+  gradient: string;
+  border: string;
+  glow: string;
+}> = {
+  manha: {
+    label: { pt: "Devocional da Manhã", en: "Morning Devotional", es: "Devocional de la Mañana" },
+    subtitle: { pt: "Uma palavra para começar o dia", en: "A word to start the day", es: "Una palabra para comenzar el día" },
+    icon: Sun,
+    gradient: "from-amber-500/15 via-orange-400/8 to-yellow-300/5",
+    border: "border-amber-400/25",
+    glow: "bg-amber-400/10",
+  },
+  tarde: {
+    label: { pt: "Devocional da Tarde", en: "Afternoon Devotional", es: "Devocional de la Tarde" },
+    subtitle: { pt: "Renove suas forças em Deus", en: "Renew your strength in God", es: "Renueva tus fuerzas en Dios" },
+    icon: CloudSun,
+    gradient: "from-sky-500/15 via-blue-400/8 to-cyan-300/5",
+    border: "border-sky-400/25",
+    glow: "bg-sky-400/10",
+  },
+  noite: {
+    label: { pt: "Devocional da Noite", en: "Evening Devotional", es: "Devocional de la Noche" },
+    subtitle: { pt: "Descanse na paz do Senhor", en: "Rest in the Lord's peace", es: "Descansa en la paz del Señor" },
+    icon: Moon,
+    gradient: "from-indigo-500/15 via-purple-400/8 to-violet-300/5",
+    border: "border-indigo-400/25",
+    glow: "bg-indigo-400/10",
+  },
+};
+
+const COPY = {
+  tagline: { pt: "Plataforma de Gestão Pastoral", en: "Church Management Platform", es: "Plataforma de Gestión Pastoral" },
+  reflection: { pt: "Reflexão pastoral", en: "Pastoral reflection", es: "Reflexión pastoral" },
+  openApp: { pt: "Abrir no Ecclesia", en: "Open in Ecclesia", es: "Abrir en Ecclesia" },
+  loading: { pt: "Carregando devocional…", en: "Loading devotional…", es: "Cargando devocional…" },
+  discover: { pt: "Conheça o Ecclesia Online", en: "Discover Ecclesia Online", es: "Conoce Ecclesia Online" },
+  discoverDesc: {
+    pt: "Tudo o que sua igreja precisa, em um só lugar.",
+    en: "Everything your church needs, in one place.",
+    es: "Todo lo que tu iglesia necesita, en un solo lugar.",
+  },
+  featuresLabel: { pt: "Recursos da plataforma", en: "Platform features", es: "Recursos de la plataforma" },
+};
+
+const STATIC_FALLBACK: Record<Period, Record<DevotionalLocale, { verse: string; reference: string; reflection: string }>> = {
+  manha: {
+    pt: { verse: "O Senhor é o meu pastor; nada me faltará.", reference: "Salmos 23:1", reflection: "Que esta manhã encontre um coração aberto à voz de Deus. Caminhe com calma, confiando que Ele vai à sua frente." },
+    en: { verse: "The Lord is my shepherd; I shall not want.", reference: "Psalm 23:1", reflection: "May this morning find your heart open to God's voice. Walk calmly, trusting that He goes before you." },
+    es: { verse: "El Señor es mi pastor; nada me faltará.", reference: "Salmos 23:1", reflection: "Que esta mañana encuentre tu corazón abierto a la voz de Dios. Camina con calma, confiando en que Él va delante de ti." },
+  },
+  tarde: {
+    pt: { verse: "Posso todas as coisas naquele que me fortalece.", reference: "Filipenses 4:13", reflection: "No meio deste dia, pause e renove suas forças na presença do Senhor. Você não caminha sozinho." },
+    en: { verse: "I can do all things through Christ who strengthens me.", reference: "Philippians 4:13", reflection: "In the middle of this day, pause and renew your strength in the Lord. You do not walk alone." },
+    es: { verse: "Todo lo puedo en Cristo que me fortalece.", reference: "Filipenses 4:13", reflection: "En medio de este día, haz una pausa y renueva tus fuerzas en la presencia del Señor. No caminas solo." },
+  },
+  noite: {
+    pt: { verse: "Em paz me deitarei e dormirei, porque só tu, Senhor, me fazes repousar seguro.", reference: "Salmos 4:8", reflection: "Ao encerrar este dia, descanse na paz de quem confia em Deus. Entregue a Ele o que ainda pesa no coração." },
+    en: { verse: "In peace I will lie down and sleep, for you alone, Lord, make me dwell in safety.", reference: "Psalm 4:8", reflection: "As you close this day, rest in the peace of those who trust in God. Surrender what still weighs on your heart." },
+    es: { verse: "En paz me acostaré y dormiré, porque solo tú, Señor, me haces vivir confiado.", reference: "Salmos 4:8", reflection: "Al cerrar este día, descansa en la paz de quien confía en Dios. Entrega lo que aún pesa en tu corazón." },
+  },
+};
+
+const FEATURES: { icon: typeof BookOpen; label: Record<DevotionalLocale, string> }[] = [
+  { icon: BookOpen, label: { pt: "Bíblia", en: "Bible", es: "Biblia" } },
+  { icon: Calendar, label: { pt: "Agenda", en: "Calendar", es: "Agenda" } },
+  { icon: Music2, label: { pt: "Culto & Louvor", en: "Worship", es: "Culto y Alabanza" } },
+  { icon: Users, label: { pt: "Membros", en: "Members", es: "Miembros" } },
+  { icon: Wallet, label: { pt: "Financeiro", en: "Treasury", es: "Finanzas" } },
+  { icon: MessageSquare, label: { pt: "IA Pastoral", en: "Pastoral AI", es: "IA Pastoral" } },
+];
+
+function getCurrentPeriod(): Period {
+  const hour = new Date().getHours();
+  if (hour < 13) return "manha";
+  if (hour < 18) return "tarde";
+  return "noite";
+}
+
+function getLocale(): DevotionalLocale {
+  const lang = (navigator.language || "pt").toLowerCase();
+  if (lang.startsWith("en")) return "en";
+  if (lang.startsWith("es")) return "es";
+  return "pt";
+}
+
+function getLocalDateString(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+type DevotionalData = { verse: string; reference: string; reflection: string };
+
+export default function DevocionalPublic() {
+  const [searchParams] = useSearchParams();
+  const reduceMotion = useReducedMotion();
+  const locale = getLocale();
+  const period = getCurrentPeriod();
+  const config = PERIOD_CONFIG[period];
+  const PeriodIcon = config.icon;
+
+  const sharedFromUrl = parseDevotionalShareParams(searchParams);
+
+  const [data, setData] = useState<DevotionalData | null>(sharedFromUrl);
+  const [loading, setLoading] = useState(!sharedFromUrl);
+
+  const fadeIn = reduceMotion
+    ? { animate: { opacity: 1 } }
+    : { initial: { opacity: 0, y: 16 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.45 } };
+
+  const fadeInDelay = (delay: number) =>
+    reduceMotion
+      ? { animate: { opacity: 1 } }
+      : { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.45, delay } };
+
+  const load = async () => {
+    if (sharedFromUrl) {
+      setData(sharedFromUrl);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+
+    const today = getLocalDateString();
+    const cached = getCachedDevotional(today, period, locale);
+    if (cached?.verse) {
+      setData({ verse: cached.verse, reference: cached.reference, reflection: cached.reflection });
+      setLoading(false);
+    }
+
+    try {
+      const result = await fetchEdgeFunction<Record<string, unknown>>(
+        "daily-devotional",
+        { period, locale },
+        { timeoutMs: 35_000 },
+      );
+      if (result.error) throw new Error(String(result.error));
+      const verse = String(result.verse ?? "").trim();
+      const reference = String(result.reference ?? "").trim();
+      const reflection = String(result.reflection ?? result.text ?? "").trim();
+      if (!verse) throw new Error("Empty verse");
+      setData({ verse, reference, reflection });
+    } catch {
+      if (!cached?.verse) {
+        setData(STATIC_FALLBACK[period][locale]);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const reflectionText = data?.reflection?.trim() || STATIC_FALLBACK[period][locale].reflection;
+  const displayReflection = data ? normalizeReflection(reflectionText) : "";
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="flex items-center justify-between px-5 py-4 border-b border-border/40">
+        <Link to="/" className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-sm">
+            <span className="text-accent font-serif text-lg leading-none" aria-hidden="true">Ω</span>
+          </div>
+          <div>
+            <p className="text-sm font-semibold leading-tight">Ecclesia</p>
+            <p className="text-[10px] text-muted-foreground leading-tight">{COPY.tagline[locale]}</p>
+          </div>
+        </Link>
+        <ThemeToggle />
+      </header>
+
+      <main className="max-w-lg mx-auto px-4 py-8 sm:py-10 space-y-5">
+
+        {/* OG preview image */}
+        <motion.div {...fadeIn}>
+          <img
+            src="/og-devocional.png"
+            alt="Devocional Ecclesia"
+            className="w-full rounded-2xl object-cover shadow-executive border border-border/30"
+            style={{ maxHeight: "180px", objectPosition: "center" }}
+          />
+        </motion.div>
+
+        <motion.div
+          {...fadeIn}
+          className={`relative overflow-hidden bg-gradient-to-br ${config.gradient} rounded-2xl border ${config.border} shadow-executive`}
+        >
+          <div
+            className={`absolute top-5 right-5 w-14 h-14 rounded-full ${config.glow} border border-accent/20 flex items-center justify-center`}
+            aria-hidden="true"
+          >
+            <PeriodIcon size={22} className="text-accent" />
+          </div>
+          <div className="absolute bottom-0 left-0 w-40 h-40 bg-primary/5 rounded-full translate-y-1/2 -translate-x-1/4" aria-hidden="true" />
+
+          <div className="relative z-10 p-6 sm:p-8 space-y-5">
+            <div className="pr-16">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-accent mb-1">Ecclesia Online</p>
+              <h1 className="font-serif text-xl sm:text-2xl text-foreground leading-tight">{config.label[locale]}</h1>
+              <p className="text-xs text-muted-foreground mt-1">{config.subtitle[locale]}</p>
+            </div>
+
+            <div className="h-px bg-gradient-to-r from-accent/40 via-accent/10 to-transparent" aria-hidden="true" />
+
+            {loading ? (
+              <div className="flex items-center justify-center py-14" role="status" aria-live="polite">
+                <Loader2 size={28} className="animate-spin text-muted-foreground" aria-hidden="true" />
+                <span className="sr-only">{COPY.loading[locale]}</span>
+              </div>
+            ) : data ? (
+              <>
+                <blockquote cite={data.reference} className="font-serif text-lg sm:text-xl italic text-foreground/95 leading-relaxed line-clamp-6 sm:line-clamp-none">
+                  &ldquo;{data.verse}&rdquo;
+                </blockquote>
+                <p className="text-sm font-semibold text-accent tracking-wide">— {data.reference}</p>
+
+                {displayReflection && (
+                  <div className="bg-background/70 backdrop-blur-sm rounded-xl p-4 border border-border/30">
+                    <div className="flex gap-2.5 items-start">
+                      <Sparkles size={15} className="text-accent mt-0.5 flex-shrink-0" aria-hidden="true" />
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+                          {COPY.reflection[locale]}
+                        </p>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          {displayReflection}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              </>
+            ) : null}
+          </div>
+        </motion.div>
+
+        <motion.div {...fadeInDelay(0.1)}>
+          <Link
+            to="/login"
+            className="flex items-center justify-between w-full px-5 py-4 bg-primary text-primary-foreground rounded-xl font-semibold hover:opacity-90 transition-opacity shadow-md"
+          >
+            <div className="flex items-center gap-3">
+              <BookOpen size={18} aria-hidden="true" />
+              <span>{COPY.openApp[locale]}</span>
+            </div>
+            <ArrowRight size={18} aria-hidden="true" />
+          </Link>
+        </motion.div>
+
+      </main>
+    </div>
+  );
+}

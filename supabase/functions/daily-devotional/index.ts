@@ -214,6 +214,137 @@ function getVerseRef(verse: typeof VERSES[0]): string {
   return verse.ref.split(" / ")[0];
 }
 
+function hashSeed(seed: string): number {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash << 5) - hash + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function extractGeminiText(data: Record<string, unknown>): string {
+  const candidates = data?.candidates as Array<{ content?: { parts?: Array<{ text?: string }> } }> | undefined;
+  const parts = candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) return "";
+  return parts
+    .map((part) => part.text?.trim() ?? "")
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
+const MIN_REFLECTION_CHARS = 180;
+const MIN_REFLECTION_SENTENCES = 4;
+
+function countSentences(text: string): number {
+  return text.split(/[.!?…]+/).filter((s) => s.trim().length > 8).length;
+}
+
+function isReflectionTooShort(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return true;
+  if (trimmed.length < MIN_REFLECTION_CHARS) return true;
+  if (countSentences(trimmed) < MIN_REFLECTION_SENTENCES) return true;
+  return false;
+}
+
+function sanitizeReflection(text: string, verseText: string): string {
+  let cleaned = text
+    .replace(/^["'`]+|["'`]+$/g, "")
+    .replace(/\*\*/g, "")
+    .replace(/^#+\s*/gm, "")
+    .replace(/^[-*]\s+/gm, "")
+    .trim();
+
+  const verseSnippet = verseText.slice(0, 40).toLowerCase();
+  if (verseSnippet.length > 12 && cleaned.toLowerCase().includes(verseSnippet)) {
+    cleaned = cleaned
+      .split("\n")
+      .filter((line) => !line.toLowerCase().includes(verseSnippet))
+      .join("\n")
+      .trim();
+  }
+
+  return cleaned;
+}
+
+function staticReflection(lang: "pt" | "en" | "es", period: string, ref?: string): string {
+  const refHint = ref ? ` (${ref})` : "";
+  const reflections: Record<string, Record<"pt" | "en" | "es", string>> = {
+    manha: {
+      pt: `Que esta manhã encontre um coração aberto à voz de Deus${refHint ? ` — a Palavra de hoje${refHint} nos convida a confiar antes de agir` : ""}.
+Antes das demandas do dia, reserve um momento para ouvir o Senhor e entregar a Ele suas expectativas.
+Esta palavra é direção, não apenas inspiração: ela quer moldar suas atitudes, palavras e decisões.
+Quando surgir pressa ou ansiedade, volte a esta verdade e caminhe com calma, sabendo que Deus vai à sua frente.
+Pratique hoje uma fé concreta: cumprimente alguém com gentileza, cumpra uma tarefa com integridade ou ore antes de responder.
+Não precisa resolver tudo de uma vez; basta dar o próximo passo confiando na fidelidade dEle.
+Que a luz desta manhã ilumine cada escolha e que você sinta a presença do Senhor em cada detalhe do dia.`,
+      en: `May this morning find your heart open to God's voice${refHint ? ` — today's Word${refHint} invites you to trust before you act` : ""}.
+Before the day's demands, take a moment to listen to the Lord and surrender your expectations to Him.
+This word is guidance, not just inspiration: it is meant to shape your attitudes, words, and decisions.
+When hurry or anxiety arise, return to this truth and walk calmly, knowing God goes before you.
+Practice faith in a concrete way today: greet someone kindly, work with integrity, or pray before you respond.
+You do not need to solve everything at once; simply take the next step trusting in His faithfulness.
+May the light of this morning guide every choice, and may you sense the Lord's presence in each detail of the day.`,
+      es: `Que esta mañana encuentre tu corazón abierto a la voz de Dios${refHint ? ` — la Palabra de hoy${refHint} te invita a confiar antes de actuar` : ""}.
+Antes de las exigencias del día, dedica un momento para escuchar al Señor y entregarle tus expectativas.
+Esta palabra es dirección, no solo inspiración: quiere moldear tus actitudes, palabras y decisiones.
+Cuando surjan prisa o ansiedad, vuelve a esta verdad y camina con calma, sabiendo que Dios va delante de ti.
+Practica hoy una fe concreta: saluda con amabilidad, trabaja con integridad u ora antes de responder.
+No necesitas resolverlo todo de una vez; da el siguiente paso confiando en Su fidelidad.
+Que la luz de esta mañana guíe cada elección y sientas la presencia del Señor en cada detalle del día.`,
+    },
+    tarde: {
+      pt: `No meio deste dia, faça uma pausa e renove suas forças na presença do Senhor${refHint ? ` — a mensagem de${refHint} ainda fala ao seu coração` : ""}.
+Talvez a manhã tenha sido corrida ou cansativa; mesmo assim, Deus não se afastou de você.
+Esta palavra é um lembrete de que você não caminha sozinho e que há graça para continuar.
+Reavalié o que ainda pode ser feito com paz: priorize o essencial e entregue a Deus o que não depende de você.
+Escolha uma aplicação prática para esta tarde — pedir perdão, ajudar alguém ou concluir algo com excelência.
+Não compare seu ritmo com o dos outros; caminhe fielmente no tempo que o Senhor lhe deu.
+Que esta tarde seja marcada por perseverança serena e pela certeza de que Ele sustenta cada passo.`,
+      en: `In the middle of this day, pause and renew your strength in the Lord's presence${refHint ? ` — the message from${refHint} still speaks to your heart` : ""}.
+Perhaps the morning was busy or tiring; even so, God has not moved away from you.
+This word reminds you that you do not walk alone and that there is grace to keep going.
+Reassess what can still be done with peace: prioritize what matters and surrender what is beyond your control.
+Choose one practical application for this afternoon — ask forgiveness, help someone, or finish a task with excellence.
+Do not compare your pace with others; walk faithfully in the time the Lord has given you.
+May this afternoon be marked by calm perseverance and the certainty that He upholds every step.`,
+      es: `En medio de este día, haz una pausa y renueva tus fuerzas en la presencia del Señor${refHint ? ` — el mensaje de${refHint} aún habla a tu corazón` : ""}.
+Quizá la mañana fue apresurada o cansada; aun así, Dios no se ha alejado de ti.
+Esta palabra te recuerda que no caminas solo y que hay gracia para continuar.
+Reevalúa lo que aún puede hacerse con paz: prioriza lo esencial y entrégale a Dios lo que no depende de ti.
+Elige una aplicación práctica para esta tarde — pedir perdón, ayudar a alguien o terminar algo con excelencia.
+No compares tu ritmo con el de otros; camina fielmente en el tiempo que el Señor te ha dado.
+Que esta tarde esté marcada por perseverancia serena y la certeza de que Él sostiene cada paso.`,
+    },
+    noite: {
+      pt: `Ao encerrar este dia, descanse na paz de quem confia em Deus${refHint ? ` — medite na Palavra de${refHint} antes de dormir` : ""}.
+Olhe para trás com gratidão pelas provisões recebidas, mesmo nas pequenas coisas que passaram despercebidas.
+Perdoe o que ficou pendente em você e entregue a Deus o que ainda pesa no coração.
+Esta palavra convida ao descanso da alma, não apenas do corpo — o Senhor cuida de quem Lhe pertence.
+Antes de dormir, nomeie uma bênção do dia e uma preocupação que você coloca nas mãos dEle.
+Amanhã é nova graça; hoje, apenas receba o amor do Pai e deixe que Ele acalme seus pensamentos.
+Que a paz de Cristo guarde seu coração e que você durma seguro sob o cuidado fiel do Senhor.`,
+      en: `As you close this day, rest in the peace of those who trust in God${refHint ? ` — meditate on the Word from${refHint} before you sleep` : ""}.
+Look back with gratitude for the provisions received, even in small things that went unnoticed.
+Forgive what remains unfinished in you and surrender to God what still weighs on your heart.
+This word invites rest for the soul, not just the body — the Lord cares for those who belong to Him.
+Before sleeping, name one blessing from the day and one worry you place in His hands.
+Tomorrow is new grace; tonight, simply receive the Father's love and let Him quiet your thoughts.
+May the peace of Christ guard your heart, and may you sleep secure under the Lord's faithful care.`,
+      es: `Al cerrar este día, descansa en la paz de quien confía en Dios${refHint ? ` — medita en la Palabra de${refHint} antes de dormir` : ""}.
+Mira atrás con gratitud por las provisiones recibidas, incluso en las cosas pequeñas que pasaron desapercibidas.
+Perdona lo que quedó pendiente en ti y entrégale a Dios lo que aún pesa en tu corazón.
+Esta palabra invita al descanso del alma, no solo del cuerpo — el Señor cuida de quien Le pertenece.
+Antes de dormir, nombra una bendición del día y una preocupación que pones en Sus manos.
+Mañana es nueva gracia; esta noche, recibe el amor del Padre y deja que Él calme tus pensamientos.
+Que la paz de Cristo guarde tu corazón y duermas seguro bajo el cuidado fiel del Señor.`,
+    },
+  };
+  return reflections[period]?.[lang] ?? reflections.manha[lang];
+}
+
 // ─── Period prompts ───────────────────────────────────────────────────────────
 
 function buildReflectionPrompt(
@@ -244,11 +375,103 @@ function buildReflectionPrompt(
 
   const tone = periodContext[period]?.[lang] ?? periodContext.manha[lang];
 
-  return lang === "pt"
-    ? `Você é um pastor evangélico experiente e acolhedor. Escreva uma reflexão devocional ${tone} de 2 a 4 frases, baseada no versículo abaixo. NÃO repita o versículo. NÃO use markdown. Seja inspirador, prático e pastoral. Responda APENAS em ${outputLang}.\n\nVersículo: "${verseText}" (${ref})\n\nReflexão:`
+  const structure = lang === "pt"
+    ? "Estrutura sugerida (5 a 8 linhas curtas, separadas por quebra de linha):\n1) Abertura acolhedora ligada ao momento do dia\n2) Insight espiritual sobre o versículo (sem citá-lo)\n3) Aplicação prática concreta para hoje\n4) Encorajamento pastoral para encerrar"
     : lang === "en"
-      ? `You are a warm and experienced evangelical pastor. Write a short ${tone} devotional reflection (2-4 sentences) based on the verse below. Do NOT repeat the verse. Do NOT use markdown. Be inspiring, practical, and pastoral. Respond ONLY in ${outputLang}.\n\nVerse: "${verseText}" (${ref})\n\nReflection:`
-      : `Eres un pastor evangélico experimentado y cálido. Escribe una reflexión devocional ${tone} corta (2-4 oraciones) basada en el versículo siguiente. NO repitas el versículo. NO uses markdown. Sé inspirador, práctico y pastoral. Responde SOLO en ${outputLang}.\n\nVersículo: "${verseText}" (${ref})\n\nReflexión:`;
+      ? "Suggested structure (5 to 8 short lines, separated by line breaks):\n1) Warm opening tied to the time of day\n2) Spiritual insight about the verse (without quoting it)\n3) Concrete practical application for today\n4) Pastoral encouragement to close"
+      : "Estructura sugerida (5 a 8 líneas cortas, separadas por salto de línea):\n1) Apertura acogedora ligada al momento del día\n2) Insight espiritual sobre el versículo (sin citarlo)\n3) Aplicación práctica concreta para hoy\n4) Ánimo pastoral para cerrar";
+
+  return lang === "pt"
+    ? `Você é um pastor evangélico experiente, acolhedor e claro. Escreva uma reflexão devocional ${tone}, com 5 a 8 linhas (cada linha = uma frase completa).
+
+Regras:
+- NÃO repita o versículo, NÃO cite a referência, NÃO use markdown ou listas.
+- Linguagem simples, espiritual e acolhedora — como uma conversa pastoral breve.
+- Inclua uma aplicação prática específica para o dia de hoje.
+- Evite frases genéricas vazias; seja concreto e pessoal.
+- Responda APENAS em ${outputLang}.
+
+${structure}
+
+Versículo base (não repita): "${verseText}" (${ref})
+
+Reflexão:`
+    : lang === "en"
+      ? `You are a warm, experienced evangelical pastor. Write a ${tone} devotional reflection with 5 to 8 lines (each line = one complete sentence).
+
+Rules:
+- Do NOT repeat the verse, do NOT cite the reference, do NOT use markdown or bullet lists.
+- Use simple, spiritual, welcoming language — like a brief pastoral conversation.
+- Include a specific practical application for today.
+- Avoid empty generic phrases; be concrete and personal.
+- Respond ONLY in ${outputLang}.
+
+${structure}
+
+Base verse (do not repeat): "${verseText}" (${ref})
+
+Reflection:`
+      : `Eres un pastor evangélico experimentado, cálido y claro. Escribe una reflexión devocional ${tone}, con 5 a 8 líneas (cada línea = una oración completa).
+
+Reglas:
+- NO repitas el versículo, NO cites la referencia, NO uses markdown ni listas.
+- Lenguaje simple, espiritual y acogedor — como una conversación pastoral breve.
+- Incluye una aplicación práctica específica para hoy.
+- Evita frases genéricas vacías; sé concreto y personal.
+- Responde SOLO en ${outputLang}.
+
+${structure}
+
+Versículo base (no repetir): "${verseText}" (${ref})
+
+Reflexión:`;
+}
+
+function buildRetryPrompt(
+  verseText: string,
+  ref: string,
+  period: string,
+  lang: "pt" | "en" | "es",
+  previous: string,
+): string {
+  const base = buildReflectionPrompt(verseText, ref, period, lang);
+  const retryNote = lang === "pt"
+    ? `\n\nSua resposta anterior ficou curta demais:\n"${previous.slice(0, 120)}..."\n\nReescreva com 5 a 8 linhas completas, mais profundas e práticas.`
+    : lang === "en"
+      ? `\n\nYour previous answer was too short:\n"${previous.slice(0, 120)}..."\n\nRewrite with 5 to 8 complete lines, deeper and more practical.`
+      : `\n\nTu respuesta anterior fue demasiado corta:\n"${previous.slice(0, 120)}..."\n\nReescribe con 5 a 8 líneas completas, más profundas y prácticas.`;
+  return base + retryNote;
+}
+
+async function generateReflection(
+  apiKey: string,
+  prompt: string,
+): Promise<string> {
+  const geminiResp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.75,
+          topP: 0.92,
+          maxOutputTokens: 768,
+        },
+        thinkingConfig: { thinkingBudget: 0 },
+      }),
+    },
+  );
+
+  if (!geminiResp.ok) {
+    const errText = await geminiResp.text();
+    console.error("Gemini devotional error:", geminiResp.status, errText);
+    return "";
+  }
+
+  const geminiData = await geminiResp.json();
+  return extractGeminiText(geminiData);
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
@@ -270,7 +493,20 @@ serve(async (req) => {
     const dayOfYear = Math.floor((now.getTime() - startOfYear.getTime()) / 86400000);
 
     const periodOffset = period === "manha" ? 0 : period === "tarde" ? 10 : 20;
-    const verseEntry = VERSES[(dayOfYear + periodOffset) % VERSES.length];
+    const refreshSeed = url.searchParams.get("seed") ?? url.searchParams.get("refreshSeed");
+    const forceRefresh = url.searchParams.get("forceRefresh") === "1";
+
+    let verseIndex: number;
+    if (refreshSeed || forceRefresh) {
+      const seed = refreshSeed ?? String(now.getTime());
+      const h1 = hashSeed(`${seed}:${period}:${locale}`);
+      const h2 = hashSeed(`${seed}-v2-${period}`);
+      const h3 = parseInt(seed.replace(/\D/g, "").slice(-8), 10) || 0;
+      verseIndex = (h1 + h2 + h3) % VERSES.length;
+    } else {
+      verseIndex = (dayOfYear + periodOffset) % VERSES.length;
+    }
+    const verseEntry = VERSES[verseIndex];
     const verseText = getVerseText(verseEntry, lang);
     const verseRef = getVerseRef(verseEntry);
 
@@ -278,47 +514,44 @@ serve(async (req) => {
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
     if (!GEMINI_API_KEY) {
-      // Graceful fallback: return verse without AI reflection
       return new Response(
-        JSON.stringify({ verse: verseText, reference: verseRef, reflection: "", period }),
+        JSON.stringify({
+          verse: verseText,
+          reference: verseRef,
+          reflection: staticReflection(lang, period, verseRef),
+          period,
+          reflectionSource: "static",
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
     const prompt = buildReflectionPrompt(verseText, verseRef, period, lang);
-
-    const geminiResp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.8,
-            topP: 0.95,
-            maxOutputTokens: 1024,
-          },
-          // Disable thinking tokens for this simple generation task.
-          // gemini-2.5-flash shares maxOutputTokens between thinking and output;
-          // with thinkingBudget=0 the full budget goes to the reflection text.
-          thinkingConfig: { thinkingBudget: 0 },
-        }),
-      },
+    let reflection = sanitizeReflection(
+      await generateReflection(GEMINI_API_KEY, prompt),
+      verseText,
     );
+    let reflectionSource = reflection ? "ai" : "static";
 
-    let reflection = "";
-    if (geminiResp.ok) {
-      const geminiData = await geminiResp.json();
-      reflection = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-    } else {
-      const errText = await geminiResp.text();
-      console.error("Gemini devotional error:", geminiResp.status, errText);
-      // Don't fail — return without reflection
+    if (reflection && isReflectionTooShort(reflection)) {
+      const retryPrompt = buildRetryPrompt(verseText, verseRef, period, lang, reflection);
+      const retryReflection = sanitizeReflection(
+        await generateReflection(GEMINI_API_KEY, retryPrompt),
+        verseText,
+      );
+      if (retryReflection && !isReflectionTooShort(retryReflection)) {
+        reflection = retryReflection;
+        reflectionSource = "ai";
+      }
+    }
+
+    if (!reflection || isReflectionTooShort(reflection)) {
+      reflection = staticReflection(lang, period, verseRef);
+      reflectionSource = "static";
     }
 
     return new Response(
-      JSON.stringify({ verse: verseText, reference: verseRef, reflection, period }),
+      JSON.stringify({ verse: verseText, reference: verseRef, reflection, period, reflectionSource }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {

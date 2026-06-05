@@ -1,59 +1,42 @@
 /**
- * Ecclesia Admin — static shell only.
- * Bump STATIC_CACHE when changing precache list or asset strategy (cache bust).
+ * Ecclesia Admin — App Shell Service Worker v4
+ *
+ * IMPORTANT: never intercept cross-origin requests (Supabase, APIs).
+ * Intercepting them caused "Failed to fetch" for Bible & Devotional.
  */
-const STATIC_CACHE = "ecclesia-static-v1";
+const STATIC_CACHE = "ecclesia-static-v4";
 
 const PRECACHE_URLS = [
   "/",
   "/manifest.webmanifest",
+  "/favicon.ico",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
   "/icons/apple-touch-icon.png",
 ];
 
-function isGet(request) {
-  return request.method === "GET";
-}
-
-function isSensitiveUrl(url) {
-  const path = url.pathname.toLowerCase();
-  const host = url.hostname.toLowerCase();
-  const search = url.search.toLowerCase();
-  if (host.includes("supabase.co")) return true;
-  if (path.includes("/auth")) return true;
-  if (path.includes("/rest/v1")) return true;
-  if (path.includes("/functions/v1")) return true;
-  if (path.includes("/join")) return true;
-  if (path.includes("/invite")) return true;
-  if (search.includes("token=")) return true;
-  if (search.includes("invite")) return true;
-  if (search.includes("qr")) return true;
-  return false;
-}
-
-function hasAuthHeaders(request) {
-  return request.headers.has("authorization") || request.headers.has("apikey");
-}
-
 function isNavigationRequest(request) {
-  return request.mode === "navigate" || (request.headers.get("accept") || "").includes("text/html");
+  return (
+    request.mode === "navigate" ||
+    (request.headers.get("accept") || "").includes("text/html")
+  );
 }
 
 function isSameOriginStaticAsset(url) {
   if (url.origin !== self.location.origin) return false;
   const p = url.pathname;
   if (p.startsWith("/assets/")) return true;
-  return /\.(js|mjs|css|woff2?|png|svg|ico|webmanifest|json)$/i.test(p);
+  return /\.(js|mjs|css|woff2?|png|jpg|jpeg|webp|svg|ico|webmanifest|json)$/i.test(p);
 }
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(STATIC_CACHE)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting())
-      .catch(() => self.skipWaiting()),
+      .then((cache) =>
+        Promise.allSettled(PRECACHE_URLS.map((url) => cache.add(url).catch(() => {}))),
+      )
+      .then(() => self.skipWaiting()),
   );
 });
 
@@ -62,12 +45,7 @@ self.addEventListener("activate", (event) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(
-          keys.map((key) => {
-            if (key !== STATIC_CACHE) return caches.delete(key);
-            return Promise.resolve();
-          }),
-        ),
+        Promise.all(keys.map((key) => (key !== STATIC_CACHE ? caches.delete(key) : Promise.resolve()))),
       )
       .then(() => self.clients.claim()),
   );
@@ -75,23 +53,28 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const request = event.request;
-  if (!isGet(request)) return;
+  if (request.method !== "GET") return;
 
   const url = new URL(request.url);
 
-  if (isSensitiveUrl(url) || hasAuthHeaders(request)) {
-    event.respondWith(fetch(request));
-    return;
-  }
+  // Cross-origin (Supabase, fonts, etc.): do NOT intercept
+  if (url.origin !== self.location.origin) return;
 
   if (isNavigationRequest(request)) {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          if (response && response.ok) return response;
-          return caches.match("/").then((cached) => cached || fetch("/"));
+          if (response?.ok) {
+            const copy = response.clone();
+            caches.open(STATIC_CACHE).then((cache) => cache.put(request, copy));
+          }
+          return response;
         })
-        .catch(() => caches.match("/").then((cached) => cached || fetch("/"))),
+        .catch(() =>
+          caches.match(request).then(
+            (cached) => cached ?? caches.match("/").then((shell) => shell ?? new Response("", { status: 503 })),
+          ),
+        ),
     );
     return;
   }
@@ -99,17 +82,15 @@ self.addEventListener("fetch", (event) => {
   if (isSameOriginStaticAsset(url)) {
     event.respondWith(
       caches.match(request).then((cached) => {
-        if (cached) return cached;
-        return fetch(request).then((response) => {
-          if (!response || !response.ok || response.type !== "basic") return response;
-          const copy = response.clone();
-          caches.open(STATIC_CACHE).then((cache) => cache.put(request, copy));
+        const networkFetch = fetch(request).then((response) => {
+          if (response?.ok && response.type === "basic") {
+            const copy = response.clone();
+            caches.open(STATIC_CACHE).then((cache) => cache.put(request, copy));
+          }
           return response;
         });
+        return cached ?? networkFetch;
       }),
     );
-    return;
   }
-
-  event.respondWith(fetch(request));
 });

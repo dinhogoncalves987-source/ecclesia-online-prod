@@ -55,7 +55,7 @@ export async function triggerShare({
   }
 
   try {
-    await navigator.clipboard.writeText(url);
+    await navigator.clipboard.writeText(text || url);
     return "copied";
   } catch {
     return "cancelled";

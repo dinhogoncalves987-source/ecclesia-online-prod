@@ -11,6 +11,9 @@ import { format } from "date-fns";
 import { ptBR, enUS, es } from "date-fns/locale";
 import { BulkImportModal } from "@/components/BulkImportModal";
 import { OperationalAssistant } from "@/components/OperationalAssistant";
+import { useRole } from "@/hooks/useRole";
+import { canWriteSecretaria } from "@/lib/permissions";
+import { insertWithOrganizationScope } from "@/lib/organizationScope";
 
 type Document = {
   id: string; title: string; document_type: string; content: string | null;
@@ -24,6 +27,8 @@ export default function Documentos() {
   const { toast } = useToast();
   const { t, lang } = useLanguage();
   const { church, loading: churchLoading } = useChurch();
+  const { canonicalRole } = useRole();
+  const canWrite = canWriteSecretaria(canonicalRole);
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -41,8 +46,8 @@ export default function Documentos() {
   ];
 
   const docTemplate = [
-    { title: "Ata de Reunião - Janeiro", category: "Atas", description: "Reunião ordinária" },
-    { title: "Estatuto Social", category: "Estatuto", description: "Documento oficial" },
+    { title: "Ata de Reunião Ministerial — Maio 2026", category: "Atas", description: "Reunião das lideranças — AD Caxias do Sul / Congregação Jardim América" },
+    { title: "Estatuto Interno — AD Caxias do Sul", category: "Estatuto", description: "Regimento interno da Congregação Jardim América" },
   ];
 
   const handleBulkImport = async (rows: Record<string, string>[]) => {
@@ -50,12 +55,12 @@ export default function Documentos() {
     let success = 0, errors = 0;
     for (const row of rows) {
       if (!row.title) { errors++; continue; }
-      const { error } = await supabase.from("documents").insert({
-        created_by: user.id, organization_id: church.id,
+      const { error } = await insertWithOrganizationScope("documents", church.id, {
+        created_by: user.id,
         title: row.title,
         document_type: row.category || "Geral",
         content: row.description || null,
-      } as any);
+      });
       if (error) errors++; else success++;
     }
     if (success > 0) fetch_();
@@ -68,13 +73,12 @@ export default function Documentos() {
     reader.onload = async (e) => {
       const text = (e.target?.result as string) ?? "";
       const docTitle = file.name.replace(/\.[^.]+$/, "");
-      const { error } = await supabase.from("documents").insert({
+      const { error } = await insertWithOrganizationScope("documents", church.id, {
         created_by: user.id,
-        organization_id: church.id,
         title: docTitle,
         document_type: "Geral",
         content: text || null,
-      } as any);
+      });
       if (error) {
         toast({ title: t("Erro"), description: error.message, variant: "destructive" });
       } else {
@@ -102,9 +106,12 @@ export default function Documentos() {
 
   const handleAdd = async () => {
     if (!title.trim() || !user || !church) return;
-    const { error } = await supabase.from("documents").insert({
-      created_by: user.id, organization_id: church.id, title: title.trim(), document_type: category, content: description.trim() || null,
-    } as any);
+    const { error } = await insertWithOrganizationScope("documents", church.id, {
+      created_by: user.id,
+      title: title.trim(),
+      document_type: category,
+      content: description.trim() || null,
+    });
     if (error) { toast({ title: t("Erro"), description: error.message, variant: "destructive" }); return; }
     setTitle(""); setDescription(""); setCategory("Geral"); setShowForm(false);
     toast({ title: t("Documento registrado!") });
@@ -112,7 +119,17 @@ export default function Documentos() {
   };
 
   const handleDelete = async (id: string) => {
-    await supabase.from("documents").delete().eq("id", id);
+    if (!church) return;
+    const { error } = await supabase
+      .from("documents")
+      .delete()
+      .eq("id", id)
+      .eq("organization_id", church.id);
+    if (error) {
+      toast({ title: t("Erro"), description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: t("Documento removido") });
     if (viewDoc?.id === id) setViewDoc(null);
     fetch_();
   };
@@ -128,6 +145,7 @@ export default function Documentos() {
             <h1 className="text-2xl font-serif font-bold text-foreground">{t("Documentos")}</h1>
             <p className="text-sm text-muted-foreground mt-1">{t("Biblioteca de documentos da igreja")}</p>
           </div>
+          {canWrite && (
           <div className="flex gap-2 flex-wrap">
             <OperationalAssistant
               module="document"
@@ -138,12 +156,12 @@ export default function Documentos() {
               ]}
               onConfirm={async (data) => {
                 if (!data.title || !user || !church) throw new Error(t("Título obrigatório"));
-                const { error } = await supabase.from("documents").insert({
-                  created_by: user.id, organization_id: church.id,
+                const { error } = await insertWithOrganizationScope("documents", church.id, {
+                  created_by: user.id,
                   title: data.title,
                   document_type: data.document_type || "Geral",
                   content: data.content || null,
-                } as any);
+                });
                 if (error) throw new Error(error.message);
                 fetch_();
                 toast({ title: t("Documento criado!") });
@@ -162,6 +180,7 @@ export default function Documentos() {
               <Plus size={16} /> {t("Novo Documento")}
             </button>
           </div>
+          )}
         </div>
 
         <div className="flex gap-2 flex-wrap">
@@ -207,7 +226,7 @@ export default function Documentos() {
                   <span className="p-1.5 rounded-lg text-muted-foreground/40 group-hover:text-accent transition-colors">
                     <Eye size={15} />
                   </span>
-                  {doc.created_by === user?.id && (
+                  {canWrite && (
                     <button
                       onClick={e => { e.stopPropagation(); handleDelete(doc.id); }}
                       className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
@@ -251,7 +270,7 @@ export default function Documentos() {
                     <p className="text-sm text-muted-foreground italic">{t("Sem conteúdo disponível.")}</p>
                   )}
                 </div>
-                {viewDoc.created_by === user?.id && (
+                {canWrite && (
                   <div className="p-4 border-t border-border/50">
                     <button
                       onClick={() => handleDelete(viewDoc.id)}
@@ -269,7 +288,7 @@ export default function Documentos() {
 
       {/* ── New document form ── */}
       <AnimatePresence>
-        {showForm && (
+        {showForm && canWrite && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-40" onClick={() => setShowForm(false)} />
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

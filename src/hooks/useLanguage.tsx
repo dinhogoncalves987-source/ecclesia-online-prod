@@ -3,6 +3,113 @@ import { createContext, useContext, useState, ReactNode } from "react";
 type Lang = "pt" | "en" | "es";
 
 const translations: Record<string, Record<Lang, string>> = {
+  // Offline / PWA
+  "Você está offline": { pt: "Você está offline", en: "You are offline", es: "Estás sin conexión" },
+  "Modo offline — algumas funções estão indisponíveis": {
+    pt: "Modo offline — algumas funções estão indisponíveis",
+    en: "Offline mode — some features are unavailable",
+    es: "Modo sin conexión — algunas funciones no están disponibles",
+  },
+  "Devocional em cache": { pt: "Devocional em cache", en: "Cached devotional", es: "Devocional en caché" },
+  "Exibindo conteúdo salvo": { pt: "Exibindo conteúdo salvo", en: "Showing saved content", es: "Mostrando contenido guardado" },
+
+  "Reflexão pastoral": { pt: "Reflexão pastoral", en: "Pastoral reflection", es: "Reflexión pastoral" },
+  "Sem conexão. Verifique sua internet e tente novamente.": {
+    pt: "Sem conexão. Verifique sua internet e tente novamente.",
+    en: "No connection. Check your internet and try again.",
+    es: "Sin conexión. Verifica tu internet e inténtalo de nuevo.",
+  },
+  "Sessão expirada. Faça login novamente para ler a Bíblia.": {
+    pt: "Sessão expirada. Faça login novamente para ler a Bíblia.",
+    en: "Session expired. Sign in again to read the Bible.",
+    es: "Sesión expirada. Inicia sesión de nuevo para leer la Biblia.",
+  },
+  "Sem conexão. Este capítulo ainda não foi salvo no cache.": {
+    pt: "Sem conexão. Este capítulo ainda não foi salvo no cache.",
+    en: "Offline. This chapter has not been cached yet.",
+    es: "Sin conexión. Este capítulo aún no está guardado en caché.",
+  },
+  "Exibindo capítulo salvo offline": {
+    pt: "Exibindo capítulo salvo offline",
+    en: "Showing offline cached chapter",
+    es: "Mostrando capítulo guardado sin conexión",
+  },
+  "Capítulo em cache": {
+    pt: "Capítulo em cache",
+    en: "Cached chapter",
+    es: "Capítulo en caché",
+  },
+
+  // Culto & Louvor V1
+  "Cadastre hinos e músicas da sua igreja": {
+    pt: "Cadastre hinos e músicas da sua igreja",
+    en: "Register hymns and songs from your church",
+    es: "Registra himnos y músicas de tu iglesia",
+  },
+  "Nova música": { pt: "Nova música", en: "New song", es: "Nueva música" },
+  "Nenhuma música cadastrada": { pt: "Nenhuma música cadastrada", en: "No songs registered", es: "Ninguna música registrada" },
+  "Cadastrar primeira música": { pt: "Cadastrar primeira música", en: "Register first song", es: "Registrar primera música" },
+  "Editar música": { pt: "Editar música", en: "Edit song", es: "Editar música" },
+  "Música atualizada!": { pt: "Música atualizada!", en: "Song updated!", es: "¡Música actualizada!" },
+  "Música cadastrada!": { pt: "Música cadastrada!", en: "Song saved!", es: "¡Música guardada!" },
+  "Tom": { pt: "Tom", en: "Key", es: "Tono" },
+  "Letra (use linha em branco entre estrofes)": {
+    pt: "Letra (use linha em branco entre estrofes)",
+    en: "Lyrics (blank line between stanzas)",
+    es: "Letra (línea en blanco entre estrofas)",
+  },
+  "Observações": { pt: "Observações", en: "Notes", es: "Observaciones" },
+  "Novo roteiro": { pt: "Novo roteiro", en: "New order", es: "Nuevo roteiro" },
+  "Nenhum roteiro salvo": { pt: "Nenhum roteiro salvo", en: "No saved orders", es: "Ningún roteiro guardado" },
+  "Título do culto": { pt: "Título do culto", en: "Service title", es: "Título del culto" },
+  "Salvar roteiro": { pt: "Salvar roteiro", en: "Save order", es: "Guardar roteiro" },
+  "Roteiro salvo!": { pt: "Roteiro salvo!", en: "Order saved!", es: "¡Roteiro guardado!" },
+  "Abrir no telão": { pt: "Abrir no telão", en: "Open on screen", es: "Abrir en pantalla" },
+  "Selecionar da biblioteca": { pt: "Selecionar da biblioteca", en: "Select from library", es: "Seleccionar de biblioteca" },
+  "Conteúdo / letra / referência bíblica": {
+    pt: "Conteúdo / letra / referência bíblica",
+    en: "Content / lyrics / Bible reference",
+    es: "Contenido / letra / referencia bíblica",
+  },
+  "Projete letras e leituras em tela cheia": {
+    pt: "Projete letras e leituras em tela cheia",
+    en: "Project lyrics and readings fullscreen",
+    es: "Proyecta letras y lecturas en pantalla completa",
+  },
+  "Texto manual": { pt: "Texto manual", en: "Manual text", es: "Texto manual" },
+  "Da biblioteca": { pt: "Da biblioteca", en: "From library", es: "De biblioteca" },
+  "Do roteiro": { pt: "Do roteiro", en: "From order", es: "Del roteiro" },
+  "Letra ou texto bíblico (linha em branco entre slides)": {
+    pt: "Letra ou texto bíblico (linha em branco entre slides)",
+    en: "Lyrics or Bible text (blank line between slides)",
+    es: "Letra o texto bíblico (línea en blanco entre diapositivas)",
+  },
+  "Selecionar música": { pt: "Selecionar música", en: "Select song", es: "Seleccionar música" },
+  "Selecionar roteiro": { pt: "Selecionar roteiro", en: "Select order", es: "Seleccionar roteiro" },
+  "Use setas ou espaço no telão": { pt: "Use setas ou espaço no telão", en: "Use arrows or space on screen", es: "Usa flechas o espacio en pantalla" },
+  "Selecione conteúdo para projetar": { pt: "Selecione conteúdo para projetar", en: "Select content to project", es: "Selecciona contenido para proyectar" },
+  "Iniciar projeção": { pt: "Iniciar projeção", en: "Start projection", es: "Iniciar proyección" },
+  "Músicas cadastradas": { pt: "Músicas cadastradas", en: "Registered songs", es: "Músicas registradas" },
+  "Roteiros salvos": { pt: "Roteiros salvos", en: "Saved orders", es: "Roteiros guardados" },
+  "IA em preparação": { pt: "IA em preparação", en: "AI in preparation", es: "IA en preparación" },
+  "Em breve: sugestões inteligentes para culto e louvor": {
+    pt: "Em breve: sugestões inteligentes para culto e louvor",
+    en: "Coming soon: smart suggestions for worship",
+    es: "Próximamente: sugerencias inteligentes para culto y alabanza",
+  },
+  "O assistente IA ajudará a sugerir hinos, montar roteiros e conectar passagens bíblicas. A integração completa será disponibilizada em breve.": {
+    pt: "O assistente IA ajudará a sugerir hinos, montar roteiros e conectar passagens bíblicas. A integração completa será disponibilizada em breve.",
+    en: "The AI assistant will help suggest hymns, build orders and connect Bible passages. Full integration coming soon.",
+    es: "El asistente IA ayudará a sugerir himnos, armar roteiros y conectar pasajes bíblicos. La integración completa estará disponible pronto.",
+  },
+  "Exemplos de prompts": { pt: "Exemplos de prompts", en: "Example prompts", es: "Ejemplos de prompts" },
+  "Descreva o que você precisa para o culto...": {
+    pt: "Descreva o que você precisa para o culto...",
+    en: "Describe what you need for the service...",
+    es: "Describe lo que necesitas para el culto...",
+  },
+  "Enviar": { pt: "Enviar", en: "Send", es: "Enviar" },
+
   // Layout / Common
   "Bem-vindo de volta": { pt: "Bem-vindo de volta", en: "Welcome back", es: "Bienvenido de vuelta" },
   "Recolher": { pt: "Recolher", en: "Collapse", es: "Contraer" },
@@ -253,6 +360,19 @@ const translations: Record<string, Record<Lang, string>> = {
   "Enviar de forma anônima": { pt: "Enviar de forma anônima", en: "Send anonymously", es: "Enviar de forma anónima" },
   "Enviar Pedido": { pt: "Enviar Pedido", en: "Submit Request", es: "Enviar Pedido" },
   "Pedido registrado!": { pt: "Pedido registrado!", en: "Request submitted!", es: "¡Pedido registrado!" },
+  "Detalhes do pedido": { pt: "Detalhes do pedido", en: "Request details", es: "Detalles del pedido" },
+  "Marcar respondido": { pt: "Marcar respondido", en: "Mark as answered", es: "Marcar respondido" },
+  "Pedido respondido": { pt: "Pedido respondido", en: "Request answered", es: "Pedido respondido" },
+  "Pedido compartilhado": { pt: "Pedido compartilhado", en: "Request shared", es: "Pedido compartido" },
+  "Erro ao responder": { pt: "Erro ao responder", en: "Error marking as answered", es: "Error al responder" },
+  "Pedido removido": { pt: "Pedido removido", en: "Request removed", es: "Pedido eliminado" },
+  "Autor": { pt: "Autor", en: "Author", es: "Autor" },
+  "Pedido enviado anonimamente": { pt: "Pedido enviado anonimamente", en: "Request sent anonymously", es: "Pedido enviado anónimamente" },
+  "Este pedido já foi respondido pela equipe pastoral": {
+    pt: "Este pedido já foi respondido pela equipe pastoral",
+    en: "This request has already been answered by the pastoral team",
+    es: "Este pedido ya fue respondido por el equipo pastoral",
+  },
 
   // Comunicacao
   "Avisos e comunicados para a comunidade": { pt: "Avisos e comunicados para a comunidade", en: "Notices and announcements for the community", es: "Avisos y comunicados para la comunidad" },
@@ -319,6 +439,32 @@ const translations: Record<string, Record<Lang, string>> = {
   "Pregação": { pt: "Pregação", en: "Preaching", es: "Predicación" },
   "Confirmado": { pt: "Confirmado", en: "Confirmed", es: "Confirmado" },
   "Pendente": { pt: "Pendente", en: "Pending", es: "Pendiente" },
+  "recusado": { pt: "recusado", en: "declined", es: "rechazado" },
+  "rascunho": { pt: "rascunho", en: "draft", es: "borrador" },
+  "publicada": { pt: "publicada", en: "published", es: "publicada" },
+  "concluida": { pt: "concluída", en: "completed", es: "concluida" },
+  "Editar Escala": { pt: "Editar Escala", en: "Edit Schedule", es: "Editar Escala" },
+  "Escala atualizada!": { pt: "Escala atualizada!", en: "Schedule updated!", es: "¡Escala actualizada!" },
+  "Status da escala": { pt: "Status da escala", en: "Schedule status", es: "Estado de la escala" },
+  "Detalhe da escala": { pt: "Detalhe da escala", en: "Schedule details", es: "Detalle de la escala" },
+  "Escalados": { pt: "Escalados", en: "Assigned volunteers", es: "Asignados" },
+  "Adicionar escalado": { pt: "Adicionar escalado", en: "Add volunteer", es: "Agregar asignado" },
+  "Remover escalado": { pt: "Remover escalado", en: "Remove volunteer", es: "Quitar asignado" },
+  "Nenhum escalado": { pt: "Nenhum escalado", en: "No volunteers assigned", es: "Ningún asignado" },
+  "Erro ao carregar escalas": { pt: "Erro ao carregar escalas", en: "Error loading schedules", es: "Error al cargar escalas" },
+  "Selecionar membro": { pt: "Selecionar membro", en: "Select member", es: "Seleccionar miembro" },
+  "Salvar alterações": { pt: "Salvar alterações", en: "Save changes", es: "Guardar cambios" },
+  "Escalado adicionado": { pt: "Escalado adicionado", en: "Volunteer added", es: "Asignado agregado" },
+  "Escalado removido": { pt: "Escalado removido", en: "Volunteer removed", es: "Asignado eliminado" },
+  "Status do escalado atualizado": { pt: "Status do escalado atualizado", en: "Volunteer status updated", es: "Estado del asignado actualizado" },
+  "Erro ao carregar escalados": { pt: "Erro ao carregar escalados", en: "Error loading assignments", es: "Error al cargar asignados" },
+  "confirmados": { pt: "confirmados", en: "confirmed", es: "confirmados" },
+  "recusados": { pt: "recusados", en: "declined", es: "rechazados" },
+  "escalados": { pt: "escalados", en: "assigned", es: "asignados" },
+  "Status do escalado": { pt: "Status do escalado", en: "Volunteer status", es: "Estado del asignado" },
+  "Notas do escalado": { pt: "Notas do escalado", en: "Volunteer notes", es: "Notas del asignado" },
+  "Excluir escala": { pt: "Excluir escala", en: "Delete schedule", es: "Eliminar escala" },
+  "Remover esta escala?": { pt: "Remover esta escala?", en: "Remove this schedule?", es: "¿Eliminar esta escala?" },
 
   // Profile
   "Meu Perfil": { pt: "Meu Perfil", en: "My Profile", es: "Mi Perfil" },
@@ -396,6 +542,8 @@ const translations: Record<string, Record<Lang, string>> = {
   "Compartilhar via E-mail": { pt: "Compartilhar via E-mail", en: "Share via Email", es: "Compartir vía E-mail" },
   "Copiar link de convite": { pt: "Copiar link de convite", en: "Copy invite link", es: "Copiar link de invitación" },
   "Link copiado!": { pt: "Link copiado!", en: "Link copied!", es: "¡Link copiado!" },
+  "Texto copiado!": { pt: "Texto copiado!", en: "Text copied!", es: "¡Texto copiado!" },
+  "Compartilhado!": { pt: "Compartilhado!", en: "Shared!", es: "¡Compartido!" },
   "Selecione a função para o convidado": { pt: "Selecione a função para o convidado", en: "Select the role for the guest", es: "Seleccione la función para el invitado" },
 
   // Footer
@@ -460,7 +608,6 @@ const translations: Record<string, Record<Lang, string>> = {
   "Erro ao remover": { pt: "Erro ao remover", en: "Error removing", es: "Error al eliminar" },
   "Erro ao buscar versículos": { pt: "Erro ao buscar versículos", en: "Error fetching verses", es: "Error al buscar versículos" },
   "A definir": { pt: "A definir", en: "TBD", es: "Por definir" },
-  "Texto copiado!": { pt: "Texto copiado!", en: "Text copied!", es: "¡Texto copiado!" },
   "Seu navegador não suporta reconhecimento de voz. Tente usar o Google Chrome.": { pt: "Seu navegador não suporta reconhecimento de voz. Tente usar o Google Chrome.", en: "Your browser does not support voice recognition. Try using Google Chrome.", es: "Su navegador no soporta reconocimiento de voz. Intente usar Google Chrome." },
   "Permissão de microfone negada. Verifique as configurações do seu navegador.": { pt: "Permissão de microfone negada. Verifique as configurações do seu navegador.", en: "Microphone permission denied. Check your browser settings.", es: "Permiso de micrófono denegado. Verifique la configuración de su navegador." },
   "Nenhuma fala detectada. Tente novamente.": { pt: "Nenhuma fala detectada. Tente novamente.", en: "No speech detected. Try again.", es: "No se detectó voz. Inténtelo de nuevo." },
@@ -572,19 +719,8 @@ const translations: Record<string, Record<Lang, string>> = {
 
   // Harpa / Hinário
   "Harpa - Hinário Digital": { pt: "Harpa - Hinário Digital", en: "Harpa - Digital Hymnal", es: "Harpa - Himnario Digital" },
-  "Hinos clássicos da fé cristã com letra e áudio": { pt: "Hinos clássicos da fé cristã com letra e áudio", en: "Classic Christian hymns with lyrics and audio", es: "Himnos clásicos de la fe cristiana con letra y audio" },
-  "Enviar Hino": { pt: "Enviar Hino", en: "Upload Hymn", es: "Subir Himno" },
-  "Assistente de Hinos": { pt: "Assistente de Hinos", en: "Hymn Assistant", es: "Asistente de Himnos" },
-  "Hinos Disponíveis": { pt: "Hinos Disponíveis", en: "Available Hymns", es: "Himnos Disponibles" },
   "Categorias": { pt: "Categorias", en: "Categories", es: "Categorías" },
-  "Com Letra": { pt: "Com Letra", en: "With Lyrics", es: "Con Letra" },
-  "Pergunte sobre hinos, peça sugestões...": { pt: "Pergunte sobre hinos, peça sugestões...", en: "Ask about hymns, request suggestions...", es: "Pregunte sobre himnos, pida sugerencias..." },
-  "Escala de culto": { pt: "Escala de culto", en: "Service schedule", es: "Escala de culto" },
-  "Hinos de adoração": { pt: "Hinos de adoração", en: "Worship hymns", es: "Himnos de adoración" },
-  "Culto temático": { pt: "Culto temático", en: "Themed service", es: "Culto temático" },
-  "Conexão bíblica": { pt: "Conexão bíblica", en: "Biblical connection", es: "Conexión bíblica" },
-  "Harpa": { pt: "Harpa", en: "Harpa", es: "Harpa" },
-  "Hinário digital com áudio": { pt: "Hinário digital com áudio", en: "Digital hymnal with audio", es: "Himnario digital con audio" },
+  "Hinos, roteiros e louvor": { pt: "Hinos, roteiros e louvor", en: "Hymns, orders & worship", es: "Himnos, roteiros y alabanza" },
   "Leia e medite na Palavra": { pt: "Leia e medite na Palavra", en: "Read and meditate on the Word", es: "Lea y medite en la Palabra" },
   "Ore pela igreja": { pt: "Ore pela igreja", en: "Pray for the church", es: "Ore por la iglesia" },
   "Comunicados da igreja": { pt: "Comunicados da igreja", en: "Church announcements", es: "Comunicados de la iglesia" },
@@ -626,17 +762,30 @@ const translations: Record<string, Record<Lang, string>> = {
   "Uploads da Igreja": { pt: "Uploads da Igreja", en: "Church Uploads", es: "Subidas de la Iglesia" },
   "Por Categoria": { pt: "Por Categoria", en: "By Category", es: "Por Categoría" },
   "Ouvir no YouTube": { pt: "Ouvir no YouTube", en: "Listen on YouTube", es: "Escuchar en YouTube" },
-  "Buscar no YouTube": { pt: "Buscar no YouTube", en: "Search on YouTube", es: "Buscar en YouTube" },
-  "Letra": { pt: "Letra", en: "Lyrics", es: "Letra" },
-  "Detalhes do hino": { pt: "Detalhes do hino", en: "Hymn details", es: "Detalles del himno" },
-  "Enviar Hino da Igreja": { pt: "Enviar Hino da Igreja", en: "Upload Church Hymn", es: "Subir Himno de la Iglesia" },
-  "Upload de hinos da igreja": { pt: "Upload de hinos da igreja", en: "Church hymn upload", es: "Subida de himnos de la iglesia" },
   "Envie hinos e louvores próprios da sua igreja. Formatos aceitos: MP3, MP4, WAV.": { pt: "Envie hinos e louvores próprios da sua igreja. Formatos aceitos: MP3, MP4, WAV.", en: "Upload hymns and worship songs from your church. Accepted formats: MP3, MP4, WAV.", es: "Suba himnos y alabanzas de su iglesia. Formatos aceptados: MP3, MP4, WAV." },
   "Arraste o arquivo aqui ou clique para selecionar": { pt: "Arraste o arquivo aqui ou clique para selecionar", en: "Drag the file here or click to select", es: "Arrastre el archivo aquí o haga clic para seleccionar" },
   "Em breve disponível": { pt: "Em breve disponível", en: "Coming soon", es: "Próximamente disponible" },
   "* O upload de áudio será habilitado em breve. Você poderá enviar gravações de ensaios, louvores próprios da congregação e muito mais.": { pt: "* O upload de áudio será habilitado em breve. Você poderá enviar gravações de ensaios, louvores próprios da congregação e muito mais.", en: "* Audio upload will be available soon. You'll be able to upload rehearsal recordings, congregation's own worship songs and much more.", es: "* La subida de audio estará disponible pronto. Podrá enviar grabaciones de ensayos, alabanzas propias de la congregación y mucho más." },
 
   // Assembleia extras
+  "Editar Assembleia": { pt: "Editar Assembleia", en: "Edit Assembly", es: "Editar Asamblea" },
+  "Assembleia atualizada!": { pt: "Assembleia atualizada!", en: "Assembly updated!", es: "¡Asamblea actualizada!" },
+  "Conteúdo da assembleia": { pt: "Conteúdo da assembleia", en: "Assembly content", es: "Contenido de la asamblea" },
+  "Sem descrição registrada": { pt: "Sem descrição registrada", en: "No description recorded", es: "Sin descripción registrada" },
+  "Vídeo da assembleia": { pt: "Vídeo da assembleia", en: "Assembly video", es: "Video de la asamblea" },
+  "Abrir no YouTube": { pt: "Abrir no YouTube", en: "Open on YouTube", es: "Abrir en YouTube" },
+  "Abrir vídeo": { pt: "Abrir vídeo", en: "Open video", es: "Abrir video" },
+  "Tornar visível para membros": { pt: "Tornar visível para membros", en: "Make visible to members", es: "Hacer visible para miembros" },
+  "Visibilidade atualizada": { pt: "Visibilidade atualizada", en: "Visibility updated", es: "Visibilidad actualizada" },
+  "Anexo removido": { pt: "Anexo removido", en: "Attachment removed", es: "Anexo eliminado" },
+  "Nenhum anexo adicionado": { pt: "Nenhum anexo adicionado", en: "No attachments added", es: "Ningún anexo agregado" },
+  "Enviando...": { pt: "Enviando...", en: "Uploading...", es: "Enviando..." },
+  "Período de Referência": { pt: "Período de Referência", en: "Reference Period", es: "Período de Referencia" },
+  "Data da Assembleia": { pt: "Data da Assembleia", en: "Assembly Date", es: "Fecha de la Asamblea" },
+  "Ex: Assembleia Geral Ordinária": { pt: "Ex: Assembleia Geral Ordinária", en: "E.g. Ordinary General Assembly", es: "Ej: Asamblea General Ordinaria" },
+  "Ex: 1º Trimestre 2026": { pt: "Ex: 1º Trimestre 2026", en: "E.g. Q1 2026", es: "Ej: 1er Trimestre 2026" },
+  "Resumo da assembleia...": { pt: "Resumo da assembleia...", en: "Assembly summary...", es: "Resumen de la asamblea..." },
+  "Não foi possível copiar": { pt: "Não foi possível copiar", en: "Could not copy", es: "No se pudo copiar" },
 
   // Admin Matriz label
   "Admin Matriz": { pt: "Admin Matriz", en: "HQ Admin", es: "Admin Matriz" },
@@ -896,6 +1045,84 @@ const translations: Record<string, Record<Lang, string>> = {
   // Sidebar section labels
   "Secretaria": { pt: "Secretaria", en: "Administration", es: "Secretaría" },
   "Administração": { pt: "Administração", en: "Management", es: "Gestión" },
+
+  // Culto & Louvor — navigation and hub
+  "Culto & Louvor": { pt: "Culto & Louvor", en: "Worship", es: "Culto y Alabanza" },
+  "Prepare, celebre e dirija seus cultos": {
+    pt: "Prepare, celebre e dirija seus cultos",
+    en: "Prepare, celebrate and lead your services",
+    es: "Prepare, celebre y dirija sus cultos",
+  },
+  "Hinos no Catálogo": { pt: "Hinos no Catálogo", en: "Hymns in Catalog", es: "Himnos en Catálogo" },
+  "Recursos planejados": { pt: "Recursos planejados", en: "Planned features", es: "Funciones planeadas" },
+  "Recursos Ativos": { pt: "Recursos Ativos", en: "Active Features", es: "Funciones Activas" },
+  "Em breve": { pt: "Em breve", en: "Coming soon", es: "Próximamente" },
+  "Recursos do módulo": { pt: "Recursos do módulo", en: "Module features", es: "Funciones del módulo" },
+  "Acessar": { pt: "Acessar", en: "Open", es: "Abrir" },
+
+  // Culto & Louvor — feature cards
+  "Biblioteca de Músicas": { pt: "Biblioteca de Músicas", en: "Song Library", es: "Biblioteca de Músicas" },
+  "Hinário digital com hinos clássicos e músicas da sua igreja": {
+    pt: "Faça upload da sua Harpa Cristã e cadastre músicas da sua congregação",
+    en: "Upload your church's hymnal and add songs from your congregation",
+    es: "Sube tu himnario y agrega músicas de tu congregación",
+  },
+  "Roteiros de Culto": { pt: "Roteiros de Culto", en: "Worship Order", es: "Orden de Culto" },
+  "Monte a programação completa do culto com ordem, letras e versículos": {
+    pt: "Monte a programação completa do culto com ordem, letras e versículos",
+    en: "Build the complete service order with songs, lyrics and scripture",
+    es: "Arma la programación completa del culto con orden, letras y versículos",
+  },
+  "Bíblia no Culto": { pt: "Bíblia no Culto", en: "Bible in Service", es: "Biblia en el Culto" },
+  "Acesse passagens bíblicas e integre versículos ao roteiro do culto": {
+    pt: "Acesse passagens bíblicas e integre versículos ao roteiro do culto",
+    en: "Access Bible passages and integrate scripture into your service order",
+    es: "Accede a pasajes bíblicos e integra versículos al orden del culto",
+  },
+  "Telão de Projeção": { pt: "Telão de Projeção", en: "Projection Screen", es: "Pantalla de Proyección" },
+  "Projete letras e versículos para a congregação em tempo real": {
+    pt: "Projete letras e versículos para a congregação em tempo real",
+    en: "Project lyrics and scripture for the congregation in real time",
+    es: "Proyecta letras y versículos para la congregación en tiempo real",
+  },
+  "Assistente de Culto IA": { pt: "Assistente de Culto IA", en: "AI Worship Assistant", es: "Asistente de Culto IA" },
+  "Sugestões de hinos, montagem de escalas e conexões bíblicas com IA": {
+    pt: "Sugestões de hinos, montagem de escalas e conexões bíblicas com IA",
+    en: "Hymn suggestions, service planning and biblical connections with AI",
+    es: "Sugerencias de himnos, planificación de cultos y conexiones bíblicas con IA",
+  },
+
+  // Culto & Louvor — AI banner
+  "Assistente de Hinos disponível": {
+    pt: "Assistente de Hinos disponível",
+    en: "Hymn Assistant available",
+    es: "Asistente de Himnos disponible",
+  },
+  "Peça sugestões de hinos, monte escalas de louvor e descubra conexões bíblicas. O assistente IA está na Biblioteca.": {
+    pt: "Peça sugestões de hinos, monte escalas de louvor e descubra conexões bíblicas. O assistente IA está na Biblioteca.",
+    en: "Request hymn suggestions, build worship playlists and discover biblical connections. The AI assistant is in the Library.",
+    es: "Solicita sugerencias de himnos, arma escalas de alabanza y descubre conexiones bíblicas. El asistente IA está en la Biblioteca.",
+  },
+  "Abrir Biblioteca com IA": {
+    pt: "Abrir Biblioteca com IA",
+    en: "Open Library with AI",
+    es: "Abrir Biblioteca con IA",
+  },
+  "Módulo em construção": {
+    pt: "Módulo em construção",
+    en: "Module under construction",
+    es: "Módulo en construcción",
+  },
+  "Cada igreja poderá fazer upload da sua própria Harpa Cristã e criar sua biblioteca personalizada de músicas e hinos.": {
+    pt: "Cada igreja poderá fazer upload da sua própria Harpa Cristã e criar sua biblioteca personalizada de músicas e hinos.",
+    en: "Each church will be able to upload their own hymnal and create their personalized library of songs and hymns.",
+    es: "Cada iglesia podrá subir su propio himnario y crear su biblioteca personalizada de músicas e himnos.",
+  },
+  "Usar a Bíblia enquanto isso": {
+    pt: "Usar a Bíblia enquanto isso",
+    en: "Use the Bible in the meantime",
+    es: "Usar la Biblia mientras tanto",
+  },
 
   // SuperAdmin — notice scope (new keys only)
   "Escopo": { pt: "Escopo", en: "Scope", es: "Alcance" },

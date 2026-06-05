@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Wallet, Users, Calendar, BookOpen, FileText,
   Heart, MessageSquare, UsersRound, Archive, BarChart3, Menu, X,
   Bell, ChevronLeft, ChevronDown, Settings, LogOut, Maximize, Minimize, Globe,
-  Shield, User, Building2, Music2, Gavel, Briefcase
+  Shield, User, Building2, Music2, Gavel, Briefcase, ShoppingBag, MessageCircle
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -79,6 +79,15 @@ const navSections: NavSection[] = [
       { icon: Building2, label: "Congregações", path: "/admin/congregacoes" },
       { icon: Shield, label: "Gerenciar Acessos", path: "/admin/gerenciar-acessos" },
       { icon: Globe, label: "Super Admin", path: "/admin/super-admin" },
+    ],
+  },
+  {
+    id: "ecossistema",
+    labelKey: "Ecossistema",
+    separator: true,
+    items: [
+      { icon: ShoppingBag, label: "Marketplace", path: "/admin/marketplace" },
+      { icon: MessageCircle, label: "Comunidade", path: "/admin/comunidade" },
     ],
   },
 ];

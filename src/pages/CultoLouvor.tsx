@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Music2, Library, ClipboardList, BookOpen,
@@ -7,7 +8,8 @@ import { AdminLayout } from "@/components/AdminLayout";
 import { useLanguage } from "@/hooks/useLanguage";
 import { Badge } from "@/components/ui/badge";
 import { useChurch } from "@/hooks/useChurchContext";
-import { getSongs, getSetlists } from "@/lib/worshipStorage";
+import { toast } from "sonner";
+import { ensureWorshipLoaded, getSongs, getSetlists, worshipLoadErrorMessage } from "@/lib/worshipStorage";
 
 type Feature = {
   icon: React.ElementType;
@@ -58,9 +60,22 @@ const FEATURES: Feature[] = [
 export default function CultoLouvor() {
   const { t } = useLanguage();
   const { church } = useChurch();
-  const churchId = church?.id ?? "local";
-  const songCount = getSongs(churchId).length;
-  const setlistCount = getSetlists(churchId).length;
+  const organizationId = church?.id;
+  const [, refreshCounts] = useState(0);
+
+  useEffect(() => {
+    if (!organizationId) return;
+    void ensureWorshipLoaded(organizationId)
+      .then(() => refreshCounts((n) => n + 1))
+      .catch((err) => {
+        toast.error(
+          worshipLoadErrorMessage(err, t("Erro ao carregar resumo de Culto & Louvor")),
+        );
+      });
+  }, [organizationId, t]);
+
+  const songCount = organizationId ? getSongs(organizationId).length : 0;
+  const setlistCount = organizationId ? getSetlists(organizationId).length : 0;
 
   return (
     <AdminLayout>

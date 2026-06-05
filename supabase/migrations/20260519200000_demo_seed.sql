@@ -18,10 +18,10 @@ BEGIN
   -- ─────────────────────────────────────────────────────────────────
   INSERT INTO public.organizations (id, name, slug, organization_type, city, state, country_code, language_code, active)
   VALUES
-    (v_convencao, 'Convenção Batista Nacional', 'convencao-batista-nacional', 'convencao', 'Brasília', 'DF', 'BR', 'pt-BR', true),
-    (v_matriz,    'Igreja Batista Central São Paulo', 'ibc-sao-paulo', 'matriz', 'São Paulo', 'SP', 'BR', 'pt-BR', true),
-    (v_setor,     'Setor Regional Norte SP', 'setor-regional-norte-sp', 'setor', 'São Paulo', 'SP', 'BR', 'pt-BR', true),
-    (v_congr,     'Congregação Batista Jardim América', 'congregacao-jardim-america', 'congregacao', 'São Paulo', 'SP', 'BR', 'pt-BR', true)
+    (v_convencao, 'Assembleia de Deus — Ministério RS', 'assembleia-deus-ministerio-rs', 'convencao', 'Porto Alegre', 'RS', 'BR', 'pt-BR', true),
+    (v_matriz,    'Assembleia de Deus em Caxias do Sul', 'assembleia-deus-caxias-do-sul', 'matriz', 'Caxias do Sul', 'RS', 'BR', 'pt-BR', true),
+    (v_setor,     'Secretaria AD Caxias do Sul', 'secretaria-ad-caxias-do-sul', 'setor', 'Caxias do Sul', 'RS', 'BR', 'pt-BR', true),
+    (v_congr,     'Congregação Jardim América', 'congregacao-jardim-america', 'congregacao', 'Caxias do Sul', 'RS', 'BR', 'pt-BR', true)
   ON CONFLICT (id) DO NOTHING;
 
   -- Parent chain (only sets if not already set)
@@ -32,23 +32,23 @@ BEGIN
   -- ─────────────────────────────────────────────────────────────────
   -- 2. Membros da Congregação
   -- ─────────────────────────────────────────────────────────────────
-  INSERT INTO public.members (id, organization_id, full_name, member_role, status, phone, email, joined_at)
+  INSERT INTO public.members (id, organization_id, full_name, member_role, status, phone, email, city, state, joined_at)
   VALUES
-    ('22222222-0000-0000-0000-000000000001', v_congr, 'Pr. João Paulo Ferreira',  'Pastor',           'Ativo',     '(11) 99999-0001', 'pastor@ibca.com.br',    '2015-03-15'),
-    ('22222222-0000-0000-0000-000000000002', v_congr, 'Maria Aparecida Santos',   'Diaconisa',        'Ativo',     '(11) 99999-0002', 'maria.santos@ibca.com', '2016-06-20'),
-    ('22222222-0000-0000-0000-000000000003', v_congr, 'Carlos Roberto Lima',      'Diácono',          'Ativo',     '(11) 99999-0003', 'carlos.lima@ibca.com',  '2017-01-10'),
-    ('22222222-0000-0000-0000-000000000004', v_congr, 'Ana Cristina Oliveira',    'Membro',           'Ativo',     '(11) 99999-0004', 'ana.oliveira@ibca.com', '2018-09-05'),
-    ('22222222-0000-0000-0000-000000000005', v_congr, 'Paulo Henrique Costa',     'Líder de Jovens',  'Ativo',     '(11) 99999-0005', 'paulo.costa@ibca.com',  '2019-03-22'),
-    ('22222222-0000-0000-0000-000000000006', v_congr, 'Fernanda Maria Alves',     'Secretária',       'Ativo',     '(11) 99999-0006', 'fernanda@ibca.com',     '2019-11-14'),
-    ('22222222-0000-0000-0000-000000000007', v_congr, 'Ricardo José Pereira',     'Tesoureiro',       'Ativo',     '(11) 99999-0007', 'tesoureiro@ibca.com',   '2020-02-28'),
-    ('22222222-0000-0000-0000-000000000008', v_congr, 'Juliana Cristina Ramos',   'Membro',           'Ativo',     '(11) 99999-0008', NULL,                    '2021-05-10'),
-    ('22222222-0000-0000-0000-000000000009', v_congr, 'Lucas Eduardo Souza',      'Obreiro',          'Ativo',     '(11) 99999-0009', NULL,                    '2022-01-17'),
-    ('22222222-0000-0000-0000-000000000010', v_congr, 'Beatriz Helena Martins',   'Membro',           'Ativo',     '(11) 99999-0010', NULL,                    '2022-08-30'),
-    ('22222222-0000-0000-0000-000000000011', v_congr, 'Rodrigo Almeida Torres',   'Visitante',        'Visitante', '(11) 99999-0011', NULL,                    '2026-05-05'),
-    ('22222222-0000-0000-0000-000000000012', v_congr, 'Silvia Regina Campos',     'Membro',           'Ativo',     '(11) 99999-0012', NULL,                    '2023-03-12'),
-    ('22222222-0000-0000-0000-000000000013', v_congr, 'André Luís Nascimento',    'Diácono',          'Ativo',     '(11) 99999-0013', NULL,                    '2020-08-05'),
-    ('22222222-0000-0000-0000-000000000014', v_congr, 'Priscila Fontes Correia',  'Membro',           'Ativo',     NULL,              NULL,                    '2024-01-20'),
-    ('22222222-0000-0000-0000-000000000015', v_congr, 'Marcos Vinícius Rocha',    'Obreiro',          'Inativo',   NULL,              NULL,                    '2021-11-08')
+    ('22222222-0000-0000-0000-000000000001', v_congr, 'Pr. João Paulo Ferreira',  'Pastor',           'Ativo',     '(54) 99999-0001', 'pastor@adcaxias.org.br',    'Caxias do Sul', 'RS', '2015-03-15'),
+    ('22222222-0000-0000-0000-000000000002', v_congr, 'Maria Aparecida Santos',   'Diaconisa',        'Ativo',     '(54) 99999-0002', 'maria.santos@adcaxias.org.br', 'Caxias do Sul', 'RS', '2016-06-20'),
+    ('22222222-0000-0000-0000-000000000003', v_congr, 'Carlos Roberto Lima',      'Diácono',          'Ativo',     '(54) 99999-0003', 'carlos.lima@adcaxias.org.br',  'Caxias do Sul', 'RS', '2017-01-10'),
+    ('22222222-0000-0000-0000-000000000004', v_congr, 'Ana Cristina Oliveira',    'Membro',           'Ativo',     '(54) 99999-0004', 'ana.oliveira@adcaxias.org.br', 'Caxias do Sul', 'RS', '2018-09-05'),
+    ('22222222-0000-0000-0000-000000000005', v_congr, 'Paulo Henrique Costa',     'Líder de Jovens',  'Ativo',     '(54) 99999-0005', 'paulo.costa@adcaxias.org.br',  'Caxias do Sul', 'RS', '2019-03-22'),
+    ('22222222-0000-0000-0000-000000000006', v_congr, 'Fernanda Maria Alves',     'Secretária',       'Ativo',     '(54) 99999-0006', 'fernanda@adcaxias.org.br',     'Caxias do Sul', 'RS', '2019-11-14'),
+    ('22222222-0000-0000-0000-000000000007', v_congr, 'Ricardo José Pereira',     'Tesoureiro',       'Ativo',     '(54) 99999-0007', 'tesoureiro@adcaxias.org.br',   'Caxias do Sul', 'RS', '2020-02-28'),
+    ('22222222-0000-0000-0000-000000000008', v_congr, 'Juliana Cristina Ramos',   'Membro',           'Ativo',     '(54) 99999-0008', NULL,                           'Caxias do Sul', 'RS', '2021-05-10'),
+    ('22222222-0000-0000-0000-000000000009', v_congr, 'Lucas Eduardo Souza',      'Obreiro',          'Ativo',     '(54) 99999-0009', NULL,                           'Caxias do Sul', 'RS', '2022-01-17'),
+    ('22222222-0000-0000-0000-000000000010', v_congr, 'Beatriz Helena Martins',   'Membro',           'Ativo',     '(54) 99999-0010', NULL,                           'Caxias do Sul', 'RS', '2022-08-30'),
+    ('22222222-0000-0000-0000-000000000011', v_congr, 'Rodrigo Almeida Torres',   'Visitante',        'Visitante', '(54) 99999-0011', NULL,                           'Caxias do Sul', 'RS', '2026-05-05'),
+    ('22222222-0000-0000-0000-000000000012', v_congr, 'Silvia Regina Campos',     'Membro',           'Ativo',     '(54) 99999-0012', NULL,                           'Caxias do Sul', 'RS', '2023-03-12'),
+    ('22222222-0000-0000-0000-000000000013', v_congr, 'André Luís Nascimento',    'Diácono',          'Ativo',     '(54) 99999-0013', NULL,                           'Caxias do Sul', 'RS', '2020-08-05'),
+    ('22222222-0000-0000-0000-000000000014', v_congr, 'Priscila Fontes Correia',  'Membro',           'Ativo',     NULL,              NULL,                           'Caxias do Sul', 'RS', '2024-01-20'),
+    ('22222222-0000-0000-0000-000000000015', v_congr, 'Marcos Vinícius Rocha',    'Obreiro',          'Inativo',   NULL,              NULL,                           'Caxias do Sul', 'RS', '2021-11-08')
   ON CONFLICT (id) DO NOTHING;
 
   -- ─────────────────────────────────────────────────────────────────
@@ -98,16 +98,16 @@ BEGIN
   INSERT INTO public.documents (id, organization_id, title, content, document_type)
   VALUES
     ('55555555-0000-0000-0000-000000000001', v_congr,
-      'Estatuto da Congregação',
-      E'ESTATUTO DA CONGREGAÇÃO BATISTA JARDIM AMÉRICA\n\nCAPÍTULO I — DA DENOMINAÇÃO\nArt. 1º — A Congregação Batista Jardim América, fundada em 21 de junho de 2001, é uma entidade religiosa sem fins lucrativos, filiada à Igreja Batista Central São Paulo e à Convenção Batista Nacional.\n\nCAPÍTULO II — DOS OBJETIVOS\nArt. 2º — São objetivos da Congregação:\na) A evangelização e o discipulado;\nb) A adoração e o culto;\nc) O serviço e a missão.\n\nCAPÍTULO III — DOS MEMBROS\nArt. 3º — São membros os professantes de fé cristã aceitos conforme este estatuto.\n\nCAPÍTULO IV — DA ADMINISTRAÇÃO\nArt. 4º — A Congregação é administrada pelo Pastor, Conselho de Diáconos e Assembleia Geral.',
+      'Estatuto Interno — Assembleia de Deus Caxias do Sul',
+      E'ESTATUTO INTERNO — CONGREGAÇÃO JARDIM AMÉRICA\nASSEMBLEIA DE DEUS EM CAXIAS DO SUL\n\nCAPÍTULO I — DA IDENTIFICAÇÃO\nArt. 1º — A Congregação Jardim América, localizada em Caxias do Sul/RS, é congregação da Assembleia de Deus em Caxias do Sul, entidade religiosa sem fins lucrativos, sob orientação pastoral e regimento interno da Secretaria administrativa da obra.\n\nCAPÍTULO II — DOS OBJETIVOS\nArt. 2º — São objetivos da Congregação:\na) Pregar o Evangelho de Jesus Cristo;\nb) Promover adoração, discipulado e santa comunhão;\nc) Servir à cidade de Caxias do Sul em missões e ação social.\n\nCAPÍTULO III — DOS MEMBROS\nArt. 3º — São membros os que confessam fé evangélica, são integrados pela liderança pastoral e acompanhados pela Secretaria da congregação.\n\nCAPÍTULO IV — DA ADMINISTRAÇÃO\nArt. 4º — A Congregação é administrada pelo Pastor local, pastores auxiliares, presbíteros, diáconos e lideranças ministeriais, em harmonia com a direção da Assembleia de Deus em Caxias do Sul.',
       'Estatuto'),
     ('55555555-0000-0000-0000-000000000002', v_congr,
-      'Ata da Assembleia Geral — Maio 2026',
-      E'ATA DA ASSEMBLEIA GERAL ORDINÁRIA\nData: 10 de maio de 2026 | Hora: 11h00 | Local: Templo Principal\n\nPresentes: 45 membros\nMesa: Pr. João Paulo Ferreira (Presidente), Fernanda Alves (Secretária)\n\nPAUTA:\n1. Leitura e aprovação da ata anterior — aprovada por unanimidade.\n2. Relatório financeiro do 1º trimestre 2026 — saldo positivo de R$ 8.750,00. Aprovado.\n3. Aprovação do calendário de eventos para o 2º semestre — aprovado com 1 abstenção.\n4. Eleição do novo conselho de diáconos — eleitos por votação secreta: Irmão Carlos Lima e Irmão André Nascimento.\n5. Proposta de reforma do banheiro do templo — aprovada por 38 votos a 4. Valor estimado: R$ 12.000,00.\n\nNada mais havendo a tratar, encerrou-se a reunião às 12h45.\n\nPr. João Paulo Ferreira — Presidente | Fernanda Alves — Secretária',
+      'Ata de Reunião Ministerial — Maio 2026',
+      E'ATA DE REUNIÃO MINISTERIAL\nAssembleia de Deus em Caxias do Sul — Congregação Jardim América\nData: 10 de maio de 2026 | Horário: 19h30 | Local: Salão de Reuniões\n\nPresentes: Pr. João Paulo Ferreira (Pastor), Fernanda Maria Alves (Secretaria), lideranças dos ministérios de Louvor, Infantil, Jovens, Recepção e Intercessão.\n\nPAUTA:\n1. Abertura em oração e leitura bíblica.\n2. Planejamento dos cultos e atividades de junho/2026 na sede de Caxias do Sul.\n3. Escalas ministeriais: confirmação das equipes de Louvor e Recepção.\n4. Mobilização da EBD e dos Pequenos Grupos (Jovens Resgate e Casais Ágape).\n5. Orientações da Secretaria sobre cadastro de membros e documentação congregacional.\n\nEncerramento às 21h00, com benção apostólica.\n\nPr. João Paulo Ferreira — Pastor\nFernanda Maria Alves — Secretaria AD Caxias do Sul / Congregação Jardim América',
       'Ata'),
     ('55555555-0000-0000-0000-000000000003', v_congr,
-      'Manual do Novo Membro',
-      E'BEM-VINDO À NOSSA FAMÍLIA!\n\nEste manual foi preparado com carinho para ajudá-lo a conhecer melhor a nossa congregação e a se integrar à nossa vida comunitária.\n\nNOSSA VISÃO\n"Ser uma comunidade que transforma vidas pelo poder do Evangelho de Jesus Cristo."\n\nNOSSOS VALORES\n• Palavra: a Bíblia como fundamento de tudo\n• Oração: comunhão constante com Deus\n• Comunidade: relacionamentos genuínos\n• Missão: alcançar o perdido\n\nMINISTÉRIOS DISPONÍVEIS\n• Ministério de Louvor e Adoração\n• Ministério Infantil (0-12 anos)\n• Grupo de Jovens Resgate (13-30 anos)\n• Grupo de Casais Ágape\n• Ministério de Misericórdia\n• Escolas Bíblicas Dominicais\n\nCOMPROMISSOS DO MEMBRO\n• Participar regularmente dos cultos\n• Contribuir com dízimos e ofertas\n• Servir em algum ministério\n• Manter comunhão com os irmãos\n\nCONTATOS\nPastor João Paulo: (11) 99999-0001\nSecretaria: seg-sex 9h-17h',
+      'Manual de Integração de Novos Membros — AD Caxias do Sul',
+      E'MANUAL DE INTEGRAÇÃO DE NOVOS MEMBROS\nAssembleia de Deus em Caxias do Sul — Congregação Jardim América\n\nBEM-VINDO À FAMÍLIA DE DEUS!\n\nA Secretaria da Congregação Jardim América preparou este material para ajudá-lo a integrar-se à vida congregacional da Assembleia de Deus em Caxias do Sul.\n\nNOSSA IDENTIDADE\nSomos uma congregação evangélica pentecostal, comprometida com a Palavra de Deus, a oração e a obra missionária na cidade de Caxias do Sul.\n\nMINISTÉRIOS DA CONGREGAÇÃO\n• Louvor e Adoração\n• Infantil\n• Jovens Resgate\n• Casais Ágape\n• Recepção e Acolhimento\n• Intercessão\n• Escola Bíblica Dominical\n\nPRIMEIROS PASSOS\n1. Participar do culto de boas-vindas\n2. Encontro com a liderança pastoral\n3. Cadastro na Secretaria (documento com foto e dados pessoais)\n4. Inscrição em um ministério ou pequeno grupo\n\nCONTATOS\nPastor João Paulo Ferreira — (11) 99999-0001\nSecretaria AD Caxias do Sul / Congregação Jardim América — seg a sex, 9h às 17h',
       'Geral')
   ON CONFLICT (id) DO NOTHING;
 
@@ -130,17 +130,17 @@ BEGIN
   INSERT INTO public.prayer_requests (id, organization_id, title, description, status)
   VALUES
     ('77777777-0000-0000-0000-000000000001', v_congr,
-      'Cura e restauração da Irmã Maria',
-      'Nosso caro pedido de oração é pela irmã Maria Santos, que realizou uma cirurgia cardíaca na semana passada. Que o Senhor conceda cura completa, paz e conforto a ela e a sua família neste momento de recuperação.',
-      'Em Oração'),
+      'Cura e restauração — Irmã Maria',
+      'Pedido de intercessão pela irmã Maria Santos, da Congregação Jardim América (Assembleia de Deus em Caxias do Sul/RS), em recuperação após cirurgia cardíaca. Oremos por cura completa, paz e conforto para ela e sua família.',
+      'Ativo'),
     ('77777777-0000-0000-0000-000000000002', v_congr,
-      'Provisão financeira para família Souza',
-      'O irmão Lucas Souza está passando por um período de desemprego há três meses. Sua família depende de sua renda. Intercedemos para que o Senhor abra portas de trabalho e fortaleça a fé dessa família.',
-      'Em Oração'),
+      'Provisão para família Souza — Caxias do Sul',
+      'O irmão Lucas Souza, membro da Congregação Jardim América em Caxias do Sul/RS, está desempregado há três meses. Intercedamos para que o Senhor abra portas de trabalho e fortaleça a fé dessa família.',
+      'Ativo'),
     ('77777777-0000-0000-0000-000000000003', v_congr,
-      'Ungimento do Congresso de Oração',
-      'Pedimos intercessão especial para o Congresso de Oração e Missões de junho. Que o Espírito Santo prepare os corações, que os pregadores sejam ungidos e que muitos sejam tocados pelo chamado missionário.',
-      'Pendente')
+      'Intercessão pelo Congresso de Oração e Missões',
+      'Agradecemos as orações pelo Congresso de Oração e Missões da Assembleia de Deus em Caxias do Sul. O evento foi abençoado; mantemos gratidão e pedimos continuidade no chamado missionário da congregação.',
+      'Respondido')
   ON CONFLICT (id) DO NOTHING;
 
   -- ─────────────────────────────────────────────────────────────────
@@ -170,12 +170,14 @@ END $$;
 -- 9. Anúncio Global de Plataforma (visible on all dashboards)
 -- =============================================================================
 INSERT INTO public.platform_announcements (
-  id, title, short_description, is_active, button_label, button_link, starts_at
+  id, title, short_description, full_content, target_type, is_active, button_label, button_link, starts_at
 )
 VALUES (
   '99999999-0000-0000-0000-000000000001',
   'Ecclesia Admin — Sistema em Demonstração',
   'Você está explorando o Ecclesia Admin com dados de demonstração. Acesse a Bíblia com IA pastoral, devocionais inteligentes, financeiro, secretaria e muito mais.',
+  'Você está explorando o Ecclesia Admin com dados de demonstração. Acesse a Bíblia com IA pastoral, devocionais inteligentes, financeiro, secretaria e muito mais. Este anúncio é exibido em todos os painéis da plataforma.',
+  'global',
   true,
   'Explorar Bíblia IA',
   '/admin/biblia',

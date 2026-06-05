@@ -76,5 +76,39 @@ export const hasPermission = (
 export const canManageChurch = (role: AdminRole | null | undefined) =>
   hasPermission(role, ["super_admin", "church_admin", "pastor", "secretary"]);
 
+export const WORSHIP_WRITE_ROLES: AdminRole[] = [
+  "super_admin",
+  "church_admin",
+  "pastor",
+  "secretary",
+  "leader",
+];
+
+export const canWriteWorship = (role: AdminRole | null | undefined) =>
+  hasPermission(role, WORSHIP_WRITE_ROLES);
+
+/** Secretaria: create/edit/delete em módulos administrativos da igreja. */
+export const SECRETARIA_WRITE_ROLES: AdminRole[] = [
+  "super_admin",
+  "church_admin",
+  "pastor",
+  "secretary",
+  "leader",
+];
+
+export const canWriteSecretaria = (role: AdminRole | null | undefined) =>
+  hasPermission(role, SECRETARIA_WRITE_ROLES);
+
+/** Escalas: excluir escala ou remover escalado (RLS sem leader). */
+export const SECRETARIA_SCHEDULE_DELETE_ROLES: AdminRole[] = [
+  "super_admin",
+  "church_admin",
+  "pastor",
+  "secretary",
+];
+
+export const canDeleteSchedule = (role: AdminRole | null | undefined) =>
+  hasPermission(role, SECRETARIA_SCHEDULE_DELETE_ROLES);
+
 export const canSwitchChurch = (role: AdminRole | null | undefined) =>
   hasPermission(role, ["super_admin", "church_admin"]);

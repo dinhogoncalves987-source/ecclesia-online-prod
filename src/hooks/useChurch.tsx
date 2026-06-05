@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { ChurchContext, type Church } from "./useChurchContext";
 import { ensureOrganizationMembership } from "@/lib/organizationMembership";
+import { isPlatformAdminRole, pickDefaultActiveChurch } from "@/lib/churchContext";
 
 const ACTIVE_CHURCH_STORAGE_KEY = "ecclesia.activeChurchId";
 
@@ -36,6 +37,48 @@ const mapOrganizationToChurch = (org: OrganizationRow): Church => ({
   email: org.email,
   pastor_name: null,
 });
+
+const ORGANIZATION_SELECT =
+  "id,parent_id,name,slug,organization_type,city,state,email,phone,logo_url,active";
+
+async function resolvePlatformAdmin(userId: string): Promise<boolean> {
+  const [profileResult, globalRolesResult, superAdminRow] = await Promise.all([
+    supabase.from("profiles").select("platform_role").eq("user_id", userId).maybeSingle(),
+    supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .is("organization_id", null),
+    supabase.from("super_admins").select("user_id").eq("user_id", userId).maybeSingle(),
+  ]);
+
+  if (isPlatformAdminRole(profileResult.data?.platform_role)) return true;
+
+  const globalRoles = (globalRolesResult.data || []) as Array<{ role: string }>;
+  if (globalRoles.some((row) => isPlatformAdminRole(row.role))) return true;
+
+  return Boolean(superAdminRow.data?.user_id);
+}
+
+async function fetchActiveOrganizations(
+  organizationIds: string[] | null,
+): Promise<{ organizations: OrganizationRow[]; error: unknown }> {
+  let query = supabase
+    .from("organizations")
+    .select(ORGANIZATION_SELECT)
+    .eq("active", true)
+    .order("name");
+
+  if (organizationIds !== null) {
+    if (organizationIds.length === 0) {
+      return { organizations: [], error: null };
+    }
+    query = query.in("id", organizationIds);
+  }
+
+  const { data, error } = await query;
+  return { organizations: (data || []) as OrganizationRow[], error };
+}
 
 export function ChurchProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -97,20 +140,24 @@ export function ChurchProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    let organizationsQueryIds: string[] | null = organizationIds;
+
     if (organizationIds.length === 0) {
-      setChurch(null);
-      setProfileChurchId(null);
-      setChurches([]);
-      setLoading(false);
-      return;
+      const platformAdmin = await resolvePlatformAdmin(user.id);
+      if (platformAdmin) {
+        organizationsQueryIds = null;
+      } else {
+        setChurch(null);
+        setProfileChurchId(null);
+        setChurches([]);
+        setLoading(false);
+        return;
+      }
     }
 
-    const { data: organizations, error: organizationsError } = await supabase
-      .from("organizations")
-      .select("id,parent_id,name,slug,organization_type,city,state,email,phone,logo_url,active")
-      .in("id", organizationIds)
-      .eq("active", true)
-      .order("name");
+    const { organizations, error: organizationsError } = await fetchActiveOrganizations(
+      organizationsQueryIds,
+    );
 
     if (organizationsError) {
       console.error("Erro ao buscar organizações:", organizationsError);
@@ -121,12 +168,20 @@ export function ChurchProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const visibleChurches = ((organizations || []) as OrganizationRow[]).map(mapOrganizationToChurch);
+    const visibleChurches = organizations.map(mapOrganizationToChurch);
     const storedChurchId = localStorage.getItem(`${ACTIVE_CHURCH_STORAGE_KEY}.${user.id}`);
-    const fallbackChurch = visibleChurches[0] || null;
-    const activeChurch = visibleChurches.find((c) => c.id === storedChurchId) || fallbackChurch;
+    const activeChurch = pickDefaultActiveChurch(visibleChurches, storedChurchId);
 
-    setProfileChurchId(fallbackChurch?.id || null);
+    if (activeChurch && user) {
+      const shouldPersist =
+        !storedChurchId ||
+        !visibleChurches.some((c) => c.id === storedChurchId);
+      if (shouldPersist) {
+        localStorage.setItem(`${ACTIVE_CHURCH_STORAGE_KEY}.${user.id}`, activeChurch.id);
+      }
+    }
+
+    setProfileChurchId(activeChurch?.id || visibleChurches[0]?.id || null);
     setChurches(visibleChurches);
     setChurch(activeChurch);
     setLoading(false);
