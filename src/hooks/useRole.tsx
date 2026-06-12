@@ -16,6 +16,7 @@ export type AppRole = LegacyAppRole;
 // Which roles can access which modules
 const MODULE_ACCESS: Record<string, AppRole[]> = {
   "/admin": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
+  "/admin/campanhas": ["super_admin", "church_admin", "leader", "member", "tesoureiro", "contador"],
   "/admin/financeiro": ["super_admin", "church_admin", "tesoureiro", "contador"],
   "/admin/membros": ["super_admin", "church_admin", "pastor", "secretary"],
   "/admin/agenda": ["super_admin", "church_admin", "pastor", "secretary", "leader", "member"],

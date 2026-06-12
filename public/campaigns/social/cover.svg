@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="800" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#be185d"/>
+      <stop offset="0.5" stop-color="#e11d48"/>
+      <stop offset="1" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#bg)"/>
+  <ellipse cx="400" cy="420" rx="320" ry="40" fill="#000" opacity="0.12"/>
+  <rect x="280" y="200" width="240" height="160" rx="12" fill="#fff" opacity="0.92"/>
+  <path d="M300 280h160M300 300h120M300 320h140" stroke="#fda4af" stroke-width="8" stroke-linecap="round"/>
+  <rect x="320" y="220" width="80" height="50" rx="6" fill="#fecdd3"/>
+  <circle cx="360" cy="245" r="12" fill="#fb7185"/>
+  <path d="M520 180c0-30-24-54-54-54s-54 24-54 54v80h108V180z" fill="#fef3c7" opacity="0.95"/>
+  <path d="M466 260v40c0 22 18 40 40 40h28c22 0 40-18 40-40v-40" stroke="#fbbf24" stroke-width="6" fill="none"/>
+  <rect x="180" y="260" width="100" height="80" rx="8" fill="#7f1d1d" opacity="0.35"/>
+  <rect x="190" y="270" width="80" height="60" rx="4" fill="#fecaca"/>
+  <path d="M190 330l40-30 30 20 50-40" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+  <circle cx="620" cy="300" r="36" fill="#fff" opacity="0.2"/>
+  <path d="M608 300c0-7 5-12 12-12s12 5 12 12-5 12-12 12" fill="#fff" opacity="0.85"/>
+  <path d="M620 288v24M608 300h24" stroke="#be185d" stroke-width="4" stroke-linecap="round"/>
+</svg>

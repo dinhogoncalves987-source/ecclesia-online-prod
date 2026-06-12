@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback } from "react";
 import { BookOpen, RefreshCw, Sparkles, Sun, CloudSun, Moon, Share2, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
-import { buildShareUrl, triggerShare } from "@/lib/share";
-import { useChurch } from "@/hooks/useChurchContext";
+import { buildDevotionalSharePayload, normalizeReflection } from "@/lib/devotionalShare";
+import { triggerShare } from "@/lib/share";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { getCachedDevotional, cacheDevotional } from "@/lib/offlineCache";
 import { fetchEdgeFunction } from "@/lib/edgeFetch";
@@ -46,7 +46,7 @@ const STATIC_REFLECTION: Record<Period, Record<"pt" | "en" | "es", string>> = {
     es: "Que esta mañana encuentre tu corazón abierto a la voz de Dios.\nAntes de las exigencias del día, dedica un momento para escuchar al Señor y entregarle tus expectativas.\nEsta palabra es dirección, no solo inspiración: quiere moldear tus actitudes, palabras y decisiones.\nCuando surjan prisa o ansiedad, vuelve a esta verdad y camina con calma, sabiendo que Dios va delante de ti.\nPractica hoy una fe concreta: saluda con amabilidad, trabaja con integridad u ora antes de responder.\nNo necesitas resolverlo todo de una vez; da el siguiente paso confiando en Su fidelidad.\nQue la luz de esta mañana guíe cada elección y sientas la presencia del Señor en cada detalle del día.",
   },
   tarde: {
-    pt: "No meio deste dia, faça uma pausa e renove suas forças na presença do Senhor.\nTalvez a manhã tenha sido corrida ou cansativa; mesmo assim, Deus não se afastou de você.\nEsta palavra é um lembrete de que você não caminha sozinho e que há graça para continuar.\nReavalié o que ainda pode ser feito com paz: priorize o essencial e entregue a Deus o que não depende de você.\nEscolha uma aplicação prática para esta tarde — pedir perdão, ajudar alguém ou concluir algo com excelência.\nNão compare seu ritmo com o dos outros; caminhe fielmente no tempo que o Senhor lhe deu.\nQue esta tarde seja marcada por perseverança serena e pela certeza de que Ele sustenta cada passo.",
+    pt: "No meio deste dia, faça uma pausa e renove suas forças na presença do Senhor.\nTalvez a manhã tenha sido corrida ou cansativa; mesmo assim, Deus não se afastou de você.\nEsta palavra é um lembrete de que você não caminha sozinho e que há graça para continuar.\nReavalie o que ainda pode ser feito com paz: priorize o essencial e entregue a Deus o que não depende de você.\nEscolha uma aplicação prática para esta tarde — pedir perdão, ajudar alguém ou concluir algo com excelência.\nNão compare seu ritmo com o dos outros; caminhe fielmente no tempo que o Senhor lhe deu.\nQue esta tarde seja marcada por perseverança serena e pela certeza de que Ele sustenta cada passo.",
     en: "In the middle of this day, pause and renew your strength in the Lord's presence.\nPerhaps the morning was busy or tiring; even so, God has not moved away from you.\nThis word reminds you that you do not walk alone and that there is grace to keep going.\nReassess what can still be done with peace: prioritize what matters and surrender what is beyond your control.\nChoose one practical application for this afternoon — ask forgiveness, help someone, or finish a task with excellence.\nDo not compare your pace with others; walk faithfully in the time the Lord has given you.\nMay this afternoon be marked by calm perseverance and the certainty that He upholds every step.",
     es: "En medio de este día, haz una pausa y renueva tus fuerzas en la presencia del Señor.\nQuizá la mañana fue apresurada o cansada; aun así, Dios no se ha alejado de ti.\nEsta palabra te recuerda que no caminas solo y que hay gracia para continuar.\nReevalúa lo que aún puede hacerse con paz: prioriza lo esencial y entrégale a Dios lo que no depende de ti.\nElige una aplicación práctica para esta tarde — pedir perdón, ayudar a alguien o terminar algo con excelencia.\nNo compares tu ritmo con el de otros; camina fielmente en el tiempo que el Señor te ha dado.\nQue esta tarde esté marcada por perseverancia serena y la certeza de que Él sostiene cada paso.",
   },
@@ -123,7 +123,6 @@ function withRefreshReflection(data: Devotional, locale: "pt" | "en" | "es"): De
 
 export function DailyDevotional() {
   const { t, lang } = useLanguage();
-  const { church } = useChurch();
   const isOnline = useOnlineStatus();
   const [devotional, setDevotional] = useState<Devotional | null>(null);
   const [loading, setLoading] = useState(true);
@@ -135,43 +134,44 @@ export function DailyDevotional() {
 
   const locale = getLocale(lang);
 
-  const buildUrl = () => {
-    if (!devotional) return window.location.origin + "/share?type=devotional";
-    return buildShareUrl({
-      type: "devotional",
-      title: t(PERIOD_CONFIG[activePeriod].labelKey),
+  const getSharePayload = () => {
+    if (!devotional) return null;
+    const reflection = devotional.reflection?.trim() || STATIC_REFLECTION[activePeriod][locale];
+    return buildDevotionalSharePayload({
       verse: devotional.verse,
-      ref: devotional.reference,
-      text: devotional.reflection || "",
-      church: church?.slug || church?.id || "",
-      lang: locale,
+      reference: devotional.reference,
+      reflection,
+      locale,
     });
   };
 
   const handleShare = async () => {
-    if (!devotional) return;
-    const url = buildUrl();
+    const payload = getSharePayload();
+    if (!payload) return;
     const result = await triggerShare({
-      url,
-      title: t(PERIOD_CONFIG[activePeriod].labelKey),
-      text: `"${devotional.verse}" — ${devotional.reference}`,
+      title: payload.title,
+      text: payload.title,
+      url: payload.url,
     });
     if (result === "copied") {
       setCopied(true);
-      toast.success(t("Link copiado!"));
+      toast.success(t("Texto copiado!"));
       setTimeout(() => setCopied(false), 2000);
+    } else if (result === "shared") {
+      toast.success(t("Compartilhado!"));
     }
   };
 
   const handleCopy = async () => {
-    const url = buildUrl();
+    const payload = getSharePayload();
+    if (!payload) return;
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(payload.text);
     } catch {
-      await navigator.clipboard.writeText(`"${devotional?.verse}" — ${devotional?.reference}`);
+      await navigator.clipboard.writeText(payload.url);
     }
     setCopied(true);
-    toast.success(t("Link copiado!"));
+    toast.success(t("Texto copiado!"));
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -263,9 +263,9 @@ export function DailyDevotional() {
   const config = PERIOD_CONFIG[activePeriod];
   const showSkeleton = loading && !devotional;
   const reflectionText = devotional?.reflection?.trim() ?? "";
-  const displayReflection = (reflectionText || STATIC_REFLECTION[activePeriod][locale])
-    .replace(/\s*\n+\s*/g, " ")
-    .trim();
+  const displayReflection = normalizeReflection(
+    reflectionText || STATIC_REFLECTION[activePeriod][locale],
+  );
 
   return (
     <div

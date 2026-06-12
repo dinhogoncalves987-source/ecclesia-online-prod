@@ -66,6 +66,8 @@ const CultoTelao = lazy(() => import("./pages/culto/TelaoProjecao"));
 
 const CultoAssistente = lazy(() => import("./pages/culto/AssistenteCulto"));
 
+const Campanhas = lazy(() => import("./pages/Campanhas"));
+
 const Oracoes = lazy(() => import("./pages/Oracoes"));
 
 const Comunicacao = lazy(() => import("./pages/Comunicacao"));
@@ -137,6 +139,8 @@ const App = () => (
               <Route path="/devocional" element={<DevocionalPublic />} />
 
               <Route path="/admin" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+
+              <Route path="/admin/campanhas" element={<ProtectedRoute><Campanhas /></ProtectedRoute>} />
 
               <Route path="/admin/financeiro" element={<ProtectedRoute><Financeiro /></ProtectedRoute>} />
 

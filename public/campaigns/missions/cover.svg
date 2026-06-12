@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="800" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#065f46"/>
+      <stop offset="0.5" stop-color="#0d9488"/>
+      <stop offset="1" stop-color="#0891b2"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="url(#bg)"/>
+  <circle cx="400" cy="240" r="140" fill="#fff" opacity="0.08"/>
+  <circle cx="400" cy="240" r="120" stroke="#fff" stroke-width="2" opacity="0.25"/>
+  <ellipse cx="400" cy="240" rx="120" ry="48" stroke="#6ee7b7" stroke-width="2" opacity="0.4"/>
+  <ellipse cx="400" cy="240" rx="48" ry="120" stroke="#6ee7b7" stroke-width="2" opacity="0.4"/>
+  <path d="M280 240h240M400 120v240" stroke="#6ee7b7" stroke-width="1.5" opacity="0.3"/>
+  <circle cx="340" cy="200" r="8" fill="#34d399"/>
+  <circle cx="480" cy="180" r="6" fill="#fbbf24"/>
+  <circle cx="520" cy="260" r="7" fill="#f472b6"/>
+  <circle cx="300" cy="280" r="5" fill="#a78bfa"/>
+  <path d="M360 320c20-40 80-40 100 0 20 40-100 40-100 0z" fill="#047857" opacity="0.6"/>
+  <circle cx="380" cy="300" r="18" fill="#fef3c7"/>
+  <circle cx="420" cy="300" r="18" fill="#fef3c7"/>
+  <path d="M370 340c15 20 50 20 60 0" stroke="#fef3c7" stroke-width="3" fill="none"/>
+  <path d="M520 340l40-60 40 60" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+  <rect x="160" y="360" width="480" height="8" rx="4" fill="#000" opacity="0.1"/>
+</svg>

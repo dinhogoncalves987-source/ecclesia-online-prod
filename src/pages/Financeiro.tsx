@@ -6,17 +6,33 @@ import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 import { FinanceOverview } from "@/components/financeiro/FinanceOverview";
 import { TransactionList } from "@/components/financeiro/TransactionList";
-import { FinanceReports } from "@/components/financeiro/FinanceReports";
-import { PixCard } from "@/components/financeiro/PixCard";
-import { BarChart3, List, FileText, CreditCard } from "lucide-react";
+import { FinanceExecutive } from "@/components/financeiro/FinanceExecutive";
+import { FinanceTithesOfferings } from "@/components/financeiro/FinanceTithesOfferings";
+import { FinanceCampaigns } from "@/components/financeiro/FinanceCampaigns";
+import { FinanceAccounts } from "@/components/financeiro/FinanceAccounts";
+import { FinanceBudget } from "@/components/financeiro/FinanceBudget";
+import { FinanceAssets } from "@/components/financeiro/FinanceAssets";
+import { FinanceAccountability } from "@/components/financeiro/FinanceAccountability";
+import { FinanceAudit } from "@/components/financeiro/FinanceAudit";
+import { FinanceIntelligence } from "@/components/financeiro/FinanceIntelligence";
+import {
+  BarChart3, Wallet, Heart, Megaphone, ArrowLeftRight, PieChart,
+  Building2, FileCheck, ShieldCheck, Sparkles,
+} from "lucide-react";
 import { runScopedOrganizationQuery } from "@/lib/organizationScope";
 import type { TreasuryTransaction } from "@/lib/finance";
 
 const TABS = [
-  { key: "overview", icon: BarChart3, labelKey: "Visão Geral" },
-  { key: "transactions", icon: List, labelKey: "Lançamentos" },
-  { key: "reports", icon: FileText, labelKey: "Relatórios Contábeis" },
-  { key: "pix", icon: CreditCard, labelKey: "PIX / Dízimos" },
+  { key: "executive", icon: BarChart3, labelKey: "Executivo" },
+  { key: "treasury", icon: Wallet, labelKey: "Tesouraria" },
+  { key: "tithes", icon: Heart, labelKey: "Dízimos & Ofertas" },
+  { key: "campaigns", icon: Megaphone, labelKey: "Campanhas" },
+  { key: "accounts", icon: ArrowLeftRight, labelKey: "Contas" },
+  { key: "budget", icon: PieChart, labelKey: "Orçamento" },
+  { key: "assets", icon: Building2, labelKey: "Patrimônio" },
+  { key: "accountability", icon: FileCheck, labelKey: "Prestação de Contas" },
+  { key: "audit", icon: ShieldCheck, labelKey: "Auditoria" },
+  { key: "intelligence", icon: Sparkles, labelKey: "Inteligência" },
 ] as const;
 
 type TabKey = typeof TABS[number]["key"];
@@ -27,7 +43,7 @@ export default function Financeiro() {
   const { church } = useChurch();
   const [transactions, setTransactions] = useState<TreasuryTransaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  const [activeTab, setActiveTab] = useState<TabKey>("executive");
 
   useEffect(() => {
     if (!user || !church) { setLoading(false); return; }
@@ -46,13 +62,13 @@ export default function Financeiro() {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        {/* Header */}
         <div>
           <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">{t("Financeiro")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{t("Tesouraria e controle contábil")}</p>
+          <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
+            {t("Gestão financeira, campanhas, prestação de contas e inteligência ministerial")}
+          </p>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-1 bg-secondary/50 rounded-xl p-1 overflow-x-auto">
           {TABS.map(tab => {
             const Icon = tab.icon;
@@ -61,7 +77,7 @@ export default function Financeiro() {
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
                   isActive ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -72,11 +88,21 @@ export default function Financeiro() {
           })}
         </div>
 
-        {/* Tab Content */}
-        {activeTab === "overview" && <FinanceOverview transactions={transactions} />}
-        {activeTab === "transactions" && <TransactionList transactions={transactions} setTransactions={setTransactions} loading={loading} />}
-        {activeTab === "reports" && <FinanceReports transactions={transactions} />}
-        {activeTab === "pix" && <PixCard />}
+        {activeTab === "executive" && <FinanceExecutive />}
+        {activeTab === "treasury" && (
+          <div className="space-y-6">
+            <FinanceOverview transactions={transactions} />
+            <TransactionList transactions={transactions} setTransactions={setTransactions} loading={loading} />
+          </div>
+        )}
+        {activeTab === "tithes" && <FinanceTithesOfferings />}
+        {activeTab === "campaigns" && <FinanceCampaigns />}
+        {activeTab === "accounts" && <FinanceAccounts />}
+        {activeTab === "budget" && <FinanceBudget />}
+        {activeTab === "assets" && <FinanceAssets />}
+        {activeTab === "accountability" && <FinanceAccountability transactions={transactions} />}
+        {activeTab === "audit" && <FinanceAudit />}
+        {activeTab === "intelligence" && <FinanceIntelligence />}
       </div>
     </AdminLayout>
   );

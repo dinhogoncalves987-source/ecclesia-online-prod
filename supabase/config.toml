@@ -1,1 +1,7 @@
 project_id = "onywmysaukyzgkzoxtsw"
+
+[functions.bible-verses]
+verify_jwt = false
+
+[functions.daily-devotional]
+verify_jwt = false

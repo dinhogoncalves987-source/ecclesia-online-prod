@@ -2,6 +2,7 @@
 import { ExecutiveCard } from "@/components/ExecutiveCard";
 import { MatrizDashboard } from "@/components/MatrizDashboard";
 import { DailyDevotional } from "@/components/DailyDevotional";
+import { DashboardCampaignSections } from "@/components/campanhas/DashboardCampaignSections";
 import { motion } from "framer-motion";
 import { Wallet, Users, TrendingUp, Calendar, Clock, Bell, Plus, ChevronRight, Loader2, Shield, Building2, Globe, BookOpen, Heart, Music2, MessageSquare, FileText } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -517,6 +518,7 @@ export default function Dashboard() {
 
         {/* Daily Devotional - always visible */}
         <DailyDevotional />
+        {!loading && church && <DashboardCampaignSections />}
         {false && !loading && canViewPlatformCampaigns && renderCampaignBanner()}
 
         {loading ? (

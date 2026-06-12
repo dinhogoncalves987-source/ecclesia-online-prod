@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Wallet, Users, Calendar, BookOpen, FileText,
   Heart, MessageSquare, UsersRound, Archive, BarChart3, Menu, X,
   Bell, ChevronLeft, ChevronDown, Settings, LogOut, Maximize, Minimize, Globe,
-  Shield, User, Building2, Music2, Gavel, Briefcase, ShoppingBag, MessageCircle
+  Shield, User, Building2, Music2, Gavel, Briefcase, ShoppingBag, MessageCircle, Megaphone
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -45,6 +45,7 @@ const navSections: NavSection[] = [
     items: [
       { icon: BookOpen, label: "Bíblia Sagrada", path: "/admin/biblia" },
       { icon: Music2, label: "Culto & Louvor", path: "/admin/culto" },
+      { icon: Megaphone, label: "Campanhas", path: "/admin/campanhas" },
     ],
   },
   {
@@ -86,8 +87,8 @@ const navSections: NavSection[] = [
     labelKey: "Ecossistema",
     separator: true,
     items: [
-      { icon: ShoppingBag, label: "Marketplace", path: "/admin/marketplace" },
       { icon: MessageCircle, label: "Comunidade", path: "/admin/comunidade" },
+      { icon: ShoppingBag, label: "Marketplace", path: "/admin/marketplace" },
     ],
   },
 ];
