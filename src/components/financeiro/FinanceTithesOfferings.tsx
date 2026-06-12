@@ -1,23 +1,24 @@
 import { useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
-import { useToast } from "@/hooks/use-toast";
 import { TITHES_OFFERINGS, formatFinanceCurrency } from "@/lib/financeDemo";
 import { PixCard } from "@/components/financeiro/PixCard";
 import { ExecutiveCard } from "@/components/ExecutiveCard";
 import { DocExportMenu } from "@/components/shared/DocExportMenu";
 import { buildFinanceExportItems } from "@/lib/docExport";
 import { FinanceDetailModal } from "@/components/financeiro/FinanceDetailModal";
-import { CreditCard, Heart, TrendingUp, Users } from "lucide-react";
+import { CheckCircle2, CreditCard, Heart, Info, TrendingUp, Users } from "lucide-react";
 
 type CongregationRow = typeof TITHES_OFFERINGS.byCongregation[number];
 
 export function FinanceTithesOfferings() {
   const { t, lang } = useLanguage();
-  const { toast } = useToast();
   const fmt = (v: number) => formatFinanceCurrency(v, lang);
   const data = TITHES_OFFERINGS;
 
   const [selectedCongregation, setSelectedCongregation] = useState<CongregationRow | null>(null);
+  const [showPixConfig, setShowPixConfig] = useState(false);
+  const [pixKey, setPixKey] = useState("");
+  const [pixSaved, setPixSaved] = useState(false);
 
   const cards = [
     { title: t("Dízimos do Mês"), value: fmt(data.monthlyTithes), icon: TrendingUp, trend: `+${data.growthVsPrevious}%` },
@@ -46,6 +47,7 @@ export function FinanceTithesOfferings() {
         ))}
       </div>
 
+      {/* Congregation table */}
       <section className="bg-card rounded-xl shadow-executive p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-serif text-lg font-semibold">{t("Por congregação")}</h3>
@@ -94,15 +96,18 @@ export function FinanceTithesOfferings() {
 
       <PixCard />
 
+      {/* PIX configuration CTA */}
       <div className="bg-accent/5 border border-accent/20 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h3 className="font-serif font-semibold">{t("Pagamento online")}</h3>
-          <p className="text-sm text-muted-foreground mt-1">{t("Configure PIX e recebimentos digitais para dízimos e ofertas.")}</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {t("Configure PIX e recebimentos digitais para dízimos e ofertas.")}
+          </p>
         </div>
         <button
           type="button"
-          onClick={() => toast({ title: t("Pagamento online"), description: t("Em breve disponível") })}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
+          onClick={() => { setPixSaved(false); setShowPixConfig(true); }}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors flex-shrink-0"
         >
           <CreditCard size={16} /> {t("Configurar PIX")}
         </button>
@@ -137,6 +142,103 @@ export function FinanceTithesOfferings() {
             <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 text-green-700 text-sm font-medium">
               <TrendingUp size={16} />
               Crescimento vs. mês anterior: +{selectedCongregation.growth}%
+            </div>
+          </div>
+        )}
+      </FinanceDetailModal>
+
+      {/* ── PIX configuration modal ────────────────────────────────── */}
+      <FinanceDetailModal
+        open={showPixConfig}
+        onClose={() => setShowPixConfig(false)}
+        title={t("Configurar PIX")}
+        subtitle="Recebimentos digitais — Dízimos e Ofertas"
+        maxWidth="md"
+      >
+        {pixSaved ? (
+          <div className="text-center py-4 space-y-3">
+            <div className="w-14 h-14 rounded-full bg-green-500/10 flex items-center justify-center mx-auto">
+              <CheckCircle2 size={28} className="text-green-600" />
+            </div>
+            <p className="font-semibold text-lg">Configuração salva!</p>
+            <p className="text-sm text-muted-foreground">
+              A chave PIX foi registrada. Os recebimentos digitais serão exibidos no painel assim que ativados.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowPixConfig(false)}
+              className="mt-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+            >
+              Concluir
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 text-sm">
+              <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
+              <p className="text-muted-foreground">
+                Configure uma chave PIX para receber dízimos e ofertas digitalmente.
+                Os valores serão consolidados automaticamente neste painel.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Tipo de chave PIX
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {["CPF/CNPJ", "E-mail", "Telefone", "Aleatória"].map(type => (
+                  <button
+                    key={type}
+                    type="button"
+                    className="px-3 py-2 rounded-lg border border-border text-xs font-medium hover:border-primary/50 hover:bg-secondary/30 transition-colors"
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Chave PIX
+              </label>
+              <input
+                type="text"
+                value={pixKey}
+                onChange={e => setPixKey(e.target.value)}
+                placeholder="Digite a chave PIX da organização..."
+                className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Nome do beneficiário
+              </label>
+              <input
+                type="text"
+                placeholder="Nome da igreja ou organização..."
+                className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowPixConfig(false)}
+                className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-secondary/30 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => setPixSaved(true)}
+                disabled={!pixKey.trim()}
+                className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Salvar configuração
+              </button>
             </div>
           </div>
         )}

@@ -48,10 +48,15 @@ export function FinanceCampaigns() {
           { label: t("Total Arrecadado"), value: formatCampaignCurrency(stats.totalRaised, lang) },
           { label: t("Saldo a alcançar"), value: formatCampaignCurrency(gap, lang) },
         ].map((item) => (
-          <div key={item.label} className="bg-card rounded-xl p-5 shadow-sm border border-border/50">
+          <Link
+            key={item.label}
+            to="/admin/campanhas"
+            className="bg-card rounded-xl p-5 shadow-sm border border-border/50 hover:border-primary/30 hover:-translate-y-0.5 transition-all duration-200 block group"
+          >
             <p className="text-xs text-muted-foreground uppercase tracking-wide">{item.label}</p>
-            <p className="text-2xl font-semibold mt-1.5 tabular-nums">{item.value}</p>
-          </div>
+            <p className="text-2xl font-semibold mt-1.5 tabular-nums group-hover:text-primary transition-colors">{item.value}</p>
+            <p className="text-[10px] text-primary/50 mt-1.5 font-medium">Ver campanhas →</p>
+          </Link>
         ))}
       </div>
 
@@ -87,10 +92,17 @@ export function FinanceCampaigns() {
           </div>
         </div>
         <div className="space-y-3">
+          {active.length === 0 && (
+            <p className="text-sm text-center text-muted-foreground py-6">{t("Nenhuma campanha ativa no momento.")}</p>
+          )}
           {active.map((c) => {
             const pct = campaignProgress(c);
             return (
-              <div key={c.id} className="p-4 rounded-lg bg-secondary/30 flex gap-4">
+              <Link
+                key={c.id}
+                to={`/admin/campanhas`}
+                className="p-4 rounded-lg bg-secondary/30 flex gap-4 hover:bg-secondary/50 transition-colors group"
+              >
                 <div className="w-20 h-14 sm:w-24 sm:h-16 rounded-lg overflow-hidden flex-shrink-0 border border-border/40">
                   <CampaignCover
                     campaign={c}
@@ -101,18 +113,18 @@ export function FinanceCampaigns() {
                   />
                 </div>
                 <div className="flex-1 min-w-0">
-                <div className="flex justify-between gap-2 mb-2">
-                  <p className="font-medium truncate">{c.title}</p>
-                  <span className="text-sm font-semibold text-accent flex-shrink-0">{pct}%</span>
+                  <div className="flex justify-between gap-2 mb-2">
+                    <p className="font-medium truncate group-hover:text-primary transition-colors">{c.title}</p>
+                    <span className="text-sm font-semibold text-accent flex-shrink-0">{pct}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-secondary overflow-hidden mb-2">
+                    <div className="h-full bg-accent rounded-full" style={{ width: `${pct}%` }} />
+                  </div>
+                  <p className="text-xs text-muted-foreground tabular-nums">
+                    {formatCampaignCurrency(c.raisedAmount, lang)} / {formatCampaignCurrency(c.goalAmount, lang)}
+                  </p>
                 </div>
-                <div className="h-2 rounded-full bg-secondary overflow-hidden mb-2">
-                  <div className="h-full bg-accent rounded-full" style={{ width: `${pct}%` }} />
-                </div>
-                <p className="text-xs text-muted-foreground tabular-nums">
-                  {formatCampaignCurrency(c.raisedAmount, lang)} / {formatCampaignCurrency(c.goalAmount, lang)}
-                </p>
-                </div>
-              </div>
+              </Link>
             );
           })}
         </div>

@@ -46,9 +46,9 @@ export const FINANCE_ALERTS = [
 ];
 
 export const RECOMMENDED_ACTIONS = [
-  { id: "r1", messageKey: "Revisar orçamento do Setor Oeste" },
-  { id: "r2", messageKey: "Publicar prestação de contas de Maio" },
-  { id: "r3", messageKey: "Aprovar repasse da campanha Missões África" },
+  { id: "r1", messageKey: "Revisar orçamento do Setor Oeste", targetTab: "budget" },
+  { id: "r2", messageKey: "Publicar prestação de contas de Maio", targetTab: "accountability" },
+  { id: "r3", messageKey: "Aprovar repasse da campanha Missões África", targetTab: "campaigns" },
 ];
 
 export const TITHES_OFFERINGS = {

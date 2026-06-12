@@ -25,6 +25,7 @@ export function FinanceDetailModal({
   children,
   maxWidth = "md",
 }: Props) {
+  // Close on Escape
   useEffect(() => {
     if (!open) return;
     const handle = (e: KeyboardEvent) => {
@@ -33,6 +34,14 @@ export function FinanceDetailModal({
     document.addEventListener("keydown", handle);
     return () => document.removeEventListener("keydown", handle);
   }, [open, onClose]);
+
+  // Lock body scroll while open
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [open]);
 
   if (!open) return null;
 

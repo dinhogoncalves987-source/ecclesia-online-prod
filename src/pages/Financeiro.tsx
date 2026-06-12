@@ -167,7 +167,7 @@ export default function Financeiro() {
         {activeTab === "assets" && <FinanceAssets />}
         {activeTab === "accountability" && <FinanceAccountability transactions={transactions} />}
         {activeTab === "audit" && <FinanceAudit />}
-        {activeTab === "intelligence" && <FinanceIntelligence />}
+        {activeTab === "intelligence" && <FinanceIntelligence onTabChange={setActiveTab} />}
       </div>
     </AdminLayout>
   );

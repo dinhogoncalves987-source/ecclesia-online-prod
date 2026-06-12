@@ -43,7 +43,11 @@ function buildInsightsCSV(): string {
   return csv;
 }
 
-export function FinanceIntelligence() {
+type Props = {
+  onTabChange?: (tab: string) => void;
+};
+
+export function FinanceIntelligence({ onTabChange }: Props) {
   const { t } = useLanguage();
 
   const alertIcon = (type: string) => {
@@ -124,13 +128,15 @@ export function FinanceIntelligence() {
         </h4>
         <div className="space-y-2">
           {RECOMMENDED_ACTIONS.map(a => (
-            <div
+            <button
               key={a.id}
-              className="flex items-center justify-between gap-3 p-3 rounded-lg bg-secondary/30 text-sm"
+              type="button"
+              onClick={() => onTabChange?.(a.targetTab)}
+              className="w-full flex items-center justify-between gap-3 p-3 rounded-lg bg-secondary/30 text-sm hover:bg-secondary/50 transition-colors text-left group"
             >
               <span>{t(a.messageKey)}</span>
-              <ArrowRight size={14} className="text-muted-foreground flex-shrink-0" />
-            </div>
+              <ArrowRight size={14} className="text-muted-foreground flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
+            </button>
           ))}
         </div>
       </section>
