@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
-import { FileText, Download, Lock, Printer } from "lucide-react";
+import { FileText, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useChurch } from "@/hooks/useChurchContext";
 import { useRole } from "@/hooks/useRole";
 import { insertWithOrganizationScope, runScopedOrganizationQuery } from "@/lib/organizationScope";
 import { getTransactionMonth, isExpense, type FinanceMonthlyClosing, type TreasuryTransaction } from "@/lib/finance";
+import { DocumentActions } from "@/components/shared/DocumentActions";
+import { downloadCSVRaw } from "@/lib/docExport";
 
 const CURRENCY_LOCALE: Record<string, { locale: string; currency: string }> = {
   pt: { locale: "pt-BR", currency: "BRL" },
@@ -99,7 +101,7 @@ export function FinanceReports({ transactions }: { transactions: TreasuryTransac
     });
   }, [monthTxs, balancete.saldoAnterior]);
 
-  const exportReport = () => {
+  const buildReportCSV = (): string => {
     let csv = "";
     if (reportType === "prestacao") {
       csv = "Item,Valor\n";
@@ -129,15 +131,12 @@ export function FinanceReports({ transactions }: { transactions: TreasuryTransac
       csv += `"Movimentacao liquida",${balancete.movimentacao}\n`;
       csv += `"Saldo final",${balancete.saldoFinal}\n`;
     }
+    return csv;
+  };
 
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${reportType}_${selectedMonth}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success(t("Relatorio exportado!"));
+  const exportReport = () => {
+    downloadCSVRaw(buildReportCSV(), `${reportType}_${selectedMonth}.csv`);
+    toast.success(t("Relatório exportado!"));
   };
 
   const closeMonth = async () => {
@@ -150,10 +149,10 @@ export function FinanceReports({ transactions }: { transactions: TreasuryTransac
     }, query => query.select().single());
 
     if (error) {
-      toast.error(t("Erro ao fechar mes"));
+      toast.error(t("Erro ao fechar mês"));
     } else if (data) {
       setClosings([data, ...closings]);
-      toast.success(t("Mes fechado"));
+      toast.success(t("Mês fechado"));
     }
     setClosing(false);
   };
@@ -173,7 +172,7 @@ export function FinanceReports({ transactions }: { transactions: TreasuryTransac
           {(["prestacao", "dre", "balancete", "fluxo"] as const).map(r => (
             <button key={r} onClick={() => setReportType(r)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${reportType === r ? "bg-card shadow-sm" : "text-muted-foreground"}`}>
-              {r === "prestacao" ? t("Prestacao") : r === "dre" ? "DRE" : r === "balancete" ? t("Balancete") : t("Fluxo de Caixa")}
+              {r === "prestacao" ? t("Prestação") : r === "dre" ? "DRE" : r === "balancete" ? t("Balancete") : t("Fluxo de Caixa")}
             </button>
           ))}
         </div>
@@ -185,15 +184,16 @@ export function FinanceReports({ transactions }: { transactions: TreasuryTransac
         {canWriteFinance && (
           <button onClick={closeMonth} disabled={closing || isMonthClosed || monthTxs.length === 0}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-secondary rounded-lg text-xs font-medium hover:bg-secondary/80 transition-colors disabled:opacity-50">
-            <Lock size={13} /> {isMonthClosed ? t("Mes fechado") : t("Fechar mes")}
+            <Lock size={13} /> {isMonthClosed ? t("Mês fechado") : t("Fechar mês")}
           </button>
         )}
-        <button onClick={() => window.print()} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-secondary rounded-lg text-xs font-medium hover:bg-secondary/80 transition-colors ml-auto">
-          <Printer size={13} /> PDF
-        </button>
-        <button onClick={exportReport} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-secondary rounded-lg text-xs font-medium hover:bg-secondary/80 transition-colors">
-          <Download size={13} /> CSV
-        </button>
+        <DocumentActions
+          className="ml-auto"
+          items={[
+            { type: "pdf", label: "PDF" },
+            { type: "csv", label: "CSV", onAction: exportReport },
+          ]}
+        />
       </div>
 
       {reportType === "prestacao" && (
@@ -201,7 +201,7 @@ export function FinanceReports({ transactions }: { transactions: TreasuryTransac
           <div className="p-5 border-b border-border/50">
             <div className="flex items-center gap-2">
               <FileText size={18} className="text-primary" />
-              <h3 className="font-serif text-lg font-semibold">{t("Prestacao de Contas")} - {formatMonth(selectedMonth)}</h3>
+              <h3 className="font-serif text-lg font-semibold">{t("Prestação de Contas")} - {formatMonth(selectedMonth)}</h3>
               {isMonthClosed && <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">{t("Fechado")}</span>}
             </div>
           </div>
@@ -210,7 +210,7 @@ export function FinanceReports({ transactions }: { transactions: TreasuryTransac
               {[
                 { label: t("Saldo inicial"), value: balancete.saldoAnterior },
                 { label: t("Entradas"), value: balancete.entradas, cls: "text-success" },
-                { label: t("Saidas"), value: balancete.saidas, cls: "text-destructive" },
+                { label: t("Saídas"), value: balancete.saidas, cls: "text-destructive" },
                 { label: t("Saldo final"), value: balancete.saldoFinal, cls: balancete.saldoFinal >= 0 ? "text-success" : "text-destructive" },
               ].map(item => (
                 <div key={item.label} className="p-3 rounded-lg bg-secondary/30">
@@ -223,7 +223,7 @@ export function FinanceReports({ transactions }: { transactions: TreasuryTransac
               <thead>
                 <tr className="border-b border-border/50 text-xs text-muted-foreground">
                   <th className="text-left py-2 font-medium">{t("Data")}</th>
-                  <th className="text-left py-2 font-medium">{t("Descricao")}</th>
+                  <th className="text-left py-2 font-medium">{t("Descrição")}</th>
                   <th className="text-left py-2 font-medium">{t("Categoria")}</th>
                   <th className="text-right py-2 font-medium">{t("Valor")}</th>
                 </tr>
@@ -239,7 +239,7 @@ export function FinanceReports({ transactions }: { transactions: TreasuryTransac
                     </td>
                   </tr>
                 ))}
-                {monthTxs.length === 0 && <tr><td colSpan={4} className="text-center py-8 text-sm text-muted-foreground">{t("Nenhuma movimentacao encontrada.")}</td></tr>}
+                {monthTxs.length === 0 && <tr><td colSpan={4} className="text-center py-8 text-sm text-muted-foreground">{t("Nenhuma movimentação encontrada.")}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -278,7 +278,7 @@ export function FinanceReports({ transactions }: { transactions: TreasuryTransac
                   </tr>
                 ))}
                 <tr className={`font-bold text-base border-t-2 border-border ${dre.resultado >= 0 ? "text-success" : "text-destructive"}`}>
-                  <td className="py-3 pl-2">{t("RESULTADO DO PERIODO")}</td>
+                  <td className="py-3 pl-2">{t("RESULTADO DO PERÍODO")}</td>
                   <td className="py-3 pr-2 text-right">{formatCurrency(dre.resultado)}</td>
                 </tr>
               </tbody>
@@ -294,9 +294,9 @@ export function FinanceReports({ transactions }: { transactions: TreasuryTransac
             <tbody>
               {[
                 { label: t("Saldo Anterior"), value: balancete.saldoAnterior },
-                { label: t("(+) Entradas no Periodo"), value: balancete.entradas, cls: "text-success" },
-                { label: t("(-) Saidas no Periodo"), value: balancete.saidas, cls: "text-destructive" },
-                { label: t("(=) Movimentacao Liquida"), value: balancete.movimentacao, cls: balancete.movimentacao >= 0 ? "text-success" : "text-destructive" },
+                { label: t("(+) Entradas no Período"), value: balancete.entradas, cls: "text-success" },
+                { label: t("(-) Saídas no Período"), value: balancete.saidas, cls: "text-destructive" },
+                { label: t("(=) Movimentação Líquida"), value: balancete.movimentacao, cls: balancete.movimentacao >= 0 ? "text-success" : "text-destructive" },
                 { label: t("SALDO FINAL"), value: balancete.saldoFinal, cls: balancete.saldoFinal >= 0 ? "text-success" : "text-destructive" },
               ].map(row => (
                 <tr key={row.label} className="border-b border-border/30">
@@ -312,7 +312,7 @@ export function FinanceReports({ transactions }: { transactions: TreasuryTransac
       {reportType === "fluxo" && (
         <div className="bg-card rounded-xl shadow-executive overflow-hidden">
           <div className="p-5 border-b border-border/50">
-            <h3 className="font-serif text-lg font-semibold">{t("Fluxo de Caixa Diario")} - {formatMonth(selectedMonth)}</h3>
+            <h3 className="font-serif text-lg font-semibold">{t("Fluxo de Caixa Diário")} - {formatMonth(selectedMonth)}</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -320,7 +320,7 @@ export function FinanceReports({ transactions }: { transactions: TreasuryTransac
                 <tr className="border-b border-border/50 text-xs text-muted-foreground">
                   <th className="px-4 py-2 text-left font-medium">{t("Data")}</th>
                   <th className="px-4 py-2 text-right font-medium text-success">{t("Entradas")}</th>
-                  <th className="px-4 py-2 text-right font-medium text-destructive">{t("Saidas")}</th>
+                  <th className="px-4 py-2 text-right font-medium text-destructive">{t("Saídas")}</th>
                   <th className="px-4 py-2 text-right font-medium">{t("Saldo Acumulado")}</th>
                 </tr>
               </thead>
@@ -340,7 +340,7 @@ export function FinanceReports({ transactions }: { transactions: TreasuryTransac
                   </tr>
                 ))}
                 {fluxoCaixa.length === 0 && (
-                  <tr><td colSpan={4} className="text-center py-8 text-sm text-muted-foreground">{t("Nenhuma movimentacao encontrada.")}</td></tr>
+                  <tr><td colSpan={4} className="text-center py-8 text-sm text-muted-foreground">{t("Nenhuma movimentação encontrada.")}</td></tr>
                 )}
               </tbody>
             </table>

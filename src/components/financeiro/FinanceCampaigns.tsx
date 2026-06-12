@@ -12,6 +12,8 @@ import {
 } from "@/lib/campaignsDemo";
 import { formatFinanceCurrency } from "@/lib/financeDemo";
 import { ArrowDown, ChevronRight, Megaphone } from "lucide-react";
+import { DocExportMenu } from "@/components/shared/DocExportMenu";
+import { buildFinanceExportItems } from "@/lib/docExport";
 
 const OPERATING_FEE_RATE = 0.025;
 
@@ -28,6 +30,14 @@ export function FinanceCampaigns() {
   const gap = Math.max(0, stats.totalGoal - stats.totalRaised);
   const operatingFee = Math.round(stats.totalRaised * OPERATING_FEE_RATE);
   const netTransfer = stats.totalRaised - operatingFee;
+
+  const buildCSV = () => {
+    let csv = "Campanha,Meta,Arrecadado,Progresso\n";
+    active.forEach(c => {
+      csv += `"${c.title}",${c.goalAmount},${c.raisedAmount},${campaignProgress(c)}%\n`;
+    });
+    return csv;
+  };
 
   return (
     <div className="space-y-6">
@@ -57,13 +67,24 @@ export function FinanceCampaigns() {
       </div>
 
       <section className="bg-card rounded-xl shadow-executive p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <h3 className="font-serif text-lg font-semibold flex items-center gap-2">
             <Megaphone size={18} className="text-accent" /> {t("Campanhas ativas")}
           </h3>
-          <Link to="/admin/campanhas" className="text-sm text-primary inline-flex items-center gap-1 hover:underline">
-            {t("Abrir Campanhas")} <ChevronRight size={14} />
-          </Link>
+          <div className="flex items-center gap-2">
+            <DocExportMenu
+              align="end"
+              items={buildFinanceExportItems({
+                moduleTitle: t("Campanhas Financeiras"),
+                summary: `${stats.activeCount} campanhas ativas | Arrecadado: ${formatCampaignCurrency(stats.totalRaised, lang)}`,
+                csvFn: buildCSV,
+                csvFilename: "campanhas_financeiro.csv",
+              })}
+            />
+            <Link to="/admin/campanhas" className="text-sm text-primary inline-flex items-center gap-1 hover:underline">
+              {t("Abrir Campanhas")} <ChevronRight size={14} />
+            </Link>
+          </div>
         </div>
         <div className="space-y-3">
           {active.map((c) => {

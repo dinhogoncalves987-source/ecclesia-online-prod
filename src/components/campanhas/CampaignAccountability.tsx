@@ -1,14 +1,13 @@
-import { CheckCircle2, Clock, FileDown, FileText, User } from "lucide-react";
+import { CheckCircle2, Clock, FileText, User } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "@/hooks/useLanguage";
-import { useToast } from "@/hooks/use-toast";
 import type { Campaign } from "@/lib/campaignsDemo";
+import { DocExportMenu } from "@/components/shared/DocExportMenu";
 
 type Props = { campaign: Campaign };
 
 export function CampaignAccountability({ campaign }: Props) {
   const { t, lang } = useLanguage();
-  const { toast } = useToast();
   const dateLoc = lang === "en" ? "en-US" : lang === "es" ? "es-MX" : "pt-BR";
 
   const isClosed = campaign.status === "Encerrada";
@@ -19,9 +18,8 @@ export function CampaignAccountability({ campaign }: Props) {
     year: "numeric",
   });
 
-  const handlePdf = () => {
-    toast({ title: t("Gerar PDF"), description: t("Em breve disponível") });
-  };
+  const shareText = `${campaign.title} — ${statusLabel}`;
+  const shareUrl = `${window.location.origin}/admin/campanhas`;
 
   return (
     <section className="rounded-xl border border-border/50 p-4 sm:p-5 bg-secondary/15 space-y-4">
@@ -65,20 +63,22 @@ export function CampaignAccountability({ campaign }: Props) {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
         <Link
           to="/admin/financeiro"
           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-secondary text-sm font-medium hover:bg-secondary/80 transition-colors"
         >
           {t("Ver relatório")}
         </Link>
-        <button
-          type="button"
-          onClick={handlePdf}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border/50 text-sm font-medium hover:bg-secondary/50 transition-colors"
-        >
-          <FileDown size={14} /> {t("Gerar PDF")}
-        </button>
+        <DocExportMenu
+          side="top"
+          items={[
+            { type: "pdf",      label: t("Gerar PDF") },
+            { type: "share",    label: t("Compartilhar"), shareTitle: campaign.title, shareText, shareUrl },
+            { type: "whatsapp", label: "WhatsApp", whatsappMessage: `${shareText}\n${shareUrl}` },
+            { type: "email",    label: t("E-mail"), emailSubject: campaign.title, emailBody: shareText },
+          ]}
+        />
       </div>
     </section>
   );

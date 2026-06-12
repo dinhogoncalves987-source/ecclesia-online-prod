@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search, Plus, X, Loader2, Upload, Sparkles, Download, Trash2, Edit2, Lock } from "lucide-react";
+import { downloadCSVRaw } from "@/lib/docExport";
 import { AnimatePresence, motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -124,14 +125,14 @@ export function TransactionList({
   const isClosed = (date: string) => closedMonths.has(getTransactionMonth(date));
 
   const financeFields = [
-    { key: "description", label: t("Descricao"), required: true },
+                { key: "description", label: t("Descrição"), required: true },
     { key: "amount", label: t("Valor"), required: true },
-    { key: "type", label: t("Tipo (Entrada/Saida)"), required: true },
+    { key: "type", label: t("Tipo (Entrada/Saída)"), required: true },
     { key: "category", label: t("Categoria"), required: true },
     { key: "date", label: t("Data (AAAA-MM-DD)") },
     { key: "payment_method", label: t("Forma de pagamento") },
     { key: "receipt_url", label: t("Comprovante") },
-    { key: "notes", label: t("Observacoes") },
+    { key: "notes", label: t("Observações") },
   ];
 
   const financeTemplate = [
@@ -207,7 +208,7 @@ export function TransactionList({
     if (!canWriteFinance) return;
     if (!newTx.desc || !newTx.value || !newTx.category || !user || !church) return;
     if (isClosed(newTx.date)) {
-      toast.error(t("Periodo fechado para edicao"));
+      toast.error(t("Período fechado para edição"));
       return;
     }
 
@@ -244,7 +245,7 @@ export function TransactionList({
         toast.error(t("Erro ao salvar"));
       } else {
         setTransactions(transactions.map(tx => tx.id === editingId ? { ...tx, ...payload } : tx));
-        toast.success(t("Lancamento atualizado!"));
+        toast.success(t("Lançamento atualizado!"));
       }
     } else {
       const { data, error } = await insertWithOrganizationScope<TreasuryTransaction>("transactions", church.id, {
@@ -257,7 +258,7 @@ export function TransactionList({
         toast.error(t("Erro ao salvar"));
       } else if (data) {
         setTransactions([data, ...transactions]);
-        toast.success(t("Lancamento salvo!"));
+        toast.success(t("Lançamento salvo!"));
       }
     }
 
@@ -288,7 +289,7 @@ export function TransactionList({
   const editTransaction = (tx: TreasuryTransaction) => {
     if (!canWriteFinance) return;
     if (isClosed(tx.date)) {
-      toast.error(t("Periodo fechado para edicao"));
+      toast.error(t("Período fechado para edição"));
       return;
     }
 
@@ -313,7 +314,7 @@ export function TransactionList({
   const deleteTransaction = async (tx: TreasuryTransaction) => {
     if (!canWriteFinance) return;
     if (!church || isClosed(tx.date)) {
-      toast.error(t("Periodo fechado para edicao"));
+      toast.error(t("Período fechado para edição"));
       return;
     }
 
@@ -328,7 +329,7 @@ export function TransactionList({
   const updateStatus = async (tx: TreasuryTransaction, status: string) => {
     if (!canWriteFinance) return;
     if (!church || isClosed(tx.date)) {
-      toast.error(t("Periodo fechado para edicao"));
+      toast.error(t("Período fechado para edição"));
       return;
     }
 
@@ -351,13 +352,7 @@ export function TransactionList({
       const account = financialAccounts.find(a => a.id === tx.financial_account_id)?.name || "";
       return `${tx.date},"${tx.description}",${tx.type},${tx.category || ""},"${center}","${account}",${tx.payment_method || ""},${tx.amount},${tx.status},"${tx.receipt_url || ""}","${tx.notes || ""}"`;
     }).join("\n");
-    const blob = new Blob([header + rows], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `tesouraria_${today()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadCSVRaw(header + rows, `tesouraria_${today()}.csv`);
     toast.success(t("Exportado!"));
   };
 
@@ -402,7 +397,7 @@ export function TransactionList({
               <Upload size={14} strokeWidth={1.5} /> {t("Importar CSV")}
             </button>
             <button onClick={() => { resetForm(); setShowForm(true); }} className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
-              <Plus size={16} strokeWidth={1.5} /> {t("Lancamento")}
+              <Plus size={16} strokeWidth={1.5} /> {t("Lançamento")}
             </button>
           </>
         )}
@@ -413,18 +408,18 @@ export function TransactionList({
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
             <div className="bg-card rounded-xl shadow-executive p-5">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-serif text-base">{editingId ? t("Editar Lancamento") : t("Novo Lancamento")}</h3>
+                <h3 className="font-serif text-base">{editingId ? t("Editar Lançamento") : t("Novo Lançamento")}</h3>
                 <button onClick={resetForm} className="p-1.5 rounded-lg hover:bg-secondary"><X size={16} /></button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                <input placeholder={t("Descricao")} value={newTx.desc} onChange={e => setNewTx({ ...newTx, desc: e.target.value })}
+                <input placeholder={t("Descrição")} value={newTx.desc} onChange={e => setNewTx({ ...newTx, desc: e.target.value })}
                   className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
                 <input placeholder={t("Valor")} value={newTx.value} onChange={e => setNewTx({ ...newTx, value: e.target.value })}
                   className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
                 <select value={newTx.type} onChange={e => setNewTx({ ...newTx, type: e.target.value as "Entrada" | "Saida" })}
                   className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring">
                   <option value="Entrada">{t("Entrada")}</option>
-                  <option value="Saida">{t("Saida")}</option>
+                  <option value="Saida">{t("Saída")}</option>
                 </select>
                 <select value={newTx.accountCategoryId} onChange={e => {
                   const selected = accountCategories.find(c => c.id === e.target.value);
@@ -456,14 +451,14 @@ export function TransactionList({
                 </select>
                 <input placeholder={t("URL do comprovante")} value={newTx.receiptUrl} onChange={e => setNewTx({ ...newTx, receiptUrl: e.target.value })}
                   className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
-                <textarea placeholder={t("Observacoes")} value={newTx.notes} onChange={e => setNewTx({ ...newTx, notes: e.target.value })}
+                <textarea placeholder={t("Observações")} value={newTx.notes} onChange={e => setNewTx({ ...newTx, notes: e.target.value })}
                   className="sm:col-span-2 px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring min-h-[42px]" />
               </div>
               <button onClick={addOrUpdateTransaction} disabled={saving || isClosed(newTx.date)}
                 className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 inline-flex items-center gap-2">
                 {saving && <Loader2 size={14} className="animate-spin" />}
                 {isClosed(newTx.date) && <Lock size={14} />}
-                {editingId ? t("Atualizar") : t("Salvar Lancamento")}
+                {editingId ? t("Atualizar") : t("Salvar Lançamento")}
               </button>
             </div>
           </motion.div>
@@ -481,7 +476,7 @@ export function TransactionList({
             {(["all", "Entrada", "Saida"] as const).map(f => (
               <button key={f} onClick={() => { setFilterType(f); setPage(0); }}
                 className={`px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${filterType === f ? "bg-card shadow-sm" : "text-muted-foreground"}`}>
-                {f === "all" ? t("Todos") : f === "Entrada" ? t("Entradas") : t("Saidas")}
+                {f === "all" ? t("Todos") : f === "Entrada" ? t("Entradas") : t("Saídas")}
               </button>
             ))}
           </div>
@@ -510,13 +505,13 @@ export function TransactionList({
               <thead>
                 <tr className="border-b border-border/50 text-left text-xs text-muted-foreground">
                   <th className="px-4 py-3 font-medium">{t("Data")}</th>
-                  <th className="px-4 py-3 font-medium">{t("Descricao")}</th>
+                  <th className="px-4 py-3 font-medium">{t("Descrição")}</th>
                   <th className="px-4 py-3 font-medium">{t("Categoria")}</th>
                   <th className="px-4 py-3 font-medium">{t("Conta")}</th>
                   <th className="px-4 py-3 font-medium">{t("Tipo")}</th>
                   <th className="px-4 py-3 font-medium text-right">{t("Valor")}</th>
                   <th className="px-4 py-3 font-medium">{t("Status")}</th>
-                  <th className="px-4 py-3 font-medium text-right">{t("Acoes")}</th>
+                  <th className="px-4 py-3 font-medium text-right">{t("Ações")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -534,7 +529,7 @@ export function TransactionList({
                       <td className="px-4 py-3 text-xs text-muted-foreground">{tx.category}</td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">{account}</td>
                       <td className="px-4 py-3">
-                        <span className={`text-xs font-medium ${expense ? "text-destructive" : "text-success"}`}>{expense ? t("Saida") : t("Entrada")}</span>
+                        <span className={`text-xs font-medium ${expense ? "text-destructive" : "text-success"}`}>{expense ? t("Saída") : t("Entrada")}</span>
                       </td>
                       <td className={`px-4 py-3 font-medium tabular-nums text-xs text-right ${expense ? "text-destructive" : "text-success"}`}>
                         {expense ? "-" : "+"}{formatCurrency(Number(tx.amount))}
@@ -569,7 +564,7 @@ export function TransactionList({
                   );
                 })}
                 {paged.length === 0 && (
-                  <tr><td colSpan={8} className="text-center py-8 text-sm text-muted-foreground">{t("Nenhuma movimentacao encontrada.")}</td></tr>
+                  <tr><td colSpan={8} className="text-center py-8 text-sm text-muted-foreground">{t("Nenhuma movimentação encontrada.")}</td></tr>
                 )}
               </tbody>
             </table>
@@ -583,7 +578,7 @@ export function TransactionList({
                 <div key={tx.id} className="p-3 rounded-lg bg-secondary/30">
                   <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                     <span>{formatDate(tx.date)}</span>
-                    <span className={expense ? "text-destructive font-medium" : "text-success font-medium"}>{expense ? t("Saida") : t("Entrada")}</span>
+                    <span className={expense ? "text-destructive font-medium" : "text-success font-medium"}>{expense ? t("Saída") : t("Entrada")}</span>
                   </div>
                   <p className="text-sm font-medium">{tx.description}</p>
                   <p className="text-[11px] text-muted-foreground">{tx.category} | {tx.payment_method || "-"}</p>
@@ -604,7 +599,7 @@ export function TransactionList({
                 </div>
               );
             })}
-            {paged.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">{t("Nenhuma movimentacao encontrada.")}</p>}
+            {paged.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">{t("Nenhuma movimentação encontrada.")}</p>}
           </div>
 
           {totalPages > 1 && (
@@ -616,7 +611,7 @@ export function TransactionList({
               <span className="text-xs text-muted-foreground">{page + 1} / {totalPages}</span>
               <button onClick={() => setPage(Math.min(totalPages - 1, page + 1))} disabled={page >= totalPages - 1}
                 className="px-3 py-1.5 text-xs font-medium rounded-lg bg-secondary hover:bg-secondary/80 disabled:opacity-40">
-                {t("Proximo")}
+                {t("Próximo")}
               </button>
             </div>
           )}
@@ -625,8 +620,8 @@ export function TransactionList({
 
       {canWriteFinance && (
         <>
-          <BulkImportModal open={showImport} onClose={() => setShowImport(false)} onImport={handleBulkImport} fields={financeFields} templateData={financeTemplate} title={t("Importar Lancamentos")} />
-          <AIImportModal open={showAIImport} onClose={() => setShowAIImport(false)} onImport={handleBulkImport} fields={financeFields} title={t("Importar Lancamentos com IA")} moduleName="Financeiro" />
+          <BulkImportModal open={showImport} onClose={() => setShowImport(false)} onImport={handleBulkImport} fields={financeFields} templateData={financeTemplate} title={t("Importar Lançamentos")} />
+          <AIImportModal open={showAIImport} onClose={() => setShowAIImport(false)} onImport={handleBulkImport} fields={financeFields} title={t("Importar Lançamentos com IA")} moduleName="Financeiro" />
         </>
       )}
     </div>
