@@ -37,6 +37,8 @@ const MODULE_ACCESS: Record<string, AppRole[]> = {
   "/admin/gerenciar-acessos": ["super_admin", "church_admin"],
   "/admin/congregacoes": ["super_admin", "church_admin"],
   "/admin/super-admin": ["super_admin"],
+  "/admin/marketplace": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
+  "/admin/comunidade": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
 };
 
 export function useRole() {
@@ -129,7 +131,7 @@ export function useRole() {
   const canAccess = (path: string): boolean => {
     if (!canonicalRole) return false;
     const allowed = MODULE_ACCESS[path];
-    if (!allowed) return true; // unknown paths are open
+    if (!allowed) return false; // unknown paths are denied by default
     if (role && allowed.includes(role)) return true;
 
     const canonicalAllowed = allowed.filter((allowedRole): allowedRole is AdminRole =>

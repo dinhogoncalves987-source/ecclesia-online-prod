@@ -6,7 +6,7 @@ import { Loader2, Eye, EyeOff, BookOpen, Users, Wallet } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useMobileFocusScroll } from "@/hooks/useMobileFocusScroll";
-import { persistPendingChurchSlug, signupPathWithChurch } from "@/lib/organizationMembership";
+import { persistPendingChurchSlug, resolveInviteChurchSlug, signupPathWithChurch } from "@/lib/organizationMembership";
 import flagBR from "@/assets/flag-br.png";
 import flagUS from "@/assets/flag-us.png";
 import flagES from "@/assets/flag-es.png";
@@ -123,6 +123,8 @@ export default function Login() {
 
           <button type="button"
             onClick={async () => {
+              const inviteSlug = resolveInviteChurchSlug(churchSlug);
+              if (inviteSlug) persistPendingChurchSlug(inviteSlug);
               const { error } = await supabase.auth.signInWithOAuth({
                 provider: "google",
                 options: {
