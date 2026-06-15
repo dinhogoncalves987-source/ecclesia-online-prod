@@ -15,6 +15,12 @@ type Props = {
   defaultMemberEmail?: string;
   /** Show member name/email inputs (staff creating on behalf of a member). */
   showMemberIdentityFields?: boolean;
+  /** Pre-fill destination/reason/observations (from AI helper or external source). */
+  initialDestinationChurch?: string;
+  initialDestinationCity?: string;
+  initialDestinationState?: string;
+  initialReason?: string;
+  initialObservations?: string;
   submitting?: boolean;
   onSubmit: (input: CreateRecommendationLetterInput) => void | Promise<void>;
 };
@@ -23,6 +29,11 @@ export function RecommendationLetterForm({
   defaultMemberName = "",
   defaultMemberEmail = "",
   showMemberIdentityFields = true,
+  initialDestinationChurch = "",
+  initialDestinationCity = "",
+  initialDestinationState = "",
+  initialReason = "",
+  initialObservations = "",
   submitting = false,
   onSubmit,
 }: Props) {
@@ -30,11 +41,11 @@ export function RecommendationLetterForm({
 
   const [memberName, setMemberName] = useState(defaultMemberName);
   const [memberEmail, setMemberEmail] = useState(defaultMemberEmail);
-  const [destinationChurch, setDestinationChurch] = useState("");
-  const [destinationCity, setDestinationCity] = useState("");
-  const [destinationState, setDestinationState] = useState("");
-  const [reason, setReason] = useState("");
-  const [observations, setObservations] = useState("");
+  const [destinationChurch, setDestinationChurch] = useState(initialDestinationChurch);
+  const [destinationCity, setDestinationCity] = useState(initialDestinationCity);
+  const [destinationState, setDestinationState] = useState(initialDestinationState);
+  const [reason, setReason] = useState(initialReason);
+  const [observations, setObservations] = useState(initialObservations);
   const [touched, setTouched] = useState(false);
 
   const trimmedName = memberName.trim() || defaultMemberName.trim();
