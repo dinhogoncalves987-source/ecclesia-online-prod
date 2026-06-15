@@ -37,6 +37,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 
 import SharePublic from "./pages/SharePublic";
+import ValidarCarta from "./pages/ValidarCarta";
 
 import DevocionalPublic from "./pages/DevocionalPublic";
 
@@ -75,6 +76,8 @@ const Comunicacao = lazy(() => import("./pages/Comunicacao"));
 const Grupos = lazy(() => import("./pages/Grupos"));
 
 const Documentos = lazy(() => import("./pages/Documentos"));
+
+const CartasRecomendacao = lazy(() => import("./pages/CartasRecomendacao"));
 
 const Relatorios = lazy(() => import("./pages/Relatorios"));
 
@@ -135,6 +138,7 @@ const App = () => (
               <Route path="/reset-password" element={<ResetPassword />} />
 
               <Route path="/share" element={<SharePublic />} />
+              <Route path="/validar/carta/:token" element={<ValidarCarta />} />
 
               <Route path="/devocional" element={<DevocionalPublic />} />
 
@@ -167,6 +171,8 @@ const App = () => (
               <Route path="/admin/grupos" element={<ProtectedRoute><Grupos /></ProtectedRoute>} />
 
               <Route path="/admin/documentos" element={<ProtectedRoute><Documentos /></ProtectedRoute>} />
+
+              <Route path="/admin/cartas-recomendacao" element={<ProtectedRoute><CartasRecomendacao /></ProtectedRoute>} />
 
               <Route path="/admin/relatorios" element={<ProtectedRoute><Relatorios /></ProtectedRoute>} />
 

@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Wallet, Users, Calendar, BookOpen, FileText,
   Heart, MessageSquare, UsersRound, Archive, BarChart3, Menu, X,
   Bell, ChevronLeft, ChevronDown, Settings, LogOut, Maximize, Minimize, Globe,
-  Shield, User, Building2, Music2, Gavel, Briefcase, ShoppingBag, MessageCircle, Megaphone
+  Shield, User, Building2, Music2, Gavel, Briefcase, ShoppingBag, MessageCircle, Megaphone, ScrollText
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -31,7 +31,7 @@ type NavSection = {
 const SECRETARIA_PATHS = [
   "/admin/membros", "/admin/agenda", "/admin/comunicacao",
   "/admin/grupos", "/admin/escalas", "/admin/documentos",
-  "/admin/assembleia-geral", "/admin/oracoes",
+  "/admin/cartas-recomendacao", "/admin/assembleia-geral", "/admin/oracoes",
 ];
 
 const navSections: NavSection[] = [
@@ -60,6 +60,7 @@ const navSections: NavSection[] = [
       { icon: UsersRound, label: "Pequenos Grupos", path: "/admin/grupos" },
       { icon: FileText, label: "Escalas", path: "/admin/escalas" },
       { icon: Archive, label: "Documentos", path: "/admin/documentos" },
+      { icon: ScrollText, label: "Cartas de Recomendação", path: "/admin/cartas-recomendacao" },
       { icon: Gavel, label: "Assembleia Geral", path: "/admin/assembleia-geral" },
       { icon: Heart, label: "Pedidos de Oração", path: "/admin/oracoes" },
     ],

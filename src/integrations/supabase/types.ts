@@ -59,6 +59,83 @@ export type Database = {
           },
         ]
       }
+      recommendation_letters: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          destination_church: string
+          destination_city: string
+          destination_state: string | null
+          id: string
+          member_email: string | null
+          member_id: string | null
+          member_name: string
+          observations: string | null
+          organization_id: string
+          origin_church_name: string
+          public_token: string
+          reason: string
+          requested_at: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          destination_church: string
+          destination_city: string
+          destination_state?: string | null
+          id?: string
+          member_email?: string | null
+          member_id?: string | null
+          member_name: string
+          observations?: string | null
+          organization_id: string
+          origin_church_name?: string
+          public_token?: string
+          reason: string
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          destination_church?: string
+          destination_city?: string
+          destination_state?: string | null
+          id?: string
+          member_email?: string | null
+          member_id?: string | null
+          member_name?: string
+          observations?: string | null
+          organization_id?: string
+          origin_church_name?: string
+          public_token?: string
+          reason?: string
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recommendation_letters_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finance_account_categories: {
         Row: {
           code: string
