@@ -1,7 +1,9 @@
 import { AdminLayout } from "@/components/AdminLayout";
-import { Search, Plus, Phone, X, Trash2, Loader2, Upload, Pencil } from "lucide-react";
+import { Search, Plus, Phone, X, Trash2, Loader2, Upload, Pencil, CreditCard } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { MemberWalletCard } from "@/components/MemberWalletCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useChurch } from "@/hooks/useChurchContext";
@@ -65,6 +67,7 @@ export default function Membros() {
   const [newMember, setNewMember] = useState({ name: "", role: "", phone: "", email: "", status: "Ativo" as MemberStatus });
   const [showImport, setShowImport] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [walletMember, setWalletMember] = useState<Member | null>(null);
   const [editForm, setEditForm] = useState({
     name: "",
     role: "",
@@ -751,7 +754,15 @@ export default function Membros() {
                 />
               </div>
             </div>
-            <div className="flex gap-2 mt-4">
+            <div className="flex gap-2 mt-4 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setWalletMember(editingMember)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-secondary text-sm font-medium hover:bg-secondary/80 transition-colors"
+              >
+                <CreditCard size={14} />
+                {t("Carteira")}
+              </button>
               <button
                 type="button"
                 onClick={closeMemberModal}
@@ -774,6 +785,19 @@ export default function Membros() {
           </div>
         </div>
       )}
+
+      {/* Carteira Ecclesia */}
+      <Dialog open={Boolean(walletMember)} onOpenChange={(v) => !v && setWalletMember(null)}>
+        <DialogContent className="max-w-sm">
+          {walletMember && (
+            <MemberWalletCard
+              member={walletMember}
+              churchName={church?.name ?? "Ecclesia"}
+              onClose={() => setWalletMember(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       <BulkImportModal
         open={showImport}

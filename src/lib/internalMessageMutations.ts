@@ -66,6 +66,35 @@ function inferMessageType(file: File): "image" | "document" {
   return "document";
 }
 
+/** Cria uma thread de secretaria com assunto/categoria fixos. */
+export async function createSecretariatThread(
+  organizationId: string,
+  userId: string,
+  subject: string,
+): Promise<{ ok: boolean; thread?: InternalThread; error?: string }> {
+  const { data, error } = await insertWithOrganizationScope<DbInternalThreadRow>(
+    "internal_threads",
+    organizationId,
+    {
+      created_by: userId,
+      subject: subject.trim() || "Secretaria",
+      source: "secretariat",
+      status: "open",
+      reply_enabled: true,
+    },
+    (query) => query.select("*").single(),
+  );
+
+  if (error) {
+    return { ok: false, error: String((error as { message?: string }).message ?? error) };
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return { ok: false, error: "missing_thread" };
+
+  return { ok: true, thread: mapDbThreadToUi(row as DbInternalThreadRow) };
+}
+
 export async function createOrGetCampaignThread(
   organizationId: string,
   campaignId: string,

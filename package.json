@@ -14,7 +14,8 @@
     "campaigns:images": "node scripts/download-campaign-images.mjs",
     "campaigns:seed-staging": "node scripts/seed-staging-campaigns.mjs",
     "chat:seed-staging": "node scripts/seed-staging-internal-messages.mjs",
-    "letters:seed-staging": "node scripts/seed-recommendation-letters.mjs"
+    "letters:seed-staging": "node scripts/seed-recommendation-letters.mjs",
+    "demo:seed-matriz": "node scripts/seed-matriz-municipal-demo.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

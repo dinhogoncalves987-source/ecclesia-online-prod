@@ -97,6 +97,10 @@ const Marketplace = lazy(() => import("./pages/Marketplace"));
 
 const Comunidade = lazy(() => import("./pages/Comunidade"));
 
+const ChatSecretaria = lazy(() => import("./pages/ChatSecretaria"));
+
+const SolicitacoesAdministrativas = lazy(() => import("./pages/SolicitacoesAdministrativas"));
+
 
 
 const queryClient = new QueryClient();
@@ -191,6 +195,10 @@ const App = () => (
               <Route path="/admin/marketplace" element={<ProtectedRoute><Marketplace /></ProtectedRoute>} />
 
               <Route path="/admin/comunidade" element={<ProtectedRoute><Comunidade /></ProtectedRoute>} />
+
+              <Route path="/admin/chat-secretaria" element={<ProtectedRoute><ChatSecretaria /></ProtectedRoute>} />
+
+              <Route path="/admin/solicitacoes" element={<ProtectedRoute><SolicitacoesAdministrativas /></ProtectedRoute>} />
 
               <Route path="*" element={<NotFound />} />
 

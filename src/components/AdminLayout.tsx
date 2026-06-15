@@ -4,7 +4,8 @@ import {
   LayoutDashboard, Wallet, Users, Calendar, BookOpen, FileText,
   Heart, MessageSquare, UsersRound, Archive, BarChart3, Menu, X,
   Bell, ChevronLeft, ChevronDown, Settings, LogOut, Maximize, Minimize, Globe,
-  Shield, User, Building2, Music2, Gavel, Briefcase, ShoppingBag, MessageCircle, Megaphone, ScrollText
+  Shield, User, Building2, Music2, Gavel, Briefcase, ShoppingBag, MessageCircle, Megaphone, ScrollText,
+  MessagesSquare, ClipboardList, CreditCard
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -32,6 +33,7 @@ const SECRETARIA_PATHS = [
   "/admin/membros", "/admin/agenda", "/admin/comunicacao",
   "/admin/grupos", "/admin/escalas", "/admin/documentos",
   "/admin/cartas-recomendacao", "/admin/assembleia-geral", "/admin/oracoes",
+  "/admin/chat-secretaria", "/admin/solicitacoes",
 ];
 
 const navSections: NavSection[] = [
@@ -55,14 +57,16 @@ const navSections: NavSection[] = [
     separator: true,
     items: [
       { icon: Users, label: "Membros", path: "/admin/membros" },
-      { icon: Calendar, label: "Agenda", path: "/admin/agenda" },
-      { icon: MessageSquare, label: "Comunicação", path: "/admin/comunicacao" },
-      { icon: UsersRound, label: "Pequenos Grupos", path: "/admin/grupos" },
-      { icon: FileText, label: "Escalas", path: "/admin/escalas" },
-      { icon: Archive, label: "Documentos", path: "/admin/documentos" },
       { icon: ScrollText, label: "Cartas de Recomendação", path: "/admin/cartas-recomendacao" },
-      { icon: Gavel, label: "Assembleia Geral", path: "/admin/assembleia-geral" },
+      { icon: ClipboardList, label: "Solicitações", path: "/admin/solicitacoes" },
+      { icon: Archive, label: "Documentos", path: "/admin/documentos" },
+      { icon: MessagesSquare, label: "Chat da Secretaria", path: "/admin/chat-secretaria" },
+      { icon: MessageSquare, label: "Comunicação", path: "/admin/comunicacao" },
       { icon: Heart, label: "Pedidos de Oração", path: "/admin/oracoes" },
+      { icon: Calendar, label: "Agenda", path: "/admin/agenda" },
+      { icon: FileText, label: "Escalas", path: "/admin/escalas" },
+      { icon: UsersRound, label: "Pequenos Grupos", path: "/admin/grupos" },
+      { icon: Gavel, label: "Assembleia Geral", path: "/admin/assembleia-geral" },
     ],
   },
   {
