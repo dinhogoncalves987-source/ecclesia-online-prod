@@ -138,6 +138,24 @@ export async function setCampaignFeatured(
   return { ok: true, id: campaignId };
 }
 
+export async function updateCampaignCoverImage(
+  organizationId: string,
+  campaignId: string,
+  url: string | null,
+): Promise<CampaignMutationResult> {
+  const { error } = await supabase
+    .from("campaigns")
+    .update({ cover_image_url: url })
+    .eq("id", campaignId)
+    .eq("organization_id", organizationId);
+
+  if (error) {
+    return { ok: false, error: String(error.message ?? error) };
+  }
+
+  return { ok: true, id: campaignId };
+}
+
 export async function deleteCampaign(
   organizationId: string,
   campaignId: string,

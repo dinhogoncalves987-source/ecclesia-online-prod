@@ -196,6 +196,30 @@ export async function deleteCampaignMedia(
   return { ok: true };
 }
 
+/**
+ * Update mutable display fields on an existing campaign_media record.
+ * The storage_path is intentionally NOT changed — the original upload file
+ * is preserved so it can be properly cleaned up if the item is later deleted.
+ * Only public_url, title and sort_order may be patched.
+ */
+export async function updateCampaignMediaUrl(
+  organizationId: string,
+  itemId: string,
+  patch: { public_url?: string | null; title?: string | null; sort_order?: number },
+): Promise<CampaignMediaUploadResult> {
+  const { error } = await supabase
+    .from("campaign_media")
+    .update(patch)
+    .eq("id", itemId)
+    .eq("organization_id", organizationId);
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  return { ok: true };
+}
+
 export type PendingCampaignMedia = {
   localId: string;
   file: File;

@@ -3,6 +3,7 @@ import { MessageCircle, X } from "lucide-react";
 import { CampaignCover } from "@/components/campanhas/CampaignCover";
 import { CampaignActions } from "@/components/campanhas/CampaignActions";
 import { CampaignActionsMenu } from "@/components/campanhas/CampaignActionsMenu";
+import { CampaignCoverControls } from "@/components/campanhas/CampaignCoverControls";
 import { campaignStatusBadgeClass } from "@/components/campanhas/CampaignForm";
 import { CampaignGallery } from "@/components/campanhas/CampaignGallery";
 import { CampaignVideos } from "@/components/campanhas/CampaignVideos";
@@ -102,6 +103,11 @@ export function CampaignDetail({
                   <X size={18} />
                 </button>
               ) : null}
+              <CampaignCoverControls
+                campaign={campaign}
+                media={media}
+                onRefresh={onRefresh}
+              />
             </>
           }
         />
@@ -152,6 +158,7 @@ export function CampaignDetail({
           media={media}
           loading={mediaLoading && !mediaPreloaded}
           onEdit={canManage && onEdit ? () => onEdit(campaign) : undefined}
+          onRefresh={onRefresh}
         />
         <CampaignVideos
           campaign={campaign}

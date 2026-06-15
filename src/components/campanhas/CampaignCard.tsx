@@ -4,6 +4,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
 import { CampaignCover } from "@/components/campanhas/CampaignCover";
 import { CampaignActionsMenu } from "@/components/campanhas/CampaignActionsMenu";
+import { CampaignCoverControls } from "@/components/campanhas/CampaignCoverControls";
 import { campaignStatusBadgeClass } from "@/components/campanhas/CampaignForm";
 import type { CampaignMediaItem } from "@/lib/campaignMedia";
 import {
@@ -54,6 +55,11 @@ export function CampaignCard({ campaign, media, index = 0, onOpen, onEdit, onRef
             >
               {t(campaign.status)}
             </span>
+            <CampaignCoverControls
+              campaign={campaign}
+              media={media}
+              onRefresh={onRefresh}
+            />
           </>
         }
       />
