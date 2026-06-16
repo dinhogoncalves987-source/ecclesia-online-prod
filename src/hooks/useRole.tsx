@@ -40,6 +40,8 @@ const MODULE_ACCESS: Record<string, AppRole[]> = {
   "/admin/super-admin": ["super_admin"],
   "/admin/marketplace": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
   "/admin/comunidade": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
+  "/admin/chat-secretaria": ["super_admin", "church_admin", "pastor", "secretary"],
+  "/admin/solicitacoes": ["super_admin", "church_admin", "pastor", "secretary"],
 };
 
 export function useRole() {
