@@ -1,4 +1,5 @@
 import { AdminLayout } from "@/components/AdminLayout";
+import { DocumentActions } from "@/components/DocumentActions";
 import { Clock, MapPin, Plus, ChevronLeft, ChevronRight, X, Trash2, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
@@ -136,6 +137,7 @@ export default function Agenda() {
   const canWrite = canWriteSecretaria(canonicalRole);
   const canDelete = canDeleteEvent(canonicalRole);
 
+  const [agendaTab, setAgendaTab] = useState<"church" | "personal">("church");
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -164,20 +166,28 @@ export default function Agenda() {
     if (!church) return;
     const startDate = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`;
     const endDate = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${daysInMonth}`;
-    const { data, error } = await runScopedOrganizationQuery<Event[]>("events", church.id, query =>
-      query
+    const { data, error } = await runScopedOrganizationQuery<Event[]>("events", church.id, query => {
+      let q = query
         .select("*")
         .gte("starts_at", `${startDate}T00:00:00`)
         .lte("starts_at", `${endDate}T23:59:59`)
-        .order("starts_at"),
-    );
+        .order("starts_at");
+      if (agendaTab === "church") {
+        // Agenda da Igreja: eventos públicos (is_public = true) OU criados por staff sem filtro pessoal
+        q = q.eq("is_public", true);
+      } else {
+        // Minha Agenda: eventos privados do usuário atual
+        q = q.eq("is_public", false).eq("created_by", user?.id ?? "");
+      }
+      return q;
+    });
     if (error) {
       console.error(error);
       toast.error(t("Erro ao carregar eventos"));
       return;
     }
     setEvents(data || []);
-  }, [church, currentMonth, currentYear, daysInMonth, t]);
+  }, [church, currentMonth, currentYear, daysInMonth, agendaTab, user?.id, t]);
 
   useEffect(() => {
     if (!user) {
@@ -196,6 +206,8 @@ export default function Agenda() {
       setLoading(false);
     };
     load();
+  // reloadEvents já inclui agendaTab em seus deps; não duplicar aqui
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, church, churchLoading, reloadEvents]);
 
   const getDay = (e: Event) => new Date(e.starts_at).getDate();
@@ -288,7 +300,8 @@ export default function Agenda() {
       location: newEvent.location.trim() || t("A definir"),
       event_type: newEvent.color,
       description: newEvent.description.trim() || null,
-      is_public: newEvent.isPublic,
+      // Eventos na aba "Agenda da Igreja" são públicos; "Minha Agenda" são pessoais/privados
+      is_public: agendaTab === "church" ? true : false,
     });
     if (error) {
       toast.error(t("Erro ao salvar"), {
@@ -459,15 +472,35 @@ export default function Agenda() {
   return (
     <AdminLayout>
       <div className="space-y-6">
+        {/* Abas Agenda da Igreja / Minha Agenda */}
+        <div className="flex gap-1 bg-secondary/40 rounded-xl p-1 w-fit">
+          <button
+            type="button"
+            onClick={() => setAgendaTab("church")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${agendaTab === "church" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            {t("Agenda da Igreja")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAgendaTab("personal")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${agendaTab === "personal" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            {t("Minha Agenda")}
+          </button>
+        </div>
+
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">{t("Agenda")}</h1>
+            <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">
+              {agendaTab === "church" ? t("Agenda da Igreja") : t("Minha Agenda")}
+            </h1>
             <p className="text-sm text-muted-foreground mt-1">
               {t(monthKeys[currentMonth])} {currentYear} · {events.length}{" "}
               {events.length !== 1 ? t("eventos") : t("evento")}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <div className="flex bg-secondary/50 rounded-lg p-0.5">
               <button
                 type="button"
@@ -484,6 +517,12 @@ export default function Agenda() {
                 {t("Calendário")}
               </button>
             </div>
+            <DocumentActions
+              actions={["print", "share"]}
+              shareTitle={`Agenda — ${t(monthKeys[currentMonth])} ${currentYear}`}
+              shareText={`${events.length} ${events.length !== 1 ? t("eventos") : t("evento")} em ${t(monthKeys[currentMonth])} ${currentYear}`}
+              size="sm"
+            />
             {canWrite && (
               <button
                 type="button"

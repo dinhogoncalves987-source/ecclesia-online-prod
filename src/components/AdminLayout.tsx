@@ -30,7 +30,7 @@ type NavSection = {
 };
 
 const SECRETARIA_PATHS = [
-  "/admin/membros", "/admin/agenda", "/admin/comunicacao",
+  "/admin/membros", "/admin/carteira-ecclesia", "/admin/agenda", "/admin/comunicacao",
   "/admin/grupos", "/admin/escalas", "/admin/documentos",
   "/admin/cartas-recomendacao", "/admin/assembleia-geral", "/admin/oracoes",
   "/admin/chat-secretaria", "/admin/solicitacoes",
@@ -57,6 +57,7 @@ const navSections: NavSection[] = [
     separator: true,
     items: [
       { icon: Users, label: "Membros", path: "/admin/membros" },
+      { icon: CreditCard, label: "Carteira de Membro", path: "/admin/carteira-ecclesia" },
       { icon: ScrollText, label: "Cartas de Recomendação", path: "/admin/cartas-recomendacao" },
       { icon: ClipboardList, label: "Solicitações", path: "/admin/solicitacoes" },
       { icon: Archive, label: "Documentos", path: "/admin/documentos" },
@@ -126,7 +127,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const childUnitsNavLabel = (): string => {
     const orgType = church?.organization_type;
     if (orgType === "convencao") return t("Matrizes");
-    if (orgType === "matriz") return t("Setores");
+    if (orgType === "matriz") return t("Setores / Distritos");
     return t("Congregações");
   };
 
@@ -144,6 +145,13 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [secretariaExpanded, setSecretariaExpanded] = useState(() =>
     SECRETARIA_PATHS.includes(location.pathname)
   );
+
+  // Auto-expand Secretaria section when navigating to a secretaria path
+  useEffect(() => {
+    if (SECRETARIA_PATHS.includes(location.pathname)) {
+      setSecretariaExpanded(true);
+    }
+  }, [location.pathname]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileName, setProfileName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);

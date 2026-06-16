@@ -9,11 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useRole } from "@/hooks/useRole";
 import { useToast } from "@/hooks/use-toast";
-import {
-  closeInternalThread,
-  reopenInternalThread,
-  sendFirstCampaignMessage,
-} from "@/lib/internalMessageMutations";
+import { sendFirstCampaignMessage } from "@/lib/internalMessageMutations";
 import type { InternalMessage, InternalThread } from "@/lib/internalMessages";
 
 type Props = {
@@ -56,6 +52,10 @@ export function InternalChatPanel({
   const [callOpen, setCallOpen] = useState(false);
   const [callMode, setCallMode] = useState<JitsiCallMode>("voice");
 
+  // Determina se a thread é individual (1:1) ou de grupo/tópico
+  const isDirect = Boolean(thread?.memberId && thread?.participantName);
+  const participantLabel = thread?.participantName ?? null;
+
   const senderRole = isStaff ? (canonicalRole ?? "leader") : "member";
 
   const { messages, loading, sending, deleting, send, remove, refetch } = useInternalMessages({
@@ -73,9 +73,9 @@ export function InternalChatPanel({
         ? pendingMessages
         : messages;
 
-  const threadClosed = thread?.status === "closed" || (thread != null && !thread.replyEnabled);
-  // Staff sempre pode escrever; membro só se campanha permite e thread está aberta
-  const canWrite = Boolean(currentUserId) && (isStaff || (allowReplies && !threadClosed));
+  // Chat WhatsApp-style: sempre aberto para quem tem permissão.
+  // Sem conceito de "encerrar/reabrir" conversa.
+  const canWrite = Boolean(currentUserId) && (isStaff || allowReplies);
   const memberLocked = !isStaff && !canWrite;
   const showComposer = canWrite;
 
@@ -133,40 +133,14 @@ export function InternalChatPanel({
     const result = await remove(messageId);
     if (!result.ok) {
       toast({
-        title: t("Erro"),
-        description: t("Não foi possível excluir a mensagem"),
+        title: t("Não foi possível apagar"),
+        description: t("Permissão negada pelo servidor. Contate o administrador do sistema para configurar as políticas de exclusão."),
         variant: "destructive",
       });
       return;
     }
-    toast({ title: t("Mensagem excluída") });
+    toast({ title: t("Mensagem apagada") });
     onThreadUpdated?.();
-  };
-
-  const handleClose = async () => {
-    if (!thread) return;
-    setThreadBusy(true);
-    const result = await closeInternalThread(organizationId, thread.id);
-    setThreadBusy(false);
-    if (!result.ok) {
-      toast({ title: t("Erro"), variant: "destructive" });
-      return;
-    }
-    onThreadUpdated?.();
-    await refetch();
-  };
-
-  const handleReopen = async () => {
-    if (!thread) return;
-    setThreadBusy(true);
-    const result = await reopenInternalThread(organizationId, thread.id);
-    setThreadBusy(false);
-    if (!result.ok) {
-      toast({ title: t("Erro"), variant: "destructive" });
-      return;
-    }
-    onThreadUpdated?.();
-    await refetch();
   };
 
   const renderEmptyHint = () => {
@@ -194,9 +168,6 @@ export function InternalChatPanel({
         isStaff={isStaff}
         showBack={showBack}
         onBack={onBack}
-        onCloseThread={() => void handleClose()}
-        onReopenThread={() => void handleReopen()}
-        busy={threadBusy}
         onVoiceCall={thread && isStaff ? () => { setCallMode("voice"); setCallOpen(true); } : undefined}
         onVideoCall={thread && isStaff ? () => { setCallMode("video"); setCallOpen(true); } : undefined}
       />
@@ -214,6 +185,15 @@ export function InternalChatPanel({
             user?.email?.split("@")[0] ||
             "Participante"
           }
+          callTitle={
+            isDirect && participantLabel
+              ? callMode === "video"
+                ? `Videochamada com ${participantLabel}`
+                : `Ligação com ${participantLabel}`
+              : callMode === "video"
+                ? "Reunião Ecclesia"
+                : "Chamada Ecclesia"
+          }
         />
       )}
 
@@ -221,7 +201,8 @@ export function InternalChatPanel({
         <InternalMessageList
           messages={displayMessages}
           loading={loading && Boolean(thread?.id)}
-          canDelete={isStaff}
+          currentUserId={currentUserId}
+          canDeleteForAll={isStaff}
           deleting={deleting}
           onDeleteMessage={handleDeleteMessage}
         />
@@ -230,7 +211,8 @@ export function InternalChatPanel({
           <InternalMessageList
             messages={[]}
             loading={loading && Boolean(thread?.id)}
-            canDelete={isStaff}
+            currentUserId={currentUserId}
+            canDeleteForAll={isStaff}
             deleting={deleting}
             onDeleteMessage={handleDeleteMessage}
           />

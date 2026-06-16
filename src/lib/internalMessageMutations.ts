@@ -88,6 +88,60 @@ function inferMessageType(file: File): InternalMessageType {
   return "document";
 }
 
+/**
+ * Busca conversa individual existente com um membro (deduplicação)
+ * ou cria nova caso não exista. Garante no máximo 1 thread por par (org + member).
+ */
+export async function findOrCreateDirectThread(
+  organizationId: string,
+  userId: string,
+  memberId: string,
+  memberName: string,
+): Promise<{ ok: boolean; thread?: InternalThread; isNew?: boolean; error?: string }> {
+  // Buscar thread existente com esse membro nessa organização
+  const { data: existing, error: findError } = await supabase
+    .from("internal_threads")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("source", "secretariat")
+    .eq("member_id", memberId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (findError) {
+    return { ok: false, error: String(findError.message ?? findError) };
+  }
+
+  if (existing) {
+    return { ok: true, thread: mapDbThreadToUi(existing as DbInternalThreadRow), isNew: false };
+  }
+
+  // Criar nova thread direta com o membro
+  const { data, error } = await insertWithOrganizationScope<DbInternalThreadRow>(
+    "internal_threads",
+    organizationId,
+    {
+      created_by: userId,
+      member_id: memberId,
+      subject: memberName.trim() || "Conversa",
+      source: "secretariat",
+      status: "open",
+      reply_enabled: true,
+    },
+    (query) => query.select("*").single(),
+  );
+
+  if (error) {
+    return { ok: false, error: String((error as { message?: string }).message ?? error) };
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return { ok: false, error: "missing_thread" };
+
+  return { ok: true, thread: mapDbThreadToUi(row as DbInternalThreadRow), isNew: true };
+}
+
 /** Cria uma thread de secretaria com assunto/categoria fixos. */
 export async function createSecretariatThread(
   organizationId: string,
@@ -396,15 +450,12 @@ export async function deleteInternalMessage(
   organizationId: string,
   messageId: string,
 ): Promise<InternalMutationResult> {
-  const { data: attachments, error: attFetchError } = await supabase
+  // Remove arquivos do storage (privacidade)
+  const { data: attachments } = await supabase
     .from("internal_message_attachments")
     .select("storage_bucket, storage_path")
     .eq("organization_id", organizationId)
     .eq("message_id", messageId);
-
-  if (attFetchError) {
-    return { ok: false, error: String(attFetchError.message ?? attFetchError) };
-  }
 
   for (const att of attachments ?? []) {
     if (att.storage_bucket && att.storage_path) {
@@ -412,12 +463,26 @@ export async function deleteInternalMessage(
     }
   }
 
-  const { error } = await supabase
+  // Tentativa 1: soft-delete via UPDATE (apaga conteúdo mas mantém registro)
+  const { error: updateError } = await supabase
+    .from("internal_messages")
+    .update({ message_type: "deleted", body: null })
+    .eq("id", messageId)
+    .eq("organization_id", organizationId);
+
+  if (!updateError) return { ok: true, id: messageId };
+
+  // Tentativa 2: hard DELETE (caso UPDATE seja bloqueado por RLS ou constraint de tipo)
+  const { error: deleteError } = await supabase
     .from("internal_messages")
     .delete()
     .eq("id", messageId)
     .eq("organization_id", organizationId);
 
-  if (error) return { ok: false, error: String(error.message ?? error) };
-  return { ok: true, id: messageId };
+  if (!deleteError) return { ok: true, id: messageId };
+
+  // Ambas as operações falharam. Retorna ok: false com mensagem de erro real.
+  // A UI deve tratar o estado local separadamente (see useInternalMessages).
+  console.warn("[deleteInternalMessage] falha no banco:", deleteError.message);
+  return { ok: false, error: deleteError.message };
 }

@@ -13,8 +13,8 @@
  *   <InternalChat mode="panel" source="campaign" organizationId={id} campaignId={cid} />
  */
 
-import { useEffect, useState } from "react";
-import { Loader2, MessageSquarePlus, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Loader2, MessageSquarePlus, Search, X } from "lucide-react";
 import { InternalChatPanel } from "@/components/messages/InternalChatPanel";
 import { InternalThreadList } from "@/components/messages/InternalThreadList";
 import { useAuth } from "@/hooks/useAuth";
@@ -35,6 +35,9 @@ type Props = {
   onClose?: () => void;
   /** Slot para renderizar header personalizado acima do layout (ex: botão "Nova Conversa"). */
   headerSlot?: React.ReactNode;
+  /** Thread a selecionar assim que a lista carregar (ex: thread recém-criada). */
+  forcedThread?: InternalThread | null;
+  onForcedThreadConsumed?: () => void;
 };
 
 export function InternalChat({
@@ -49,6 +52,8 @@ export function InternalChat({
   className,
   onClose,
   headerSlot,
+  forcedThread,
+  onForcedThreadConsumed,
 }: Props) {
   const { user } = useAuth();
 
@@ -65,13 +70,36 @@ export function InternalChat({
 
   const [selectedThread, setSelectedThread] = useState<InternalThread | null>(null);
   const [mobileShowPanel, setMobileShowPanel] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // Auto-selecionar primeira conversa ao carregar (inbox)
+  // Auto-selecionar primeira conversa ao carregar (inbox) ou forcedThread
   useEffect(() => {
-    if (mode === "inbox" && !threadsLoading && threads.length > 0 && selectedThread === null) {
+    if (mode !== "inbox" || threadsLoading) return;
+
+    // forcedThread tem prioridade: encontrar na lista ou usar direto
+    if (forcedThread) {
+      const found = threads.find((t) => t.id === forcedThread.id) ?? forcedThread;
+      setSelectedThread(found);
+      setMobileShowPanel(true);
+      onForcedThreadConsumed?.();
+      return;
+    }
+
+    if (threads.length > 0 && selectedThread === null) {
       setSelectedThread(threads[0]);
     }
-  }, [mode, threadsLoading, threads, selectedThread]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, threadsLoading, threads, forcedThread]);
+
+  // Filtrar conversas pelo texto de busca (subject ou participantName)
+  const filteredThreads = useMemo(() => {
+    if (!searchQuery.trim()) return threads;
+    const q = searchQuery.toLowerCase();
+    return threads.filter((t) =>
+      t.subject?.toLowerCase().includes(q) ||
+      t.participantName?.toLowerCase().includes(q),
+    );
+  }, [threads, searchQuery]);
 
   // ── PANEL: thread única (campanha) ────────────────────────────────────────
   const [panelThread, setPanelThread] = useState<InternalThread | null>(null);
@@ -152,13 +180,30 @@ export function InternalChat({
             mobileShowPanel ? "hidden sm:flex" : "flex",
           )}
         >
-          <div className="flex-shrink-0 px-3 py-2 border-b border-border/30 bg-muted/30">
-            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-              Conversas
-            </p>
+          {/* Barra de busca WhatsApp-style */}
+          <div className="flex-shrink-0 px-3 py-2 border-b border-border/30 bg-card">
+            <div className="relative">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Pesquisar conversas..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg bg-muted/50 border border-border/40 placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring/50 focus:bg-background transition-colors"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
           </div>
           <InternalThreadList
-            threads={threads}
+            threads={filteredThreads}
             selectedId={activeThread?.id ?? null}
             loading={threadsLoading}
             onSelect={(t) => {
@@ -166,6 +211,12 @@ export function InternalChat({
               setMobileShowPanel(true);
             }}
           />
+          {!threadsLoading && searchQuery && filteredThreads.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-8 px-4 text-center text-muted-foreground">
+              <Search size={24} className="mb-2 opacity-30" />
+              <p className="text-xs">Nenhuma conversa encontrada para<br />"{searchQuery}"</p>
+            </div>
+          )}
         </div>
 
         {/* Painel de mensagens */}

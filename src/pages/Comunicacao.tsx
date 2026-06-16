@@ -1,4 +1,5 @@
 import { AdminLayout } from "@/components/AdminLayout";
+import { DocumentActions } from "@/components/DocumentActions";
 import { MessageSquare, Plus, X, Clock, AlertTriangle, Info, Bell, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
@@ -281,6 +282,14 @@ export default function Comunicacao() {
           <div>
             <h1 className="text-2xl font-serif font-bold text-foreground">{t("Comunicação")}</h1>
             <p className="text-sm text-muted-foreground mt-1">{t("Avisos e comunicados para a comunidade")}</p>
+          </div>
+          <div className="flex gap-2 flex-wrap items-center">
+            <DocumentActions
+              actions={["print", "share"]}
+              shareTitle={t("Comunicados")}
+              shareText={t("Avisos e comunicados da comunidade")}
+              size="sm"
+            />
           </div>
           {canWrite && (
             <div className="flex gap-2 flex-wrap">

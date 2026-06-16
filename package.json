@@ -15,7 +15,8 @@
     "campaigns:seed-staging": "node scripts/seed-staging-campaigns.mjs",
     "chat:seed-staging": "node scripts/seed-staging-internal-messages.mjs",
     "letters:seed-staging": "node scripts/seed-recommendation-letters.mjs",
-    "demo:seed-matriz": "node scripts/seed-matriz-municipal-demo.mjs"
+    "demo:seed-matriz": "node scripts/seed-matriz-municipal-demo.mjs",
+    "demo:seed-full": "node scripts/seed-full-demo.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -56,7 +57,9 @@
     "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.38.0",
+    "html2canvas": "^1.4.1",
     "input-otp": "^1.4.2",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
     "papaparse": "^5.5.3",

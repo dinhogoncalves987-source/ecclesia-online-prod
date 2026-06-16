@@ -84,8 +84,17 @@ export function useInternalMessages({
       setDeleting(false);
 
       if (result.ok) {
-        setMessages((prev) => prev.filter((m) => m.id !== messageId));
+        // DB confirmou a exclusão: atualiza estado local
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? { ...m, messageType: "deleted" as const, body: null, attachments: [] }
+              : m,
+          ),
+        );
       }
+      // Se DB falhou, NÃO atualiza estado local — a mensagem permanece visível
+      // para refletir a realidade do banco. Ver relatório de auditoria para SQL de correção.
 
       return result;
     },

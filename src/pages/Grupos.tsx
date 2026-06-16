@@ -1,4 +1,5 @@
 import { AdminLayout } from "@/components/AdminLayout";
+import { DocumentActions } from "@/components/DocumentActions";
 import { UsersRound, Plus, X, MapPin, Clock, Tag, MessageCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
@@ -347,11 +348,19 @@ export default function Grupos() {
             <h1 className="text-2xl font-serif font-bold text-foreground">{t("Pequenos Grupos")}</h1>
             <p className="text-sm text-muted-foreground mt-1">{t("Gerencie os grupos de comunhão e estudo")}</p>
           </div>
-          {canWrite && (
-          <button onClick={openCreateForm} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
-            <Plus size={16} /> {t("Novo Grupo")}
-          </button>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            <DocumentActions
+              actions={["print", "share"]}
+              shareTitle={t("Pequenos Grupos")}
+              shareText={t("Pequenos Grupos — Ecclesia")}
+              size="sm"
+            />
+            {canWrite && (
+              <button onClick={openCreateForm} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+                <Plus size={16} /> {t("Novo Grupo")}
+              </button>
+            )}
+          </div>
         </div>
 
         {loading ? (

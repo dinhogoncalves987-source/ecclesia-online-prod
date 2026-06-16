@@ -1,4 +1,5 @@
 import { AdminLayout } from "@/components/AdminLayout";
+import { DocumentActions } from "@/components/DocumentActions";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -566,14 +567,22 @@ export default function AssembleiaGeral() {
               {t("Atas, relatórios e registros das assembleias da igreja")}
             </p>
           </div>
-          {isAdmin && (
-            <button
-              onClick={openCreateForm}
-              className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
-            >
-              <Plus size={16} /> {t("Nova Assembleia")}
-            </button>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            <DocumentActions
+              actions={["print", "share"]}
+              shareTitle={t("Assembleia Geral")}
+              shareText={t("Atas e registros das assembleias")}
+              size="sm"
+            />
+            {isAdmin && (
+              <button
+                onClick={openCreateForm}
+                className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                <Plus size={16} /> {t("Nova Assembleia")}
+              </button>
+            )}
+          </div>
         </div>
 
         {loading ? (

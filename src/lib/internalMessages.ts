@@ -13,7 +13,7 @@ export type InternalThreadSource =
   | "prayer"
   | "general";
 
-export type InternalMessageType = "text" | "image" | "audio" | "video" | "document" | "system";
+export type InternalMessageType = "text" | "image" | "audio" | "video" | "document" | "system" | "deleted";
 
 export type DbInternalThreadRow = {
   id: string;

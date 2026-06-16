@@ -1,4 +1,5 @@
 import { AdminLayout } from "@/components/AdminLayout";
+import { DocumentActions } from "@/components/DocumentActions";
 import { FileText, Plus, X, Calendar, Clock, User, Users, Pencil, Trash2, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
@@ -495,11 +496,19 @@ export default function Escalas() {
             <h1 className="text-2xl font-serif font-bold text-foreground">{t("Escalas de Serviço")}</h1>
             <p className="text-sm text-muted-foreground mt-1">{t("Organize as escalas por ministério")}</p>
           </div>
-          {canWrite && (
-            <button onClick={openCreateForm} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
-              <Plus size={16} /> {t("Nova Escala")}
-            </button>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            <DocumentActions
+              actions={["print", "share"]}
+              shareTitle={t("Escalas de Serviço")}
+              shareText={t("Escalas de Serviço — Ecclesia")}
+              size="sm"
+            />
+            {canWrite && (
+              <button onClick={openCreateForm} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+                <Plus size={16} /> {t("Nova Escala")}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex gap-2 flex-wrap">

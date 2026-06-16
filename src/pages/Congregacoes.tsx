@@ -8,16 +8,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Navigate } from "react-router-dom";
 import {
+  AlertCircle,
+  Building2,
+  ChevronDown,
   Church as ChurchIcon,
-  Plus,
+  Edit,
   Loader2,
+  Mail,
   MapPin,
   Phone,
-  Mail,
+  Plus,
   Share2,
   Trash2,
-  Edit,
-  Building2,
 } from "lucide-react";
 
 type ChildOrganizationType = "matriz" | "setor" | "congregacao" | string;
@@ -45,6 +47,10 @@ export default function Congregacoes() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Sub-congregações carregadas para cada setor expandido (chave = setor.id)
+  const [sectorCongregations, setSectorCongregations] = useState<Record<string, ChildOrganization[]>>({});
+  const [loadingCongregations, setLoadingCongregations] = useState<Record<string, boolean>>({});
   const [form, setForm] = useState({
     name: "",
     city: "",
@@ -61,9 +67,40 @@ export default function Congregacoes() {
 
   const pageTitle = (): string => {
     if (isConvencaoContext) return t("Matrizes Municipais");
-    if (isMatriz) return t("Setores");
+    if (isMatriz) return t("Setores / Distritos");
     return t("Congregações");
   };
+
+  const loadCongregationsForSector = useCallback(async (sectorId: string) => {
+    if (sectorCongregations[sectorId] !== undefined) return; // já carregado
+    setLoadingCongregations((prev) => ({ ...prev, [sectorId]: true }));
+    const { data, error } = await supabase
+      .from("organizations")
+      .select("id,name,slug,city,state,phone,email,organization_type,parent_id")
+      .eq("parent_id", sectorId)
+      .eq("active", true)
+      .eq("organization_type", "congregacao")
+      .order("name");
+    setLoadingCongregations((prev) => ({ ...prev, [sectorId]: false }));
+    if (!error && data) {
+      setSectorCongregations((prev) => ({
+        ...prev,
+        [sectorId]: data.map((row) => ({
+          id: row.id,
+          name: row.name,
+          slug: row.slug ?? "",
+          city: row.city,
+          state: row.state,
+          phone: row.phone,
+          email: row.email,
+          organization_type: row.organization_type,
+          parent_id: row.parent_id,
+        })),
+      }));
+    } else {
+      setSectorCongregations((prev) => ({ ...prev, [sectorId]: [] }));
+    }
+  }, [sectorCongregations]);
 
   useEffect(() => {
     if (!church?.id) {
@@ -454,66 +491,216 @@ export default function Congregacoes() {
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {childOrganizations.map((c) => (
-                <div key={c.id} className="p-4 hover:bg-secondary/20 transition-colors">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center flex-shrink-0">
-                      <ChurchIcon size={20} className="text-accent" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-medium">{c.name}</p>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-semibold shrink-0">
-                          {typeBadgeLabel(c.organization_type)}
-                        </span>
+              {childOrganizations.map((c) => {
+                const isExpanded = expandedId === c.id;
+                return (
+                  <div key={c.id} className="transition-colors">
+                    {/* Cabeçalho da linha — clicável para expandir */}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        const next = isExpanded ? null : c.id;
+                        setExpandedId(next);
+                        if (next && isMatriz && c.organization_type === "setor") {
+                          void loadCongregationsForSector(c.id);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter") return;
+                        const next = isExpanded ? null : c.id;
+                        setExpandedId(next);
+                        if (next && isMatriz && c.organization_type === "setor") {
+                          void loadCongregationsForSector(c.id);
+                        }
+                      }}
+                      className="p-4 hover:bg-secondary/30 transition-colors cursor-pointer select-none"
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${isExpanded ? "bg-accent/30" : "bg-accent/20"}`}>
+                          <ChurchIcon size={20} className="text-accent" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-semibold">{c.name}</p>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-semibold shrink-0">
+                              {typeBadgeLabel(c.organization_type)}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                            {c.city && (
+                              <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                                <MapPin size={10} /> {c.city}
+                                {c.state ? `, ${c.state}` : ""}
+                              </span>
+                            )}
+                            {c.phone && (
+                              <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                                <Phone size={10} /> {c.phone}
+                              </span>
+                            )}
+                            {c.email && (
+                              <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                                <Mail size={10} /> {c.email}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <span className="text-[11px] text-muted-foreground mr-1 hidden sm:inline">
+                            {isExpanded ? "Recolher" : "Ver detalhes"}
+                          </span>
+                          <ChevronDown
+                            size={15}
+                            className={`text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                          />
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
-                        {c.city && (
-                          <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
-                            <MapPin size={10} /> {c.city}
-                            {c.state ? `, ${c.state}` : ""}
-                          </span>
-                        )}
-                        {c.phone && (
-                          <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
-                            <Phone size={10} /> {c.phone}
-                          </span>
-                        )}
-                        {c.email && (
-                          <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
-                            <Mail size={10} /> {c.email}
-                          </span>
-                        )}
-                      </div>
                     </div>
-                    {canManageChildUnits && (
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => handleShareInvite(c)}
-                          className="p-2 rounded-lg hover:bg-secondary transition-colors"
-                          title={t("Copiar link de convite")}
-                        >
-                          <Share2 size={14} className="text-muted-foreground" />
-                        </button>
-                        <button
-                          onClick={() => handleEdit(c)}
-                          className="p-2 rounded-lg hover:bg-secondary transition-colors"
-                          title={t("Editar")}
-                        >
-                          <Edit size={14} className="text-muted-foreground" />
-                        </button>
-                        <button
-                          onClick={() => void handleDelete(c.id)}
-                          className="p-2 rounded-lg hover:bg-destructive/10 transition-colors"
-                          title={t("Excluir")}
-                        >
-                          <Trash2 size={14} className="text-destructive" />
-                        </button>
+
+                    {/* Painel expandido — detalhes + ações operacionais */}
+                    {isExpanded && (
+                      <div className="bg-muted/30 border-t border-border/40 px-4 pb-4 pt-3 space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                          <div>
+                            <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">
+                              Nome
+                            </p>
+                            <p className="font-medium">{c.name}</p>
+                          </div>
+                          {(c.city || c.state) && (
+                            <div>
+                              <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">
+                                Localização
+                              </p>
+                              <p className="font-medium">
+                                {[c.city, c.state].filter(Boolean).join(", ")}
+                              </p>
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">
+                              Tipo
+                            </p>
+                            <p className="font-medium">{typeBadgeLabel(c.organization_type)}</p>
+                          </div>
+                          {c.phone && (
+                            <div>
+                              <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">
+                                Telefone
+                              </p>
+                              <p className="font-medium">{c.phone}</p>
+                            </div>
+                          )}
+                          {c.email && (
+                            <div>
+                              <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">
+                                Email
+                              </p>
+                              <p className="font-medium">{c.email}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {canManageChildUnits && (
+                          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/40">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleShareInvite(c); }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+                            >
+                              <Share2 size={13} />
+                              {t("Convidar responsável")}
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleEdit(c); setExpandedId(null); }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary text-foreground text-xs font-medium hover:bg-secondary/80 transition-colors border border-border"
+                            >
+                              <Edit size={13} />
+                              {t("Editar dados")}
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); void handleDelete(c.id); }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-destructive text-xs font-medium hover:bg-destructive/10 transition-colors border border-destructive/30"
+                            >
+                              <Trash2 size={13} />
+                              {t("Remover unidade")}
+                            </button>
+                          </div>
+                        )}
+
+                        <p className="text-[10px] text-muted-foreground">
+                          O link de "Convidar responsável" direciona ao cadastro nesta unidade.
+                          Defina o acesso do gestor em{" "}
+                          <strong>Configurações → Gerenciar Acessos</strong> após o cadastro.
+                        </p>
+
+                        {/* Congregações vinculadas (apenas para setores sob Matriz) */}
+                        {isMatriz && c.organization_type === "setor" && (
+                          <div className="mt-3 pt-3 border-t border-border/30">
+                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                              <ChurchIcon size={11} />
+                              Congregações vinculadas
+                            </p>
+                            {loadingCongregations[c.id] ? (
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Loader2 size={12} className="animate-spin" />
+                                Carregando congregações...
+                              </div>
+                            ) : !sectorCongregations[c.id] ? (
+                              <p className="text-xs text-muted-foreground">Clique para expandir e carregar.</p>
+                            ) : sectorCongregations[c.id].length === 0 ? (
+                              <p className="text-xs text-amber-600 flex items-center gap-1.5">
+                                <AlertCircle size={12} />
+                                Nenhuma congregação vinculada a este setor.
+                              </p>
+                            ) : (
+                              <div className="space-y-2">
+                                {sectorCongregations[c.id].map((cong) => (
+                                  <div key={cong.id} className="flex items-start justify-between gap-3 rounded-lg bg-background/60 px-3 py-2 border border-border/40">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium truncate">{cong.name}</p>
+                                      <div className="flex flex-wrap gap-x-3 mt-0.5">
+                                        {cong.city && (
+                                          <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">
+                                            <MapPin size={9} /> {cong.city}{cong.state ? `, ${cong.state}` : ""}
+                                          </span>
+                                        )}
+                                        {cong.phone && (
+                                          <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">
+                                            <Phone size={9} /> {cong.phone}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-1 flex-shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); handleShareInvite(cong); }}
+                                        className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                                      >
+                                        <Share2 size={10} />
+                                        Convidar
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); handleEdit(cong); setExpandedId(null); }}
+                                        className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                                      >
+                                        <Edit size={10} />
+                                        Editar
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

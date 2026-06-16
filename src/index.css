@@ -106,3 +106,14 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Waveform animado para gravação de áudio */
+@keyframes ec-waveform {
+  0%, 100% { transform: scaleY(0.3); opacity: 0.6; }
+  50%       { transform: scaleY(1);   opacity: 1;   }
+}
+
+.ec-wave-bar {
+  transform-origin: center;
+  animation: ec-waveform 0.7s ease-in-out infinite;
+}

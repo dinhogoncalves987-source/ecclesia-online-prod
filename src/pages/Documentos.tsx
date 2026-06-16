@@ -1,4 +1,5 @@
 import { AdminLayout } from "@/components/AdminLayout";
+import { DocumentActions } from "@/components/DocumentActions";
 import { Plus, X, FileText, FolderOpen, Upload, Eye } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
@@ -144,6 +145,14 @@ export default function Documentos() {
           <div>
             <h1 className="text-2xl font-serif font-bold text-foreground">{t("Documentos")}</h1>
             <p className="text-sm text-muted-foreground mt-1">{t("Biblioteca de documentos da igreja")}</p>
+          </div>
+          <div className="flex gap-2 flex-wrap items-center">
+            <DocumentActions
+              actions={["print", "share"]}
+              shareTitle={t("Documentos")}
+              shareText={t("Biblioteca de documentos da igreja")}
+              size="sm"
+            />
           </div>
           {canWrite && (
           <div className="flex gap-2 flex-wrap">

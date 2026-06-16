@@ -38,6 +38,7 @@ import ResetPassword from "./pages/ResetPassword";
 
 import SharePublic from "./pages/SharePublic";
 import ValidarCarta from "./pages/ValidarCarta";
+import ValidarMembro from "./pages/ValidarMembro";
 
 import DevocionalPublic from "./pages/DevocionalPublic";
 
@@ -101,6 +102,8 @@ const ChatSecretaria = lazy(() => import("./pages/ChatSecretaria"));
 
 const SolicitacoesAdministrativas = lazy(() => import("./pages/SolicitacoesAdministrativas"));
 
+const CarteiraEcclesia = lazy(() => import("./pages/CarteiraEcclesia"));
+
 
 
 const queryClient = new QueryClient();
@@ -143,6 +146,7 @@ const App = () => (
 
               <Route path="/share" element={<SharePublic />} />
               <Route path="/validar/carta/:token" element={<ValidarCarta />} />
+              <Route path="/validar-membro/:id" element={<ValidarMembro />} />
 
               <Route path="/devocional" element={<DevocionalPublic />} />
 
@@ -199,6 +203,8 @@ const App = () => (
               <Route path="/admin/chat-secretaria" element={<ProtectedRoute><ChatSecretaria /></ProtectedRoute>} />
 
               <Route path="/admin/solicitacoes" element={<ProtectedRoute><SolicitacoesAdministrativas /></ProtectedRoute>} />
+
+              <Route path="/admin/carteira-ecclesia" element={<ProtectedRoute><CarteiraEcclesia /></ProtectedRoute>} />
 
               <Route path="*" element={<NotFound />} />
 

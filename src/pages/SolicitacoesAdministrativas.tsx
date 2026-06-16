@@ -103,8 +103,15 @@ const EMPTY_FORM = {
 export default function SolicitacoesAdministrativas() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { church, loading: churchLoading } = useChurch();
-  const { canonicalRole } = useRole();
+  const { church, loading: churchLoading, isMatriz } = useChurch();
+  const { canonicalRole, isAdmin } = useRole();
+  // Nomenclatura adaptada por perfil: Matriz/Admin cria, Congregação solicita
+  const isCreatorProfile = isMatriz || isAdmin;
+  const actionLabel = isCreatorProfile ? "Nova Demanda" : "Nova Solicitação";
+  const pageTitle = isCreatorProfile ? "Demandas Administrativas" : "Solicitações Administrativas";
+  const pageDesc = isCreatorProfile
+    ? "Registro e acompanhamento de demandas administrativas"
+    : "Gerenciamento de pedidos recebidos pela secretaria";
   const canWrite = canWriteSecretaria(canonicalRole);
 
   const [requests, setRequests] = useState<AdmRequest[]>([]);
@@ -252,16 +259,16 @@ export default function SolicitacoesAdministrativas() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <ClipboardList size={22} />
-              Solicitações Administrativas
+              {pageTitle}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Gerenciamento de pedidos recebidos pela secretaria
+              {pageDesc}
             </p>
           </div>
           {canWrite && (
             <Button onClick={() => setShowForm(true)}>
               <Plus size={16} className="mr-1.5" />
-              Nova Solicitação
+              {actionLabel}
             </Button>
           )}
         </div>
@@ -327,7 +334,7 @@ export default function SolicitacoesAdministrativas() {
             {canWrite && requests.length === 0 && (
               <Button variant="outline" size="sm" className="mt-4" onClick={() => setShowForm(true)}>
                 <Plus size={14} className="mr-1" />
-                Criar primeira solicitação
+                {isCreatorProfile ? "Registrar primeira demanda" : "Criar primeira solicitação"}
               </Button>
             )}
           </div>
@@ -411,7 +418,7 @@ export default function SolicitacoesAdministrativas() {
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Nova Solicitação</DialogTitle>
+            <DialogTitle>{actionLabel}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">

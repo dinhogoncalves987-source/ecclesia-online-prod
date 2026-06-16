@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { ptBR, enUS, es } from "date-fns/locale";
 
 import { AdminLayout } from "@/components/AdminLayout";
+import { DocumentActions } from "@/components/DocumentActions";
 import { useAuth } from "@/hooks/useAuth";
 import { useChurch } from "@/hooks/useChurchContext";
 import { useRole } from "@/hooks/useRole";
@@ -314,16 +315,17 @@ export default function CartasRecomendacao() {
               className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
             >
               <Plus size={15} />
-              {t("Nova Solicitação")}
+              {canManage ? t("Nova Carta") : t("Nova Solicitação")}
             </button>
-            <button
-              onClick={() => { setAiInput(""); setAiParsed(null); setAiOpen(true); }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-secondary text-foreground text-sm font-medium hover:bg-secondary/80 transition-colors border border-border/50"
-            >
-              <Wand2 size={14} className="text-violet-500" />
-              {t("Criar com IA")}
-            </button>
-
+            {canManage && (
+              <button
+                onClick={() => { setAiInput(""); setAiParsed(null); setAiOpen(true); }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-secondary text-foreground text-sm font-medium hover:bg-secondary/80 transition-colors border border-border/50"
+              >
+                <Wand2 size={14} className="text-violet-500" />
+                {t("Criar com IA")}
+              </button>
+            )}
             {canManage && letters.length > 0 && (
               <ExportMenu
                 onCsv={handleExportCsv}
@@ -650,6 +652,24 @@ export default function CartasRecomendacao() {
                     onCopied={() => toast({ title: t("Link copiado!"), description: t("Link de validação copiado para a área de transferência.") })}
                   />
                 </div>
+
+                {/* Ações do documento aprovado */}
+                <div className="flex-shrink-0 border-t border-border/50 px-5 py-3 bg-muted/20">
+                  <p className="text-[11px] text-muted-foreground mb-2">
+                    {t("Imprima, envie por WhatsApp ou Email para apresentar na igreja de destino.")}
+                  </p>
+                  <DocumentActions
+                    printElementId="recommendation-letter-document"
+                    shareTitle={`Carta de Recomendação — ${selected.memberName}`}
+                    shareText={`Carta de Recomendação emitida por ${selected.originChurchName ?? church?.name ?? "Ecclesia"} para ${selected.memberName}. Igreja destino: ${selected.destinationChurch} — ${selected.destinationCity}.`}
+                    shareUrl={`${window.location.origin}/validar/carta/${selected.publicToken ?? ""}`}
+                    whatsappText={`📜 *Carta de Recomendação*\n\nNome: ${selected.memberName}\nIgreja: ${selected.originChurchName ?? church?.name ?? "Ecclesia"}\nDestino: ${selected.destinationChurch} — ${selected.destinationCity}\n\n🔗 Validação: ${window.location.origin}/validar/carta/${selected.publicToken ?? ""}`}
+                    emailSubject={`Carta de Recomendação — ${selected.memberName}`}
+                    emailBody={`Carta de Recomendação emitida por ${selected.originChurchName ?? church?.name ?? "Ecclesia"}.\n\nNome: ${selected.memberName}\nDestino: ${selected.destinationChurch}, ${selected.destinationCity}\n\nLink de validação: ${window.location.origin}/validar/carta/${selected.publicToken ?? ""}`}
+                    actions={["share", "whatsapp", "email", "print"]}
+                    size="sm"
+                  />
+                </div>
               </motion.div>
             </div>
           </>
@@ -674,10 +694,12 @@ export default function CartasRecomendacao() {
               >
                 <div className="flex items-center justify-between p-5 border-b border-border/50">
                   <div>
-                    <h2 className="font-serif font-bold text-lg">{t("Nova Solicitação")}</h2>
+                    <h2 className="font-serif font-bold text-lg">
+                      {canManage ? t("Nova Carta de Recomendação") : t("Nova Solicitação")}
+                    </h2>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {canManage
-                        ? t("Preencha os dados para criar uma solicitação.")
+                        ? t("Preencha os dados para criar a carta de recomendação.")
                         : t("Preencha os dados da igreja de destino para solicitar sua carta.")}
                     </p>
                   </div>
