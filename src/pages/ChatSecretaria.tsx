@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MessageSquarePlus, Loader2, X } from "lucide-react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { InternalThreadList } from "@/components/messages/InternalThreadList";
@@ -38,6 +38,13 @@ export default function ChatSecretaria() {
 
   const [selectedThread, setSelectedThread] = useState<InternalThread | null>(null);
   const [showNew, setShowNew] = useState(false);
+
+  // Auto-selecionar a primeira conversa quando os threads carregarem
+  useEffect(() => {
+    if (!loading && threads.length > 0 && selectedThread === null) {
+      setSelectedThread(threads[0]);
+    }
+  }, [loading, threads, selectedThread]);
   const [newSubject, setNewSubject] = useState("");
   const [newMessage, setNewMessage] = useState("");
   const [creating, setCreating] = useState(false);
@@ -152,18 +159,24 @@ export default function ChatSecretaria() {
                   allowReplies
                   isStaff
                   title={selectedThread.subject}
-                  subtitle="Secretaria"
+                  subtitle="Chat da Secretaria"
                   onThreadCreated={(t) => setSelectedThread(t)}
                   onThreadUpdated={() => void refetch()}
                 />
               </>
+            ) : loading ? (
+              <div className="flex flex-1 items-center justify-center">
+                <Loader2 size={22} className="animate-spin text-muted-foreground" />
+              </div>
             ) : (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center px-6">
                 <MessageSquarePlus size={40} className="text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">
-                  Selecione uma conversa ou crie uma nova
+                <p className="text-sm font-medium">Nenhuma conversa ainda</p>
+                <p className="text-xs text-muted-foreground max-w-xs">
+                  Crie a primeira conversa para iniciar a comunicação interna da secretaria.
                 </p>
-                <Button variant="outline" size="sm" onClick={() => setShowNew(true)}>
+                <Button size="sm" onClick={() => setShowNew(true)}>
+                  <MessageSquarePlus size={14} className="mr-1.5" />
                   Nova Conversa
                 </Button>
               </div>

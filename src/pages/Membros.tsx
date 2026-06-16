@@ -513,14 +513,14 @@ export default function Membros() {
                       </td>
                       <td className="px-5 py-3 text-muted-foreground tabular-nums">{m.joined_at}</td>
                       <td className="px-5 py-3" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => setWalletMember(m)}
-                            className="p-1 rounded hover:bg-secondary transition-colors"
-                            title={t("Carteira Ecclesia")}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-accent/10 hover:bg-accent/20 text-accent text-[11px] font-medium transition-colors"
                           >
-                            <CreditCard size={14} className="text-muted-foreground" />
+                            <CreditCard size={12} />
+                            {t("Carteira")}
                           </button>
                           {canWrite && (
                             <>
@@ -543,7 +543,7 @@ export default function Membros() {
                                 </button>
                               ) : (
                                 <span
-                                  className="p-1 text-[10px] text-muted-foreground max-w-[4rem] leading-tight"
+                                  className="p-1 text-[10px] text-muted-foreground"
                                   title={t("Use alteração de status")}
                                 >
                                   —
@@ -557,7 +557,7 @@ export default function Membros() {
                   ))}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={canWrite ? 6 : 5} className="text-center py-8 text-sm text-muted-foreground">
+                      <td colSpan={6} className="text-center py-8 text-sm text-muted-foreground">
                         {t("Nenhum membro encontrado.")}
                       </td>
                     </tr>
@@ -628,10 +628,10 @@ export default function Membros() {
                       <button
                         type="button"
                         onClick={() => setWalletMember(m)}
-                        className="p-1.5 rounded-lg hover:bg-secondary transition-colors"
-                        title={t("Carteira Ecclesia")}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-accent/10 hover:bg-accent/20 text-accent text-[10px] font-medium transition-colors"
                       >
-                        <CreditCard size={14} className="text-muted-foreground" />
+                        <CreditCard size={11} />
+                        {t("Carteira")}
                       </button>
                       {canWrite && (
                         <>
