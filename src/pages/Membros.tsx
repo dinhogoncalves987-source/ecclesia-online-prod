@@ -468,7 +468,7 @@ export default function Membros() {
                     <th className="px-5 py-3 font-medium">{t("Contato")}</th>
                     <th className="px-5 py-3 font-medium">{t("Status")}</th>
                     <th className="px-5 py-3 font-medium">{t("Desde")}</th>
-                    {canWrite && <th className="px-5 py-3 font-medium w-24">{t("Ações")}</th>}
+                    <th className="px-5 py-3 font-medium w-28">{t("Ações")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -512,37 +512,47 @@ export default function Membros() {
                         )}
                       </td>
                       <td className="px-5 py-3 text-muted-foreground tabular-nums">{m.joined_at}</td>
-                      {canWrite && (
-                        <td className="px-5 py-3" onClick={e => e.stopPropagation()}>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => openMember(m)}
-                              className="p-1 rounded hover:bg-secondary transition-colors"
-                              title={t("Editar")}
-                            >
-                              <Pencil size={14} className="text-muted-foreground" />
-                            </button>
-                            {canDeleteMember(m) ? (
+                      <td className="px-5 py-3" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setWalletMember(m)}
+                            className="p-1 rounded hover:bg-secondary transition-colors"
+                            title={t("Carteira Ecclesia")}
+                          >
+                            <CreditCard size={14} className="text-muted-foreground" />
+                          </button>
+                          {canWrite && (
+                            <>
                               <button
                                 type="button"
-                                onClick={() => removeMember(m)}
-                                className="p-1 rounded hover:bg-destructive/10 transition-colors"
-                                title={t("Remover")}
+                                onClick={() => openMember(m)}
+                                className="p-1 rounded hover:bg-secondary transition-colors"
+                                title={t("Editar")}
                               >
-                                <Trash2 size={14} className="text-muted-foreground" />
+                                <Pencil size={14} className="text-muted-foreground" />
                               </button>
-                            ) : (
-                              <span
-                                className="p-1 text-[10px] text-muted-foreground max-w-[4rem] leading-tight"
-                                title={t("Use alteração de status")}
-                              >
-                                —
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                      )}
+                              {canDeleteMember(m) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => removeMember(m)}
+                                  className="p-1 rounded hover:bg-destructive/10 transition-colors"
+                                  title={t("Remover")}
+                                >
+                                  <Trash2 size={14} className="text-muted-foreground" />
+                                </button>
+                              ) : (
+                                <span
+                                  className="p-1 text-[10px] text-muted-foreground max-w-[4rem] leading-tight"
+                                  title={t("Use alteração de status")}
+                                >
+                                  —
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                   {filtered.length === 0 && (
@@ -614,28 +624,38 @@ export default function Membros() {
                         </div>
                       )}
                     </div>
-                    {canWrite && (
-                      <div className="flex flex-col gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={() => openMember(m)}
-                          className="p-1.5 rounded-lg hover:bg-secondary transition-colors"
-                          title={t("Editar")}
-                        >
-                          <Pencil size={14} className="text-muted-foreground" />
-                        </button>
-                        {canDeleteMember(m) && (
+                    <div className="flex flex-col gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={() => setWalletMember(m)}
+                        className="p-1.5 rounded-lg hover:bg-secondary transition-colors"
+                        title={t("Carteira Ecclesia")}
+                      >
+                        <CreditCard size={14} className="text-muted-foreground" />
+                      </button>
+                      {canWrite && (
+                        <>
                           <button
                             type="button"
-                            onClick={() => removeMember(m)}
-                            className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors"
-                            title={t("Remover")}
+                            onClick={() => openMember(m)}
+                            className="p-1.5 rounded-lg hover:bg-secondary transition-colors"
+                            title={t("Editar")}
                           >
-                            <Trash2 size={14} className="text-muted-foreground" />
+                            <Pencil size={14} className="text-muted-foreground" />
                           </button>
-                        )}
-                      </div>
-                    )}
+                          {canDeleteMember(m) && (
+                            <button
+                              type="button"
+                              onClick={() => removeMember(m)}
+                              className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors"
+                              title={t("Remover")}
+                            >
+                              <Trash2 size={14} className="text-muted-foreground" />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </motion.div>
               ))}

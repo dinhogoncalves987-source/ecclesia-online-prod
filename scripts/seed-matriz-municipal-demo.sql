@@ -142,28 +142,33 @@ BEGIN
 
     ('dd000004-0000-0000-0000-000000000002',v_org,
      'dd000003-0000-0000-0000-000000000013','Rafael Casagrande',NULL,
-     v_name,'Primeira Igreja Batista de Sao Paulo','Sao Paulo','SP',
-     'Mudanca para fins de estudo','Membro ingressou em universidade federal.',
+     v_name,'Assembleia de Deus — Campo de Sao Paulo','Sao Paulo','SP',
+     'Mudanca para fins de estudo','Membro ingressou em universidade federal. Apresenta-se ao campo local.',
      'requested', now()-interval '7 days', NULL, NULL),
 
     ('dd000004-0000-0000-0000-000000000003',v_org,
      'dd000003-0000-0000-0000-00000000000e','Simone Bettega',NULL,
-     v_name,'Igreja Evangelica Quadrangular de Curitiba','Curitiba','PR',
-     'Visita durante transferencia temporaria','Relocacao profissional de 6 meses.',
+     v_name,'Assembleia de Deus — Boqueirao — Curitiba','Curitiba','PR',
+     'Apresentacao de membro durante relocacao','Relocacao profissional de 6 meses. Membro em plena comunhao.',
      'under_review', now()-interval '21 days', now()-interval '18 days', NULL),
 
     ('dd000004-0000-0000-0000-000000000004',v_org,
      'dd000003-0000-0000-0000-000000000007','Fernanda Pasinato','fernanda.p@adcaxias.org.br',
-     v_name,'Igreja Presbiteriana de Florianopolis','Florianopolis','SC',
-     'Apresentacao e comunhao com nova congregacao','Membro em plena comunhao.',
+     v_name,'Assembleia de Deus — Campinas — Florianopolis','Florianopolis','SC',
+     'Transferencia de congregacao','Membro em plena comunhao. Transferencia solicitada pelo proprio membro.',
      'approved', now()-interval '30 days', now()-interval '27 days', now()-interval '25 days'),
 
     ('dd000004-0000-0000-0000-000000000005',v_org,
      'dd000003-0000-0000-0000-000000000009','Roberto Galvani',NULL,
-     v_name,'Comunidade Evangelica Brasileira — Orlando','Orlando','FL',
-     'Viagem internacional — apresentacao pastoral','Secretaria optou por nao emitir carta.',
+     v_name,'Assembleia de Deus — Orlando — FL','Orlando','FL',
+     'Viagem missionaria internacional','Membro viajou sem documentacao ministerial completa. Carta nao emitida.',
      'rejected', now()-interval '45 days', now()-interval '42 days', NULL)
-  ON CONFLICT (id) DO NOTHING;
+  ON CONFLICT (id) DO UPDATE SET
+    destination_church   = EXCLUDED.destination_church,
+    destination_city     = EXCLUDED.destination_city,
+    destination_state    = EXCLUDED.destination_state,
+    reason               = EXCLUDED.reason,
+    observations         = EXCLUDED.observations;
   GET DIAGNOSTICS v_cnt = ROW_COUNT;
   RAISE NOTICE '[03] Cartas inseridas: %', v_cnt;
 
@@ -347,8 +352,9 @@ BEGIN
      'AUTORIZACAO DE USO DE IMAGEM. Autorizamos o uso da imagem de nosso filho(a) nas atividades do Ministerio Infantil da Assembleia de Deus em Caxias do Sul, para fins eclesiasticos sem fins lucrativos.'),
     ('dd000009-0000-0000-0000-000000000006',v_org,
      'Carta de Recomendacao Arquivada — Fernanda Pasinato','Carta de Recomendacao',
-     'CARTA DE RECOMENDACAO ARQUIVADA. Emitida em 21/05/2026 para Fernanda Pasinato, destinada a Igreja Presbiteriana de Florianopolis/SC. Validada via Ecclesia Online — codigo DD000004.')
-  ON CONFLICT (id) DO NOTHING;
+     'CARTA DE RECOMENDACAO ARQUIVADA. Emitida em 21/05/2026 para Fernanda Pasinato, destinada a Assembleia de Deus — Campinas — Florianopolis/SC. Aprovada e validada via Ecclesia Online — codigo DD000004.')
+  ON CONFLICT (id) DO UPDATE SET
+    content = EXCLUDED.content;
   GET DIAGNOSTICS v_cnt = ROW_COUNT;
   RAISE NOTICE '[06] Documentos inseridos: %', v_cnt;
 

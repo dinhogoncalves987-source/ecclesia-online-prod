@@ -182,6 +182,27 @@ async function countByIds(table, ids) {
  * Insere rows e reporta quantos eram novos (before vs after count).
  * @returns {{ inserted: number, skipped: number, error: string|null }}
  */
+/** Upsert que SOBRESCREVE registros existentes (sem ignoreDuplicates). */
+async function upsertRowsForce(table, rows, label) {
+  const tag = label ?? table;
+  if (!rows.length) {
+    inf(`${tag}: nenhum registro (array vazio)`);
+    return { inserted: 0, skipped: 0, error: null };
+  }
+
+  const { error: upsertErr } = await sb
+    .from(table)
+    .upsert(rows, { onConflict: "id", ignoreDuplicates: false });
+
+  if (upsertErr) {
+    err(`${tag}: ${upsertErr.message}`);
+    return { inserted: 0, skipped: rows.length, error: upsertErr.message };
+  }
+
+  ok(`${tag}: ${rows.length} registro(s) inserido(s)/atualizado(s)`);
+  return { inserted: rows.length, skipped: 0, error: null };
+}
+
 async function insertRows(table, rows, label) {
   const tag = label ?? table;
   if (!rows.length) {
@@ -348,14 +369,15 @@ async function main() {
   sep("04 — Cartas de Recomendação (5)");
   const now = new Date();
   const daysAgo = (d) => new Date(now - d * 864e5).toISOString();
+  // upsertRowsForce: sobrescreve registros existentes para corrigir denominações erradas
   const letters = [
-    { id: "dd000004-0000-0000-0000-000000000001", organization_id: ORG_ID, member_id: M3,  member_name: "Marcos Antonio Rossato",  member_email: "marcos.rossato@adcaxias.org.br", origin_church_name: orgRow.name, destination_church: "Assembleia de Deus — Zona Norte",             destination_city: "Porto Alegre",    destination_state: "RS", reason: "Transferência de residência",       observations: "Membro se muda em razão de novo emprego na capital.", status: "requested",    requested_at: daysAgo(14), reviewed_at: null,      approved_at: null },
-    { id: "dd000004-0000-0000-0000-000000000002", organization_id: ORG_ID, member_id: M19, member_name: "Rafael Casagrande",        member_email: null,                             origin_church_name: orgRow.name, destination_church: "Primeira Igreja Batista de São Paulo",          destination_city: "São Paulo",       destination_state: "SP", reason: "Mudança para fins de estudo",       observations: "Membro ingressou em universidade federal.",            status: "requested",    requested_at: daysAgo(7),  reviewed_at: null,      approved_at: null },
-    { id: "dd000004-0000-0000-0000-000000000003", organization_id: ORG_ID, member_id: M14, member_name: "Simone Bettega",           member_email: null,                             origin_church_name: orgRow.name, destination_church: "Igreja Evangélica Quadrangular de Curitiba",    destination_city: "Curitiba",        destination_state: "PR", reason: "Visita durante transferência",       observations: "Relocação profissional de 6 meses.",                   status: "under_review", requested_at: daysAgo(21), reviewed_at: daysAgo(18), approved_at: null },
-    { id: "dd000004-0000-0000-0000-000000000004", organization_id: ORG_ID, member_id: M7,  member_name: "Fernanda Pasinato",        member_email: "fernanda.p@adcaxias.org.br",     origin_church_name: orgRow.name, destination_church: "Igreja Presbiteriana de Florianópolis",         destination_city: "Florianópolis",   destination_state: "SC", reason: "Apresentação e comunhão",           observations: "Membro em plena comunhão.",                            status: "approved",     requested_at: daysAgo(30), reviewed_at: daysAgo(27), approved_at: daysAgo(25) },
-    { id: "dd000004-0000-0000-0000-000000000005", organization_id: ORG_ID, member_id: M9,  member_name: "Roberto Galvani",          member_email: null,                             origin_church_name: orgRow.name, destination_church: "Comunidade Evangélica Brasileira — Orlando",    destination_city: "Orlando",         destination_state: "FL", reason: "Viagem internacional",              observations: "Secretaria optou por não emitir carta.",               status: "rejected",     requested_at: daysAgo(45), reviewed_at: daysAgo(42), approved_at: null },
+    { id: "dd000004-0000-0000-0000-000000000001", organization_id: ORG_ID, member_id: M3,  member_name: "Marcos Antonio Rossato",  member_email: "marcos.rossato@adcaxias.org.br", origin_church_name: orgRow.name, destination_church: "Assembleia de Deus — Zona Norte",               destination_city: "Porto Alegre",    destination_state: "RS", reason: "Transferência de residência",           observations: "Membro se muda em razão de novo emprego na capital.", status: "requested",    requested_at: daysAgo(14), reviewed_at: null,       approved_at: null },
+    { id: "dd000004-0000-0000-0000-000000000002", organization_id: ORG_ID, member_id: M19, member_name: "Rafael Casagrande",        member_email: null,                             origin_church_name: orgRow.name, destination_church: "Assembleia de Deus — Campo de São Paulo",        destination_city: "São Paulo",       destination_state: "SP", reason: "Mudança para fins de estudo",           observations: "Membro ingressou em universidade federal. Apresenta-se ao campo local.", status: "requested",    requested_at: daysAgo(7),  reviewed_at: null,       approved_at: null },
+    { id: "dd000004-0000-0000-0000-000000000003", organization_id: ORG_ID, member_id: M14, member_name: "Simone Bettega",           member_email: null,                             origin_church_name: orgRow.name, destination_church: "Assembleia de Deus — Boqueirão — Curitiba",      destination_city: "Curitiba",        destination_state: "PR", reason: "Apresentação de membro durante relocação", observations: "Relocação profissional de 6 meses. Membro em plena comunhão.", status: "under_review", requested_at: daysAgo(21), reviewed_at: daysAgo(18), approved_at: null },
+    { id: "dd000004-0000-0000-0000-000000000004", organization_id: ORG_ID, member_id: M7,  member_name: "Fernanda Pasinato",        member_email: "fernanda.p@adcaxias.org.br",     origin_church_name: orgRow.name, destination_church: "Assembleia de Deus — Campinas — Florianópolis", destination_city: "Florianópolis",   destination_state: "SC", reason: "Transferência de congregação",          observations: "Membro em plena comunhão. Transferência solicitada pelo próprio membro.", status: "approved",     requested_at: daysAgo(30), reviewed_at: daysAgo(27), approved_at: daysAgo(25) },
+    { id: "dd000004-0000-0000-0000-000000000005", organization_id: ORG_ID, member_id: M9,  member_name: "Roberto Galvani",          member_email: null,                             origin_church_name: orgRow.name, destination_church: "Assembleia de Deus — Orlando — FL",              destination_city: "Orlando",         destination_state: "FL", reason: "Viagem missionária internacional",      observations: "Membro viajou sem documentação ministerial completa. Carta não emitida.", status: "rejected",     requested_at: daysAgo(45), reviewed_at: daysAgo(42), approved_at: null },
   ];
-  counts.letters = await insertRows("recommendation_letters", letters, "cartas");
+  counts.letters = await upsertRowsForce("recommendation_letters", letters, "cartas");
 
   // ----------------------------------------------------------
   // 05 — Financeiro — Contas
@@ -451,9 +473,10 @@ async function main() {
     { id: "dd000009-0000-0000-0000-000000000003", organization_id: ORG_ID, title: "Estatuto Social — AD Caxias do Sul",                  document_type: "Estatuto",               content: "ESTATUTO SOCIAL — ASSEMBLEIA DE DEUS EM CAXIAS DO SUL. Entidade religiosa sem fins lucrativos, Caxias do Sul, RS. Objetivos: pregar o Evangelho, promover adoração e discipulado, missões e ação social." },
     { id: "dd000009-0000-0000-0000-000000000004", organization_id: ORG_ID, title: "Relatório Financeiro Semestral 1º Sem 2026",          document_type: "Relatório",              content: "RELATÓRIO FINANCEIRO 1º SEMESTRE 2026. RECEITAS: Dízimos R$34.600, Ofertas R$9.850, Missões R$8.500, Construção R$18.200. TOTAL RECEITAS: R$71.150. DESPESAS: R$70.250. SALDO: R$900." },
     { id: "dd000009-0000-0000-0000-000000000005", organization_id: ORG_ID, title: "Autorização de Uso de Imagem — Ministério Infantil",  document_type: "Autorização",            content: "AUTORIZAÇÃO DE USO DE IMAGEM. Autorizamos o uso da imagem de nosso filho(a) nas atividades do Ministério Infantil da Assembleia de Deus em Caxias do Sul, para fins eclesiásticos sem fins lucrativos." },
-    { id: "dd000009-0000-0000-0000-000000000006", organization_id: ORG_ID, title: "Carta de Recomendação Arquivada — Fernanda Pasinato", document_type: "Carta de Recomendação",  content: "CARTA DE RECOMENDAÇÃO ARQUIVADA. Emitida em 21/05/2026 para Fernanda Pasinato, destinada à Igreja Presbiteriana de Florianópolis/SC. Validada via Ecclesia Online — código DD000004." },
+    { id: "dd000009-0000-0000-0000-000000000006", organization_id: ORG_ID, title: "Carta de Recomendação Arquivada — Fernanda Pasinato", document_type: "Carta de Recomendação",  content: "CARTA DE RECOMENDAÇÃO ARQUIVADA. Emitida em 21/05/2026 para Fernanda Pasinato, destinada à Assembleia de Deus — Campinas — Florianópolis/SC. Aprovada e validada via Ecclesia Online — código DD000004." },
   ];
-  counts.documents = await insertRows("documents", documents, "documentos");
+  // upsertRowsForce para sobrescrever documento com referência incorreta a outra denominação
+  counts.documents = await upsertRowsForce("documents", documents, "documentos");
 
   // ----------------------------------------------------------
   // 07 — Eventos (8)
