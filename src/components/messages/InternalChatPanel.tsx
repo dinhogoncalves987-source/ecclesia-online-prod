@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { ArrowLeft } from "lucide-react";
 import { InternalChatHeader } from "@/components/messages/InternalChatHeader";
 import { InternalChatLockedFooter } from "@/components/messages/InternalChatLockedFooter";
 import { InternalMessageComposer } from "@/components/messages/InternalMessageComposer";
 import { InternalMessageList } from "@/components/messages/InternalMessageList";
+import { JitsiCallModal, type JitsiCallMode } from "@/components/messages/JitsiCallModal";
 import { useInternalMessages } from "@/hooks/useInternalMessages";
+import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useRole } from "@/hooks/useRole";
 import { useToast } from "@/hooks/use-toast";
@@ -46,11 +47,14 @@ export function InternalChatPanel({
   onThreadCreated,
   onThreadUpdated,
 }: Props) {
+  const { user } = useAuth();
   const { t } = useLanguage();
   const { toast } = useToast();
   const { canonicalRole } = useRole();
   const [threadBusy, setThreadBusy] = useState(false);
   const [pendingMessages, setPendingMessages] = useState<InternalMessage[]>([]);
+  const [callOpen, setCallOpen] = useState(false);
+  const [callMode, setCallMode] = useState<JitsiCallMode>("voice");
 
   const senderRole = isStaff ? (canonicalRole ?? "leader") : "member";
 
@@ -183,37 +187,34 @@ export function InternalChatPanel({
 
   return (
     <div className="flex flex-col flex-1 min-w-0 min-h-0 h-full bg-background">
-      {isStaff && thread ? (
-        <InternalChatHeader
-          thread={thread}
-          title={headerTitle}
-          subtitle={subtitle}
-          isStaff={isStaff}
-          showBack={showBack}
-          onBack={onBack}
-          onCloseThread={() => void handleClose()}
-          onReopenThread={() => void handleReopen()}
-          busy={threadBusy}
+      <InternalChatHeader
+        thread={thread}
+        title={headerTitle}
+        subtitle={subtitle}
+        isStaff={isStaff}
+        showBack={showBack}
+        onBack={onBack}
+        onCloseThread={() => void handleClose()}
+        onReopenThread={() => void handleReopen()}
+        busy={threadBusy}
+        onVoiceCall={thread && isStaff ? () => { setCallMode("voice"); setCallOpen(true); } : undefined}
+        onVideoCall={thread && isStaff ? () => { setCallMode("video"); setCallOpen(true); } : undefined}
+      />
+
+      {/* Modal Jitsi — apenas para staff com thread ativa */}
+      {thread && isStaff && (
+        <JitsiCallModal
+          open={callOpen}
+          onClose={() => setCallOpen(false)}
+          organizationId={organizationId}
+          threadId={thread.id}
+          mode={callMode}
+          displayName={
+            (user?.user_metadata as Record<string, string> | undefined)?.full_name ||
+            user?.email?.split("@")[0] ||
+            "Participante"
+          }
         />
-      ) : (
-        <div className="flex-shrink-0 border-b border-border/50 bg-card px-3 sm:px-4 py-3 min-h-[56px] flex items-center gap-2">
-          {showBack && onBack ? (
-            <button
-              type="button"
-              onClick={onBack}
-              className="md:hidden p-2 -ml-1 rounded-full hover:bg-secondary flex-shrink-0"
-              aria-label={t("Voltar")}
-            >
-              <ArrowLeft size={18} />
-            </button>
-          ) : null}
-          <div className="min-w-0 flex-1">
-            <h3 className="font-semibold text-sm sm:text-base truncate">{headerTitle}</h3>
-            {subtitle ? (
-              <p className="text-[11px] text-muted-foreground truncate">{subtitle}</p>
-            ) : null}
-          </div>
-        </div>
       )}
 
       {displayMessages.length > 0 ? (

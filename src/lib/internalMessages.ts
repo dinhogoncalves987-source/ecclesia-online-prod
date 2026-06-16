@@ -123,8 +123,26 @@ export const INTERNAL_ATTACHMENT_MIME = [
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ] as const;
 
+export const INTERNAL_VIDEO_MIME = [
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+] as const;
+
+export const INTERNAL_AUDIO_MIME = [
+  "audio/mpeg",
+  "audio/ogg",
+  "audio/wav",
+  "audio/mp4",
+  "audio/webm",
+  "audio/x-m4a",
+  "audio/aac",
+] as const;
+
 export const INTERNAL_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
 export const INTERNAL_DOCUMENT_MAX_BYTES = 20 * 1024 * 1024;
+export const INTERNAL_VIDEO_MAX_BYTES = 100 * 1024 * 1024;
+export const INTERNAL_AUDIO_MAX_BYTES = 20 * 1024 * 1024;
 
 export function mapDbThreadToUi(row: DbInternalThreadRow): InternalThread {
   return {

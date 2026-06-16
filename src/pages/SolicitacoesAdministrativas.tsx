@@ -120,7 +120,10 @@ export default function SolicitacoesAdministrativas() {
   const [changingStatus, setChangingStatus] = useState<string | null>(null);
 
   const fetchRequests = useCallback(async () => {
-    if (!church) return;
+    if (!church) {
+      setLoading(false);
+      return;
+    }
     const { data, error } = await supabase
       .from("administrative_requests")
       .select("*")
@@ -136,8 +139,9 @@ export default function SolicitacoesAdministrativas() {
   }, [church, toast]);
 
   useEffect(() => {
+    if (churchLoading) return;
     void fetchRequests();
-  }, [fetchRequests]);
+  }, [fetchRequests, churchLoading]);
 
   const statusCounts = STATUS_ORDER.reduce(
     (acc, s) => ({ ...acc, [s]: requests.filter((r) => r.status === s).length }),

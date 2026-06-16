@@ -53,7 +53,31 @@ export function MemberWalletCard({ member, churchName, onClose }: Props) {
   const code = memberCode(member.id);
   const qrValue = `${window.location.origin}/admin/membros?code=${member.id}`;
 
-  const handlePrint = () => window.print();
+  const handlePrint = () => {
+    const prev = document.getElementById("__wallet-print-css");
+    if (prev) prev.remove();
+    const style = document.createElement("style");
+    style.id = "__wallet-print-css";
+    style.textContent = `
+      @media print {
+        body > * { visibility: hidden !important; }
+        #wallet-card, #wallet-card * { visibility: visible !important; }
+        #wallet-card {
+          position: fixed !important;
+          top: 20px !important;
+          left: 50% !important;
+          transform: translateX(-50%) !important;
+          width: 320px !important;
+          z-index: 99999 !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+    window.print();
+    setTimeout(() => {
+      document.getElementById("__wallet-print-css")?.remove();
+    }, 1000);
+  };
 
   return (
     <div className="flex flex-col items-center gap-4 py-2">

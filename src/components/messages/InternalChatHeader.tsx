@@ -1,4 +1,4 @@
-import { ArrowLeft, Lock, RotateCcw } from "lucide-react";
+import { ArrowLeft, Lock, Phone, RotateCcw, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
 import type { InternalThread } from "@/lib/internalMessages";
@@ -13,6 +13,8 @@ type Props = {
   onBack?: () => void;
   onCloseThread?: () => void;
   onReopenThread?: () => void;
+  onVoiceCall?: () => void;
+  onVideoCall?: () => void;
   busy?: boolean;
 };
 
@@ -21,6 +23,13 @@ const STATUS_CLASS: Record<string, string> = {
   pending: "bg-amber-500/15 text-amber-700",
   answered: "bg-blue-500/15 text-blue-700",
   closed: "bg-muted text-muted-foreground",
+};
+
+const STATUS_PT: Record<string, string> = {
+  open: "Aberta",
+  pending: "Pendente",
+  answered: "Respondida",
+  closed: "Encerrada",
 };
 
 export function InternalChatHeader({
@@ -32,6 +41,8 @@ export function InternalChatHeader({
   onBack,
   onCloseThread,
   onReopenThread,
+  onVoiceCall,
+  onVideoCall,
   busy = false,
 }: Props) {
   const { t } = useLanguage();
@@ -62,6 +73,53 @@ export function InternalChatHeader({
         ) : null}
       </div>
 
+      {/* Botões de chamada — visíveis para staff; desabilitados quando sem thread ou sem permissão */}
+      <div className="flex items-center gap-0.5 flex-shrink-0">
+        <button
+          type="button"
+          onClick={onVoiceCall}
+          disabled={!onVoiceCall}
+          title={
+            onVoiceCall
+              ? t("Iniciar chamada de voz")
+              : !thread
+                ? t("Selecione uma conversa para iniciar chamada")
+                : t("Apenas administradores podem iniciar chamadas")
+          }
+          className={cn(
+            "h-8 w-8 rounded-full flex items-center justify-center transition-colors",
+            onVoiceCall
+              ? "hover:bg-secondary text-foreground"
+              : "text-muted-foreground/25 cursor-not-allowed",
+          )}
+          aria-label={t("Ligação de voz")}
+        >
+          <Phone size={15} />
+        </button>
+
+        <button
+          type="button"
+          onClick={onVideoCall}
+          disabled={!onVideoCall}
+          title={
+            onVideoCall
+              ? t("Iniciar videochamada")
+              : !thread
+                ? t("Selecione uma conversa para iniciar videochamada")
+                : t("Apenas administradores podem iniciar chamadas")
+          }
+          className={cn(
+            "h-8 w-8 rounded-full flex items-center justify-center transition-colors",
+            onVideoCall
+              ? "hover:bg-secondary text-foreground"
+              : "text-muted-foreground/25 cursor-not-allowed",
+          )}
+          aria-label={t("Videochamada")}
+        >
+          <Video size={15} />
+        </button>
+      </div>
+
       {thread && isStaff ? (
         <div className="flex items-center gap-1 flex-shrink-0">
           <span
@@ -70,7 +128,7 @@ export function InternalChatHeader({
               STATUS_CLASS[thread.status] ?? STATUS_CLASS.open,
             )}
           >
-            {thread.status}
+            {STATUS_PT[thread.status] ?? thread.status}
           </span>
 
           {isClosed ? (

@@ -2,9 +2,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { insertWithOrganizationScope } from "@/lib/organizationScope";
 import {
   INTERNAL_ATTACHMENT_MIME,
+  INTERNAL_AUDIO_MAX_BYTES,
+  INTERNAL_AUDIO_MIME,
   INTERNAL_DOCUMENT_MAX_BYTES,
   INTERNAL_IMAGE_MAX_BYTES,
   INTERNAL_MESSAGE_BUCKET,
+  INTERNAL_VIDEO_MAX_BYTES,
+  INTERNAL_VIDEO_MIME,
   mapDbAttachmentToUi,
   mapDbMessageToUi,
   mapDbThreadToUi,
@@ -14,6 +18,7 @@ import {
   type DbInternalThreadRow,
   type InternalMessage,
   type InternalMessageAttachment,
+  type InternalMessageType,
   type InternalThread,
 } from "@/lib/internalMessages";
 
@@ -25,7 +30,7 @@ export type InternalMutationResult = {
 
 export type SendMessagePayload = {
   body?: string;
-  messageType?: "text" | "image" | "document";
+  messageType?: InternalMessageType;
   senderRole?: string | null;
 };
 
@@ -43,6 +48,13 @@ export function validateInternalAttachment(file: File): string | null {
   const isDoc =
     INTERNAL_ATTACHMENT_MIME.includes(mime as (typeof INTERNAL_ATTACHMENT_MIME)[number]) ||
     [".pdf", ".docx", ".xlsx"].includes(ext);
+  const isVideo =
+    INTERNAL_VIDEO_MIME.includes(mime as (typeof INTERNAL_VIDEO_MIME)[number]) ||
+    [".mp4", ".webm", ".mov"].includes(ext);
+  const isAudio =
+    INTERNAL_AUDIO_MIME.includes(mime as (typeof INTERNAL_AUDIO_MIME)[number]) ||
+    mime.startsWith("audio/") ||
+    [".mp3", ".ogg", ".wav", ".m4a", ".aac"].includes(ext);
 
   if (isImage) {
     if (file.size > INTERNAL_IMAGE_MAX_BYTES) return "image_too_large";
@@ -50,6 +62,14 @@ export function validateInternalAttachment(file: File): string | null {
   }
   if (isDoc) {
     if (file.size > INTERNAL_DOCUMENT_MAX_BYTES) return "document_too_large";
+    return null;
+  }
+  if (isVideo) {
+    if (file.size > INTERNAL_VIDEO_MAX_BYTES) return "video_too_large";
+    return null;
+  }
+  if (isAudio) {
+    if (file.size > INTERNAL_AUDIO_MAX_BYTES) return "audio_too_large";
     return null;
   }
   return "invalid_type";
@@ -60,9 +80,11 @@ function buildStoragePath(organizationId: string, threadId: string, file: File):
   return `${organizationId}/${threadId}/${crypto.randomUUID()}.${ext}`;
 }
 
-function inferMessageType(file: File): "image" | "document" {
+function inferMessageType(file: File): InternalMessageType {
   const mime = file.type.toLowerCase();
   if (mime.startsWith("image/")) return "image";
+  if (mime.startsWith("video/")) return "video";
+  if (mime.startsWith("audio/")) return "audio";
   return "document";
 }
 

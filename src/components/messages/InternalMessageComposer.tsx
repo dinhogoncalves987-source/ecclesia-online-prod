@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Loader2, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InternalAttachmentButton } from "@/components/messages/InternalAttachmentButton";
+import { InternalAudioRecorder } from "@/components/messages/InternalAudioRecorder";
 import { useLanguage } from "@/hooks/useLanguage";
 
 type Props = {
@@ -21,7 +22,7 @@ export function InternalMessageComposer({
   const [text, setText] = useState("");
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
-  const canSend = !disabled && !sending && (text.trim().length > 0 || pendingFile);
+  const canSend = !disabled && !sending && (text.trim().length > 0 || Boolean(pendingFile));
 
   const handleSend = async () => {
     if (!canSend) return;
@@ -31,6 +32,12 @@ export function InternalMessageComposer({
     setPendingFile(null);
     await onSend(body, file);
   };
+
+  const handleAudioReady = async (file: File) => {
+    await onSend("", file);
+  };
+
+  const showMic = !disabled && !pendingFile && text.trim().length === 0;
 
   return (
     <div className="flex-shrink-0 border-t border-border/50 bg-card px-2 sm:px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
@@ -69,16 +76,23 @@ export function InternalMessageComposer({
           }}
         />
 
-        <Button
-          type="button"
-          size="icon"
-          className="h-9 w-9 flex-shrink-0 rounded-full"
-          disabled={!canSend}
-          onClick={() => void handleSend()}
-          aria-label={t("Enviar")}
-        >
-          {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-        </Button>
+        {showMic ? (
+          <InternalAudioRecorder
+            disabled={disabled || sending}
+            onAudioReady={handleAudioReady}
+          />
+        ) : (
+          <Button
+            type="button"
+            size="icon"
+            className="h-9 w-9 flex-shrink-0 rounded-full"
+            disabled={!canSend}
+            onClick={() => void handleSend()}
+            aria-label={t("Enviar")}
+          >
+            {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+          </Button>
+        )}
       </div>
     </div>
   );

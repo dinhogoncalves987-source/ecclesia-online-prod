@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
+import { InternalAudioPreview } from "@/components/messages/InternalAudioPreview";
 import { InternalDocumentPreview } from "@/components/messages/InternalDocumentPreview";
 import { InternalImagePreview } from "@/components/messages/InternalImagePreview";
 import { InternalVideoPreview } from "@/components/messages/InternalVideoPreview";
@@ -96,6 +97,9 @@ export function InternalMessageBubble({
             }
             if (message.messageType === "video" || att.fileType?.startsWith("video/")) {
               return <InternalVideoPreview key={att.id} attachment={att} />;
+            }
+            if (message.messageType === "audio" || att.fileType?.startsWith("audio/")) {
+              return <InternalAudioPreview key={att.id} attachment={att} />;
             }
             return <InternalDocumentPreview key={att.id} attachment={att} />;
           })}
