@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import {
   HeadphonesIcon,
   Loader2,
@@ -72,6 +73,15 @@ export default function ChatSecretaria() {
   const { toast } = useToast();
   const { church, loading: churchLoading } = useChurch();
   const { isAdmin } = useRole();
+  const { pathname } = useLocation();
+
+  // On the global route /admin/chat the title is "Conversas".
+  // On the legacy /admin/chat-secretaria it stays as "Chat da Secretaria".
+  const isGlobalChat = pathname === "/admin/chat";
+  const pageTitle    = isGlobalChat ? "Conversas" : "Chat da Secretaria";
+  const pageSubtitle = isGlobalChat
+    ? "Comunicação interna da organização"
+    : "Comunicação interna administrativa";
 
   // estado geral
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -255,8 +265,8 @@ export default function ChatSecretaria() {
   const headerSlot = (
     <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border/50">
       <div>
-        <h1 className="text-lg font-semibold">Chat da Secretaria</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">Comunicação interna administrativa</p>
+        <h1 className="text-lg font-semibold">{pageTitle}</h1>
+        <p className="text-xs text-muted-foreground mt-0.5">{pageSubtitle}</p>
       </div>
       <div className="flex items-center gap-2">
         <Button
@@ -298,7 +308,7 @@ export default function ChatSecretaria() {
           organizationId={church?.id ?? ""}
           isStaff
           allowReplies
-          subtitle="Chat da Secretaria"
+          subtitle={pageTitle}
           headerSlot={headerSlot}
           className="flex-1 min-h-0"
           forcedThread={forcedThread}

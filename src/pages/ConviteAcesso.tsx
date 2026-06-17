@@ -2,18 +2,27 @@
  * Public access invite page — no auth required to view the invite.
  * Route: /convite-acesso/:token
  *
- * Flow:
- *  1. Load invite info via public RPC (get_access_invite_by_token).
- *  2. Show name, role, church.
- *  3. If NOT logged in → show inline login/signup.
- *  4. If logged in → button "Ativar meu acesso" → accept_access_invite RPC.
- *  5. Redirect to /admin.
+ * Security model:
+ *  - If the invite has an e-mail, ONLY a user logged in with that exact e-mail
+ *    may accept the invite.  Any other logged-in user sees a "wrong account"
+ *    screen and is offered the chance to sign out first.
+ *  - The backend RPC (accept_access_invite) also validates this independently,
+ *    so a crafted request cannot bypass the frontend check.
+ *
+ * Steps:
+ *  loading       → fetching invite + current session
+ *  auth          → not logged in → inline login / signup
+ *  wrong_account → logged in as a different e-mail → block + offer logout
+ *  preview       → logged in as the correct e-mail → confirm & accept
+ *  accepting     → RPC in flight
+ *  done          → success → redirect to /admin
+ *  error         → any unrecoverable error
  */
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  CheckCircle2, XCircle, Loader2, Shield, User, MapPin,
-  LogIn, UserPlus, Eye, EyeOff,
+  AlertTriangle, CheckCircle2, XCircle, Loader2, LogOut,
+  Shield, User, MapPin, LogIn, UserPlus, Eye, EyeOff,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -22,7 +31,9 @@ import {
 } from "@/lib/accessInvites";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
-type Step = "loading" | "error" | "preview" | "auth" | "accepting" | "done";
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type Step = "loading" | "error" | "wrong_account" | "preview" | "auth" | "accepting" | "done";
 
 const ROLE_LABELS: Record<string, string> = {
   church_admin: "Administrador",
@@ -34,27 +45,44 @@ const ROLE_LABELS: Record<string, string> = {
   member:       "Membro",
 };
 
+// ── Helper ────────────────────────────────────────────────────────────────────
+
+/** Returns true when inviteEmail is set AND does not match the current user. */
+function isEmailMismatch(inviteEmail: string | null | undefined, currentEmail: string | null): boolean {
+  if (!inviteEmail || inviteEmail.trim() === "") return false; // no restriction
+  if (!currentEmail) return true; // not logged in at all
+  return inviteEmail.toLowerCase().trim() !== currentEmail.toLowerCase().trim();
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function ConviteAcesso() {
   const { token = "" } = useParams<{ token: string }>();
   const navigate         = useNavigate();
 
-  const [step, setStep]       = useState<Step>("loading");
-  const [invite, setInvite]   = useState<AccessInvitePublic | null>(null);
-  const [errMsg, setErrMsg]   = useState("");
-  const [session, setSession] = useState<boolean | null>(null);
+  const [step, setStep]               = useState<Step>("loading");
+  const [invite, setInvite]           = useState<AccessInvitePublic | null>(null);
+  const [errMsg, setErrMsg]           = useState("");
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
 
-  const [authMode, setAuthMode]         = useState<"login" | "signup">("login");
-  const [email, setEmail]               = useState("");
-  const [password, setPassword]         = useState("");
-  const [showPass, setShowPass]         = useState(false);
-  const [authLoading, setAuthLoading]   = useState(false);
-  const [authError, setAuthError]       = useState("");
+  // Auth form state
+  const [authMode, setAuthMode]       = useState<"login" | "signup">("login");
+  const [email, setEmail]             = useState("");
+  const [password, setPassword]       = useState("");
+  const [showPass, setShowPass]       = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError]     = useState("");
+
+  // ── Init: load invite + check current session ─────────────────────────────
 
   useEffect(() => {
     const init = async () => {
-      const { data: { session: s } } = await supabase.auth.getSession();
-      setSession(!!s);
+      // 1. Get current user (may be null if not logged in)
+      const { data: { user } } = await supabase.auth.getUser();
+      const userEmail = user?.email?.toLowerCase().trim() ?? null;
+      setCurrentUserEmail(userEmail);
 
+      // 2. Fetch invite details (public RPC — no auth required)
       const { data, error } = await getAccessInviteByToken(token);
       if (error || !data) {
         const friendly: Record<string, string> = {
@@ -68,21 +96,39 @@ export default function ConviteAcesso() {
         return;
       }
       setInvite(data);
-      if (s) setStep("preview");
-      else    setStep("auth");
+
+      // 3. Decide next step based on current session + email match
+      if (!user) {
+        // Not logged in → show login/signup form, pre-fill invite e-mail
+        if (data.email) setEmail(data.email);
+        setStep("auth");
+        return;
+      }
+
+      // Logged in — check e-mail match
+      if (isEmailMismatch(data.email, userEmail)) {
+        setStep("wrong_account");
+      } else {
+        setStep("preview");
+      }
     };
     void init();
   }, [token]);
 
-  useEffect(() => {
-    if (step !== "auth" && invite && session) setStep("preview");
-  }, [session, invite, step]);
+  // ── Handlers ──────────────────────────────────────────────────────────────
 
+  /** Accept the invite — only reached when emails are confirmed to match. */
   const handleAccept = async () => {
     setStep("accepting");
     const { error } = await acceptAccessInvite(token);
     if (error) {
-      setErrMsg(error === "already_accepted" ? "Este convite já foi utilizado." : `Erro: ${error}`);
+      const friendly: Record<string, string> = {
+        already_accepted:  "Este convite já foi utilizado.",
+        email_mismatch:    "Este convite pertence a outro e-mail. Faça login com o e-mail correto.",
+        expired_or_revoked:"Este convite expirou ou foi revogado.",
+        not_authenticated: "Você precisa estar autenticado para aceitar este convite.",
+      };
+      setErrMsg(friendly[error] ?? `Erro: ${error}`);
       setStep("error");
       return;
     }
@@ -90,6 +136,16 @@ export default function ConviteAcesso() {
     setTimeout(() => navigate("/admin"), 2000);
   };
 
+  /** Sign out the wrong user, then go to auth step. */
+  const handleSignOutAndContinue = async () => {
+    await supabase.auth.signOut();
+    setCurrentUserEmail(null);
+    if (invite?.email) setEmail(invite.email);
+    setAuthMode("login");
+    setStep("auth");
+  };
+
+  /** Auth form submission (login or signup). */
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthLoading(true);
@@ -105,15 +161,28 @@ export default function ConviteAcesso() {
         });
         if (error) { setAuthError(error.message); return; }
       }
-      setSession(true);
-      setStep("preview");
+
+      // Re-validate email after auth
+      const { data: { user } } = await supabase.auth.getUser();
+      const userEmail = user?.email?.toLowerCase().trim() ?? null;
+      setCurrentUserEmail(userEmail);
+
+      if (invite && isEmailMismatch(invite.email, userEmail)) {
+        setStep("wrong_account");
+      } else {
+        setStep("preview");
+      }
     } finally {
       setAuthLoading(false);
     }
   };
 
+  // ── Derived ───────────────────────────────────────────────────────────────
+
   const roleLabel = invite ? (ROLE_LABELS[invite.role] ?? invite.role) : "";
   const inviteUrl = token ? buildAccessInviteUrl(token) : "";
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 flex flex-col items-center justify-center p-4">
@@ -132,7 +201,8 @@ export default function ConviteAcesso() {
         </div>
 
         <div className="p-6">
-          {/* Loading */}
+
+          {/* ── Loading ── */}
           {step === "loading" && (
             <div className="flex flex-col items-center gap-3 py-8">
               <Loader2 size={32} className="animate-spin text-accent" />
@@ -140,7 +210,7 @@ export default function ConviteAcesso() {
             </div>
           )}
 
-          {/* Error */}
+          {/* ── Error ── */}
           {step === "error" && (
             <div className="flex flex-col items-center gap-3 py-8 text-center">
               <XCircle size={40} className="text-destructive" />
@@ -149,16 +219,58 @@ export default function ConviteAcesso() {
             </div>
           )}
 
-          {/* Done */}
-          {step === "done" && (
-            <div className="flex flex-col items-center gap-3 py-8 text-center">
-              <CheckCircle2 size={40} className="text-emerald-500" />
-              <p className="font-semibold">Acesso ativado!</p>
-              <p className="text-sm text-muted-foreground">Redirecionando para o painel...</p>
+          {/* ── Wrong account ── */}
+          {step === "wrong_account" && invite && (
+            <div className="space-y-5">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <div className="w-14 h-14 rounded-full bg-amber-500/20 flex items-center justify-center">
+                  <AlertTriangle size={28} className="text-amber-500" />
+                </div>
+                <p className="font-semibold">Conta diferente detectada</p>
+              </div>
+
+              <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4 space-y-2 text-sm">
+                <p className="text-muted-foreground">
+                  Este convite foi enviado para:
+                </p>
+                <p className="font-semibold text-amber-700 dark:text-amber-400 break-all">
+                  {invite.email || "— (sem e-mail cadastrado)"}
+                </p>
+                <p className="text-muted-foreground mt-2">
+                  Você está logado como:
+                </p>
+                <p className="font-semibold break-all">{currentUserEmail ?? "—"}</p>
+              </div>
+
+              <p className="text-sm text-muted-foreground text-center">
+                Para aceitar este convite, saia desta conta e entre com o e-mail correto.
+              </p>
+
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleSignOutAndContinue()}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/90 transition-colors"
+                >
+                  <LogOut size={15} />
+                  Sair e continuar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate(-1)}
+                  className="w-full px-4 py-2.5 bg-secondary rounded-xl text-sm hover:bg-secondary/80 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+
+              <p className="text-[11px] text-muted-foreground text-center">
+                Ao sair, você não perderá dados. Apenas a sessão será encerrada.
+              </p>
             </div>
           )}
 
-          {/* Invite preview + accept */}
+          {/* ── Preview + Accept ── */}
           {step === "preview" && invite && (
             <div className="space-y-5">
               <div className="rounded-xl bg-secondary/40 p-4 space-y-3">
@@ -177,9 +289,18 @@ export default function ConviteAcesso() {
                     Função: <span className="font-medium text-foreground">{roleLabel}</span>
                   </p>
                   <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    <MapPin size={11} /> {invite.church_name}
-                    {invite.church_city ? ` · ${invite.church_city}${invite.church_state ? `/${invite.church_state}` : ""}` : ""}
+                    <MapPin size={11} />
+                    {invite.church_name}
+                    {invite.church_city
+                      ? ` · ${invite.church_city}${invite.church_state ? `/${invite.church_state}` : ""}`
+                      : ""}
                   </p>
+                  {currentUserEmail && (
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                      <CheckCircle2 size={11} />
+                      Conta verificada: {currentUserEmail}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -198,7 +319,7 @@ export default function ConviteAcesso() {
             </div>
           )}
 
-          {/* Accepting */}
+          {/* ── Accepting ── */}
           {step === "accepting" && (
             <div className="flex flex-col items-center gap-3 py-8">
               <Loader2 size={32} className="animate-spin text-accent" />
@@ -206,16 +327,35 @@ export default function ConviteAcesso() {
             </div>
           )}
 
-          {/* Auth form */}
+          {/* ── Done ── */}
+          {step === "done" && (
+            <div className="flex flex-col items-center gap-3 py-8 text-center">
+              <CheckCircle2 size={40} className="text-emerald-500" />
+              <p className="font-semibold">Acesso ativado!</p>
+              <p className="text-sm text-muted-foreground">Redirecionando para o painel...</p>
+            </div>
+          )}
+
+          {/* ── Auth form ── */}
           {step === "auth" && invite && (
             <div className="space-y-4">
               <div className="rounded-xl bg-secondary/40 p-3 flex items-center gap-3">
                 <Shield size={18} className="text-accent flex-shrink-0" />
                 <div>
                   <p className="text-sm font-medium">{invite.full_name}</p>
-                  <p className="text-xs text-muted-foreground">{roleLabel} · {invite.church_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {roleLabel} · {invite.church_name}
+                  </p>
                 </div>
               </div>
+
+              {invite.email && (
+                <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 px-3 py-2">
+                  <p className="text-xs text-blue-700 dark:text-blue-400">
+                    Entre com o e-mail <strong>{invite.email}</strong> para aceitar este convite.
+                  </p>
+                </div>
+              )}
 
               <p className="text-sm text-muted-foreground">
                 {authMode === "login"
@@ -249,11 +389,13 @@ export default function ConviteAcesso() {
                     {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
+
                 {authError && <p className="text-xs text-destructive">{authError}</p>}
+
                 <button
                   type="submit"
                   disabled={authLoading}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/90 disabled:opacity-50"
                 >
                   {authLoading ? (
                     <Loader2 size={14} className="animate-spin" />
@@ -269,11 +411,9 @@ export default function ConviteAcesso() {
               <button
                 type="button"
                 onClick={() => setAuthMode((m) => (m === "login" ? "signup" : "login"))}
-                className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors text-center"
+                className="w-full text-xs text-muted-foreground hover:text-foreground text-center"
               >
-                {authMode === "login"
-                  ? "Não tem conta? Criar agora"
-                  : "Já tem conta? Entrar"}
+                {authMode === "login" ? "Não tem conta? Criar agora" : "Já tem conta? Entrar"}
               </button>
             </div>
           )}

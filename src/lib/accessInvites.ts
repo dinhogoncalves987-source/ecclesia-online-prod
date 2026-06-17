@@ -123,7 +123,16 @@ export async function acceptAccessInvite(token: string): Promise<{
 }> {
   const { data, error } = await supabase.rpc("accept_access_invite", { _token: token });
   if (error) return { data: null, error: error.message };
-  const result = data as { ok: boolean; error?: string; organization_id?: string; role?: string };
-  if (!result.ok) return { data: null, error: result.error ?? "Erro ao aceitar convite" };
+  const result = data as {
+    ok: boolean;
+    error?: string;
+    invite_email?: string;
+    organization_id?: string;
+    role?: string;
+  };
+  if (!result.ok) {
+    // Return the raw error code so callers can handle email_mismatch specifically
+    return { data: null, error: result.error ?? "Erro ao aceitar convite" };
+  }
   return { data: { organization_id: result.organization_id!, role: result.role! }, error: null };
 }

@@ -16,16 +16,18 @@ export type AppRole = LegacyAppRole;
 // Which roles can access which modules
 const MODULE_ACCESS: Record<string, AppRole[]> = {
   "/admin": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
-  "/admin/campanhas": ["super_admin", "church_admin", "leader", "member", "tesoureiro", "contador"],
+  // Campanhas: all roles can view; create/edit is gated inside the page via CAMPAIGN_MANAGE_ROLES
+  "/admin/campanhas": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
   "/admin/financeiro": ["super_admin", "church_admin", "tesoureiro", "contador"],
   "/admin/membros": ["super_admin", "church_admin", "pastor", "secretary"],
   "/admin/agenda": ["super_admin", "church_admin", "pastor", "secretary", "leader", "member"],
-  "/admin/biblia": ["super_admin", "church_admin", "leader", "member"],
-  "/admin/culto": ["super_admin", "church_admin", "pastor", "secretary", "leader", "member"],
-  "/admin/culto/biblioteca": ["super_admin", "church_admin", "pastor", "secretary", "leader", "member"],
-  "/admin/culto/roteiros": ["super_admin", "church_admin", "pastor", "secretary", "leader", "member"],
-  "/admin/culto/telao": ["super_admin", "church_admin", "pastor", "secretary", "leader", "member"],
-  "/admin/culto/assistente": ["super_admin", "church_admin", "pastor", "secretary", "leader", "member"],
+  // Institutional modules — every authenticated user must see these in the menu
+  "/admin/biblia": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
+  "/admin/culto": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
+  "/admin/culto/biblioteca": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
+  "/admin/culto/roteiros": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
+  "/admin/culto/telao": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
+  "/admin/culto/assistente": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
   "/admin/oracoes": ["super_admin", "church_admin", "pastor", "secretary", "leader", "member"],
   "/admin/comunicacao": ["super_admin", "church_admin", "pastor", "secretary", "leader", "member"],
   "/admin/grupos": ["super_admin", "church_admin", "pastor", "secretary", "leader"],
@@ -40,6 +42,7 @@ const MODULE_ACCESS: Record<string, AppRole[]> = {
   "/admin/super-admin": ["super_admin"],
   "/admin/marketplace": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
   "/admin/comunidade": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
+  "/admin/chat":            ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
   "/admin/chat-secretaria": ["super_admin", "church_admin", "pastor", "secretary"],
   "/admin/solicitacoes": ["super_admin", "church_admin", "pastor", "secretary"],
   "/admin/carteira-ecclesia": ["super_admin", "church_admin", "pastor", "secretary"],

@@ -204,6 +204,9 @@ const App = () => (
 
               <Route path="/admin/comunidade" element={<ProtectedRoute><Comunidade /></ProtectedRoute>} />
 
+              {/* Global chat — accessible to all roles */}
+              <Route path="/admin/chat" element={<ProtectedRoute><ChatSecretaria /></ProtectedRoute>} />
+              {/* Legacy route kept for backward compatibility */}
               <Route path="/admin/chat-secretaria" element={<ProtectedRoute><ChatSecretaria /></ProtectedRoute>} />
 
               <Route path="/admin/solicitacoes" element={<ProtectedRoute><SolicitacoesAdministrativas /></ProtectedRoute>} />

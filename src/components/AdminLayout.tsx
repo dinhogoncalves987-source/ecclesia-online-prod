@@ -35,11 +35,16 @@ const SECRETARIA_PATHS = [
   "/admin/cartas-recomendacao", "/admin/assembleia-geral", "/admin/oracoes",
   "/admin/chat-secretaria", "/admin/solicitacoes",
 ];
+// Global chat route — lives outside Secretaria, never auto-expands it
+const GLOBAL_CHAT_PATH = "/admin/chat";
 
 const navSections: NavSection[] = [
   {
     id: "main",
-    items: [{ icon: LayoutDashboard, label: "Dashboard", path: "/admin" }],
+    items: [
+      { icon: LayoutDashboard, label: "Dashboard",  path: "/admin" },
+      { icon: MessagesSquare,  label: "Conversas",  path: "/admin/chat" },
+    ],
   },
   {
     id: "espiritual",
@@ -61,7 +66,6 @@ const navSections: NavSection[] = [
       { icon: ScrollText, label: "Cartas de Recomendação", path: "/admin/cartas-recomendacao" },
       { icon: ClipboardList, label: "Solicitações", path: "/admin/solicitacoes" },
       { icon: Archive, label: "Documentos", path: "/admin/documentos" },
-      { icon: MessagesSquare, label: "Chat da Secretaria", path: "/admin/chat-secretaria" },
       { icon: MessageSquare, label: "Comunicação", path: "/admin/comunicacao" },
       { icon: Heart, label: "Pedidos de Oração", path: "/admin/oracoes" },
       { icon: Calendar, label: "Agenda", path: "/admin/agenda" },
@@ -99,12 +103,14 @@ const navSections: NavSection[] = [
   },
 ];
 
+// Mobile bottom nav — max 4 route shortcuts + permanent "Mais" button.
+// Never remove Agenda: it is a core church module.
+// Finanças and Perfil remain reachable via the "Mais" sidebar overlay.
 const mobileNavItems = [
-  { icon: LayoutDashboard, label: "Início", path: "/admin" },
-  { icon: Wallet, label: "Finanças", path: "/admin/financeiro" },
-  { icon: Calendar, label: "Agenda", path: "/admin/agenda" },
-  { icon: BookOpen, label: "Bíblia", path: "/admin/biblia" },
-  { icon: User, label: "Perfil", path: "/admin/perfil" },
+  { icon: LayoutDashboard, label: "Início",  path: "/admin" },
+  { icon: Calendar,        label: "Agenda",  path: "/admin/agenda" },
+  { icon: MessagesSquare,  label: "Chat",    path: "/admin/chat" },
+  { icon: BookOpen,        label: "Bíblia",  path: "/admin/biblia" },
 ];
 
 type FullscreenDocument = Document & {
@@ -146,9 +152,10 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     SECRETARIA_PATHS.includes(location.pathname)
   );
 
-  // Auto-expand Secretaria section when navigating to a secretaria path
+  // Auto-expand Secretaria section when navigating to a secretaria path.
+  // Never expand for the global chat route — it lives outside Secretaria.
   useEffect(() => {
-    if (SECRETARIA_PATHS.includes(location.pathname)) {
+    if (location.pathname !== GLOBAL_CHAT_PATH && SECRETARIA_PATHS.includes(location.pathname)) {
       setSecretariaExpanded(true);
     }
   }, [location.pathname]);
@@ -505,6 +512,14 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             <span className="text-[10px] font-medium">{t(item.label)}</span>
           </Link>
         ))}
+        {/* Permanent "Mais" button — opens the full sidebar overlay */}
+        <button
+          onClick={() => setMobileMenuOpen(true)}
+          className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+        >
+          <Menu size={20} strokeWidth={1.5} />
+          <span className="text-[10px] font-medium">{t("Mais")}</span>
+        </button>
       </nav>
 
       {/* Logout confirmation modal */}

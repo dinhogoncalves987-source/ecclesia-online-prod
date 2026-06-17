@@ -15,7 +15,9 @@ export type CampaignFormValues = {
   status: CampaignDbStatus;
 };
 
-export const CAMPAIGN_MANAGE_ROLES = ["super_admin", "church_admin", "leader", "tesoureiro"] as const;
+// Only pastoral/admin staff can create, edit, publish or close campaigns.
+// Tesoureiro, contador, leader and member get read-only access.
+export const CAMPAIGN_MANAGE_ROLES = ["super_admin", "church_admin", "pastor", "secretary"] as const;
 
 export const CAMPAIGN_CATEGORIES: CampaignType[] = [
   "Construção",
