@@ -125,21 +125,27 @@ function isoDate(offsetDays = 0) {
 async function seedOrganizations() {
   console.log("\n📋 Organizações (setores + congregações)...");
   const orgs = [
-    { id: SETOR_A, name: "Setor Norte", slug: "setor-norte-caxias", organization_type: "setor", parent_id: MATRIZ_ID, city: "Caxias do Sul", state: "RS", active: true },
-    { id: SETOR_B, name: "Setor Sul", slug: "setor-sul-caxias", organization_type: "setor", parent_id: MATRIZ_ID, city: "Caxias do Sul", state: "RS", active: true },
-    { id: SETOR_C, name: "Setor Leste", slug: "setor-leste-caxias", organization_type: "setor", parent_id: MATRIZ_ID, city: "Caxias do Sul", state: "RS", active: true },
-    { id: SETOR_D, name: "Setor Oeste", slug: "setor-oeste-caxias", organization_type: "setor", parent_id: MATRIZ_ID, city: "Caxias do Sul", state: "RS", active: true },
-    { id: SETOR_E, name: "Setor Central", slug: "setor-central-caxias", organization_type: "setor", parent_id: MATRIZ_ID, city: "Caxias do Sul", state: "RS", active: true },
-    { id: CONG_A1, name: "Congregação Esperança", slug: "cong-esperanca", organization_type: "congregacao", parent_id: SETOR_A, city: "Caxias do Sul", state: "RS", active: true },
-    { id: CONG_A2, name: "Congregação Vitória", slug: "cong-vitoria", organization_type: "congregacao", parent_id: SETOR_A, city: "Caxias do Sul", state: "RS", active: true },
-    { id: CONG_B1, name: "Congregação Paz", slug: "cong-paz", organization_type: "congregacao", parent_id: SETOR_B, city: "Caxias do Sul", state: "RS", active: true },
-    { id: CONG_B2, name: "Congregação Graça", slug: "cong-graca", organization_type: "congregacao", parent_id: SETOR_B, city: "Caxias do Sul", state: "RS", active: true },
-    { id: CONG_C1, name: "Congregação Renovação", slug: "cong-renovacao", organization_type: "congregacao", parent_id: SETOR_C, city: "Caxias do Sul", state: "RS", active: true },
-    { id: CONG_C2, name: "Congregação Luz", slug: "cong-luz", organization_type: "congregacao", parent_id: SETOR_C, city: "Caxias do Sul", state: "RS", active: true },
-    { id: CONG_D1, name: "Congregação Boa Nova", slug: "cong-boa-nova", organization_type: "congregacao", parent_id: SETOR_D, city: "Caxias do Sul", state: "RS", active: true },
-    { id: CONG_D2, name: "Congregação Monte Sião", slug: "cong-monte-siao", organization_type: "congregacao", parent_id: SETOR_D, city: "Caxias do Sul", state: "RS", active: true },
-    { id: CONG_E1, name: "Congregação Hosana", slug: "cong-hosana", organization_type: "congregacao", parent_id: SETOR_E, city: "Caxias do Sul", state: "RS", active: true },
-    { id: CONG_E2, name: "Congregação Emanuel", slug: "cong-emanuel", organization_type: "congregacao", parent_id: SETOR_E, city: "Caxias do Sul", state: "RS", active: true },
+    // ── Setores — diretos filhos da Matriz ───────────────────────────────────
+    { id: SETOR_A, name: "Setor Norte",    slug: "setor-norte-caxias",   organization_type: "setor", parent_id: MATRIZ_ID, city: "Caxias do Sul", state: "RS", active: true },
+    { id: SETOR_B, name: "Setor Sul",      slug: "setor-sul-caxias",     organization_type: "setor", parent_id: MATRIZ_ID, city: "Caxias do Sul", state: "RS", active: true },
+    { id: SETOR_C, name: "Setor Leste",    slug: "setor-leste-caxias",   organization_type: "setor", parent_id: MATRIZ_ID, city: "Caxias do Sul", state: "RS", active: true },
+    { id: SETOR_D, name: "Setor Oeste",    slug: "setor-oeste-caxias",   organization_type: "setor", parent_id: MATRIZ_ID, city: "Caxias do Sul", state: "RS", active: true },
+    { id: SETOR_E, name: "Setor Centro",   slug: "setor-centro-caxias",  organization_type: "setor", parent_id: MATRIZ_ID, city: "Caxias do Sul", state: "RS", active: true },
+    // ── Congregações do Setor Norte ──────────────────────────────────────────
+    { id: CONG_A1, name: "Congregação Santa Fé",    slug: "cong-santa-fe",    organization_type: "congregacao", parent_id: SETOR_A, city: "Caxias do Sul", state: "RS", active: true },
+    { id: CONG_A2, name: "Congregação Bela Vista",  slug: "cong-bela-vista",  organization_type: "congregacao", parent_id: SETOR_A, city: "Caxias do Sul", state: "RS", active: true },
+    // ── Congregações do Setor Sul ────────────────────────────────────────────
+    { id: CONG_B1, name: "Congregação Desvio Rizzo", slug: "cong-desvio-rizzo", organization_type: "congregacao", parent_id: SETOR_B, city: "Caxias do Sul", state: "RS", active: true },
+    { id: CONG_B2, name: "Congregação Cruzeiro",    slug: "cong-cruzeiro",    organization_type: "congregacao", parent_id: SETOR_B, city: "Caxias do Sul", state: "RS", active: true },
+    // ── Congregações do Setor Leste ──────────────────────────────────────────
+    { id: CONG_C1, name: "Congregação Lourdes",     slug: "cong-lourdes",     organization_type: "congregacao", parent_id: SETOR_C, city: "Caxias do Sul", state: "RS", active: true },
+    { id: CONG_C2, name: "Congregação São José",    slug: "cong-sao-jose",    organization_type: "congregacao", parent_id: SETOR_C, city: "Caxias do Sul", state: "RS", active: true },
+    // ── Congregações do Setor Oeste ──────────────────────────────────────────
+    { id: CONG_D1, name: "Congregação Forqueta",    slug: "cong-forqueta",    organization_type: "congregacao", parent_id: SETOR_D, city: "Caxias do Sul", state: "RS", active: true },
+    { id: CONG_D2, name: "Congregação Ana Rech",    slug: "cong-ana-rech",    organization_type: "congregacao", parent_id: SETOR_D, city: "Caxias do Sul", state: "RS", active: true },
+    // ── Congregações do Setor Centro ─────────────────────────────────────────
+    { id: CONG_E1, name: "Congregação Centro",      slug: "cong-centro",      organization_type: "congregacao", parent_id: SETOR_E, city: "Caxias do Sul", state: "RS", active: true },
+    { id: CONG_E2, name: "Congregação São Pelegrino", slug: "cong-sao-pelegrino", organization_type: "congregacao", parent_id: SETOR_E, city: "Caxias do Sul", state: "RS", active: true },
   ];
   const n = await upsert("organizations", orgs);
   results["Setores"] = 5;

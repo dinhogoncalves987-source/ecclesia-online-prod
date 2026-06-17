@@ -6,6 +6,7 @@ import { useChurch } from "@/hooks/useChurchContext";
 import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { getPublicAppUrl } from "@/lib/publicUrl";
 import { Navigate } from "react-router-dom";
 import {
   AlertCircle,
@@ -51,6 +52,8 @@ export default function Congregacoes() {
   // Sub-congregações carregadas para cada setor expandido (chave = setor.id)
   const [sectorCongregations, setSectorCongregations] = useState<Record<string, ChildOrganization[]>>({});
   const [loadingCongregations, setLoadingCongregations] = useState<Record<string, boolean>>({});
+  // Pre-loaded counts per sector (shown on the row before expanding)
+  const [congregationCounts, setCongregationCounts] = useState<Record<string, number>>({});
   const [form, setForm] = useState({
     name: "",
     city: "",
@@ -71,8 +74,8 @@ export default function Congregacoes() {
     return t("Congregações");
   };
 
-  const loadCongregationsForSector = useCallback(async (sectorId: string) => {
-    if (sectorCongregations[sectorId] !== undefined) return; // já carregado
+  const loadCongregationsForSector = useCallback(async (sectorId: string, force = false) => {
+    if (!force && sectorCongregations[sectorId] !== undefined) return;
     setLoadingCongregations((prev) => ({ ...prev, [sectorId]: true }));
     const { data, error } = await supabase
       .from("organizations")
@@ -86,19 +89,13 @@ export default function Congregacoes() {
       setSectorCongregations((prev) => ({
         ...prev,
         [sectorId]: data.map((row) => ({
-          id: row.id,
-          name: row.name,
-          slug: row.slug ?? "",
-          city: row.city,
-          state: row.state,
-          phone: row.phone,
-          email: row.email,
-          organization_type: row.organization_type,
+          id: row.id, name: row.name, slug: row.slug ?? "",
+          city: row.city, state: row.state, phone: row.phone,
+          email: row.email, organization_type: row.organization_type,
           parent_id: row.parent_id,
         })),
       }));
-    } else {
-      setSectorCongregations((prev) => ({ ...prev, [sectorId]: [] }));
+      setCongregationCounts((prev) => ({ ...prev, [sectorId]: data.length }));
     }
   }, [sectorCongregations]);
 
@@ -148,19 +145,28 @@ export default function Congregacoes() {
         toast({ title: t("Erro ao carregar"), description: error.message, variant: "destructive" });
         setChildOrganizations([]);
       } else if (data) {
-        setChildOrganizations(
-          data.map((row) => ({
-            id: row.id,
-            name: row.name,
-            slug: row.slug ?? "",
-            city: row.city,
-            state: row.state,
-            phone: row.phone,
-            email: row.email,
-            organization_type: row.organization_type,
-            parent_id: row.parent_id,
-          })),
-        );
+        const sectors = data.map((row) => ({
+          id: row.id, name: row.name, slug: row.slug ?? "",
+          city: row.city, state: row.state, phone: row.phone,
+          email: row.email, organization_type: row.organization_type,
+          parent_id: row.parent_id,
+        }));
+        setChildOrganizations(sectors);
+        // Pre-load congregation counts for all sectors
+        const sectorIds = sectors.map((s) => s.id);
+        if (sectorIds.length > 0) {
+          const { data: congs } = await supabase
+            .from("organizations")
+            .select("id,parent_id")
+            .in("parent_id", sectorIds)
+            .eq("active", true)
+            .eq("organization_type", "congregacao");
+          if (congs) {
+            const counts: Record<string, number> = {};
+            for (const c of congs) { counts[c.parent_id!] = (counts[c.parent_id!] ?? 0) + 1; }
+            setCongregationCounts(counts);
+          }
+        }
       }
       setLoading(false);
       return;
@@ -338,7 +344,7 @@ export default function Congregacoes() {
   };
 
   const handleShareInvite = (c: ChildOrganization) => {
-    const url = `${window.location.origin}/signup?church=${encodeURIComponent(c.slug)}`;
+    const url = `${getPublicAppUrl()}/signup?church=${encodeURIComponent(c.slug)}`;
     navigator.clipboard.writeText(url);
     toast({
       title: t("Link copiado!"),
@@ -503,7 +509,7 @@ export default function Congregacoes() {
                         const next = isExpanded ? null : c.id;
                         setExpandedId(next);
                         if (next && isMatriz && c.organization_type === "setor") {
-                          void loadCongregationsForSector(c.id);
+                          void loadCongregationsForSector(c.id, true);
                         }
                       }}
                       onKeyDown={(e) => {
@@ -511,7 +517,7 @@ export default function Congregacoes() {
                         const next = isExpanded ? null : c.id;
                         setExpandedId(next);
                         if (next && isMatriz && c.organization_type === "setor") {
-                          void loadCongregationsForSector(c.id);
+                          void loadCongregationsForSector(c.id, true);
                         }
                       }}
                       className="p-4 hover:bg-secondary/30 transition-colors cursor-pointer select-none"
@@ -526,6 +532,11 @@ export default function Congregacoes() {
                             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-semibold shrink-0">
                               {typeBadgeLabel(c.organization_type)}
                             </span>
+                            {isMatriz && c.organization_type === "setor" && congregationCounts[c.id] !== undefined && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/15 text-accent font-semibold shrink-0">
+                                {congregationCounts[c.id]} congreg.
+                              </span>
+                            )}
                           </div>
                           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
                             {c.city && (
