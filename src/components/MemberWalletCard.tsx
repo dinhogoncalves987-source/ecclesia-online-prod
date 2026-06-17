@@ -14,16 +14,19 @@ import { ChevronLeft, ChevronRight, Shield } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DocumentActions } from "@/components/DocumentActions";
+import { getPublicAppUrl } from "@/lib/publicUrl";
 import { cn } from "@/lib/utils";
 
 export type WalletMember = {
   id: string;
   full_name: string;
   member_role: string | null;
+  administrative_role?: string | null;
   status: string;
   phone: string | null;
   email: string | null;
   joined_at: string | null;
+  photo_url?: string | null;
   cpf?: string | null;
   rg?: string | null;
   birth_date?: string | null;
@@ -36,6 +39,8 @@ export type WalletMember = {
 type Props = {
   member: WalletMember;
   churchName: string;
+  churchCity?: string;
+  churchState?: string;
   onClose?: () => void;
 };
 
@@ -77,13 +82,15 @@ const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
 // ── Frente ────────────────────────────────────────────────────────────────────
 
 function CardFront({
-  id, member, churchName, code, issueDate, validUntil, qrValue,
+  id, member, churchName, churchCity, churchState, code, issueDate, validUntil, qrValue,
 }: {
   id: string; member: WalletMember; churchName: string;
+  churchCity?: string; churchState?: string;
   code: string; issueDate: string; validUntil: string; qrValue: string;
 }) {
   const statusInfo = STATUS_BADGE[member.status] ?? STATUS_BADGE.Ativo;
   const roleLabel  = ROLE_LABEL[member.member_role ?? ""] ?? member.member_role ?? "Membro";
+  const churchDisplay = [churchName, churchCity && churchState ? `${churchCity} - ${churchState}` : (churchCity || churchState)].filter(Boolean).join("\n");
 
   return (
     <div
@@ -102,7 +109,7 @@ function CardFront({
               <Shield size={9} className="text-blue-300" />
               <span className="text-[7px] font-bold tracking-[0.18em] text-blue-200 uppercase">Carteira de Membro</span>
             </div>
-            <p className="text-[9px] text-slate-300 leading-tight max-w-[55%] line-clamp-2">{churchName}</p>
+            <p className="text-[9px] text-slate-300 leading-tight max-w-[55%] line-clamp-2 whitespace-pre-line">{churchDisplay}</p>
           </div>
           <span className={cn("text-[7px] font-bold tracking-wider px-1.5 py-0.5 rounded-full uppercase flex-shrink-0", statusInfo.cls)}>
             {statusInfo.label}
@@ -111,18 +118,28 @@ function CardFront({
 
         <div className="flex items-end justify-between gap-2">
           <div className="flex items-end gap-2.5">
-            <div className="w-11 h-14 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-base shadow-lg flex-shrink-0">
-              {initials(member.full_name)}
-            </div>
+            {member.photo_url ? (
+              <img
+                src={member.photo_url}
+                alt={member.full_name}
+                className="w-11 h-14 rounded-lg object-cover shadow-lg flex-shrink-0"
+              />
+            ) : (
+              <div className="w-11 h-14 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-base shadow-lg flex-shrink-0">
+                {initials(member.full_name)}
+              </div>
+            )}
             <div className="pb-0.5">
               <p className="text-[8px] text-slate-400 uppercase tracking-wide">Nome completo</p>
               <p className="text-white font-bold text-[10px] leading-tight mt-0.5">{member.full_name}</p>
               <p className="text-slate-400 text-[8px] mt-1">
-                <span className="text-slate-500">Categoria:</span> Membro
+                <span className="text-slate-500">Função:</span> {roleLabel}
               </p>
-              <p className="text-slate-400 text-[8px]">
-                <span className="text-slate-500">Cargo:</span> {roleLabel}
-              </p>
+              {member.administrative_role && member.administrative_role !== "Nenhum" && (
+                <p className="text-slate-400 text-[8px]">
+                  <span className="text-slate-500">Cargo:</span> {member.administrative_role}
+                </p>
+              )}
               {member.congregation && (
                 <p className="text-slate-400 text-[8px]">
                   <span className="text-slate-500">Congregação:</span> {member.congregation}
@@ -225,7 +242,7 @@ function CardBack({ id, member, churchName }: { id: string; member: WalletMember
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
-export function MemberWalletCard({ member, churchName, onClose }: Props) {
+export function MemberWalletCard({ member, churchName, churchCity, churchState, onClose }: Props) {
   const [showBack, setShowBack] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
@@ -235,7 +252,7 @@ export function MemberWalletCard({ member, churchName, onClose }: Props) {
   const issueDate  = format(new Date(), "dd/MM/yyyy", { locale: ptBR });
   const validUntil = format(new Date(new Date().setFullYear(new Date().getFullYear() + 1)), "dd/MM/yyyy", { locale: ptBR });
   const code           = memberCode(member.id);
-  const validationUrl  = `${window.location.origin}/validar-membro/${member.id}`;
+  const validationUrl  = `${getPublicAppUrl()}/validar-membro/${member.id}`;
   const qrValue        = validationUrl;
   const roleLabel      = ROLE_LABEL[member.member_role ?? ""] ?? member.member_role ?? "Membro";
 
@@ -243,9 +260,10 @@ export function MemberWalletCard({ member, churchName, onClose }: Props) {
     `📋 CARTEIRA DE MEMBRO`,
     ``,
     `Nome: ${member.full_name}`,
-    `Igreja: ${churchName}`,
-    `Categoria: Membro`,
-    `Cargo/Função: ${roleLabel}`,
+    `Igreja: ${churchName}${churchCity ? ` · ${churchCity}${churchState ? `/${churchState}` : ""}` : ""}`,
+    `Função: ${roleLabel}`,
+    member.administrative_role && member.administrative_role !== "Nenhum" ? `Cargo: ${member.administrative_role}` : null,
+    member.congregation ? `Congregação: ${member.congregation}` : null,
     `Matrícula: Nº ${code}`,
     `Situação: ${member.status || "Ativa"}`,
     ``,
@@ -253,12 +271,14 @@ export function MemberWalletCard({ member, churchName, onClose }: Props) {
     ``,
     `🔗 Validação:`,
     validationUrl,
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 
   // ── Geração de PDF real (html2canvas + jsPDF) ─────────────────────────────
 
-  const handleGeneratePdf = async () => {
-    setGeneratingPdf(true);
+  const fileName = `CarteiraMembro-${member.full_name.replace(/\s+/g, "-")}.pdf`;
+
+  /** Renderiza frente + verso e devolve um Blob PDF sem salvar no disco. */
+  const generateWalletPdfBlob = async (): Promise<{ blob: Blob; fileName: string } | null> => {
     try {
       const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
         import("html2canvas"),
@@ -267,47 +287,41 @@ export function MemberWalletCard({ member, churchName, onClose }: Props) {
 
       const frontEl = document.getElementById("wallet-pdf-front");
       const backEl  = document.getElementById("wallet-pdf-back");
+      if (!frontEl || !backEl) throw new Error("Elementos do cartão não encontrados");
 
-      if (!frontEl || !backEl) {
-        throw new Error("Elementos do cartão não encontrados");
-      }
-
-      // Opções de captura: escala alta para qualidade gráfica
-      const captureOpts = {
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: null,
-        logging: false,
-      };
-
+      const captureOpts = { scale: 3, useCORS: true, allowTaint: true, backgroundColor: null, logging: false };
       const frontCanvas = await html2canvas(frontEl, captureOpts);
       const backCanvas  = await html2canvas(backEl,  captureOpts);
 
-      // PDF: tamanho cartão de crédito 85mm × 54mm (landscape)
       const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: [85, 54] });
-
-      // Página 1 — Frente
-      const frontImg = frontCanvas.toDataURL("image/jpeg", 0.97);
-      pdf.addImage(frontImg, "JPEG", 0, 0, 85, 54);
-
-      // Página 2 — Verso
+      pdf.addImage(frontCanvas.toDataURL("image/jpeg", 0.97), "JPEG", 0, 0, 85, 54);
       pdf.addPage([85, 54], "landscape");
-      const backImg = backCanvas.toDataURL("image/jpeg", 0.97);
-      pdf.addImage(backImg, "JPEG", 0, 0, 85, 54);
+      pdf.addImage(backCanvas.toDataURL("image/jpeg", 0.97), "JPEG", 0, 0, 85, 54);
 
-      const fileName = `CarteiraMembro-${member.full_name.replace(/\s+/g, "-")}.pdf`;
-      pdf.save(fileName);
+      return { blob: pdf.output("blob"), fileName };
     } catch (err) {
-      console.error("[MemberWalletCard] Erro ao gerar PDF:", err);
-      // Fallback: impressão do card visível
-      window.print();
+      console.error("[MemberWalletCard] Erro ao gerar PDF blob:", err);
+      return null;
+    }
+  };
+
+  const handleGeneratePdf = async () => {
+    setGeneratingPdf(true);
+    try {
+      const result = await generateWalletPdfBlob();
+      if (!result) { window.print(); return; }
+      const url = URL.createObjectURL(result.blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = result.fileName;
+      a.click();
+      URL.revokeObjectURL(url);
     } finally {
       setGeneratingPdf(false);
     }
   };
 
-  const cardProps = { member, churchName, code, issueDate, validUntil, qrValue };
+  const cardProps = { member, churchName, churchCity, churchState, code, issueDate, validUntil, qrValue };
 
   return (
     <div className="flex flex-col items-center gap-4 py-2">
@@ -365,11 +379,13 @@ export function MemberWalletCard({ member, churchName, onClose }: Props) {
         shareTitle={`Carteira de Membro — ${member.full_name}`}
         shareText={shareText}
         shareUrl={validationUrl}
-        whatsappText={shareText}
+        whatsappText={`Carteira de Membro — ${member.full_name} | ${churchName}`}
         emailSubject={`Carteira de Membro — ${member.full_name} — ${churchName}`}
         emailBody={shareText}
         actions={["pdf", "share", "whatsapp", "email", "print"]}
         onGeneratePdf={generatingPdf ? undefined : () => void handleGeneratePdf()}
+        onGeneratePdfBlob={generatingPdf ? undefined : generateWalletPdfBlob}
+        onGeneratingChange={setGeneratingPdf}
       />
 
       {generatingPdf && (

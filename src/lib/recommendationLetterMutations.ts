@@ -120,6 +120,38 @@ export async function rejectRecommendationLetter(
   });
 }
 
+// ── Update letter content ─────────────────────────────────────────────────────
+
+export type UpdateRecommendationLetterInput = {
+  memberName?: string;
+  memberEmail?: string | null;
+  destinationChurch?: string;
+  destinationCity?: string;
+  destinationState?: string | null;
+  reason?: string;
+  observations?: string | null;
+};
+
+/**
+ * Update editable fields of a letter (staff only).
+ * Does NOT change status or timestamps.
+ */
+export async function updateRecommendationLetter(
+  organizationId: string,
+  letterId: string,
+  input: UpdateRecommendationLetterInput,
+): Promise<RecommendationLetterMutationResult> {
+  const patch: Record<string, unknown> = {};
+  if (input.memberName     !== undefined) patch.member_name      = input.memberName.trim();
+  if (input.memberEmail    !== undefined) patch.member_email     = input.memberEmail?.trim() || null;
+  if (input.destinationChurch !== undefined) patch.destination_church = input.destinationChurch.trim();
+  if (input.destinationCity   !== undefined) patch.destination_city   = input.destinationCity.trim();
+  if (input.destinationState  !== undefined) patch.destination_state  = input.destinationState?.trim() || null;
+  if (input.reason         !== undefined) patch.reason           = input.reason.trim();
+  if (input.observations   !== undefined) patch.observations     = input.observations?.trim() || null;
+  return patchLetter(organizationId, letterId, patch);
+}
+
 /** Generic status setter — kept for flexibility/future use. */
 export async function updateRecommendationLetterStatus(
   organizationId: string,

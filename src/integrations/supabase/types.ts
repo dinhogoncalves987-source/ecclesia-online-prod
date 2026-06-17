@@ -1550,63 +1550,123 @@ export type Database = {
       members: {
         Row: {
           address: string | null
+          address_complement: string | null
+          address_number: string | null
+          administrative_role: string | null
           baptized_at: string | null
           birth_date: string | null
           city: string | null
+          congregation_id: string | null
+          conversion_date: string | null
           country_code: string | null
+          cpf: string | null
           created_at: string | null
           created_by: string | null
           email: string | null
+          father_name: string | null
           full_name: string
+          gender: string | null
           id: string
           joined_at: string | null
+          marital_status: string | null
           member_role: string | null
+          mother_name: string | null
+          neighborhood: string | null
           notes: string | null
           organization_id: string
           phone: string | null
+          photo_url: string | null
+          rg: string | null
+          rg_issue_date: string | null
+          rg_issuer: string | null
+          sector_id: string | null
+          spouse_name: string | null
           state: string | null
           status: string
+          street: string | null
           updated_at: string | null
+          whatsapp: string | null
+          zip_code: string | null
         }
         Insert: {
           address?: string | null
+          address_complement?: string | null
+          address_number?: string | null
+          administrative_role?: string | null
           baptized_at?: string | null
           birth_date?: string | null
           city?: string | null
+          congregation_id?: string | null
+          conversion_date?: string | null
           country_code?: string | null
+          cpf?: string | null
           created_at?: string | null
           created_by?: string | null
           email?: string | null
+          father_name?: string | null
           full_name: string
+          gender?: string | null
           id?: string
           joined_at?: string | null
+          marital_status?: string | null
           member_role?: string | null
+          mother_name?: string | null
+          neighborhood?: string | null
           notes?: string | null
           organization_id: string
           phone?: string | null
+          photo_url?: string | null
+          rg?: string | null
+          rg_issue_date?: string | null
+          rg_issuer?: string | null
+          sector_id?: string | null
+          spouse_name?: string | null
           state?: string | null
           status?: string
+          street?: string | null
           updated_at?: string | null
+          whatsapp?: string | null
+          zip_code?: string | null
         }
         Update: {
           address?: string | null
+          address_complement?: string | null
+          address_number?: string | null
+          administrative_role?: string | null
           baptized_at?: string | null
           birth_date?: string | null
           city?: string | null
+          congregation_id?: string | null
+          conversion_date?: string | null
           country_code?: string | null
+          cpf?: string | null
           created_at?: string | null
           created_by?: string | null
           email?: string | null
+          father_name?: string | null
           full_name?: string
+          gender?: string | null
           id?: string
           joined_at?: string | null
+          marital_status?: string | null
           member_role?: string | null
+          mother_name?: string | null
+          neighborhood?: string | null
           notes?: string | null
           organization_id?: string
           phone?: string | null
+          photo_url?: string | null
+          rg?: string | null
+          rg_issue_date?: string | null
+          rg_issuer?: string | null
+          sector_id?: string | null
+          spouse_name?: string | null
           state?: string | null
           status?: string
+          street?: string | null
           updated_at?: string | null
+          whatsapp?: string | null
+          zip_code?: string | null
         }
         Relationships: [
           {

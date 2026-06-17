@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Loader2, Mic, Send, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InternalAttachmentButton } from "@/components/messages/InternalAttachmentButton";
@@ -48,9 +48,22 @@ export function InternalMessageComposer({
   const { t } = useLanguage();
   const [text, setText] = useState("");
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const canSend = !disabled && !sending && (text.trim().length > 0 || Boolean(pendingFile));
   const showMic = !disabled && !pendingFile && text.trim().length === 0;
+
+  // Auto-grow: adjust height whenever text changes
+  const adjustHeight = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`; // max ≈ 8 lines
+  }, []);
+
+  useEffect(() => {
+    adjustHeight();
+  }, [text, adjustHeight]);
 
   const handleSend = async () => {
     if (!canSend) return;
@@ -59,6 +72,10 @@ export function InternalMessageComposer({
     setText("");
     setPendingFile(null);
     await onSend(body, file);
+    // Restore focus so user can keep typing immediately (WhatsApp behaviour)
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
   };
 
   const handleAudioReady = async (file: File) => {
@@ -164,12 +181,17 @@ export function InternalMessageComposer({
                 {/* Input + mic/enviar integrados */}
                 <div className="flex-1 flex items-end gap-0 rounded-2xl border border-border/50 bg-secondary/30 overflow-hidden px-3 py-[7px]">
                   <textarea
+                    ref={textareaRef}
                     value={text}
-                    onChange={(e) => setText(e.target.value)}
+                    onChange={(e) => { setText(e.target.value); adjustHeight(); }}
                     placeholder={placeholder ?? t("Mensagem")}
                     rows={1}
                     disabled={disabled || sending}
-                    className="flex-1 min-w-0 max-h-32 resize-none bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 leading-5"
+                    spellCheck
+                    autoComplete="on"
+                    autoCorrect="on"
+                    className="flex-1 min-w-0 resize-none bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 leading-5 overflow-y-auto"
+                    style={{ maxHeight: "128px" }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();

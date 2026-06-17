@@ -1,9 +1,13 @@
 import { AdminLayout } from "@/components/AdminLayout";
-import { Search, Plus, Phone, X, Trash2, Loader2, Upload, Pencil, CreditCard } from "lucide-react";
+import {
+  Search, Plus, X, Trash2, Loader2, Upload, Pencil, CreditCard, Camera, ChevronRight,
+  User, FileText, Phone, MapPin, Church, Briefcase, Users, BookOpen, Send,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { MemberWalletCard } from "@/components/MemberWalletCard";
+import { MemberInviteModal } from "@/components/MemberInviteModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useChurch } from "@/hooks/useChurchContext";
@@ -19,37 +23,194 @@ import {
   MEMBER_STATUSES_NO_DELETE,
   isMemberStatus,
   type MemberStatus,
+  ECCLESIASTICAL_FUNCTIONS,
+  ADMINISTRATIVE_ROLES,
+  GENDER_OPTIONS,
+  MARITAL_STATUS_OPTIONS,
 } from "@/lib/secretariaConstants";
+import { getMemberInvites, buildInviteUrl, buildWhatsappLink } from "@/lib/memberInvites";
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 type Member = {
   id: string;
   full_name: string;
   member_role: string | null;
+  administrative_role: string | null;
   status: string;
   phone: string | null;
+  whatsapp: string | null;
   email: string | null;
+  photo_url: string | null;
+  birth_date: string | null;
+  gender: string | null;
+  marital_status: string | null;
+  cpf: string | null;
+  rg: string | null;
+  rg_issuer: string | null;
+  rg_issue_date: string | null;
   joined_at: string | null;
   address: string | null;
+  zip_code: string | null;
+  street: string | null;
+  address_number: string | null;
+  address_complement: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  state: string | null;
+  baptized_at: string | null;
+  conversion_date: string | null;
+  congregation_id: string | null;
+  sector_id: string | null;
+  father_name: string | null;
+  mother_name: string | null;
+  spouse_name: string | null;
   notes: string | null;
 };
 
+type SubOrg = { id: string; name: string; organization_type: string };
+
 type FilterStatus = "all" | MemberStatus;
 
-const statusBadgeClass = (status: string) => {
-  switch (status) {
-    case "Ativo":
-      return "bg-success/10 text-success";
-    case "Visitante":
-      return "bg-accent/10 text-accent";
-    case "Falecido":
-      return "bg-muted text-muted-foreground";
-    case "Transferido":
-    case "Disciplinado":
-      return "bg-amber-500/10 text-amber-700 dark:text-amber-400";
-    default:
-      return "bg-muted text-muted-foreground";
-  }
+const EMPTY_FORM: Omit<Member, "id"> = {
+  full_name: "",
+  member_role: "Membro",
+  administrative_role: "Nenhum",
+  status: "Ativo",
+  phone: "",
+  whatsapp: "",
+  email: "",
+  photo_url: null,
+  birth_date: "",
+  gender: "",
+  marital_status: "",
+  cpf: "",
+  rg: "",
+  rg_issuer: "",
+  rg_issue_date: "",
+  joined_at: "",
+  address: null,
+  zip_code: "",
+  street: "",
+  address_number: "",
+  address_complement: "",
+  neighborhood: "",
+  city: "",
+  state: "",
+  baptized_at: "",
+  conversion_date: "",
+  congregation_id: null,
+  sector_id: null,
+  father_name: "",
+  mother_name: "",
+  spouse_name: "",
+  notes: "",
 };
+
+// ─── Tabs definition ─────────────────────────────────────────────────────────
+
+type Tab = {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  short: string;
+};
+
+const TABS: Tab[] = [
+  { id: "pessoal",     label: "Dados Pessoais",       icon: User,    short: "Pessoal"  },
+  { id: "documentos",  label: "Documentos",            icon: FileText, short: "Docs"   },
+  { id: "contato",     label: "Contato",               icon: Phone,   short: "Contato" },
+  { id: "endereco",    label: "Endereço",              icon: MapPin,  short: "Endereço" },
+  { id: "eclesiastico",label: "Dados Eclesiásticos",   icon: Church,  short: "Igreja"  },
+  { id: "funcao",      label: "Função / Cargo",        icon: Briefcase, short: "Cargo" },
+  { id: "familia",     label: "Família",               icon: Users,   short: "Família" },
+  { id: "observacoes", label: "Observações",           icon: BookOpen, short: "Obs."   },
+];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function memberInitials(name: string) {
+  return name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
+}
+
+function statusBadgeClass(status: string) {
+  switch (status) {
+    case "Ativo":         return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
+    case "Visitante":     return "bg-amber-500/10 text-amber-700 dark:text-amber-400";
+    case "Congregado":    return "bg-blue-500/10 text-blue-700 dark:text-blue-400";
+    case "Falecido":      return "bg-slate-300/30 text-slate-600 dark:text-slate-400";
+    case "Transferido":   return "bg-purple-500/10 text-purple-700 dark:text-purple-400";
+    case "Em disciplina": return "bg-red-500/10 text-red-700 dark:text-red-400";
+    case "Afastado":      return "bg-orange-500/10 text-orange-700 dark:text-orange-400";
+    default:              return "bg-muted text-muted-foreground";
+  }
+}
+
+function MemberAvatar({ member, size = "sm" }: { member: Pick<Member, "full_name" | "photo_url">; size?: "sm" | "md" | "lg" }) {
+  const sizeClass = size === "lg" ? "w-16 h-16 text-base" : size === "md" ? "w-10 h-10 text-sm" : "w-8 h-8 text-xs";
+  if (member.photo_url) {
+    return (
+      <img
+        src={member.photo_url}
+        alt={member.full_name}
+        className={`${sizeClass} rounded-full object-cover ring-2 ring-background flex-shrink-0`}
+      />
+    );
+  }
+  return (
+    <div className={`${sizeClass} rounded-full bg-accent/10 flex items-center justify-center font-semibold text-accent flex-shrink-0`}>
+      {memberInitials(member.full_name)}
+    </div>
+  );
+}
+
+function FormInput({
+  label, value, onChange, type = "text", placeholder, required, disabled,
+}: {
+  label: string; value: string; onChange: (v: string) => void;
+  type?: string; placeholder?: string; required?: boolean; disabled?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-medium text-muted-foreground">
+        {label}{required && <span className="text-destructive ml-0.5">*</span>}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+        className="px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+      />
+    </div>
+  );
+}
+
+function FormSelect({
+  label, value, onChange, options, required,
+}: {
+  label: string; value: string; onChange: (v: string) => void;
+  options: readonly string[] | string[]; required?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-medium text-muted-foreground">
+        {label}{required && <span className="text-destructive ml-0.5">*</span>}
+      </label>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+      >
+        <option value="">— Selecionar —</option>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Membros() {
   const { user } = useAuth();
@@ -63,33 +224,418 @@ export default function Membros() {
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
-  const [showForm, setShowForm] = useState(false);
-  const [newMember, setNewMember] = useState({ name: "", role: "", phone: "", email: "", status: "Ativo" as MemberStatus });
   const [showImport, setShowImport] = useState(false);
-  const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [walletMember, setWalletMember] = useState<Member | null>(null);
-  const [editForm, setEditForm] = useState({
-    name: "",
-    role: "",
-    phone: "",
-    email: "",
-    status: "Ativo" as MemberStatus,
-    joined_at: "",
-    address: "",
-    notes: "",
-  });
+
+  // Modal form state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [isNewMember, setIsNewMember] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("pessoal");
+  const [form, setForm] = useState<Omit<Member, "id">>({ ...EMPTY_FORM });
+
+  // Photo upload
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  // Sub-organizations (sectors + congregations)
+  const [subOrgs, setSubOrgs] = useState<SubOrg[]>([]);
+
+  // Invite modal (shown after creating a new member)
+  const [inviteModal, setInviteModal] = useState<{
+    open: boolean;
+    memberId: string;
+    memberName: string;
+    phone: string | null;
+  } | null>(null);
+
+  const setField = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
+    setForm(prev => ({ ...prev, [key]: value }));
+
+  // ── Load members ────────────────────────────────────────────────────────────
 
   const reloadMembers = useCallback(async () => {
     if (!church) return;
     const { data, error } = await runScopedOrganizationQuery<Member[]>("members", church.id, query =>
       query.select("*").order("full_name"),
     );
-    if (error) {
-      toast.error(t("Erro ao carregar membros"));
-      return;
-    }
+    if (error) { toast.error(t("Erro ao carregar membros")); return; }
     setMembers(data || []);
   }, [church, t]);
+
+  // ── Load sub-organizations for selectors (matrix + setores + congregações) ────
+
+  const reloadSubOrgs = useCallback(async () => {
+    if (!church) return;
+    // Step 1: direct children of matrix (setores)
+    const { data: children } = await supabase
+      .from("organizations")
+      .select("id, name, organization_type")
+      .eq("parent_id", church.id)
+      .eq("active", true);
+    const childIds = (children || []).map(c => c.id);
+    // Step 2: grandchildren (congregações under setores) — only if setores exist
+    let grandchildren: SubOrg[] = [];
+    if (childIds.length > 0) {
+      const { data: gc } = await supabase
+        .from("organizations")
+        .select("id, name, organization_type")
+        .in("parent_id", childIds)
+        .eq("active", true);
+      grandchildren = (gc as SubOrg[]) || [];
+    }
+    // Combine: include matrix itself + all descendants
+    const all: SubOrg[] = [
+      { id: church.id, name: church.name, organization_type: church.organization_type || "matriz" },
+      ...((children as SubOrg[]) || []),
+      ...grandchildren,
+    ].sort((a, b) => a.name.localeCompare(b.name));
+    setSubOrgs(all);
+  }, [church]);
+
+  useEffect(() => {
+    if (!user || churchLoading) return;
+    if (!church) { setMembers([]); setLoading(false); return; }
+    const load = async () => {
+      setLoading(true);
+      await Promise.all([reloadMembers(), reloadSubOrgs()]);
+      setLoading(false);
+    };
+    load();
+  }, [user, church, churchLoading, reloadMembers, reloadSubOrgs]);
+
+  // ── Filtering ───────────────────────────────────────────────────────────────
+
+  const filtered = members.filter(m => {
+    if (filterStatus !== "all" && m.status !== filterStatus) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      return (
+        m.full_name.toLowerCase().includes(q) ||
+        (m.member_role || "").toLowerCase().includes(q) ||
+        (m.administrative_role || "").toLowerCase().includes(q) ||
+        (m.email || "").toLowerCase().includes(q) ||
+        (m.phone || "").includes(q)
+      );
+    }
+    return true;
+  });
+
+  // ── Photo upload ─────────────────────────────────────────────────────────────
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { toast.error("Foto muito grande (máx. 5MB)"); return; }
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  // Usa o bucket 'avatars' (existente desde migration inicial) com
+  // path members/{memberId}.{ext} para separar de avatars de usuário.
+  const uploadPhotoIfNeeded = async (memberId: string): Promise<string | null> => {
+    if (!photoFile) return form.photo_url;
+    setUploadingPhoto(true);
+    try {
+      const ext = photoFile.name.split(".").pop() || "jpg";
+      const path = `members/${memberId}.${ext}`;
+      const { error } = await supabase.storage
+        .from("avatars")
+        .upload(path, photoFile, { upsert: true, contentType: photoFile.type });
+      if (error) {
+        toast.warning(`Foto não salva: ${error.message}`);
+        return null;
+      }
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+      return urlData?.publicUrl ?? null;
+    } catch (e) {
+      toast.warning("Erro inesperado no upload da foto.");
+      return null;
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  // ── Open modal ───────────────────────────────────────────────────────────────
+
+  const openNew = () => {
+    setIsNewMember(true);
+    setEditingId(null);
+    setForm({ ...EMPTY_FORM });
+    setPhotoPreview(null);
+    setPhotoFile(null);
+    setActiveTab("pessoal");
+    setModalOpen(true);
+  };
+
+  const openEdit = (m: Member) => {
+    setIsNewMember(false);
+    setEditingId(m.id);
+    setForm({
+      full_name:         m.full_name,
+      member_role:       m.member_role || "Membro",
+      administrative_role: m.administrative_role || "Nenhum",
+      status:            isMemberStatus(m.status) ? m.status : "Ativo",
+      phone:             m.phone || "",
+      whatsapp:          m.whatsapp || "",
+      email:             m.email || "",
+      photo_url:         m.photo_url || null,
+      birth_date:        m.birth_date || "",
+      gender:            m.gender || "",
+      marital_status:    m.marital_status || "",
+      cpf:               m.cpf || "",
+      rg:                m.rg || "",
+      rg_issuer:         m.rg_issuer || "",
+      rg_issue_date:     m.rg_issue_date || "",
+      joined_at:         m.joined_at || "",
+      address:           m.address || null,
+      zip_code:          m.zip_code || "",
+      street:            m.street || "",
+      address_number:    m.address_number || "",
+      address_complement: m.address_complement || "",
+      neighborhood:      m.neighborhood || "",
+      city:              m.city || "",
+      state:             m.state || "",
+      baptized_at:       m.baptized_at || "",
+      conversion_date:   m.conversion_date || "",
+      congregation_id:   m.congregation_id || null,
+      sector_id:         m.sector_id || null,
+      father_name:       m.father_name || "",
+      mother_name:       m.mother_name || "",
+      spouse_name:       m.spouse_name || "",
+      notes:             m.notes || "",
+    });
+    setPhotoPreview(m.photo_url || null);
+    setPhotoFile(null);
+    setActiveTab("pessoal");
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditingId(null);
+    setPhotoPreview(null);
+    setPhotoFile(null);
+  };
+
+  // ── Schema / RLS error detection ─────────────────────────────────────────────
+
+  /**
+   * PGRST204 — column doesn't exist in PostgREST schema cache.
+   * This means migration 20260617120000_members_extended_fields.sql has not
+   * been applied yet.
+   */
+  const isMissingColumnError = (err: { message?: string; code?: string } | null): boolean =>
+    !!err && (
+      err.code === "PGRST204" ||
+      (!!err.message && (
+        err.message.includes("schema cache") ||
+        err.message.startsWith("Could not find the '")
+      ))
+    );
+
+  /**
+   * PGRST116 — the UPDATE found 0 matching rows.
+   * This is PostgREST's response when the USING clause of an RLS policy
+   * blocks the row, or when no row with that ID exists.
+   */
+  const isNoRowsError = (err: { message?: string; code?: string } | null): boolean =>
+    !!err && err.code === "PGRST116";
+
+  /**
+   * Core payload — ONLY columns that existed before migration 20260617120000.
+   * These columns are guaranteed to exist in any environment.
+   * Concatenates individual address fields into the legacy `address` column.
+   */
+  const buildCorePayload = () => ({
+    full_name:   form.full_name.trim(),
+    member_role: form.member_role || "Membro",
+    status:      form.status,
+    phone:       form.phone?.trim()  || null,
+    email:       form.email?.trim()  || null,
+    notes:       form.notes?.trim()  || null,
+    joined_at:   form.joined_at      || null,
+    baptized_at: form.baptized_at    || null,
+    birth_date:  form.birth_date     || null,
+    city:        form.city?.trim()   || null,
+    state:       form.state?.trim()  || null,
+    address: [form.street, form.address_number, form.neighborhood, form.city, form.state]
+      .filter(Boolean).join(", ") || form.address || null,
+  });
+
+  /**
+   * Extended payload — ONLY the new columns added by migration 20260617120000.
+   * Separated from core so it can fail gracefully if the migration is not applied.
+   */
+  const buildExtendedPayload = (photoUrl: string | null) => ({
+    photo_url:          photoUrl,
+    whatsapp:           form.whatsapp?.trim() || null,
+    gender:             form.gender || null,
+    marital_status:     form.marital_status || null,
+    cpf:                form.cpf?.trim() || null,
+    rg:                 form.rg?.trim() || null,
+    rg_issuer:          form.rg_issuer?.trim() || null,
+    rg_issue_date:      form.rg_issue_date || null,
+    zip_code:           form.zip_code?.trim() || null,
+    street:             form.street?.trim() || null,
+    address_number:     form.address_number?.trim() || null,
+    address_complement: form.address_complement?.trim() || null,
+    neighborhood:       form.neighborhood?.trim() || null,
+    conversion_date:    form.conversion_date || null,
+    administrative_role: form.administrative_role === "Nenhum" ? null : (form.administrative_role || null),
+    father_name:        form.father_name?.trim() || null,
+    mother_name:        form.mother_name?.trim() || null,
+    spouse_name:        form.spouse_name?.trim() || null,
+    sector_id:          form.sector_id || null,
+    congregation_id:    form.congregation_id || null,
+  });
+
+  // ── Save ─────────────────────────────────────────────────────────────────────
+
+  const handleSave = async (openWallet = false) => {
+    if (!form.full_name.trim()) {
+      toast.error("Nome completo é obrigatório.");
+      setActiveTab("pessoal");
+      return;
+    }
+    if (!form.member_role) {
+      toast.error("Função eclesiástica é obrigatória.");
+      setActiveTab("funcao");
+      return;
+    }
+    if (!user || !church) return;
+
+    setSaving(true);
+    try {
+      // ── Helpers ───────────────────────────────────────────────────────────
+      const tryExtended = async (memberId: string, photoUrl: string | null) => {
+        const { error } = await supabase
+          .from("members")
+          .update(buildExtendedPayload(photoUrl))
+          .eq("id", memberId)
+          .select("id")
+          .single();
+        if (error && isMissingColumnError(error)) {
+          console.warn("[Membros] extended fields need migration:", error.message);
+          toast.warning(
+            "Dados básicos salvos. Para salvar foto, endereço, CPF e outros campos, aplique as migrations no Supabase Dashboard → SQL Editor:\n• 20260617120000_members_extended_fields.sql\n• 20260617130000_members_status_constraint_fix.sql",
+            { duration: 8000 }
+          );
+          return false;
+        }
+        if (error && !isNoRowsError(error)) {
+          console.warn("[Membros] extended fields unexpected error:", error.message);
+        }
+        return !error;
+      };
+
+      if (isNewMember) {
+        // ── INSERT: include all core fields directly ─────────────────────────
+        const core = buildCorePayload();
+        const { data: inserted, error: insErr } = await supabase
+          .from("members")
+          .insert({ ...core, created_by: user.id, organization_id: church.id })
+          .select("id")
+          .single();
+
+        if (insErr || !inserted) {
+          console.error("[Membros] insert error:", insErr);
+          toast.error("Erro ao criar membro", { description: insErr?.message ?? "Falha ao inserir" });
+          return;
+        }
+
+        const newId = inserted.id;
+        console.log("[Membros] new member created:", newId);
+
+        const photoUrl  = await uploadPhotoIfNeeded(newId);
+        const allSaved  = await tryExtended(newId, photoUrl);
+        if (allSaved) toast.success("Membro cadastrado com sucesso!");
+
+        await reloadMembers();
+        if (openWallet) {
+          const saved = members.find(m => m.id === newId) || { ...(form as Member), id: newId, photo_url: photoUrl };
+          setWalletMember(saved as Member);
+        }
+        closeModal();
+
+        // Open invite modal if member has a phone/whatsapp
+        const invitePhone = form.whatsapp?.trim() || form.phone?.trim() || null;
+        if (invitePhone) {
+          setInviteModal({
+            open:       true,
+            memberId:   newId,
+            memberName: form.full_name.trim(),
+            phone:      invitePhone,
+          });
+        }
+
+      } else {
+        // ── EDIT existing member ─────────────────────────────────────────────
+        if (!editingId) {
+          toast.error("ID do membro não encontrado. Feche e tente novamente.");
+          return;
+        }
+
+        console.log("[Membros][EDIT] id=", editingId);
+
+        // Step 1 — core fields (columns that always exist)
+        const { data: coreRow, error: coreErr } = await supabase
+          .from("members")
+          .update(buildCorePayload())
+          .eq("id", editingId)
+          .select("id")
+          .single();
+
+        console.log("[Membros][EDIT core]:", { saved: coreRow?.id, error: coreErr?.code, msg: coreErr?.message });
+
+        if (coreErr) {
+          if (isNoRowsError(coreErr)) {
+            toast.error("Permissão negada.", {
+              description: "Nenhuma linha atualizada. Verifique se você tem acesso para editar este membro (RLS).",
+            });
+          } else {
+            toast.error("Erro ao salvar", { description: coreErr.message });
+          }
+          return;
+        }
+
+        // Step 2 — photo upload + extended columns (best-effort)
+        const photoUrl = await uploadPhotoIfNeeded(editingId);
+        const allSaved = await tryExtended(editingId, photoUrl);
+        if (allSaved) toast.success("Membro atualizado com sucesso!");
+
+        await reloadMembers();
+        closeModal();
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Delete ───────────────────────────────────────────────────────────────────
+
+  const removeMember = async (m: Member) => {
+    if (!church) return;
+    if (!confirm(`Remover ${m.full_name}? Esta ação não pode ser desfeita.`)) return;
+    const { error } = await supabase.from("members").delete()
+      .eq("id", m.id).eq("organization_id", church.id);
+    if (error) { toast.error("Erro ao remover", { description: error.message }); return; }
+    toast.success("Membro removido");
+    await reloadMembers();
+  };
+
+  const updateMemberStatus = async (id: string, newStatus: MemberStatus) => {
+    if (!church) return;
+    const { error } = await supabase.from("members").update({ status: newStatus })
+      .eq("id", id).eq("organization_id", church.id);
+    if (error) { toast.error("Erro ao atualizar", { description: error.message }); return; }
+    toast.success("Status atualizado");
+    await reloadMembers();
+  };
+
+  // ── Bulk import ──────────────────────────────────────────────────────────────
 
   const memberFields = [
     { key: "name", label: t("Nome"), required: true },
@@ -106,13 +652,9 @@ export default function Membros() {
 
   const handleBulkImport = async (rows: Record<string, string>[]) => {
     if (!user || !church) return { success: 0, errors: 0 };
-    let success = 0;
-    let errors = 0;
+    let success = 0, errors = 0;
     for (const row of rows) {
-      if (!row.name) {
-        errors++;
-        continue;
-      }
+      if (!row.name) { errors++; continue; }
       const status = row.status && isMemberStatus(row.status) ? row.status : "Ativo";
       const { error } = await insertWithOrganizationScope("members", church.id, {
         created_by: user.id,
@@ -123,178 +665,65 @@ export default function Membros() {
         joined_at: new Date().toISOString().split("T")[0],
         status,
       });
-      if (error) errors++;
-      else success++;
+      if (error) errors++; else success++;
     }
     if (success > 0) await reloadMembers();
     return { success, errors };
   };
 
-  useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-    if (churchLoading) return;
-    if (!church) {
-      setMembers([]);
-      setLoading(false);
-      return;
-    }
-    const load = async () => {
-      setLoading(true);
-      await reloadMembers();
-      setLoading(false);
-    };
-    load();
-  }, [user, church, churchLoading, reloadMembers]);
+  // ── Stats ────────────────────────────────────────────────────────────────────
 
-  const filtered = members.filter(m => {
-    if (filterStatus !== "all" && m.status !== filterStatus) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return (
-        m.full_name.toLowerCase().includes(q) ||
-        (m.member_role || "").toLowerCase().includes(q) ||
-        (m.email || "").toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
-
-  const addMember = async () => {
-    if (!newMember.name || !user || !church) return;
-    setSaving(true);
-    const { error } = await insertWithOrganizationScope<Member>(
-      "members",
-      church.id,
-      {
-        created_by: user.id,
-        full_name: newMember.name,
-        member_role: newMember.role || "Membro",
-        phone: newMember.phone || null,
-        email: newMember.email || null,
-        joined_at: new Date().toISOString().split("T")[0],
-        status: newMember.status,
-      },
-      query => query.select().single(),
-    );
-    if (error) {
-      toast.error(t("Erro ao salvar"), { description: String((error as { message?: string }).message || "") });
-      setSaving(false);
-      return;
-    }
-    toast.success(t("Membro cadastrado!"));
-    await reloadMembers();
-    setNewMember({ name: "", role: "", phone: "", email: "", status: "Ativo" });
-    setShowForm(false);
-    setSaving(false);
-  };
-
-  const removeMember = async (member: Member) => {
-    if (MEMBER_STATUSES_NO_DELETE.includes(member.status as MemberStatus)) {
-      toast.error(t("Use alteração de status em vez de remover"));
-      return;
-    }
-    if (!window.confirm(t("Remover este membro da lista?"))) return;
-    const { error } = await supabase
-      .from("members")
-      .delete()
-      .eq("id", member.id)
-      .eq("organization_id", church?.id || "");
-    if (error) {
-      toast.error(t("Erro ao remover"), { description: error.message });
-      return;
-    }
-    toast.success(t("Membro removido"));
-    await reloadMembers();
-  };
-
-  const updateMemberStatus = async (id: string, newStatus: MemberStatus) => {
-    if (!church) return;
-    const { error } = await supabase
-      .from("members")
-      .update({ status: newStatus })
-      .eq("id", id)
-      .eq("organization_id", church.id);
-    if (error) {
-      toast.error(t("Erro ao atualizar"), { description: error.message });
-      return;
-    }
-    toast.success(t("Status atualizado"));
-    await reloadMembers();
-  };
-
-  const openMember = (m: Member) => {
-    setEditingMember(m);
-    setEditForm({
-      name: m.full_name,
-      role: m.member_role || "",
-      phone: m.phone || "",
-      email: m.email || "",
-      status: isMemberStatus(m.status) ? m.status : "Ativo",
-      joined_at: m.joined_at || "",
-      address: m.address || "",
-      notes: m.notes || "",
-    });
-  };
-
-  const closeMemberModal = () => setEditingMember(null);
-
-  const saveEdit = async () => {
-    if (!editingMember || !church || !editForm.name.trim()) return;
-    setSaving(true);
-    const { error } = await supabase
-      .from("members")
-      .update({
-        full_name: editForm.name.trim(),
-        member_role: editForm.role || "Membro",
-        phone: editForm.phone || null,
-        email: editForm.email || null,
-        status: editForm.status,
-        joined_at: editForm.joined_at || null,
-        address: editForm.address.trim() || null,
-        notes: editForm.notes.trim() || null,
-      })
-      .eq("id", editingMember.id)
-      .eq("organization_id", church.id);
-    if (error) {
-      toast.error(t("Erro ao salvar"), { description: error.message });
-      setSaving(false);
-      return;
-    }
-    toast.success(t("Membro atualizado"));
-    closeMemberModal();
-    await reloadMembers();
-    setSaving(false);
-  };
-
-  const handleFormKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      addMember();
-    }
-  };
-
-  const activeCount = members.filter(m => m.status === "Ativo").length;
-  const visitanteCount = members.filter(m => m.status === "Visitante").length;
-  const falecidoCount = members.filter(m => m.status === "Falecido").length;
+  const activeCount     = members.filter(m => m.status === "Ativo").length;
+  const visitanteCount  = members.filter(m => m.status === "Visitante").length;
+  const falecidoCount   = members.filter(m => m.status === "Falecido").length;
   const transferidoCount = members.filter(m => m.status === "Transferido").length;
-
-  const filterOptions: FilterStatus[] = ["all", ...MEMBER_STATUSES];
 
   const canDeleteMember = (m: Member) =>
     canWrite && !MEMBER_STATUSES_NO_DELETE.includes(m.status as MemberStatus);
 
+  // ── Sub-org label helper ─────────────────────────────────────────────────────
+
+  const orgName = (id: string | null) => subOrgs.find(o => o.id === id)?.name ?? null;
+
+  // ── Wallet member with congregation name ─────────────────────────────────────
+
+  const toWalletMember = (m: Member) => ({
+    id: m.id,
+    full_name: m.full_name,
+    member_role: m.member_role,
+    administrative_role: m.administrative_role,
+    status: m.status,
+    phone: m.phone,
+    email: m.email,
+    photo_url: m.photo_url,
+    cpf: m.cpf,
+    rg: m.rg,
+    birth_date: m.birth_date,
+    baptism_date: m.baptized_at,
+    congregation: orgName(m.congregation_id) ?? orgName(m.sector_id) ?? null,
+    pastor_name: null,
+    parent_names: [m.father_name, m.mother_name].filter(Boolean).join(" / ") || null,
+    joined_at: m.joined_at,
+  });
+
+  const filterOptions: FilterStatus[] = ["all", ...MEMBER_STATUSES];
+  const sectors       = subOrgs.filter(o => o.organization_type === "setor" || o.organization_type === "district");
+  const congregations = subOrgs.filter(o => o.organization_type === "congregacao" || o.organization_type === "congregation" || o.organization_type === "church");
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────────
+
   return (
     <AdminLayout>
       <div className="space-y-6">
+
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
             <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">{t("Membros")}</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {members.length} {t("cadastrados")} · {activeCount} {t("ativos")} · {visitanteCount}{" "}
-              {t("visitantes")}
+              {members.length} {t("cadastrados")} · {activeCount} {t("ativos")} · {visitanteCount} {t("visitantes")}
               {falecidoCount > 0 && ` · ${falecidoCount} ${t("falecidos")}`}
               {transferidoCount > 0 && ` · ${transferidoCount} ${t("transferidos")}`}
             </p>
@@ -305,38 +734,24 @@ export default function Membros() {
                 module="member"
                 fields={[
                   { key: "name", label: t("Nome"), required: true },
-                  {
-                    key: "role",
-                    label: t("Função"),
-                    options: ["Pastor", "Diácono", "Diaconisa", "Obreiro", "Membro", "Visitante"],
-                  },
+                  { key: "role", label: t("Função"), options: ["Pastor", "Diácono", "Diaconisa", "Obreiro", "Membro"] },
                   { key: "phone", label: t("Telefone") },
                   { key: "email", label: t("E-mail") },
                 ]}
                 onConfirm={async data => {
                   if (!data.name || !user || !church) throw new Error(t("Nome obrigatório"));
                   const { error } = await insertWithOrganizationScope("members", church.id, {
-                    created_by: user.id,
-                    full_name: data.name,
-                    member_role: data.role || "Membro",
-                    phone: data.phone || null,
-                    email: data.email || null,
-                    joined_at: new Date().toISOString().split("T")[0],
-                    status: "Ativo",
+                    created_by: user.id, full_name: data.name, member_role: data.role || "Membro",
+                    phone: data.phone || null, email: data.email || null,
+                    joined_at: new Date().toISOString().split("T")[0], status: "Ativo",
                   });
                   if (error) throw new Error(String((error as { message?: string }).message || ""));
                   await reloadMembers();
                   toast.success(t("Membro cadastrado!"));
                 }}
                 onEdit={data => {
-                  setNewMember({
-                    name: data.name || "",
-                    role: data.role || "",
-                    phone: data.phone || "",
-                    email: data.email || "",
-                    status: "Ativo",
-                  });
-                  setShowForm(true);
+                  setForm({ ...EMPTY_FORM, full_name: data.name || "", member_role: data.role || "Membro", phone: data.phone || "", email: data.email || "" });
+                  setIsNewMember(true); setEditingId(null); setActiveTab("pessoal"); setModalOpen(true);
                 }}
               />
               <button
@@ -346,8 +761,8 @@ export default function Membros() {
                 <Upload size={14} strokeWidth={1.5} /> {t("Importar")}
               </button>
               <button
-                onClick={() => setShowForm(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity self-start"
+                onClick={openNew}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
               >
                 <Plus size={16} strokeWidth={1.5} /> {t("Novo Membro")}
               </button>
@@ -355,84 +770,12 @@ export default function Membros() {
           )}
         </div>
 
-        <AnimatePresence>
-          {showForm && canWrite && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="bg-card rounded-xl shadow-executive p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-serif text-base">{t("Cadastrar Membro")}</h3>
-                  <button onClick={() => setShowForm(false)} className="p-1.5 rounded-lg hover:bg-secondary">
-                    <X size={16} strokeWidth={1.5} />
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" onKeyDown={handleFormKeyDown}>
-                  <input
-                    placeholder={t("Nome completo")}
-                    value={newMember.name}
-                    onChange={e => setNewMember({ ...newMember, name: e.target.value })}
-                    className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
-                  <input
-                    placeholder={t("Função")}
-                    value={newMember.role}
-                    onChange={e => setNewMember({ ...newMember, role: e.target.value })}
-                    className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
-                  <input
-                    placeholder={t("Telefone")}
-                    value={newMember.phone}
-                    onChange={e => setNewMember({ ...newMember, phone: e.target.value })}
-                    className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
-                  <input
-                    placeholder={t("E-mail")}
-                    value={newMember.email}
-                    onChange={e => setNewMember({ ...newMember, email: e.target.value })}
-                    className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
-                  <div className="sm:col-span-2">
-                    <label className="text-xs text-muted-foreground mb-1 block">{t("Status")}</label>
-                    <select
-                      value={newMember.status}
-                      onChange={e =>
-                        setNewMember({
-                          ...newMember,
-                          status: e.target.value as MemberStatus,
-                        })
-                      }
-                      className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm"
-                    >
-                      {MEMBER_STATUSES.map(s => (
-                        <option key={s} value={s}>
-                          {t(s)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <button
-                  onClick={addMember}
-                  disabled={saving}
-                  className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 inline-flex items-center gap-2"
-                >
-                  {saving && <Loader2 size={14} className="animate-spin" />}
-                  {t("Salvar Membro")}
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
+        {/* Search + Filter */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
-              placeholder={t("Buscar por nome, função ou e-mail...")}
+              placeholder={t("Buscar por nome, função ou contato...")}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2.5 bg-card rounded-lg shadow-[var(--shadow-sm)] text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
@@ -440,59 +783,67 @@ export default function Membros() {
           </div>
           <div className="flex gap-1 flex-wrap bg-secondary/50 rounded-lg p-0.5 max-w-full overflow-x-auto">
             {filterOptions.map(s => (
-              <button
-                key={s}
-                onClick={() => setFilterStatus(s)}
-                className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
-                  filterStatus === s ? "bg-card shadow-sm" : "text-muted-foreground"
-                }`}
-              >
+              <button key={s} onClick={() => setFilterStatus(s)}
+                className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${filterStatus === s ? "bg-card shadow-sm" : "text-muted-foreground"}`}>
                 {s === "all" ? t("Todos") : t(s)}
               </button>
             ))}
           </div>
         </div>
 
+        {/* Table */}
         {loading || churchLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 size={24} className="animate-spin text-muted-foreground" />
           </div>
         ) : (
           <>
+            {/* Desktop table */}
             <div className="hidden sm:block bg-card rounded-xl shadow-executive overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border/50 text-left text-xs text-muted-foreground">
-                    <th className="px-5 py-3 font-medium">{t("Nome")}</th>
-                    <th className="px-5 py-3 font-medium">{t("Função")}</th>
-                    <th className="px-5 py-3 font-medium">{t("Contato")}</th>
-                    <th className="px-5 py-3 font-medium">{t("Status")}</th>
-                    <th className="px-5 py-3 font-medium">{t("Desde")}</th>
-                    <th className="px-5 py-3 font-medium w-28">{t("Ações")}</th>
+                    <th className="px-4 py-3 font-medium">{t("Membro")}</th>
+                    <th className="px-4 py-3 font-medium">{t("Função / Cargo")}</th>
+                    <th className="px-4 py-3 font-medium hidden lg:table-cell">{t("Local")}</th>
+                    <th className="px-4 py-3 font-medium hidden md:table-cell">{t("Contato")}</th>
+                    <th className="px-4 py-3 font-medium">{t("Status")}</th>
+                    <th className="px-4 py-3 font-medium w-28">{t("Ações")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map(m => (
-                    <tr
-                      key={m.id}
-                      onClick={() => openMember(m)}
-                      className="border-b border-border/30 hover:bg-secondary/30 transition-colors cursor-pointer"
-                    >
-                      <td className="px-5 py-3">
+                    <tr key={m.id}
+                      onClick={() => canWrite && openEdit(m)}
+                      className={`border-b border-border/30 transition-colors ${canWrite ? "hover:bg-secondary/30 cursor-pointer" : ""}`}>
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-xs font-medium text-accent">
-                            {m.full_name
-                              .split(" ")
-                              .map(n => n[0])
-                              .join("")
-                              .slice(0, 2)}
+                          <MemberAvatar member={m} size="sm" />
+                          <div>
+                            <p className="font-medium">{m.full_name}</p>
+                            {m.birth_date && (
+                              <p className="text-[11px] text-muted-foreground">
+                                Admissão: {m.joined_at ?? "—"}
+                              </p>
+                            )}
                           </div>
-                          <span className="font-medium">{m.full_name}</span>
                         </div>
                       </td>
-                      <td className="px-5 py-3 text-muted-foreground">{m.member_role}</td>
-                      <td className="px-5 py-3 text-muted-foreground">{m.phone}</td>
-                      <td className="px-5 py-3" onClick={e => e.stopPropagation()}>
+                      <td className="px-4 py-3">
+                        <div>
+                          <p className="text-sm text-foreground">{m.member_role || "—"}</p>
+                          {m.administrative_role && m.administrative_role !== "Nenhum" && (
+                            <p className="text-[11px] text-muted-foreground">{m.administrative_role}</p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs hidden lg:table-cell">
+                        {orgName(m.congregation_id) || orgName(m.sector_id) || "—"}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs hidden md:table-cell">
+                        {m.phone || m.email || "—"}
+                      </td>
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         {canWrite ? (
                           <select
                             value={isMemberStatus(m.status) ? m.status : "Ativo"}
@@ -500,9 +851,7 @@ export default function Membros() {
                             className={`text-[10px] font-medium px-2 py-0.5 rounded-full border-0 cursor-pointer ${statusBadgeClass(m.status)}`}
                           >
                             {MEMBER_STATUSES.map(s => (
-                              <option key={s} value={s}>
-                                {t(s)}
-                              </option>
+                              <option key={s} value={s}>{t(s)}</option>
                             ))}
                           </select>
                         ) : (
@@ -511,43 +860,26 @@ export default function Membros() {
                           </span>
                         )}
                       </td>
-                      <td className="px-5 py-3 text-muted-foreground tabular-nums">{m.joined_at}</td>
-                      <td className="px-5 py-3" onClick={e => e.stopPropagation()}>
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setWalletMember(m)}
+                          <button type="button" onClick={() => setWalletMember(m)}
                             className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-accent/10 hover:bg-accent/20 text-accent text-[11px] font-medium transition-colors"
-                          >
-                            <CreditCard size={12} />
-                            {t("Carteira")}
+                            title={t("Carteira de Membro")}>
+                            <CreditCard size={12} /> {t("Carteira")}
                           </button>
                           {canWrite && (
                             <>
-                              <button
-                                type="button"
-                                onClick={() => openMember(m)}
-                                className="p-1 rounded hover:bg-secondary transition-colors"
-                                title={t("Editar")}
-                              >
+                              <button type="button" onClick={() => openEdit(m)}
+                                className="p-1 rounded hover:bg-secondary transition-colors" title={t("Editar")}>
                                 <Pencil size={14} className="text-muted-foreground" />
                               </button>
                               {canDeleteMember(m) ? (
-                                <button
-                                  type="button"
-                                  onClick={() => removeMember(m)}
-                                  className="p-1 rounded hover:bg-destructive/10 transition-colors"
-                                  title={t("Remover")}
-                                >
+                                <button type="button" onClick={() => removeMember(m)}
+                                  className="p-1 rounded hover:bg-destructive/10 transition-colors" title={t("Remover")}>
                                   <Trash2 size={14} className="text-muted-foreground" />
                                 </button>
                               ) : (
-                                <span
-                                  className="p-1 text-[10px] text-muted-foreground"
-                                  title={t("Use alteração de status")}
-                                >
-                                  —
-                                </span>
+                                <span className="p-1 text-[10px] text-muted-foreground" title={t("Use alteração de status")}>—</span>
                               )}
                             </>
                           )}
@@ -566,33 +898,17 @@ export default function Membros() {
               </table>
             </div>
 
+            {/* Mobile cards */}
             <div className="sm:hidden space-y-2">
               {filtered.map((m, i) => (
-                <motion.div
-                  key={m.id}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.03 }}
-                >
+                <motion.div key={m.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
                   <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => openMember(m)}
-                    onKeyDown={e => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        openMember(m);
-                      }
-                    }}
+                    role="button" tabIndex={0}
+                    onClick={() => canWrite && openEdit(m)}
+                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openEdit(m); } }}
                     className="bg-card rounded-xl shadow-executive p-4 flex items-center gap-3 cursor-pointer hover:bg-secondary/20 transition-colors"
                   >
-                    <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-sm font-medium text-accent flex-shrink-0">
-                      {m.full_name
-                        .split(" ")
-                        .map(n => n[0])
-                        .join("")
-                        .slice(0, 2)}
-                    </div>
+                    <MemberAvatar member={m} size="md" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-sm font-medium truncate">{m.full_name}</p>
@@ -600,233 +916,439 @@ export default function Membros() {
                           <select
                             value={isMemberStatus(m.status) ? m.status : "Ativo"}
                             onClick={e => e.stopPropagation()}
-                            onChange={e => updateMemberStatus(m.id, e.target.value as MemberStatus)}
-                            className={`text-[10px] font-medium px-2 py-0.5 rounded-full border-0 max-w-[7rem] ${statusBadgeClass(m.status)}`}
+                            onChange={e => { e.stopPropagation(); updateMemberStatus(m.id, e.target.value as MemberStatus); }}
+                            className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border-0 flex-shrink-0 ${statusBadgeClass(m.status)}`}
                           >
-                            {MEMBER_STATUSES.map(s => (
-                              <option key={s} value={s}>
-                                {t(s)}
-                              </option>
-                            ))}
+                            {MEMBER_STATUSES.map(s => <option key={s} value={s}>{t(s)}</option>)}
                           </select>
                         ) : (
-                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${statusBadgeClass(m.status)}`}>
-                            {t(m.status)}
-                          </span>
+                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${statusBadgeClass(m.status)}`}>{t(m.status)}</span>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground">{m.member_role}</p>
-                      {m.phone && (
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                            <Phone size={10} /> {m.phone}
-                          </span>
-                        </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className="text-xs text-muted-foreground truncate">{m.member_role || "—"}</p>
+                        {m.administrative_role && m.administrative_role !== "Nenhum" && (
+                          <span className="text-[10px] text-muted-foreground/60">· {m.administrative_role}</span>
+                        )}
+                      </div>
+                      {orgName(m.congregation_id || m.sector_id) && (
+                        <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                          {orgName(m.congregation_id) || orgName(m.sector_id)}
+                        </p>
                       )}
                     </div>
-                    <div className="flex flex-col gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={() => setWalletMember(m)}
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-accent/10 hover:bg-accent/20 text-accent text-[10px] font-medium transition-colors"
-                      >
-                        <CreditCard size={11} />
-                        {t("Carteira")}
+                    <div className="flex flex-col gap-1.5 flex-shrink-0">
+                      <button type="button" onClick={e => { e.stopPropagation(); setWalletMember(m); }}
+                        className="p-1.5 rounded-lg bg-accent/10 hover:bg-accent/20 transition-colors" title={t("Carteira")}>
+                        <CreditCard size={14} className="text-accent" />
                       </button>
-                      {canWrite && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => openMember(m)}
-                            className="p-1.5 rounded-lg hover:bg-secondary transition-colors"
-                            title={t("Editar")}
-                          >
-                            <Pencil size={14} className="text-muted-foreground" />
-                          </button>
-                          {canDeleteMember(m) && (
-                            <button
-                              type="button"
-                              onClick={() => removeMember(m)}
-                              className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors"
-                              title={t("Remover")}
-                            >
-                              <Trash2 size={14} className="text-muted-foreground" />
-                            </button>
-                          )}
-                        </>
+                      {canWrite && canDeleteMember(m) && (
+                        <button type="button" onClick={e => { e.stopPropagation(); removeMember(m); }}
+                          className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors" title={t("Remover")}>
+                          <Trash2 size={14} className="text-muted-foreground" />
+                        </button>
                       )}
                     </div>
                   </div>
                 </motion.div>
               ))}
               {filtered.length === 0 && (
-                <p className="text-center text-sm text-muted-foreground py-8">{t("Nenhum membro encontrado.")}</p>
+                <div className="text-center py-8 text-sm text-muted-foreground">
+                  {t("Nenhum membro encontrado.")}
+                </div>
               )}
             </div>
           </>
         )}
       </div>
 
-      {editingMember && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/20 backdrop-blur-sm"
-          onClick={closeMemberModal}
-        >
-          <div
-            className="w-full max-w-md bg-card rounded-2xl p-6 shadow-xl max-h-[85vh] overflow-y-auto"
-            onClick={e => e.stopPropagation()}
-            role="dialog"
-            aria-labelledby="member-profile-title"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 id="member-profile-title" className="text-lg font-serif font-bold truncate pr-2">
-                {editForm.name || editingMember.full_name}
-              </h2>
-              <button
-                type="button"
-                onClick={closeMemberModal}
-                className="p-1.5 rounded-lg hover:bg-secondary flex-shrink-0"
-                aria-label={t("Cancelar")}
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">{t("Nome completo")}</label>
-                <input
-                  value={editForm.name}
-                  onChange={e => setEditForm({ ...editForm, name: e.target.value })}
-                  readOnly={!canWrite}
-                  className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm read-only:opacity-80"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">{t("Função")}</label>
-                <input
-                  value={editForm.role}
-                  onChange={e => setEditForm({ ...editForm, role: e.target.value })}
-                  readOnly={!canWrite}
-                  className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm read-only:opacity-80"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">{t("Status")}</label>
-                <select
-                  value={editForm.status}
-                  onChange={e => setEditForm({ ...editForm, status: e.target.value as MemberStatus })}
-                  disabled={!canWrite}
-                  className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm disabled:opacity-80"
-                >
-                  {MEMBER_STATUSES.map(s => (
-                    <option key={s} value={s}>
-                      {t(s)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">{t("Telefone")}</label>
-                <input
-                  value={editForm.phone}
-                  onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
-                  readOnly={!canWrite}
-                  className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm read-only:opacity-80"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">{t("E-mail")}</label>
-                <input
-                  type="email"
-                  value={editForm.email}
-                  onChange={e => setEditForm({ ...editForm, email: e.target.value })}
-                  readOnly={!canWrite}
-                  className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm read-only:opacity-80"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">{t("Desde")}</label>
-                <input
-                  type="date"
-                  value={editForm.joined_at}
-                  onChange={e => setEditForm({ ...editForm, joined_at: e.target.value })}
-                  readOnly={!canWrite}
-                  className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm read-only:opacity-80"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">{t("Endereço")}</label>
-                <input
-                  value={editForm.address}
-                  onChange={e => setEditForm({ ...editForm, address: e.target.value })}
-                  readOnly={!canWrite}
-                  className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm read-only:opacity-80"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">{t("Observações")}</label>
-                <textarea
-                  value={editForm.notes}
-                  onChange={e => setEditForm({ ...editForm, notes: e.target.value })}
-                  readOnly={!canWrite}
-                  rows={3}
-                  className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-sm resize-y min-h-[4.5rem] read-only:opacity-80"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2 mt-4 flex-wrap">
-              <button
-                type="button"
-                onClick={() => setWalletMember(editingMember)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-secondary text-sm font-medium hover:bg-secondary/80 transition-colors"
-              >
-                <CreditCard size={14} />
-                {t("Carteira")}
-              </button>
-              <button
-                type="button"
-                onClick={closeMemberModal}
-                className="flex-1 py-2 rounded-lg bg-secondary text-sm font-medium"
-              >
-                {canWrite ? t("Cancelar") : t("Fechar")}
-              </button>
-              {canWrite && (
-                <button
-                  type="button"
-                  onClick={saveEdit}
-                  disabled={saving}
-                  className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 inline-flex items-center justify-center gap-2"
-                >
-                  {saving && <Loader2 size={14} className="animate-spin" />}
-                  {t("Salvar")}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── Member Form Modal ──────────────────────────────────────────────────── */}
 
-      {/* Carteira Ecclesia */}
-      <Dialog open={Boolean(walletMember)} onOpenChange={(v) => !v && setWalletMember(null)}>
-        <DialogContent className="max-w-sm">
-          {walletMember && (
+      <AnimatePresence>
+        {modalOpen && (
+          <Dialog open={modalOpen} onOpenChange={open => { if (!open) closeModal(); }}>
+            <DialogContent className="max-w-2xl w-full p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
+
+              {/* Modal header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border/50 flex-shrink-0">
+                <div>
+                  <h2 className="font-serif text-lg">{isNewMember ? "Cadastrar Membro" : "Editar Membro"}</h2>
+                  {!isNewMember && form.full_name && (
+                    <p className="text-xs text-muted-foreground">{form.full_name}</p>
+                  )}
+                </div>
+                <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
+                  <X size={18} strokeWidth={1.5} />
+                </button>
+              </div>
+
+              {/* Tabs nav */}
+              <div className="flex border-b border-border/50 overflow-x-auto flex-shrink-0 bg-background">
+                {TABS.map(tab => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                        activeTab === tab.id
+                          ? "border-primary text-primary"
+                          : "border-transparent text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <Icon size={13} className="flex-shrink-0" />
+                      <span className="hidden sm:inline">{tab.label}</span>
+                      <span className="sm:hidden">{tab.short}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Tab content */}
+              <div className="overflow-y-auto flex-1 px-5 py-5">
+
+                {/* ── Tab 1: Dados Pessoais ── */}
+                {activeTab === "pessoal" && (
+                  <div className="space-y-5">
+                    {/* Photo upload */}
+                    <div className="flex items-center gap-4">
+                      <div className="relative">
+                        {photoPreview ? (
+                          <img src={photoPreview} alt="Foto" className="w-20 h-20 rounded-full object-cover ring-2 ring-border" />
+                        ) : (
+                          <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+                            <User size={28} />
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => photoInputRef.current?.click()}
+                          className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:opacity-90 transition-opacity"
+                          title="Alterar foto"
+                        >
+                          <Camera size={13} />
+                        </button>
+                        <input
+                          ref={photoInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handlePhotoChange}
+                        />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Foto do membro</p>
+                        <p className="text-xs text-muted-foreground">JPG, PNG · máx. 5MB</p>
+                        {photoPreview && (
+                          <button type="button" onClick={() => { setPhotoPreview(null); setPhotoFile(null); setField("photo_url", null); }}
+                            className="text-xs text-destructive hover:underline mt-1">
+                            Remover foto
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="sm:col-span-2">
+                        <FormInput label="Nome completo" value={form.full_name} onChange={v => setField("full_name", v)} required placeholder="Nome e sobrenome completos" />
+                      </div>
+                      <FormInput label="Data de nascimento" value={form.birth_date || ""} onChange={v => setField("birth_date", v)} type="date" />
+                      <FormSelect label="Sexo" value={form.gender || ""} onChange={v => setField("gender", v)} options={GENDER_OPTIONS} />
+                      <FormSelect label="Estado civil" value={form.marital_status || ""} onChange={v => setField("marital_status", v)} options={MARITAL_STATUS_OPTIONS} />
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Tab 2: Documentos ── */}
+                {activeTab === "documentos" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormInput label="CPF" value={form.cpf || ""} onChange={v => setField("cpf", v)} placeholder="000.000.000-00" />
+                    <FormInput label="RG" value={form.rg || ""} onChange={v => setField("rg", v)} placeholder="Número do RG" />
+                    <FormInput label="Órgão emissor" value={form.rg_issuer || ""} onChange={v => setField("rg_issuer", v)} placeholder="Ex: SSP/RS" />
+                    <FormInput label="Data de emissão (RG)" value={form.rg_issue_date || ""} onChange={v => setField("rg_issue_date", v)} type="date" />
+                  </div>
+                )}
+
+                {/* ── Tab 3: Contato ── */}
+                {activeTab === "contato" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormInput label="Telefone" value={form.phone || ""} onChange={v => setField("phone", v)} placeholder="(00) 00000-0000" type="tel" />
+                    <FormInput label="WhatsApp" value={form.whatsapp || ""} onChange={v => setField("whatsapp", v)} placeholder="(00) 00000-0000" type="tel" />
+                    <div className="sm:col-span-2">
+                      <FormInput label="E-mail" value={form.email || ""} onChange={v => setField("email", v)} placeholder="email@exemplo.com" type="email" />
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Tab 4: Endereço ── */}
+                {activeTab === "endereco" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormInput label="CEP" value={form.zip_code || ""} onChange={v => setField("zip_code", v)} placeholder="00000-000" />
+                    <div className="sm:col-span-2">
+                      <FormInput label="Rua / Logradouro" value={form.street || ""} onChange={v => setField("street", v)} placeholder="Nome da rua" />
+                    </div>
+                    <FormInput label="Número" value={form.address_number || ""} onChange={v => setField("address_number", v)} placeholder="Nº" />
+                    <FormInput label="Complemento" value={form.address_complement || ""} onChange={v => setField("address_complement", v)} placeholder="Apto, casa, bloco..." />
+                    <FormInput label="Bairro" value={form.neighborhood || ""} onChange={v => setField("neighborhood", v)} placeholder="Bairro" />
+                    <FormInput label="Cidade" value={form.city || ""} onChange={v => setField("city", v)} placeholder="Cidade" />
+                    <FormInput label="Estado (UF)" value={form.state || ""} onChange={v => setField("state", v)} placeholder="RS" />
+                  </div>
+                )}
+
+                {/* ── Tab 5: Dados Eclesiásticos ── */}
+                {activeTab === "eclesiastico" && (
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <FormInput label="Data de conversão" value={form.conversion_date || ""} onChange={v => setField("conversion_date", v)} type="date" />
+                      <FormInput label="Data de batismo nas águas" value={form.baptized_at || ""} onChange={v => setField("baptized_at", v)} type="date" />
+                      <FormInput label="Data de admissão" value={form.joined_at || ""} onChange={v => setField("joined_at", v)} type="date" />
+                      <FormSelect label="Situação do membro" value={form.status} onChange={v => setField("status", v as MemberStatus)} options={MEMBER_STATUSES} required />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Sector selector */}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-medium text-muted-foreground">Setor / Distrito</label>
+                        <select
+                          value={form.sector_id || ""}
+                          onChange={e => setField("sector_id", e.target.value || null)}
+                          className="px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          <option value="">— Nenhum —</option>
+                          {sectors.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                          {sectors.length === 0 && (
+                            <option disabled>Nenhum setor cadastrado</option>
+                          )}
+                        </select>
+                      </div>
+
+                      {/* Congregation selector */}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-medium text-muted-foreground">Congregação onde congrega</label>
+                        <select
+                          value={form.congregation_id || ""}
+                          onChange={e => setField("congregation_id", e.target.value || null)}
+                          className="px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          <option value="">— Selecionar —</option>
+                          {subOrgs.map(o => (
+                            <option key={o.id} value={o.id}>
+                              {o.name} ({o.organization_type})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Tab 6: Função / Cargo ── */}
+                {activeTab === "funcao" && (
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="sm:col-span-2">
+                        <FormSelect
+                          label="Função eclesiástica"
+                          value={form.member_role || "Membro"}
+                          onChange={v => setField("member_role", v)}
+                          options={ECCLESIASTICAL_FUNCTIONS}
+                          required
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          A função eclesiástica representa o ministério do membro na igreja.
+                        </p>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <FormSelect
+                          label="Cargo administrativo"
+                          value={form.administrative_role || "Nenhum"}
+                          onChange={v => setField("administrative_role", v)}
+                          options={ADMINISTRATIVE_ROLES}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          O cargo administrativo é a função de gestão, separado da ordem ministerial.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Preview */}
+                    {(form.member_role || form.administrative_role) && (
+                      <div className="bg-muted/50 rounded-lg p-4 space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Exibição na Carteira</p>
+                        <p className="text-sm"><span className="text-muted-foreground">Função eclesiástica:</span> {form.member_role || "—"}</p>
+                        {form.administrative_role && form.administrative_role !== "Nenhum" && (
+                          <p className="text-sm"><span className="text-muted-foreground">Cargo:</span> {form.administrative_role}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Tab 7: Família ── */}
+                {activeTab === "familia" && (
+                  <div className="grid grid-cols-1 gap-4">
+                    <FormInput label="Nome do pai" value={form.father_name || ""} onChange={v => setField("father_name", v)} placeholder="Nome completo do pai" />
+                    <FormInput label="Nome da mãe" value={form.mother_name || ""} onChange={v => setField("mother_name", v)} placeholder="Nome completo da mãe" />
+                    <FormInput label="Cônjuge" value={form.spouse_name || ""} onChange={v => setField("spouse_name", v)} placeholder="Nome do cônjuge" />
+                  </div>
+                )}
+
+                {/* ── Tab 8: Observações ── */}
+                {activeTab === "observacoes" && (
+                  <div className="space-y-4">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-medium text-muted-foreground">Observações internas da secretaria</label>
+                      <textarea
+                        value={form.notes || ""}
+                        onChange={e => setField("notes", e.target.value)}
+                        rows={5}
+                        placeholder="Anotações da secretaria, histórico pastoral, observações administrativas..."
+                        className="px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+                      />
+                      <p className="text-xs text-muted-foreground">Visível apenas para secretaria e liderança.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal footer */}
+              <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-border/50 bg-background flex-shrink-0">
+                {/* Tab navigation arrows */}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const idx = TABS.findIndex(t => t.id === activeTab);
+                      if (idx > 0) setActiveTab(TABS[idx - 1].id);
+                    }}
+                    disabled={activeTab === TABS[0].id}
+                    className="px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-secondary transition-colors disabled:opacity-30"
+                  >
+                    ← Anterior
+                  </button>
+                  <span className="text-xs text-muted-foreground">
+                    {TABS.findIndex(t => t.id === activeTab) + 1}/{TABS.length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const idx = TABS.findIndex(t => t.id === activeTab);
+                      if (idx < TABS.length - 1) setActiveTab(TABS[idx + 1].id);
+                    }}
+                    disabled={activeTab === TABS[TABS.length - 1].id}
+                    className="px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-secondary transition-colors disabled:opacity-30 flex items-center gap-1"
+                  >
+                    Próximo <ChevronRight size={12} />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {!isNewMember && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => { const m = members.find(x => x.id === editingId); if (m) { closeModal(); setWalletMember(m); } }}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
+                      >
+                        <CreditCard size={14} /> Carteira
+                      </button>
+                      {(form.whatsapp || form.phone) && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!editingId) return;
+                            const { data: invites } = await getMemberInvites(editingId);
+                            const pending = invites.find(i => i.status === "pending");
+                            const token = pending?.token;
+                            if (!token) {
+                              setInviteModal({
+                                open:       true,
+                                memberId:   editingId,
+                                memberName: form.full_name,
+                                phone:      form.whatsapp?.trim() || form.phone?.trim() || null,
+                              });
+                              return;
+                            }
+                            const url = buildInviteUrl(token);
+                            const ph  = form.whatsapp?.trim() || form.phone?.trim() || "";
+                            if (ph) {
+                              window.open(
+                                buildWhatsappLink(ph, form.full_name, church?.name ?? "Igreja", url),
+                                "_blank", "noopener,noreferrer",
+                              );
+                            } else {
+                              await navigator.clipboard.writeText(url);
+                              toast.success("Link copiado!");
+                            }
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
+                        >
+                          <Send size={13} /> Convite
+                        </button>
+                      )}
+                    </>
+                  )}
+                  <button type="button" onClick={closeModal}
+                    className="px-4 py-2 text-sm rounded-lg hover:bg-secondary transition-colors text-muted-foreground">
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSave(false)}
+                    disabled={saving || uploadingPhoto}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                  >
+                    {(saving || uploadingPhoto) && <Loader2 size={14} className="animate-spin" />}
+                    {saving ? "Salvando..." : uploadingPhoto ? "Enviando foto..." : "Salvar Membro"}
+                  </button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+      </AnimatePresence>
+
+      {/* Wallet modal */}
+      {walletMember && (
+        <Dialog open={!!walletMember} onOpenChange={open => { if (!open) setWalletMember(null); }}>
+          <DialogContent className="max-w-sm">
             <MemberWalletCard
-              member={walletMember}
-              churchName={church?.name ?? "Ecclesia"}
+              member={toWalletMember(walletMember)}
+              churchName={church?.name ?? "Igreja"}
+              churchCity={church?.city ?? undefined}
+              churchState={church?.state ?? undefined}
               onClose={() => setWalletMember(null)}
             />
-          )}
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
 
-      <BulkImportModal
-        open={showImport}
-        onClose={() => setShowImport(false)}
-        onImport={handleBulkImport}
-        fields={memberFields}
-        templateData={memberTemplate}
-        title={t("Importar Membros")}
-      />
+      {/* Bulk import */}
+      {showImport && (
+        <BulkImportModal
+          title={t("Importar Membros")}
+          fields={memberFields}
+          template={memberTemplate}
+          onImport={handleBulkImport}
+          onClose={() => setShowImport(false)}
+        />
+      )}
+
+      {/* Invite modal */}
+      {inviteModal && (
+        <MemberInviteModal
+          open={inviteModal.open}
+          onClose={() => setInviteModal(null)}
+          memberId={inviteModal.memberId}
+          memberName={inviteModal.memberName}
+          organizationId={church?.id ?? ""}
+          churchName={church?.name ?? "Igreja"}
+          sectorId={form.sector_id}
+          congregationId={form.congregation_id}
+          invitedBy={user?.id}
+          phone={inviteModal.phone}
+        />
+      )}
     </AdminLayout>
   );
 }

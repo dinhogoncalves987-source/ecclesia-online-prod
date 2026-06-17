@@ -39,6 +39,7 @@ import ResetPassword from "./pages/ResetPassword";
 import SharePublic from "./pages/SharePublic";
 import ValidarCarta from "./pages/ValidarCarta";
 import ValidarMembro from "./pages/ValidarMembro";
+import ConviteMembro from "./pages/ConviteMembro";
 
 import DevocionalPublic from "./pages/DevocionalPublic";
 
@@ -147,6 +148,7 @@ const App = () => (
               <Route path="/share" element={<SharePublic />} />
               <Route path="/validar/carta/:token" element={<ValidarCarta />} />
               <Route path="/validar-membro/:id" element={<ValidarMembro />} />
+              <Route path="/convite-membro/:token" element={<ConviteMembro />} />
 
               <Route path="/devocional" element={<DevocionalPublic />} />
 

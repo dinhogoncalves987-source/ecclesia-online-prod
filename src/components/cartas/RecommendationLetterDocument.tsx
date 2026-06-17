@@ -57,6 +57,8 @@ type Props = {
   showActions?: boolean;
   /** Callback from parent when copy-link succeeds (for toast). */
   onCopied?: () => void;
+  /** Name + role of who approved (e.g. "Pastor João Silva — Pastor Presidente"). */
+  approverLabel?: string;
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -65,6 +67,7 @@ export function RecommendationLetterDocument({
   letter,
   showActions = true,
   onCopied,
+  approverLabel,
 }: Props) {
   const docId = `carta-doc-${letter.id}`;
   const validationUrl = buildValidationUrl(letter.publicToken);
@@ -180,11 +183,18 @@ export function RecommendationLetterDocument({
           <p className="text-sm text-neutral-600 mb-6">
             Emitida em {approvedDateStr}.
           </p>
-          <div className="border-t border-neutral-400 pt-2 w-72">
-            <p className="text-sm font-semibold text-neutral-800">
-              Secretaria da Igreja
-            </p>
-            <p className="text-xs text-neutral-500">{churchName}</p>
+          <div className="border-t border-neutral-400 pt-3 w-72">
+            {approverLabel ? (
+              <>
+                <p className="text-sm font-semibold text-neutral-800">{approverLabel}</p>
+                <p className="text-xs text-neutral-500">{churchName}</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-neutral-800">Secretaria da Igreja</p>
+                <p className="text-xs text-neutral-500">{churchName}</p>
+              </>
+            )}
           </div>
         </div>
 

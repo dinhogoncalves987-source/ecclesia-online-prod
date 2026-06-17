@@ -9,7 +9,9 @@ import {
   createRecommendationLetter,
   markRecommendationUnderReview,
   rejectRecommendationLetter,
+  updateRecommendationLetter,
   type CreateRecommendationLetterInput,
+  type UpdateRecommendationLetterInput,
   type RecommendationLetterMutationResult,
 } from "@/lib/recommendationLetterMutations";
 
@@ -102,6 +104,21 @@ export function useRecommendationLetters({
     [organizationId, currentUserId, load],
   );
 
+  const update = useCallback(
+    async (
+      letterId: string,
+      input: UpdateRecommendationLetterInput,
+    ): Promise<RecommendationLetterMutationResult> => {
+      if (!organizationId) return { ok: false, error: "missing_organization" };
+      setMutating(true);
+      const result = await updateRecommendationLetter(organizationId, letterId, input);
+      setMutating(false);
+      if (result.ok) await load();
+      return result;
+    },
+    [organizationId, load],
+  );
+
   return {
     letters,
     loading,
@@ -110,6 +127,7 @@ export function useRecommendationLetters({
     mutating,
     refetch: load,
     create,
+    update,
     setUnderReview,
     approve,
     reject,

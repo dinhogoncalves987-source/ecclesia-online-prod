@@ -4,6 +4,7 @@ import {
   FileText, Clock, Search, CheckCircle2, XCircle, Send, X,
   MapPin, Mail, Loader2, Inbox, Eye, Plus, Wand2, Download,
   Printer, Share2, MoreHorizontal, ScrollText, Link2, ChevronRight,
+  Pencil, UserCheck,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR, enUS, es } from "date-fns/locale";
@@ -24,7 +25,8 @@ import {
 import { downloadCSVRaw, shareContent } from "@/lib/docExport";
 import { RecommendationLetterForm } from "@/components/cartas/RecommendationLetterForm";
 import { RecommendationLetterDocument } from "@/components/cartas/RecommendationLetterDocument";
-import type { CreateRecommendationLetterInput } from "@/lib/recommendationLetterMutations";
+import type { CreateRecommendationLetterInput, UpdateRecommendationLetterInput } from "@/lib/recommendationLetterMutations";
+import { supabase } from "@/integrations/supabase/client";
 
 // ── Status presentation ───────────────────────────────────────────────────────
 
@@ -154,7 +156,7 @@ export default function CartasRecomendacao() {
 
   const {
     letters, loading, fromDatabase, mutating,
-    create, setUnderReview, approve, reject,
+    create, update, setUnderReview, approve, reject,
   } = useRecommendationLetters({
     organizationId: church?.id,
     currentUserId:  user?.id,
@@ -162,14 +164,19 @@ export default function CartasRecomendacao() {
 
   // ── UI state ─────────────────────────────────────────────────────────────
   const [filter, setFilter]             = useState<FilterValue>("all");
+  const [search, setSearch]             = useState("");
   const [selected, setSelected]         = useState<RecommendationLetter | null>(null);
   const [showDocument, setShowDocument] = useState(false);
   const [createOpen, setCreateOpen]     = useState(false);
+  const [editingLetter, setEditingLetter] = useState<RecommendationLetter | null>(null);
   const [aiOpen, setAiOpen]             = useState(false);
   const [aiInput, setAiInput]           = useState("");
   const [aiParsed, setAiParsed]         = useState<AiSuggestion | null>(null);
   const [suggestion, setSuggestion]     = useState<AiSuggestion | null>(null);
   const [formKey, setFormKey]           = useState(0);
+
+  // Approver info fetched on demand when opening a letter detail
+  const [approverLabel, setApproverLabel] = useState<string | null>(null);
 
   const dateLoc = lang === "en" ? enUS : lang === "es" ? es : ptBR;
   const fmtDate = (iso: string | null) =>
@@ -191,10 +198,19 @@ export default function CartasRecomendacao() {
     return base;
   }, [letters]);
 
-  const filtered = useMemo(
-    () => filter === "all" ? letters : letters.filter((l) => l.status === filter),
-    [letters, filter],
-  );
+  const filtered = useMemo(() => {
+    let result = filter === "all" ? letters : letters.filter((l) => l.status === filter);
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      result = result.filter((l) =>
+        l.memberName.toLowerCase().includes(q) ||
+        l.destinationChurch.toLowerCase().includes(q) ||
+        l.destinationCity.toLowerCase().includes(q) ||
+        (l.memberEmail ?? "").toLowerCase().includes(q),
+      );
+    }
+    return result;
+  }, [letters, filter, search]);
 
   // ── Create handler ────────────────────────────────────────────────────────
   const handleCreate = async (input: CreateRecommendationLetterInput) => {
@@ -242,6 +258,46 @@ export default function CartasRecomendacao() {
   const quickReview  = (id: string) => runAction(() => setUnderReview(id), t("Marcada em análise"), false);
   const quickApprove = (id: string) => runAction(() => approve(id), t("Solicitação aprovada"), false);
   const quickReject  = (id: string) => runAction(() => reject(id), t("Solicitação rejeitada"), false);
+
+  // ── Approver info ─────────────────────────────────────────────────────
+  useEffect(() => {
+    setApproverLabel(null);
+    if (!selected?.approvedBy) return;
+    supabase
+      .from("profiles")
+      .select("full_name, role_title")
+      .eq("user_id", selected.approvedBy)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          const name = (data as { full_name?: string; role_title?: string }).full_name ?? "";
+          const role = (data as { full_name?: string; role_title?: string }).role_title ?? "";
+          setApproverLabel([name, role].filter(Boolean).join(" — "));
+        }
+      });
+  }, [selected?.approvedBy]);
+
+  // ── Edit handler ──────────────────────────────────────────────────────
+  const handleEdit = async (input: CreateRecommendationLetterInput) => {
+    if (!editingLetter) return;
+    const editInput: UpdateRecommendationLetterInput = {
+      memberName:       input.memberName,
+      memberEmail:      input.memberEmail,
+      destinationChurch: input.destinationChurch,
+      destinationCity:  input.destinationCity,
+      destinationState: input.destinationState,
+      reason:           input.reason,
+      observations:     input.observations,
+    };
+    const result = await update(editingLetter.id, editInput);
+    if (result.ok) {
+      toast({ title: t("Carta atualizada com sucesso!") });
+      setEditingLetter(null);
+      setSelected(null);
+    } else {
+      toast({ title: t("Erro ao salvar"), description: result.error ?? t("Tente novamente"), variant: "destructive" });
+    }
+  };
 
   // ── AI helper ─────────────────────────────────────────────────────────────
   const handleAiSuggest = () => {
@@ -367,26 +423,48 @@ export default function CartasRecomendacao() {
               ))}
             </div>
 
-            {/* Filters */}
-            <div className="flex gap-2 flex-wrap">
-              {filterChips.map((chip) => (
-                <button
-                  key={chip.value}
-                  onClick={() => setFilter(chip.value)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    filter === chip.value
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {chip.label}
-                  {chip.value !== "all" && (
-                    <span className="ml-1.5 text-xs opacity-70">
-                      {counts[chip.value as RecommendationLetterStatus] ?? 0}
-                    </span>
-                  )}
-                </button>
-              ))}
+            {/* Search + Filters */}
+            <div className="space-y-2">
+              {/* Search bar */}
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={t("Buscar por nome, congregação ou cidade...")}
+                  className="w-full pl-9 pr-3 py-2 rounded-lg bg-secondary border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+                {search && (
+                  <button
+                    onClick={() => setSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-muted-foreground hover:text-foreground"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+
+              {/* Status filter chips */}
+              <div className="flex gap-2 flex-wrap">
+                {filterChips.map((chip) => (
+                  <button
+                    key={chip.value}
+                    onClick={() => setFilter(chip.value)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      filter === chip.value
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {chip.label}
+                    {chip.value !== "all" && (
+                      <span className="ml-1.5 text-xs opacity-70">
+                        {counts[chip.value as RecommendationLetterStatus] ?? 0}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* List or empty state */}
@@ -416,6 +494,7 @@ export default function CartasRecomendacao() {
                     fmtDate={fmtDateShort}
                     statusLabel={(s) => t(STATUS_LABELS[s])}
                     onOpen={() => { setSelected(letter); setShowDocument(false); }}
+                    onEdit={() => setEditingLetter(letter)}
                     onReview={() => quickReview(letter.id)}
                     onApprove={() => quickApprove(letter.id)}
                     onReject={() => quickReject(letter.id)}
@@ -452,6 +531,7 @@ export default function CartasRecomendacao() {
                 defaultMemberName={defaultMemberName}
                 defaultMemberEmail={user?.email ?? ""}
                 showMemberIdentityFields={!defaultMemberName}
+                isStaff={false}
                 submitting={mutating}
                 onSubmit={handleCreate}
               />
@@ -560,6 +640,14 @@ export default function CartasRecomendacao() {
                     <HistoryLine label={t("Solicitada em")}  value={fmtDate(selected.requestedAt)} />
                     {selected.reviewedAt && <HistoryLine label={t("Analisada em")} value={fmtDate(selected.reviewedAt)} />}
                     {selected.approvedAt && <HistoryLine label={t("Aprovada em")}  value={fmtDate(selected.approvedAt)} />}
+                    {approverLabel && (
+                      <div className="flex items-center gap-1.5 mt-1 pt-1 border-t border-border/40">
+                        <UserCheck size={11} className="text-emerald-500 flex-shrink-0" />
+                        <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                          {t("Aprovada por")} {approverLabel}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {selected.status === "rejected" && (
@@ -578,6 +666,14 @@ export default function CartasRecomendacao() {
                       className="flex-1 min-w-[140px] flex items-center justify-center gap-2 py-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-sm font-medium hover:bg-emerald-500/20 transition-colors"
                     >
                       <Eye size={15} /> {t("Visualizar documento")}
+                    </button>
+                  )}
+                  {canManage && (
+                    <button
+                      onClick={() => { setEditingLetter(selected); setSelected(null); }}
+                      className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-secondary text-foreground text-sm font-medium hover:bg-secondary/80 transition-colors"
+                    >
+                      <Pencil size={14} /> {t("Editar")}
                     </button>
                   )}
                   {canManage && selected.status !== "approved" && (
@@ -649,6 +745,7 @@ export default function CartasRecomendacao() {
                 <div className="flex-1 overflow-y-auto p-5">
                   <RecommendationLetterDocument
                     letter={selected}
+                    approverLabel={approverLabel ?? undefined}
                     onCopied={() => toast({ title: t("Link copiado!"), description: t("Link de validação copiado para a área de transferência.") })}
                   />
                 </div>
@@ -721,6 +818,8 @@ export default function CartasRecomendacao() {
                     defaultMemberName={canManage ? "" : defaultMemberName}
                     defaultMemberEmail={canManage ? "" : (user?.email ?? "")}
                     showMemberIdentityFields={canManage || !defaultMemberName}
+                    isStaff={canManage}
+                    organizationId={church?.id}
                     initialDestinationChurch={suggestion?.destinationChurch}
                     initialDestinationCity={suggestion?.destinationCity}
                     initialDestinationState={suggestion?.destinationState}
@@ -728,6 +827,60 @@ export default function CartasRecomendacao() {
                     initialObservations={suggestion?.observations}
                     submitting={mutating}
                     onSubmit={handleCreate}
+                  />
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── Edit modal ───────────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {editingLetter && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-40"
+              onClick={() => setEditingLetter(null)}
+            />
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="w-full max-w-lg bg-card rounded-2xl shadow-xl flex flex-col max-h-[90vh]"
+              >
+                <div className="flex items-center justify-between p-5 border-b border-border/50">
+                  <div>
+                    <h2 className="font-serif font-bold text-lg flex items-center gap-2">
+                      <Pencil size={16} className="text-primary" />
+                      {t("Editar Carta de Recomendação")}
+                    </h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {editingLetter.memberName}
+                    </p>
+                  </div>
+                  <button onClick={() => setEditingLetter(null)} className="p-1.5 rounded-lg hover:bg-secondary flex-shrink-0">
+                    <X size={18} />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-5">
+                  <RecommendationLetterForm
+                    key={`edit-${editingLetter.id}`}
+                    isStaff={canManage}
+                    organizationId={church?.id}
+                    showMemberIdentityFields={true}
+                    initialMemberName={editingLetter.memberName}
+                    initialMemberEmail={editingLetter.memberEmail ?? ""}
+                    initialDestinationChurch={editingLetter.destinationChurch}
+                    initialDestinationCity={editingLetter.destinationCity}
+                    initialDestinationState={editingLetter.destinationState ?? ""}
+                    initialReason={editingLetter.reason}
+                    initialObservations={editingLetter.observations ?? ""}
+                    submitting={mutating}
+                    onSubmit={handleEdit}
+                    submitLabel={t("Salvar alterações")}
                   />
                 </div>
               </motion.div>
@@ -870,6 +1023,7 @@ type LetterRowProps = {
   fmtDate: (iso: string | null) => string;
   statusLabel: (s: RecommendationLetterStatus) => string;
   onOpen: () => void;
+  onEdit: () => void;
   onReview: () => void;
   onApprove: () => void;
   onReject: () => void;
@@ -880,7 +1034,7 @@ type LetterRowProps = {
 
 function LetterRow({
   letter, index, canManage, canApprove, canReview, mutating,
-  fmtDate, statusLabel, onOpen, onReview, onApprove, onReject,
+  fmtDate, statusLabel, onOpen, onEdit, onReview, onApprove, onReject,
   onViewDoc, onCopyLink, onShare,
 }: LetterRowProps) {
   return (
@@ -955,6 +1109,11 @@ function LetterRow({
               <QuickBtn label="Copiar link"   color="gray"  icon={<Link2 size={11} />} onClick={onCopyLink} />
               <QuickBtn label="Compartilhar"  color="gray"  icon={<Share2 size={11} />} onClick={onShare} />
             </>
+          )}
+
+          {/* Edit */}
+          {canManage && (
+            <QuickBtn label="Editar" color="gray" icon={<Pencil size={11} />} onClick={onEdit} />
           )}
 
           {/* Open detail always */}
