@@ -4,6 +4,13 @@ const PLATFORM_ADMIN_ROLE_VALUES = new Set([
   "platform_admin",
   "super_admin",
   "superadmin",
+  // Support agents — belong to the platform, not to a specific church
+  "support_secretaria",
+  "support_financeiro",
+  "support_culto_louvor",
+  "support_tecnico",
+  "support_implantacao",
+  "support_readonly",
 ]);
 
 /** Congregação demo (Jardim América) — referência para platform admin sem org ativa. */

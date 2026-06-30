@@ -15,6 +15,32 @@ export interface Church {
   phone: string | null;
   email: string | null;
   pastor_name: string | null;
+  // ── Status operacional ────────────────────────────────
+  unit_status: string | null;
+  // ── Configuração denominacional ───────────────────────
+  denomination_type: string | null;
+  hierarchy_model: string | null;
+  // ── Labels configuráveis por nível hierárquico ────────
+  // Cada org nomeia seus próprios níveis. NULL = usar fallback no frontend.
+  top_level_label: string | null;
+  top_level_label_plural: string | null;
+  municipal_level_label: string | null;
+  municipal_level_label_plural: string | null;
+  intermediate_level_label: string | null;
+  intermediate_level_label_plural: string | null;
+  local_unit_label: string | null;
+  local_unit_label_plural: string | null;
+  // ── Flags de níveis ativos ────────────────────────────
+  uses_convention_level: boolean | null;
+  uses_municipal_level: boolean | null;
+  uses_intermediate_level: boolean | null;
+  uses_local_units: boolean | null;
+  // ── Campos financeiros estruturais ───────────────────────
+  has_operational_cashbox: boolean | null;
+  is_financially_autonomous: boolean | null;
+  financially_consolidates_to_id: string | null;
+  cnpj: string | null;
+  financial_policy_notes: string | null;
 }
 
 export interface ChurchContextType {
@@ -26,6 +52,8 @@ export interface ChurchContextType {
   loading: boolean;
   isMatriz: boolean;
   congregations: Church[];
+  /** true se o usuário tem pelo menos um vínculo ativo em organization_users */
+  hasActiveMembership: boolean;
   switchChurch: (churchId: string) => boolean;
   clearActiveChurch: () => void;
   refetch: () => void;
@@ -40,6 +68,7 @@ export const ChurchContext = createContext<ChurchContextType>({
   loading: true,
   isMatriz: false,
   congregations: [],
+  hasActiveMembership: false,
   switchChurch: () => false,
   clearActiveChurch: () => {},
   refetch: () => {},

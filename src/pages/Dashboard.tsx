@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useChurch } from "@/hooks/useChurchContext";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useRole } from "@/hooks/useRole";
+import { useSupportContext } from "@/contexts/SupportContext";
 import { runScopedOrganizationQuery } from "@/lib/organizationScope";
 
 interface PlatformCampaign {
@@ -76,8 +77,55 @@ export default function Dashboard() {
   const { t, lang } = useLanguage();
   const { church, isMatriz } = useChurch();
   const { canonicalRole, isAdmin, isSuperAdmin, role } = useRole();
+  const { isPlatformUser, isSupportModeActive, activeSupportOrg, platformRole } = useSupportContext();
   const isMembro = canonicalRole === "member" || canonicalRole === "leader" || role === "membro" || role === "lider" || role === "obreiro";
   const canViewPlatformCampaigns = isSuperAdmin || canonicalRole === "member";
+
+  // For platform users without support org selected, show platform overview
+  const isPlatformOverviewMode = isPlatformUser && !isSupportModeActive;
+
+  const orgType = church?.organization_type ?? null;
+  const isInternationalOrg = orgType === "international_convention";
+  const isNationalOrg = orgType === "national_convention";
+  const isStateOrg    = orgType === "state_convention" || orgType === "convencao";
+  const isSingleChurchOrg = church?.hierarchy_model === "single_church";
+
+  /** Subtitle label for current org in dashboard header */
+  const orgDashboardSubtitle = (): string => {
+    if (isPlatformOverviewMode) return t("Visão global da plataforma Ecclesia");
+    if (isSuperAdmin && isSupportModeActive) return `Modo suporte: ${activeSupportOrg?.name ?? ""}`;
+    if (isSuperAdmin) return t("Visão global da plataforma");
+    if (isInternationalOrg) return "Painel da Organização Internacional";
+    if (isNationalOrg) return "Painel da Sede Nacional";
+    if (isStateOrg) return `Painel da ${church?.top_level_label ?? "Convenção Estadual"}`;
+    if (orgType === "matriz" || orgType === "sede") {
+      if (isSingleChurchOrg) return `Painel — ${church?.name ?? "Minha Igreja"}`;
+      return `Painel da ${church?.municipal_level_label ?? "Matriz Municipal"}`;
+    }
+    if (orgType === "setor") return `Painel do ${church?.intermediate_level_label ?? "Setor"}`;
+    if (orgType === "congregacao") return `Painel da ${church?.local_unit_label ?? "Congregação"}`;
+    if (isMembro) return t("Bem-vindo à sua igreja");
+    return t("Visão geral da administração");
+  };
+
+  /** Structure nav label for Quick Access card */
+  const structureNavLabel = (): { label: string; desc: string } => {
+    if (isInternationalOrg) {
+      if (church?.hierarchy_model === "international_flexible") {
+        return { label: "Campos / Países / Igrejas", desc: "Gerenciar estrutura internacional" };
+      }
+      return { label: church?.top_level_label_plural ?? "Convenções / Países", desc: "Gerenciar estrutura internacional" };
+    }
+    if (isNationalOrg) return { label: "Convenções Estaduais", desc: "Gerenciar estrutura nacional" };
+    if (isStateOrg) return { label: church?.municipal_level_label_plural ?? "Matrizes / Sedes", desc: "Gerenciar matrizes e sedes" };
+    if (orgType === "matriz" || orgType === "sede") {
+      if (isSingleChurchOrg) return { label: church?.name ?? "Minha Igreja", desc: "Dados e operações da igreja" };
+      const label = church?.intermediate_level_label_plural ?? "Setores";
+      return { label, desc: `Gerenciar ${label.toLowerCase()}` };
+    }
+    const label = church?.local_unit_label_plural ?? "Congregações";
+    return { label, desc: `Gerenciar ${label.toLowerCase()}` };
+  };
   const [platformNotices, setPlatformNotices] = useState<PlatformCampaign[]>([]);
   const platformCampaigns = platformNotices;
   const [activeCampaignIndex, setActiveCampaignIndex] = useState(0);
@@ -450,12 +498,8 @@ export default function Dashboard() {
             { label: t("Membros"), desc: t("Cadastro e gestão de membros"), path: "/admin/membros", icon: Users },
             { label: t("Agenda"), desc: t("Calendário e eventos da igreja"), path: "/admin/agenda", icon: Calendar },
             ...(isAdmin ? [{
-              label: church?.organization_type === "convencao" ? t("Matrizes")
-                : church?.organization_type === "matriz" ? t("Setores")
-                : t("Congregações"),
-              desc: church?.organization_type === "convencao" ? t("Gerenciar matrizes municipais")
-                : church?.organization_type === "matriz" ? t("Gerenciar setores")
-                : t("Gerenciar congregações"),
+              label: structureNavLabel().label,
+              desc: structureNavLabel().desc,
               path: "/admin/congregacoes",
               icon: Building2,
             }] : []),
@@ -489,17 +533,7 @@ export default function Dashboard() {
               {church?.name ?? t("Dashboard")}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {isSuperAdmin
-                ? t("Visão global da plataforma")
-                : church?.organization_type === "convencao"
-                  ? t("Painel da Convenção / Regional")
-                  : church?.organization_type === "matriz"
-                    ? t("Painel da Matriz Municipal")
-                    : church?.organization_type === "setor"
-                      ? t("Painel do Setor")
-                      : isMembro
-                        ? t("Bem-vindo à sua igreja")
-                        : t("Visão geral da administração")}
+              {orgDashboardSubtitle()}
             </p>
           </div>
           {isAdmin && (
@@ -525,8 +559,8 @@ export default function Dashboard() {
           <div className="flex items-center justify-center py-12">
             <Loader2 size={24} className="animate-spin text-muted-foreground" />
           </div>
-        ) : !church && !isSuperAdmin ? (
-          /* No church assigned — welcome/onboarding state */
+        ) : !church && !isSuperAdmin && !isPlatformOverviewMode ? (
+          /* No church assigned — welcome/onboarding state (regular users only) */
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -559,7 +593,7 @@ export default function Dashboard() {
             </div>
           </motion.div>
         ) : (
-          isAdmin ? renderAdminDashboard() : renderMembroDashboard()
+          (isAdmin || isPlatformOverviewMode) ? renderAdminDashboard() : renderMembroDashboard()
         )}
       </div>
     </AdminLayout>

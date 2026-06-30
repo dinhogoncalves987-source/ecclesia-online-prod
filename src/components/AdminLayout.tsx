@@ -5,7 +5,7 @@ import {
   Heart, MessageSquare, UsersRound, Archive, BarChart3, Menu, X,
   Bell, ChevronLeft, ChevronDown, Settings, LogOut, Maximize, Minimize, Globe,
   Shield, User, Building2, Music2, Gavel, Briefcase, ShoppingBag, MessageCircle, Megaphone, ScrollText,
-  MessagesSquare, ClipboardList, CreditCard
+  MessagesSquare, ClipboardList, CreditCard, LayoutGrid
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -14,6 +14,9 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useRole } from "@/hooks/useRole";
 import { useChurch } from "@/hooks/useChurchContext";
 import { supabase } from "@/integrations/supabase/client";
+import { SupportModeBanner } from "@/components/platform/SupportModeBanner";
+import { RequireSupportOrganization } from "@/components/platform/RequireSupportOrganization";
+import { useSupportContext } from "@/contexts/SupportContext";
 import flagBR from "@/assets/flag-br.png";
 import flagUS from "@/assets/flag-us.png";
 import flagES from "@/assets/flag-es.png";
@@ -89,7 +92,7 @@ const navSections: NavSection[] = [
     items: [
       { icon: Building2, label: "Congregações", path: "/admin/congregacoes" },
       { icon: Shield, label: "Gerenciar Acessos", path: "/admin/gerenciar-acessos" },
-      { icon: Globe, label: "Super Admin", path: "/admin/super-admin" },
+      { icon: LayoutGrid, label: "Cockpit", path: "/admin/super-admin" },
     ],
   },
   {
@@ -129,12 +132,45 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const { t, lang, setLang } = useLanguage();
   const { canAccess, isAdmin, isSuperAdmin } = useRole();
   const { church } = useChurch();
+  const { isPlatformUser, isSupportModeActive } = useSupportContext();
+
+  // Routes that are platform-level and do NOT require a support org selected
+  const UNGUARDED_PLATFORM_PATHS = [
+    "/admin",               // Dashboard (shows platform metrics)
+    "/admin/super-admin",   // SuperAdmin page
+    "/admin/perfil",        // Profile
+    "/admin/gerenciar-acessos", // Team manager for super admin
+  ];
+
+  // Check if current route needs org context for platform users
+  const isGuardedRoute = isPlatformUser
+    && !isSupportModeActive
+    && !UNGUARDED_PLATFORM_PATHS.some(
+        (p) => location.pathname === p || (p !== "/admin" && location.pathname.startsWith(p + "/")),
+      );
 
   const childUnitsNavLabel = (): string => {
     const orgType = church?.organization_type;
-    if (orgType === "convencao") return t("Matrizes");
-    if (orgType === "matriz") return t("Setores / Distritos");
-    return t("Congregações");
+    const model   = church?.hierarchy_model;
+    if (orgType === "international_convention") {
+      if (model === "international_flexible") return t("Campos / Países");
+      return church?.top_level_label_plural ?? t("Convenções / Países");
+    }
+    if (orgType === "national_convention") return church?.top_level_label_plural ?? t("Convenções Estaduais");
+    if (orgType === "state_convention") return church?.municipal_level_label_plural ?? t("Matrizes / Sedes");
+    if (orgType === "convencao") return church?.municipal_level_label_plural ?? t("Matrizes");
+    if (orgType === "matriz" || orgType === "sede") {
+      if (model === "single_church") return church?.municipal_level_label ?? t("Minha Igreja");
+      if (church?.uses_local_units === false && church?.uses_intermediate_level === false) {
+        return church?.municipal_level_label ?? t("Minha unidade");
+      }
+      if (church?.uses_intermediate_level === false) {
+        return church?.local_unit_label_plural ?? t("Unidades locais");
+      }
+      return church?.intermediate_level_label_plural ?? t("Unidades");
+    }
+    if (orgType === "setor") return church?.local_unit_label_plural ?? t("Unidades locais");
+    return church?.local_unit_label_plural ?? t("Unidades locais");
   };
 
   // Build resolved sections (applying dynamic Congregações label)
@@ -440,8 +476,13 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">
+          {/* Support mode banner — visible for all platform users */}
+          <SupportModeBanner />
           <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
-            {children}
+            {isGuardedRoute
+              ? <RequireSupportOrganization>{children}</RequireSupportOrganization>
+              : children
+            }
           </div>
         </main>
       </div>

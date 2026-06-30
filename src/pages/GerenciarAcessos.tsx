@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
@@ -6,11 +6,13 @@ import { useChurch } from "@/hooks/useChurchContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
-  CheckCircle2, ChevronDown, Clock, Copy, Loader2, Mail,
-  Phone, Plus, Send, Shield, UserPlus, UserX, X, XCircle,
+  ArrowLeft, BarChart3, BookOpen, Building2, CheckCircle2, ChevronDown,
+  ChevronRight, ClipboardList, Clock, Copy, Eye, Key,
+  Loader2, Mail, MessageSquare, Phone, Plus, Send, Shield,
+  Sparkles, User, UserPlus, Users, UserX, Wallet, X, XCircle,
 } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate, useLocation } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -33,50 +35,68 @@ interface OrgMemberRow {
   avatar_url: string | null;
   role: OrgMembershipRole;
   is_active: boolean;
+  created_at?: string;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const ASSIGNABLE_ROLES: OrgMembershipRole[] = [
-  "church_admin", "tesoureiro", "contador", "pastor",
-  "secretary", "leader", "member",
+  "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member",
 ];
 
-const ROLE_LABELS: Record<OrgMembershipRole, string> = {
+const ROLE_LABELS: Record<OrgMembershipRole | "porteiro", string> = {
   church_admin: "Administrador",
-  tesoureiro:   "Tesoureiro",
-  contador:     "Contador",
   pastor:       "Pastor",
   secretary:    "Secretário(a)",
+  tesoureiro:   "Tesoureiro",
+  contador:     "Contador",
   leader:       "Líder",
   member:       "Membro",
+  porteiro:     "Porteiro",
 };
 
 const ROLE_COLORS: Record<OrgMembershipRole, string> = {
   church_admin: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  tesoureiro:   "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  contador:     "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
   pastor:       "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
   secretary:    "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
+  tesoureiro:   "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  contador:     "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
   leader:       "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
   member:       "bg-secondary text-muted-foreground",
 };
 
-const ROLE_DESC: Record<OrgMembershipRole, string> = {
+const ROLE_DESC: Record<OrgMembershipRole | "porteiro", string> = {
   church_admin: "Acesso total. Pode gerenciar usuários e todos os módulos.",
-  tesoureiro:   "Acesso a Financeiro e Relatórios.",
-  contador:     "Acesso somente leitura a Financeiro e Relatórios.",
   pastor:       "Acesso a Membros, Comunicação e gestão pastoral.",
   secretary:    "Acesso a Membros, Comunicação e documentos.",
+  tesoureiro:   "Acesso a Financeiro e Relatórios.",
+  contador:     "Acesso somente leitura a Financeiro e Relatórios.",
   leader:       "Acesso a Agenda, Grupos e módulos de liderança.",
   member:       "Acesso aos módulos básicos da comunidade.",
+  porteiro:     "Acesso mínimo. Futuramente habilitado para leitor de QR Code.",
 };
 
+type RoleCardConfig = {
+  role: OrgMembershipRole | "porteiro";
+  Icon: React.ElementType;
+  iconColor: string;
+  cardAccent: string;
+  future?: boolean;
+};
+
+const ROLE_CARDS: RoleCardConfig[] = [
+  { role: "church_admin", Icon: Shield,      iconColor: "text-red-500",     cardAccent: "group-hover:border-red-300 dark:group-hover:border-red-700" },
+  { role: "pastor",       Icon: BookOpen,    iconColor: "text-amber-500",   cardAccent: "group-hover:border-amber-300 dark:group-hover:border-amber-700" },
+  { role: "secretary",    Icon: ClipboardList, iconColor: "text-indigo-500", cardAccent: "group-hover:border-indigo-300 dark:group-hover:border-indigo-700" },
+  { role: "tesoureiro",   Icon: Wallet,      iconColor: "text-blue-500",    cardAccent: "group-hover:border-blue-300 dark:group-hover:border-blue-700" },
+  { role: "contador",     Icon: BarChart3,   iconColor: "text-cyan-500",    cardAccent: "group-hover:border-cyan-300 dark:group-hover:border-cyan-700" },
+  { role: "leader",       Icon: Users,       iconColor: "text-purple-500",  cardAccent: "group-hover:border-purple-300 dark:group-hover:border-purple-700" },
+  { role: "member",       Icon: User,        iconColor: "text-slate-500",   cardAccent: "group-hover:border-slate-300 dark:group-hover:border-slate-700" },
+  { role: "porteiro",     Icon: Key,         iconColor: "text-emerald-500", cardAccent: "group-hover:border-emerald-300 dark:group-hover:border-emerald-700", future: true },
+];
+
 const INVITE_STATUS_LABELS: Record<string, string> = {
-  pending:  "Pendente",
-  accepted: "Aceito",
-  expired:  "Expirado",
-  revoked:  "Revogado",
+  pending: "Pendente", accepted: "Aceito", expired: "Expirado", revoked: "Revogado",
 };
 
 const INVITE_STATUS_COLORS: Record<string, string> = {
@@ -86,7 +106,7 @@ const INVITE_STATUS_COLORS: Record<string, string> = {
   revoked:  "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400",
 };
 
-// ── Normalizer ────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function normalizeRole(role: string | null | undefined): OrgMembershipRole {
   switch (role) {
@@ -100,7 +120,19 @@ function normalizeRole(role: string | null | undefined): OrgMembershipRole {
   }
 }
 
-// ── WhatsApp icon ─────────────────────────────────────────────────────────────
+function UserAvatar({ user, size = "md" }: { user: OrgMemberRow; size?: "sm" | "md" | "lg" }) {
+  const initials = user.full_name
+    ? user.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+    : user.email?.charAt(0).toUpperCase() ?? "?";
+  const cls = size === "lg" ? "w-14 h-14 text-base" : size === "sm" ? "w-8 h-8 text-[10px]" : "w-10 h-10 text-xs";
+  return user.avatar_url ? (
+    <img src={user.avatar_url} alt="" className={`${cls} rounded-full object-cover flex-shrink-0`} />
+  ) : (
+    <div className={`${cls} rounded-full bg-accent/20 flex items-center justify-center font-bold text-accent flex-shrink-0`}>
+      {initials}
+    </div>
+  );
+}
 
 function WhatsAppIcon({ size = 14 }: { size?: number }) {
   return (
@@ -110,45 +142,346 @@ function WhatsAppIcon({ size = 14 }: { size?: number }) {
   );
 }
 
+
+// ── Platform Team Manager ─────────────────────────────────────────────────────
+
+import { ALL_PLATFORM_ROLES, PLATFORM_ROLE_LABELS, isPlatformRole } from "@/lib/platformSupportPermissions";
+import type { PlatformRole } from "@/lib/platformSupportPermissions";
+import { SupportOrganizationSelector } from "@/components/platform/SupportOrganizationSelector";
+import { useSupportContext } from "@/contexts/SupportContext";
+import { useNavigate as _useNavigate } from "react-router-dom";
+
+interface PlatformAgent {
+  user_id: string;
+  full_name: string | null;
+  email: string | null;
+  platform_role: string;
+  departments: { id: string; name: string; is_primary: boolean }[];
+}
+
+function PlatformTeamManager() {
+  const [agents, setAgents] = useState<PlatformAgent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectorOpen, setSelectorOpen] = useState(false);
+  const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
+  const { activeSupportOrg, clearSupportOrg } = useSupportContext();
+  const nav = _useNavigate();
+
+  const loadAgents = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("profiles")
+      .select("user_id, full_name, email, platform_role")
+      .not("platform_role", "is", null)
+      .order("full_name");
+
+    const agentRows: PlatformAgent[] = await Promise.all(
+      (data ?? [])
+        .filter((r) => r.platform_role && isPlatformRole(r.platform_role))
+        .map(async (r) => {
+          const { data: deptLinks } = await supabase
+            .from("platform_support_agent_departments" as any)
+            .select("is_primary, department:platform_support_departments(id, name)")
+            .eq("agent_user_id", r.user_id);
+          const departments = ((deptLinks || []) as any[])
+            .map((d) => ({ id: d.department?.id, name: d.department?.name, is_primary: d.is_primary }))
+            .filter((d) => d.id);
+          return { user_id: r.user_id, full_name: r.full_name, email: r.email, platform_role: r.platform_role!, departments };
+        })
+    );
+
+    setAgents(agentRows);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { void loadAgents(); }, [loadAgents]);
+
+  const handleUpdateRole = async (userId: string, newRole: PlatformRole) => {
+    await supabase.from("profiles").update({ platform_role: newRole } as any).eq("user_id", userId);
+    toast({ title: `Função atualizada para ${PLATFORM_ROLE_LABELS[newRole]}` });
+    void loadAgents();
+  };
+
+  const handleDeactivate = async (userId: string, name: string | null) => {
+    if (!confirm(`Remover ${name || "este agente"} da equipe da plataforma?`)) return;
+    setDeactivatingId(userId);
+    await supabase.from("profiles").update({ platform_role: null } as any).eq("user_id", userId);
+    await supabase.from("platform_support_agent_departments" as any).delete().eq("agent_user_id", userId);
+    toast({ title: `${name || "Agente"} removido da equipe` });
+    setDeactivatingId(null);
+    void loadAgents();
+  };
+
+  return (
+    <AdminLayout>
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-serif tracking-tight flex items-center gap-2">
+              <Shield size={28} className="text-accent" />
+              Gerenciar Acessos
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Equipe da plataforma Ecclesia — funções, departamentos e permissões de acesso.
+            </p>
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => nav("/admin/super-admin", { state: { openTeam: true } })}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-secondary text-foreground rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors border border-border"
+            >
+              <UserPlus size={15} />
+              Novo agente
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectorOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+            >
+              <Building2 size={15} />
+              Atender organização
+            </button>
+          </div>
+        </div>
+
+        {/* Current support context */}
+        {activeSupportOrg && (
+          <div className="bg-accent/10 border border-accent/20 rounded-xl p-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-accent uppercase tracking-wide mb-0.5">Modo suporte ativo</p>
+              <p className="text-sm font-medium">{activeSupportOrg.name}</p>
+              <p className="text-xs text-muted-foreground">{activeSupportOrg.organization_type} — {[activeSupportOrg.city, activeSupportOrg.state].filter(Boolean).join(", ")}</p>
+            </div>
+            <button type="button" onClick={clearSupportOrg} className="text-xs text-destructive hover:underline flex items-center gap-1">
+              <X size={12} /> Sair
+            </button>
+          </div>
+        )}
+
+        <div className="bg-amber-500/10 border border-amber-400/30 rounded-xl p-4 text-xs text-muted-foreground space-y-1">
+          <p className="font-semibold text-foreground">Selecione uma organização para gerenciar seus acessos</p>
+          <p>Clique em <strong>Atender organização</strong> para gerenciar acessos de uma Igreja específica (pastor, secretária, tesoureiro, etc).</p>
+          <p>O painel abaixo mostra e gerencia a equipe interna da plataforma Ecclesia.</p>
+        </div>
+
+        {/* Agents table */}
+        <div className="bg-card rounded-xl shadow-sm border border-border/50 overflow-hidden">
+          <div className="p-4 border-b border-border/40 flex items-center justify-between">
+            <h2 className="font-semibold text-sm flex items-center gap-2">
+              <Users size={15} className="text-accent" />
+              Agentes da plataforma
+            </h2>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">{agents.length} agente{agents.length !== 1 ? "s" : ""}</span>
+              <button onClick={() => nav("/admin/super-admin")} className="text-xs text-accent hover:underline flex items-center gap-1">
+                Ver Cockpit completo <ChevronRight size={11} />
+              </button>
+            </div>
+          </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 size={20} className="animate-spin text-muted-foreground" />
+            </div>
+          ) : agents.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <Users size={32} className="mx-auto mb-2 opacity-30" />
+              <p className="text-sm">Nenhum agente da plataforma configurado.</p>
+              <p className="text-xs mt-1">Acesse o Cockpit → Equipe para adicionar o primeiro agente.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border/30">
+              {agents.map((agent) => {
+                const initials = agent.full_name?.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() || "?";
+                const roleLabel = PLATFORM_ROLE_LABELS[agent.platform_role as PlatformRole] || agent.platform_role;
+                return (
+                  <div key={agent.user_id} className="px-4 py-3 flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0 text-xs font-bold text-accent mt-0.5">
+                      {initials}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{agent.full_name || agent.email || agent.user_id}</p>
+                      <p className="text-xs text-muted-foreground truncate">{agent.email}</p>
+                      {agent.departments.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {agent.departments.map((d) => (
+                            <span key={d.id} className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${d.is_primary ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"}`}>
+                              {d.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <select
+                        value={agent.platform_role}
+                        onChange={(e) => void handleUpdateRole(agent.user_id, e.target.value as PlatformRole)}
+                        className="text-xs border border-border/60 rounded-md px-2 py-1 bg-background"
+                      >
+                        {ALL_PLATFORM_ROLES.map((r) => (
+                          <option key={r} value={r}>{PLATFORM_ROLE_LABELS[r]}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={deactivatingId === agent.user_id}
+                        onClick={() => void handleDeactivate(agent.user_id, agent.full_name)}
+                        className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors text-destructive/60 hover:text-destructive"
+                        title="Remover da equipe"
+                      >
+                        {deactivatingId === agent.user_id ? <Loader2 size={13} className="animate-spin" /> : <UserX size={13} />}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-muted/40 rounded-xl p-4 text-xs text-muted-foreground space-y-1 border border-border/30">
+          <p className="font-medium text-foreground">Como adicionar novos agentes</p>
+          <p>1. Acesse <strong>Cockpit → Equipe</strong> e clique em "Novo agente da plataforma".</p>
+          <p>2. O agente deve ter uma conta ativa no Ecclesia (e-mail cadastrado).</p>
+          <p>3. Configure a função e os departamentos de atuação.</p>
+          <p>4. O agente aparecerá aqui e poderá selecionar organizações para atendimento.</p>
+        </div>
+      </div>
+
+      <SupportOrganizationSelector open={selectorOpen} onClose={() => setSelectorOpen(false)} />
+    </AdminLayout>
+  );
+}
+
+// ── Navigation state from Hierarquia ─────────────────────────────────────────
+
+type HierarchyNavigationState = {
+  openNewAccess?: boolean;
+  presetRole?: string;
+  contextOrganizationId?: string;
+  contextOrganizationName?: string;
+  contextOrganizationType?: string;
+  source?: string;
+} | null;
+
+function readHierarchyContext(state: HierarchyNavigationState) {
+  if (!state?.contextOrganizationId) return null;
+  return {
+    id: state.contextOrganizationId,
+    name: state.contextOrganizationName ?? "Unidade",
+    type: state.contextOrganizationType,
+    source: state.source,
+  };
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function GerenciarAcessos() {
-  const { user } = useAuth();
-  const { isAdmin, loading: roleLoading } = useRole();
+  const { user }                          = useAuth();
+  const { isAdmin, isSuperAdmin, loading: roleLoading } = useRole();
   const { church, loading: churchLoading } = useChurch();
-  const { t } = useLanguage();
+  const { t }                             = useLanguage();
+  const navigate                          = useNavigate();
+  const location                          = useLocation();
 
-  const [users, setUsers]       = useState<OrgMemberRow[]>([]);
-  const [invites, setInvites]   = useState<AccessInviteRecord[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const navigationState = location.state as HierarchyNavigationState;
+  const contextOrganizationId   = navigationState?.contextOrganizationId ?? null;
+  const contextOrganizationName = navigationState?.contextOrganizationName ?? null;
+  const contextOrganizationType = navigationState?.contextOrganizationType ?? null;
+  const navigationSource        = navigationState?.source ?? null;
+  const navigationPresetRole    = navigationState?.presetRole ?? null;
+
+  // Ref persiste o ID contextual — não reseta ao abrir modal ou trocar role
+  const hierarchyContextOrgIdRef   = useRef<string | null>(contextOrganizationId);
+  const hierarchyContextOrgNameRef = useRef<string | null>(contextOrganizationName);
+
+  // ── Core state ─────────────────────────────────────────────────────────────
+  const [users, setUsers]                   = useState<OrgMemberRow[]>([]);
+  const [invites, setInvites]               = useState<AccessInviteRecord[]>([]);
+  const [loading, setLoading]               = useState(true);
   const [invitesSupported, setInvitesSupported] = useState(true);
 
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [removingId, setRemovingId] = useState<string | null>(null);
-  const [revokingId, setRevokingId] = useState<string | null>(null);
-
+  // ── UI state ───────────────────────────────────────────────────────────────
+  const [selectedRole, setSelectedRole]     = useState<OrgMembershipRole | null>(null);
+  const [detailUser, setDetailUser]         = useState<OrgMemberRow | null>(null);
+  const [expandedId, setExpandedId]         = useState<string | null>(null);
+  const [updatingId, setUpdatingId]         = useState<string | null>(null);
+  const [removingId, setRemovingId]         = useState<string | null>(null);
+  const [revokingId, setRevokingId]         = useState<string | null>(null);
   const [newAccessModal, setNewAccessModal] = useState(false);
-  const [newAccessForm, setNewAccessForm] = useState({
+  const [newAccessForm, setNewAccessForm]   = useState({
     name: "", email: "", phone: "", role: "member" as OrgMembershipRole,
   });
-  const [savingInvite, setSavingInvite] = useState(false);
+  const [savingInvite, setSavingInvite]     = useState(false);
 
-  // ── Loaders ───────────────────────────────────────────────────────────────
+  // Contexto de unidade vindo da Hierarquia — inicializado sincronamente do state
+  const [contextOrg, setContextOrg] = useState<
+    { id: string; name: string; type?: string; source?: string } | null
+  >(() => readHierarchyContext(navigationState));
 
+  // Sincroniza contexto e modal quando navega de Congregacoes (+ Definir)
+  useEffect(() => {
+    const state = location.state as HierarchyNavigationState;
+    const ctx = readHierarchyContext(state);
+    if (ctx?.id) {
+      hierarchyContextOrgIdRef.current = ctx.id;
+      hierarchyContextOrgNameRef.current = ctx.name;
+      setContextOrg(ctx);
+    }
+    if (state?.openNewAccess) {
+      const preset = state.presetRole ? normalizeRole(state.presetRole) : "secretary";
+      setNewAccessForm((f) => ({ ...f, role: preset }));
+      setNewAccessModal(true);
+    }
+  }, [location.state, location.key]);
+
+  // Organização efetiva: contexto da Hierarquia tem prioridade máxima sobre church.id
+  const effectiveOrgId =
+    hierarchyContextOrgIdRef.current
+    ?? contextOrganizationId
+    ?? contextOrg?.id
+    ?? church?.id
+    ?? null;
+
+  const effectiveOrgName =
+    hierarchyContextOrgNameRef.current
+    ?? contextOrganizationName
+    ?? contextOrg?.name
+    ?? church?.name
+    ?? "Organização atual";
+
+  const isHierarchyContext = Boolean(
+    hierarchyContextOrgIdRef.current ?? contextOrganizationId ?? contextOrg?.id,
+  );
+  const isContextScoped = isHierarchyContext && effectiveOrgId !== church?.id;
+
+  // ── Derived ────────────────────────────────────────────────────────────────
+  const roleCounts = useMemo(() => {
+    const counts: Partial<Record<OrgMembershipRole, number>> = {};
+    for (const u of users) {
+      if (u.is_active) counts[u.role] = (counts[u.role] ?? 0) + 1;
+    }
+    return counts;
+  }, [users]);
+
+  const filteredUsers = useMemo(
+    () => selectedRole ? users.filter((u) => u.role === selectedRole) : users,
+    [users, selectedRole],
+  );
+
+  // ── Loaders ────────────────────────────────────────────────────────────────
   const loadUsers = useCallback(async () => {
-    if (!church?.id) { setUsers([]); return; }
+    if (!effectiveOrgId) { setUsers([]); return; }
 
     const { data: memberships, error: membErr } = await supabase
       .from("organization_users")
-      .select("id, user_id, role, is_active")
-      .eq("organization_id", church.id)
+      .select("id, user_id, role, is_active, created_at")
+      .eq("organization_id", effectiveOrgId)
       .order("created_at", { ascending: true });
 
     if (membErr) {
       toast({ title: t("Erro ao carregar usuários"), description: membErr.message, variant: "destructive" });
-      setUsers([]);
-      return;
+      setUsers([]); return;
     }
 
     const rows = memberships || [];
@@ -168,6 +501,7 @@ export default function GerenciarAcessos() {
         full_name: p?.full_name ?? null, email: p?.email ?? null,
         avatar_url: p?.avatar_url ?? null,
         role: normalizeRole(m.role), is_active: m.is_active ?? true,
+        created_at: m.created_at,
       };
     });
 
@@ -176,19 +510,17 @@ export default function GerenciarAcessos() {
       return diff !== 0 ? diff : (a.full_name || "").localeCompare(b.full_name || "", "pt-BR");
     });
     setUsers(merged);
-  }, [church?.id, t]);
+  }, [effectiveOrgId, t]);
 
   const loadInvites = useCallback(async () => {
-    if (!church?.id) { setInvites([]); return; }
+    if (!effectiveOrgId) { setInvites([]); return; }
     try {
-      const data = await getAccessInvites(church.id);
-      setInvites(data);
+      setInvites(await getAccessInvites(effectiveOrgId));
     } catch {
-      // Table may not exist yet — show empty list without error
       setInvitesSupported(false);
       setInvites([]);
     }
-  }, [church?.id]);
+  }, [effectiveOrgId]);
 
   useEffect(() => {
     if (roleLoading || churchLoading) return;
@@ -197,40 +529,52 @@ export default function GerenciarAcessos() {
     Promise.all([loadUsers(), loadInvites()]).finally(() => setLoading(false));
   }, [user, roleLoading, churchLoading, loadUsers, loadInvites]);
 
-  // ── Actions ───────────────────────────────────────────────────────────────
+  // ── Actions ────────────────────────────────────────────────────────────────
+  const handleChatWith = (u: OrgMemberRow) => {
+    navigate("/admin/chat", {
+      state: { openDm: true, userId: u.user_id, userName: u.full_name || u.email || "Usuário" },
+    });
+  };
+
+  const openNewAccess = (role?: OrgMembershipRole) => {
+    setNewAccessForm((f) => ({ ...f, role: role ?? selectedRole ?? "member" }));
+    setNewAccessModal(true);
+  };
 
   const handleRoleChange = async (membershipId: string, userId: string, newRole: OrgMembershipRole) => {
-    if (!church?.id) return;
+    if (!effectiveOrgId) return;
     setUpdatingId(userId);
     const { error } = await supabase
       .from("organization_users")
       .update({ role: newRole })
       .eq("id", membershipId)
-      .eq("organization_id", church.id);
+      .eq("organization_id", effectiveOrgId);
     if (error) {
       toast({ title: t("Erro ao atualizar"), description: error.message, variant: "destructive" });
     } else {
       toast({ title: `Função atualizada para ${ROLE_LABELS[newRole]}` });
       setUsers((prev) => prev.map((u) => u.user_id === userId ? { ...u, role: newRole } : u));
+      if (detailUser?.user_id === userId) setDetailUser((d) => d ? { ...d, role: newRole } : d);
     }
     setUpdatingId(null);
   };
 
   const handleRemoveAccess = async (membershipId: string, userId: string) => {
-    if (!church?.id) return;
+    if (!effectiveOrgId) return;
     if (!confirm(t("Remover acesso desta pessoa à organização?"))) return;
     setRemovingId(userId);
     const { error } = await supabase
       .from("organization_users")
       .update({ is_active: false })
       .eq("id", membershipId)
-      .eq("organization_id", church.id);
+      .eq("organization_id", effectiveOrgId);
     if (error) {
       toast({ title: t("Erro ao remover acesso"), description: error.message, variant: "destructive" });
     } else {
       toast({ title: t("Acesso removido") });
       setUsers((prev) => prev.map((u) => u.membership_id === membershipId ? { ...u, is_active: false } : u));
       setExpandedId(null);
+      setDetailUser(null);
     }
     setRemovingId(null);
   };
@@ -249,53 +593,56 @@ export default function GerenciarAcessos() {
   };
 
   const handleCopyInviteLink = (token: string) => {
-    const url = buildAccessInviteUrl(token);
-    navigator.clipboard.writeText(url).catch(() => {});
+    navigator.clipboard.writeText(buildAccessInviteUrl(token)).catch(() => {});
     toast({ title: "Link copiado!" });
   };
 
   const handleWhatsAppInvite = (inv: AccessInviteRecord) => {
-    if (!church) return;
-    const url = buildAccessWhatsAppLink({
-      phone: inv.phone || "",
-      name: inv.full_name,
-      roleLabel: ROLE_LABELS[normalizeRole(inv.role)],
-      orgName: church.name,
-      token: inv.token,
-    });
-    if (!inv.phone) {
-      // No phone: just copy the link
-      handleCopyInviteLink(inv.token);
-      toast({ title: "Sem WhatsApp cadastrado. Link copiado!" });
-      return;
-    }
-    window.open(url, "_blank", "noopener,noreferrer");
+    if (!effectiveOrgName) return;
+    if (!inv.phone) { handleCopyInviteLink(inv.token); toast({ title: "Sem WhatsApp. Link copiado!" }); return; }
+    window.open(buildAccessWhatsAppLink({ phone: inv.phone, name: inv.full_name, roleLabel: ROLE_LABELS[normalizeRole(inv.role)], orgName: effectiveOrgName, token: inv.token }), "_blank", "noopener,noreferrer");
   };
 
   const handleCreateInvite = async () => {
-    if (!newAccessForm.name.trim()) {
-      toast({ title: "Nome é obrigatório.", variant: "destructive" }); return;
+    if (!newAccessForm.name.trim()) { toast({ title: "Nome é obrigatório.", variant: "destructive" }); return; }
+
+    const inviteOrgId =
+      hierarchyContextOrgIdRef.current
+      ?? contextOrganizationId
+      ?? contextOrg?.id
+      ?? church?.id
+      ?? null;
+
+    if (!inviteOrgId) {
+      toast({
+        title: "Organização não definida",
+        description: "Não foi possível identificar em qual unidade o acesso será criado.",
+        variant: "destructive",
+      });
+      return;
     }
-    if (!church?.id || !user?.id) return;
+    if (!user?.id) return;
+
+    console.log("[GerenciarAcessos] create invite context", {
+      contextOrganizationId,
+      contextOrganizationName,
+      contextOrganizationType,
+      churchId: church?.id,
+      effectiveOrgId: inviteOrgId,
+      role: newAccessForm.role,
+      email: newAccessForm.email,
+    });
+
     setSavingInvite(true);
 
-    // Check if email already registered
     if (newAccessForm.email.trim()) {
       const { data: existingProfile } = await supabase
-        .from("profiles")
-        .select("user_id, full_name")
-        .eq("email", newAccessForm.email.trim())
-        .maybeSingle();
-
+        .from("profiles").select("user_id, full_name").eq("email", newAccessForm.email.trim()).maybeSingle();
       if (existingProfile) {
-        // Create org_users link immediately
         const { error } = await supabase.from("organization_users").upsert({
-          user_id: existingProfile.user_id,
-          organization_id: church.id,
-          role: newAccessForm.role,
-          is_active: true,
+          user_id: existingProfile.user_id, organization_id: inviteOrgId,
+          role: newAccessForm.role, is_active: true,
         }, { onConflict: "user_id,organization_id" });
-
         if (!error) {
           toast({ title: "Usuário vinculado!", description: `${existingProfile.full_name || newAccessForm.email} adicionado como ${ROLE_LABELS[newAccessForm.role]}.` });
           await loadUsers();
@@ -307,10 +654,8 @@ export default function GerenciarAcessos() {
       }
     }
 
-    // User not found or no email → create access_invite
     const { data: inv, error: invErr } = await createAccessInvite({
-      organization_id: church.id,
-      invited_by: user.id,
+      organization_id: inviteOrgId, invited_by: user.id,
       full_name: newAccessForm.name.trim(),
       email: newAccessForm.email.trim() || undefined,
       phone: newAccessForm.phone.trim() || undefined,
@@ -318,20 +663,14 @@ export default function GerenciarAcessos() {
     });
 
     if (invErr || !inv) {
-      // access_invites table may not exist — show migration notice
       const isTableMissing = invErr?.includes("relation") || invErr?.includes("does not exist") || invErr?.includes("42P01");
-      if (isTableMissing) {
-        toast({
-          title: "Migração pendente",
-          description: "Aplique 20260618120000_access_invites.sql no Supabase para salvar convites.",
-          variant: "destructive",
-        });
-      } else {
-        toast({ title: "Erro ao criar convite", description: invErr ?? "", variant: "destructive" });
-      }
+      toast({
+        title: isTableMissing ? "Migração pendente" : "Erro ao criar convite",
+        description: isTableMissing ? "Aplique 20260618120000_access_invites.sql no Supabase." : invErr ?? "",
+        variant: "destructive",
+      });
     } else {
-      const inviteUrl = buildAccessInviteUrl(inv.token);
-      navigator.clipboard.writeText(inviteUrl).catch(() => {});
+      navigator.clipboard.writeText(buildAccessInviteUrl(inv.token)).catch(() => {});
       toast({ title: "Convite criado!", description: "Link copiado para a área de transferência." });
       await loadInvites();
     }
@@ -343,13 +682,21 @@ export default function GerenciarAcessos() {
 
   if (!roleLoading && !isAdmin) return <Navigate to="/admin" replace />;
 
-  const pendingInvites = invites.filter((i) => i.status === "pending");
+  // ── Platform Team Manager (Super Admin view, only when no org context) ─────
+  // Shows when: super admin, no hierarchy context, no support org active (no church)
+  if (!roleLoading && !churchLoading && isSuperAdmin && !hierarchyContextOrgIdRef.current && !contextOrganizationId && !church) {
+    return <PlatformTeamManager />;
+  }
+
+  const pendingInvites  = invites.filter((i) => i.status === "pending");
   const historicInvites = invites.filter((i) => i.status !== "pending");
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <AdminLayout>
       <div className="space-y-6">
-        {/* Header */}
+
+        {/* ── Header ────────────────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl sm:text-3xl font-serif tracking-tight flex items-center gap-2">
@@ -357,13 +704,13 @@ export default function GerenciarAcessos() {
               {t("Gerenciar Acessos")}
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {church ? `Usuários e convites de ${church.name}` : t("Defina quem pode acessar cada módulo")}
+              {effectiveOrgName ? `Usuários e convites de ${effectiveOrgName}` : t("Defina quem pode acessar cada módulo")}
             </p>
           </div>
           {isAdmin && (
             <button
               type="button"
-              onClick={() => setNewAccessModal(true)}
+              onClick={() => openNewAccess()}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors flex-shrink-0"
             >
               <UserPlus size={16} />
@@ -372,107 +719,129 @@ export default function GerenciarAcessos() {
           )}
         </div>
 
-        {/* Migration warning */}
+        {/* ── Banner de contexto de unidade ─────────────────────────────────── */}
+        {isHierarchyContext && contextOrg && (
+          <div className="bg-accent/10 border border-accent/30 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <Shield size={18} className="text-accent flex-shrink-0 mt-0.5" />
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-semibold">
+                    Gerenciando acessos de: {contextOrg.name}
+                  </p>
+                  {(contextOrg.source === "hierarquia" || navigationSource === "hierarquia") && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-accent/20 text-accent font-semibold">
+                      Origem: Hierarquia
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Convites e vínculos criados aqui pertencem a esta unidade
+                  {contextOrg.type ? ` (${contextOrg.type})` : ""}
+                  {isContextScoped ? " — não à Matriz." : "."}
+                </p>
+              </div>
+            </div>
+            {church && isContextScoped && (
+              <button
+                type="button"
+                onClick={() => {
+                  hierarchyContextOrgIdRef.current = null;
+                  hierarchyContextOrgNameRef.current = null;
+                  setContextOrg(null);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card border border-border text-xs font-medium hover:bg-secondary transition-colors flex-shrink-0"
+              >
+                <ArrowLeft size={13} /> Voltar para {church.name}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ── Migration warning ─────────────────────────────────────────────── */}
         {!invitesSupported && (
           <div className="bg-amber-500/10 border border-amber-400/30 rounded-xl p-4 text-sm">
             <p className="font-semibold text-amber-700 dark:text-amber-400">Migração necessária</p>
             <p className="text-muted-foreground mt-0.5">
-              Aplique <code className="bg-secondary px-1 rounded text-xs">20260618120000_access_invites.sql</code> no Supabase para habilitar convites persistentes.
+              Aplique <code className="bg-secondary px-1 rounded text-xs">20260618120000_access_invites.sql</code> para habilitar convites persistentes.
             </p>
           </div>
         )}
 
-        {/* Modal Novo Acesso */}
-        {newAccessModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-base flex items-center gap-2">
-                  <UserPlus size={16} className="text-accent" />
-                  Novo Acesso
-                </h2>
-                <button type="button" onClick={() => setNewAccessModal(false)} className="text-muted-foreground hover:text-foreground">
-                  <X size={18} />
-                </button>
-              </div>
-
-              <p className="text-xs text-muted-foreground">
-                Se o email já estiver cadastrado, o vínculo é criado imediatamente. Caso contrário, um link de convite é gerado e salvo.
-              </p>
-
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs text-muted-foreground block mb-1">Nome completo *</label>
-                  <input
-                    value={newAccessForm.name}
-                    onChange={(e) => setNewAccessForm((f) => ({ ...f, name: e.target.value }))}
-                    placeholder="Nome completo"
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground block mb-1">Email</label>
-                  <div className="relative">
-                    <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      type="email"
-                      value={newAccessForm.email}
-                      onChange={(e) => setNewAccessForm((f) => ({ ...f, email: e.target.value }))}
-                      placeholder="email@exemplo.com"
-                      className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground block mb-1">WhatsApp (opcional)</label>
-                  <div className="relative">
-                    <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      value={newAccessForm.phone}
-                      onChange={(e) => setNewAccessForm((f) => ({ ...f, phone: e.target.value }))}
-                      placeholder="(54) 99999-9999"
-                      className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground block mb-1">Função</label>
-                  <select
-                    value={newAccessForm.role}
-                    onChange={(e) => setNewAccessForm((f) => ({ ...f, role: e.target.value as OrgMembershipRole }))}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                  >
-                    {ASSIGNABLE_ROLES.map((r) => (
-                      <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                    ))}
-                  </select>
-                  <p className="text-[11px] text-muted-foreground mt-1">{ROLE_DESC[newAccessForm.role]}</p>
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  disabled={savingInvite}
-                  onClick={() => void handleCreateInvite()}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
-                >
-                  {savingInvite ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                  Criar acesso
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setNewAccessModal(false)}
-                  className="px-4 py-2.5 bg-secondary rounded-lg text-sm hover:bg-secondary/80"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
+        {/* ── Funções — Role grid ───────────────────────────────────────────── */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Funções disponíveis
+            </h2>
+            {selectedRole && (
+              <button
+                type="button"
+                onClick={() => setSelectedRole(null)}
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X size={12} /> Ver todas
+              </button>
+            )}
           </div>
-        )}
 
-        {/* Convites Pendentes */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {ROLE_CARDS.map(({ role, Icon, iconColor, cardAccent, future }) => {
+              const isSelected = selectedRole === role;
+              const count      = future ? 0 : (roleCounts[role as OrgMembershipRole] ?? 0);
+              return (
+                <button
+                  key={role}
+                  type="button"
+                  onClick={() => {
+                    if (future) {
+                      toast({ title: "Em breve", description: "A função Porteiro será habilitada futuramente com leitor de QR Code." });
+                      return;
+                    }
+                    setSelectedRole(isSelected ? null : (role as OrgMembershipRole));
+                  }}
+                  className={`group relative flex flex-col gap-2 p-3.5 rounded-xl border transition-all text-left ${
+                    isSelected
+                      ? "border-accent bg-accent/10 shadow-sm"
+                      : `border-border/60 bg-card hover:bg-secondary/50 ${cardAccent}`
+                  } ${future ? "opacity-60" : ""}`}
+                >
+                  <div className="flex items-start justify-between">
+                    <Icon size={20} className={`${isSelected ? "text-accent" : iconColor} transition-colors`} />
+                    {future ? (
+                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                        Em breve
+                      </span>
+                    ) : (
+                      <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ${
+                        isSelected
+                          ? "bg-accent text-accent-foreground"
+                          : count > 0
+                            ? "bg-primary/10 text-primary"
+                            : "bg-muted text-muted-foreground"
+                      }`}>
+                        {count}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold leading-tight">{ROLE_LABELS[role]}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight line-clamp-2">
+                      {ROLE_DESC[role]}
+                    </p>
+                  </div>
+                  {isSelected && (
+                    <div className="absolute bottom-2 right-2">
+                      <ChevronRight size={12} className="text-accent" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Pending invites ───────────────────────────────────────────────── */}
         {pendingInvites.length > 0 && (
           <div className="bg-card rounded-xl shadow-executive overflow-hidden">
             <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
@@ -486,9 +855,9 @@ export default function GerenciarAcessos() {
             </div>
             <div className="divide-y divide-border/40">
               {pendingInvites.map((inv) => {
-                const roleNorm = normalizeRole(inv.role);
+                const roleNorm  = normalizeRole(inv.role);
                 const inviteUrl = buildAccessInviteUrl(inv.token);
-                const expires = inv.expires_at ? format(new Date(inv.expires_at), "dd/MM/yyyy", { locale: ptBR }) : "—";
+                const expires   = inv.expires_at ? format(new Date(inv.expires_at), "dd/MM/yyyy", { locale: ptBR }) : "—";
                 return (
                   <div key={inv.id} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
                     <div className="flex-1 min-w-0 space-y-0.5">
@@ -507,29 +876,17 @@ export default function GerenciarAcessos() {
                     </div>
                     <div className="flex flex-wrap gap-1.5 flex-shrink-0">
                       {inv.phone && (
-                        <button
-                          type="button"
-                          onClick={() => handleWhatsAppInvite(inv)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 transition-colors border border-green-300 dark:border-green-800"
-                        >
-                          <WhatsAppIcon size={12} />
-                          WhatsApp
+                        <button type="button" onClick={() => handleWhatsAppInvite(inv)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 transition-colors border border-green-300 dark:border-green-800">
+                          <WhatsAppIcon size={12} /> WhatsApp
                         </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => handleCopyInviteLink(inv.token)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg bg-secondary hover:bg-secondary/80 transition-colors border border-border"
-                      >
-                        <Copy size={11} />
-                        Copiar link
+                      <button type="button" onClick={() => handleCopyInviteLink(inv.token)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg bg-secondary hover:bg-secondary/80 transition-colors border border-border">
+                        <Copy size={11} /> Copiar link
                       </button>
-                      <button
-                        type="button"
-                        disabled={revokingId === inv.id}
-                        onClick={() => void handleRevokeInvite(inv.id)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg text-destructive hover:bg-destructive/10 transition-colors border border-destructive/30 disabled:opacity-40"
-                      >
+                      <button type="button" disabled={revokingId === inv.id} onClick={() => void handleRevokeInvite(inv.id)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg text-destructive hover:bg-destructive/10 transition-colors border border-destructive/30 disabled:opacity-40">
                         {revokingId === inv.id ? <Loader2 size={11} className="animate-spin" /> : <XCircle size={11} />}
                         Revogar
                       </button>
@@ -541,48 +898,79 @@ export default function GerenciarAcessos() {
           </div>
         )}
 
-        {/* Usuários ativos */}
+        {/* ── User list ─────────────────────────────────────────────────────── */}
         <div className="bg-card rounded-xl shadow-executive overflow-hidden">
-          <div className="px-5 py-4 border-b border-border/40">
+          <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
             <h2 className="font-semibold text-sm flex items-center gap-2">
               <CheckCircle2 size={15} className="text-emerald-500" />
-              Usuários com Acesso
-              {!loading && <span className="text-muted-foreground text-xs font-normal">({users.length})</span>}
+              {selectedRole ? (
+                <>
+                  <button type="button" onClick={() => setSelectedRole(null)}
+                    className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors">
+                    <ArrowLeft size={13} />
+                    Todas as funções
+                  </button>
+                  <span className="text-muted-foreground">/</span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${ROLE_COLORS[selectedRole]}`}>
+                    {ROLE_LABELS[selectedRole]}
+                  </span>
+                </>
+              ) : (
+                <>
+                  Usuários com Acesso
+                  {!loading && <span className="text-muted-foreground text-xs font-normal">({users.length})</span>}
+                </>
+              )}
             </h2>
+            {selectedRole && (
+              <button type="button" onClick={() => openNewAccess(selectedRole)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90 transition-colors">
+                <UserPlus size={13} /> Convidar {ROLE_LABELS[selectedRole]}
+              </button>
+            )}
           </div>
 
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 size={24} className="animate-spin text-muted-foreground" />
             </div>
-          ) : users.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-10">
-              {church ? "Nenhum usuário vinculado." : "Selecione uma organização."}
-            </p>
+          ) : filteredUsers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-14 gap-3 text-center px-6">
+              {selectedRole ? (
+                <>
+                  <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">
+                    {(() => { const cfg = ROLE_CARDS.find((c) => c.role === selectedRole); return cfg ? <cfg.Icon size={22} className={cfg.iconColor} /> : <User size={22} />; })()}
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">Nenhum {ROLE_LABELS[selectedRole]} cadastrado</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Convide alguém para assumir esta função nesta unidade.</p>
+                  </div>
+                  <button type="button" onClick={() => openNewAccess(selectedRole)}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+                    <UserPlus size={15} /> Convidar {ROLE_LABELS[selectedRole]}
+                  </button>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {effectiveOrgId ? "Nenhum usuário vinculado." : "Selecione uma organização."}
+                </p>
+              )}
+            </div>
           ) : (
             <div className="divide-y divide-border">
-              {users.map((u) => {
-                const initials = u.full_name
-                  ? u.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
-                  : u.email?.charAt(0).toUpperCase() || "?";
+              {filteredUsers.map((u) => {
                 const isCurrentUser = u.user_id === user?.id;
                 const isExpanded    = expandedId === u.membership_id;
-
                 return (
                   <div key={u.membership_id} className={!u.is_active ? "opacity-50" : ""}>
+                    {/* Row header */}
                     <div
                       role="button" tabIndex={0}
                       onClick={() => setExpandedId(isExpanded ? null : u.membership_id)}
                       onKeyDown={(e) => e.key === "Enter" && setExpandedId(isExpanded ? null : u.membership_id)}
-                      className="flex items-center gap-4 p-4 hover:bg-secondary/30 transition-colors cursor-pointer select-none"
+                      className="flex items-center gap-3 p-4 hover:bg-secondary/30 transition-colors cursor-pointer select-none"
                     >
-                      {u.avatar_url ? (
-                        <img src={u.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center text-xs font-bold text-accent flex-shrink-0">
-                          {initials}
-                        </div>
-                      )}
+                      <UserAvatar user={u} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">
                           {u.full_name || "Sem nome"}
@@ -595,13 +983,31 @@ export default function GerenciarAcessos() {
                         <span className={`px-2 py-0.5 rounded text-xs font-semibold ${ROLE_COLORS[u.role]}`}>
                           {ROLE_LABELS[u.role]}
                         </span>
+                        {/* Quick actions (visible without expanding) */}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setDetailUser(u); }}
+                          title="Ver acesso"
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                        >
+                          <Eye size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleChatWith(u); }}
+                          title="Conversar"
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors"
+                        >
+                          <MessageSquare size={14} />
+                        </button>
                         <ChevronDown size={14} className={`text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                       </div>
                     </div>
 
+                    {/* Expanded panel */}
                     {isExpanded && (
                       <div className="bg-muted/30 border-t border-border/30 px-4 pb-4 pt-3 flex flex-col sm:flex-row sm:items-start gap-4">
-                        <div className="flex-1 space-y-1.5">
+                        <div className="flex-1 space-y-2">
                           <p className="text-xs font-medium text-muted-foreground">Alterar função</p>
                           <div className="relative inline-block">
                             {updatingId === u.user_id ? (
@@ -615,9 +1021,7 @@ export default function GerenciarAcessos() {
                                   onClick={(e) => e.stopPropagation()}
                                   className={`appearance-none pl-3 pr-8 py-1.5 rounded-lg text-xs font-semibold border border-border focus:outline-none focus:ring-2 focus:ring-accent/30 bg-card text-foreground ${isCurrentUser ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
                                 >
-                                  {ASSIGNABLE_ROLES.map((r) => (
-                                    <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                                  ))}
+                                  {ASSIGNABLE_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                                 </select>
                                 <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                               </>
@@ -626,19 +1030,27 @@ export default function GerenciarAcessos() {
                           <p className="text-[11px] text-muted-foreground">{ROLE_DESC[u.role]}</p>
                         </div>
 
-                        {!isCurrentUser && (
-                          <div className="flex gap-2 flex-wrap flex-shrink-0">
-                            <button
-                              type="button"
+                        <div className="flex gap-2 flex-wrap flex-shrink-0">
+                          <button type="button"
+                            onClick={(e) => { e.stopPropagation(); setDetailUser(u); }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary text-foreground text-xs font-medium hover:bg-secondary/80 border border-border">
+                            <Eye size={13} /> Ver Acesso
+                          </button>
+                          <button type="button"
+                            onClick={(e) => { e.stopPropagation(); handleChatWith(u); }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/10 text-accent text-xs font-medium hover:bg-accent/20 border border-accent/30">
+                            <MessageSquare size={13} /> Conversar
+                          </button>
+                          {!isCurrentUser && (
+                            <button type="button"
                               onClick={(e) => { e.stopPropagation(); void handleRemoveAccess(u.membership_id, u.user_id); }}
                               disabled={removingId === u.user_id}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-destructive text-xs font-medium hover:bg-destructive/10 border border-destructive/30 disabled:opacity-40"
-                            >
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-destructive text-xs font-medium hover:bg-destructive/10 border border-destructive/30 disabled:opacity-40">
                               {removingId === u.user_id ? <Loader2 size={13} className="animate-spin" /> : <UserX size={13} />}
                               Revogar acesso
                             </button>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -648,7 +1060,7 @@ export default function GerenciarAcessos() {
           )}
         </div>
 
-        {/* Histórico de convites */}
+        {/* ── Invite history ───────────────────────────────────────────────── */}
         {historicInvites.length > 0 && (
           <div className="bg-card rounded-xl shadow-executive overflow-hidden">
             <div className="px-5 py-4 border-b border-border/40">
@@ -659,7 +1071,7 @@ export default function GerenciarAcessos() {
             </div>
             <div className="divide-y divide-border/40">
               {historicInvites.map((inv) => {
-                const roleNorm = normalizeRole(inv.role);
+                const roleNorm  = normalizeRole(inv.role);
                 const createdAt = format(new Date(inv.created_at), "dd/MM/yyyy", { locale: ptBR });
                 return (
                   <div key={inv.id} className="px-4 py-3 flex items-center gap-3 opacity-70">
@@ -683,21 +1095,182 @@ export default function GerenciarAcessos() {
           </div>
         )}
 
-        {/* Funções disponíveis */}
-        <div className="bg-card rounded-xl shadow-executive p-5">
-          <h2 className="font-medium text-sm mb-3">Funções disponíveis</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {ASSIGNABLE_ROLES.map((role) => (
-              <div key={role} className="p-3 rounded-lg bg-secondary/30">
-                <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${ROLE_COLORS[role]}`}>
-                  {ROLE_LABELS[role]}
-                </span>
-                <p className="text-xs text-muted-foreground mt-1.5">{ROLE_DESC[role]}</p>
+      </div>
+
+      {/* ── New Access Modal ────────────────────────────────────────────────── */}
+      {newAccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-base flex items-center gap-2">
+                <UserPlus size={16} className="text-accent" /> Novo Acesso
+              </h2>
+              <button type="button" onClick={() => setNewAccessModal(false)} className="text-muted-foreground hover:text-foreground">
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Se o usuário já existir e puder ser localizado pelo e-mail cadastrado em perfis, o vínculo será criado imediatamente. Caso contrário, será gerado um convite pendente.
+              {isHierarchyContext && (
+                <> Unidade alvo: <strong>{effectiveOrgName}</strong>.</>
+              )}
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Nome completo *</label>
+                <input value={newAccessForm.name} onChange={(e) => setNewAccessForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="Nome completo"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30" />
               </div>
-            ))}
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Email</label>
+                <div className="relative">
+                  <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input type="email" value={newAccessForm.email} onChange={(e) => setNewAccessForm((f) => ({ ...f, email: e.target.value }))}
+                    placeholder="email@exemplo.com"
+                    className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">WhatsApp (opcional)</label>
+                <div className="relative">
+                  <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input value={newAccessForm.phone} onChange={(e) => setNewAccessForm((f) => ({ ...f, phone: e.target.value }))}
+                    placeholder="(54) 99999-9999"
+                    className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Função</label>
+                <select value={newAccessForm.role} onChange={(e) => setNewAccessForm((f) => ({ ...f, role: e.target.value as OrgMembershipRole }))}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30">
+                  {ASSIGNABLE_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                </select>
+                <p className="text-[11px] text-muted-foreground mt-1">{ROLE_DESC[newAccessForm.role]}</p>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button type="button" disabled={savingInvite} onClick={() => void handleCreateInvite()}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+                {savingInvite ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                Criar acesso
+              </button>
+              <button type="button" onClick={() => setNewAccessModal(false)}
+                className="px-4 py-2.5 bg-secondary rounded-lg text-sm hover:bg-secondary/80">
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ── User detail sheet (right drawer) ──────────────────────────────── */}
+      {detailUser && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="flex-1 bg-black/40 backdrop-blur-sm" onClick={() => setDetailUser(null)} />
+          <div className="w-full max-w-sm bg-card shadow-2xl flex flex-col h-full overflow-y-auto">
+            {/* Sheet header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border/50 flex-shrink-0">
+              <h2 className="font-semibold text-base flex items-center gap-2">
+                <Eye size={16} className="text-accent" /> Detalhe do Acesso
+              </h2>
+              <button type="button" onClick={() => setDetailUser(null)}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Sheet body */}
+            <div className="flex-1 px-5 py-6 space-y-6">
+              {/* Avatar + name */}
+              <div className="flex items-center gap-4">
+                <UserAvatar user={detailUser} size="lg" />
+                <div>
+                  <p className="font-semibold text-base">{detailUser.full_name || "Sem nome"}</p>
+                  {detailUser.email && <p className="text-sm text-muted-foreground">{detailUser.email}</p>}
+                </div>
+              </div>
+
+              {/* Info grid */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between py-2.5 border-b border-border/40">
+                  <span className="text-xs text-muted-foreground">Função</span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${ROLE_COLORS[detailUser.role]}`}>
+                    {ROLE_LABELS[detailUser.role]}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between py-2.5 border-b border-border/40">
+                  <span className="text-xs text-muted-foreground">Status</span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${detailUser.is_active ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"}`}>
+                    {detailUser.is_active ? "Ativo" : "Inativo"}
+                  </span>
+                </div>
+                {detailUser.created_at && (
+                  <div className="flex items-center justify-between py-2.5 border-b border-border/40">
+                    <span className="text-xs text-muted-foreground">Vinculado em</span>
+                    <span className="text-xs font-medium">
+                      {format(new Date(detailUser.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between py-2.5 border-b border-border/40">
+                  <span className="text-xs text-muted-foreground">Unidade</span>
+                  <span className="text-xs font-medium">{effectiveOrgName ?? "—"}</span>
+                </div>
+              </div>
+
+              {/* Permissions summary */}
+              <div className="bg-secondary/40 rounded-xl p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
+                  <Sparkles size={11} /> Permissões principais
+                </p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{ROLE_DESC[detailUser.role]}</p>
+              </div>
+
+              {/* Alterar função */}
+              {detailUser.user_id !== user?.id && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Alterar função</p>
+                  <div className="relative">
+                    {updatingId === detailUser.user_id ? (
+                      <Loader2 size={16} className="animate-spin text-muted-foreground" />
+                    ) : (
+                      <>
+                        <select
+                          value={detailUser.role}
+                          onChange={(e) => void handleRoleChange(detailUser.membership_id, detailUser.user_id, e.target.value as OrgMembershipRole)}
+                          className="w-full appearance-none pl-3 pr-8 py-2 rounded-lg text-sm border border-border focus:outline-none focus:ring-2 focus:ring-accent/30 bg-card text-foreground cursor-pointer"
+                        >
+                          {ASSIGNABLE_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                        </select>
+                        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground" />
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Sheet actions */}
+            <div className="px-5 py-4 border-t border-border/50 flex flex-col gap-2 flex-shrink-0">
+              <button type="button" onClick={() => { handleChatWith(detailUser); setDetailUser(null); }}
+                className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-accent/10 text-accent rounded-lg text-sm font-medium hover:bg-accent/20 transition-colors border border-accent/30">
+                <MessageSquare size={15} /> Abrir Conversa
+              </button>
+              {detailUser.user_id !== user?.id && (
+                <button type="button"
+                  disabled={removingId === detailUser.user_id}
+                  onClick={() => void handleRemoveAccess(detailUser.membership_id, detailUser.user_id)}
+                  className="flex items-center justify-center gap-2 w-full px-4 py-2.5 text-destructive rounded-lg text-sm font-medium hover:bg-destructive/10 transition-colors border border-destructive/30 disabled:opacity-40">
+                  {removingId === detailUser.user_id ? <Loader2 size={15} className="animate-spin" /> : <UserX size={15} />}
+                  Revogar Acesso
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }
+

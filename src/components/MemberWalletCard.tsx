@@ -2,7 +2,7 @@
  * MemberWalletCard — Carteira de Membro digital.
  *
  * Frente: logo da igreja, nome da igreja, avatar, cargo, matrícula, QR Code.
- * Verso:  CPF/RG, filiação, batismo, pastor, disclaimer.
+ * Verso:  CPF, filiação, batismo, pastor, disclaimer.
  *
  * PDF: gera arquivo 85mm × 54mm com frente + verso numa única chamada.
  * O usuário pode então compartilhar o arquivo via WhatsApp, Email ou Download.
@@ -202,12 +202,6 @@ function CardBack({ id, member, churchName }: { id: string; member: WalletMember
               <p className="text-[8px] text-slate-300 font-mono">{maskCpf(member.cpf)}</p>
             </div>
           )}
-          {member.rg && (
-            <div>
-              <p className="text-[6px] text-slate-500 uppercase tracking-wide">RG</p>
-              <p className="text-[8px] text-slate-300 font-mono">{member.rg}</p>
-            </div>
-          )}
           {member.baptism_date && (
             <div>
               <p className="text-[6px] text-slate-500 uppercase tracking-wide">Batismo</p>
@@ -222,7 +216,7 @@ function CardBack({ id, member, churchName }: { id: string; member: WalletMember
               <p className="text-[8px] text-slate-300">{member.pastor_name}</p>
             </div>
           )}
-          {!member.cpf && !member.rg && !member.baptism_date && !member.parent_names && (
+          {!member.cpf && !member.baptism_date && !member.parent_names && (
             <div className="col-span-2">
               <p className="text-[8px] text-slate-500 italic">Dados complementares registrados na secretaria</p>
             </div>

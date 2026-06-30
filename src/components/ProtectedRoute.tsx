@@ -9,7 +9,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { user, loading } = useAuth();
   const { canAccess, canonicalRole, isSuperAdmin, loading: roleLoading } = useRole();
-  const { church, loading: churchLoading } = useChurch();
+  const { church, hasActiveMembership, loading: churchLoading } = useChurch();
 
   if (loading || (user && (roleLoading || churchLoading || !canonicalRole))) {
     return (
@@ -23,7 +23,11 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (!church && !isSuperAdmin) {
+  // OrganizationPending só deve aparecer quando o usuário realmente não tem
+  // vínculo: não é super admin, não tem organização ativa resolvida E não
+  // possui nenhum vínculo ativo em organization_users. Um church_admin com
+  // vínculo ativo (is_active = true) NUNCA deve cair aqui.
+  if (!church && !isSuperAdmin && !hasActiveMembership) {
     return <OrganizationPending />;
   }
 

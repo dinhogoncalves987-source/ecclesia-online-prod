@@ -389,54 +389,133 @@ export type Database = {
       organizations: {
         Row: {
           active: boolean
+          address_complement: string | null
+          address_number: string | null
           city: string | null
           country_code: string | null
           created_at: string
+          denomination_type: string | null
           email: string | null
+          hierarchy_model: string | null
           id: string
+          intermediate_level_label: string | null
+          intermediate_level_label_plural: string | null
           language_code: string | null
+          local_unit_label: string | null
+          local_unit_label_plural: string | null
           logo_url: string | null
+          municipal_level_label: string | null
+          municipal_level_label_plural: string | null
           name: string
+          neighborhood: string | null
           organization_type: string
           parent_id: string | null
           phone: string | null
           slug: string | null
           state: string | null
+          street: string | null
+          top_level_label: string | null
+          top_level_label_plural: string | null
+          unit_status: string
           updated_at: string
+          uses_convention_level: boolean | null
+          uses_intermediate_level: boolean | null
+          uses_local_units: boolean | null
+          uses_municipal_level: boolean | null
+          website_url: string | null
+          zip_code: string | null
+          // ── National operational foundation fields ──────────────────
+          has_operational_cashbox: boolean | null
+          is_financially_autonomous: boolean | null
+          financially_consolidates_to_id: string | null
+          cnpj: string | null
+          financial_policy_notes: string | null
         }
         Insert: {
           active?: boolean
+          address_complement?: string | null
+          address_number?: string | null
           city?: string | null
           country_code?: string | null
           created_at?: string
+          denomination_type?: string | null
           email?: string | null
+          hierarchy_model?: string | null
           id?: string
+          intermediate_level_label?: string | null
+          intermediate_level_label_plural?: string | null
           language_code?: string | null
+          local_unit_label?: string | null
+          local_unit_label_plural?: string | null
           logo_url?: string | null
+          municipal_level_label?: string | null
+          municipal_level_label_plural?: string | null
           name: string
+          neighborhood?: string | null
           organization_type?: string
           parent_id?: string | null
           phone?: string | null
           slug?: string | null
           state?: string | null
+          street?: string | null
+          top_level_label?: string | null
+          top_level_label_plural?: string | null
+          unit_status?: string
           updated_at?: string
+          uses_convention_level?: boolean | null
+          uses_intermediate_level?: boolean | null
+          uses_local_units?: boolean | null
+          uses_municipal_level?: boolean | null
+          website_url?: string | null
+          zip_code?: string | null
+          has_operational_cashbox?: boolean | null
+          is_financially_autonomous?: boolean | null
+          financially_consolidates_to_id?: string | null
+          cnpj?: string | null
+          financial_policy_notes?: string | null
         }
         Update: {
           active?: boolean
+          address_complement?: string | null
+          address_number?: string | null
           city?: string | null
           country_code?: string | null
           created_at?: string
+          denomination_type?: string | null
           email?: string | null
+          hierarchy_model?: string | null
           id?: string
+          intermediate_level_label?: string | null
+          intermediate_level_label_plural?: string | null
           language_code?: string | null
+          local_unit_label?: string | null
+          local_unit_label_plural?: string | null
           logo_url?: string | null
+          municipal_level_label?: string | null
+          municipal_level_label_plural?: string | null
           name?: string
+          neighborhood?: string | null
           organization_type?: string
           parent_id?: string | null
           phone?: string | null
           slug?: string | null
           state?: string | null
+          street?: string | null
+          top_level_label?: string | null
+          top_level_label_plural?: string | null
+          unit_status?: string
           updated_at?: string
+          uses_convention_level?: boolean | null
+          uses_intermediate_level?: boolean | null
+          uses_local_units?: boolean | null
+          uses_municipal_level?: boolean | null
+          website_url?: string | null
+          zip_code?: string | null
+          has_operational_cashbox?: boolean | null
+          is_financially_autonomous?: boolean | null
+          financially_consolidates_to_id?: string | null
+          cnpj?: string | null
+          financial_policy_notes?: string | null
         }
         Relationships: [
           {

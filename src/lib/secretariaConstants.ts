@@ -65,3 +65,28 @@ export const MARITAL_STATUS_OPTIONS = [
   "Separado(a)",
   "União Estável",
 ] as const;
+
+/** Status de documentação civil. */
+export const CIVIL_DOCUMENT_STATUS_OPTIONS = [
+  "Pendente",
+  "Apresentado",
+  "Validado",
+  "Rejeitado",
+] as const;
+
+export type CivilDocumentStatus = (typeof CIVIL_DOCUMENT_STATUS_OPTIONS)[number];
+
+/**
+ * Retorna o documento civil exigido com base no estado civil.
+ * Solteiro(a) → Certidão de nascimento
+ * Casado(a)   → Certidão de casamento
+ * Divorciado(a) → Certidão de divórcio
+ */
+export function getCivilDocLabel(maritalStatus: string): string | null {
+  switch (maritalStatus) {
+    case "Solteiro(a)": return "Certidão de nascimento";
+    case "Casado(a)":   return "Certidão de casamento";
+    case "Divorciado(a)": return "Certidão de divórcio";
+    default: return null;
+  }
+}

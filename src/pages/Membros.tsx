@@ -1,10 +1,11 @@
 import { AdminLayout } from "@/components/AdminLayout";
 import {
   Search, Plus, X, Trash2, Loader2, Upload, Pencil, CreditCard, Camera, ChevronRight,
-  User, FileText, Phone, MapPin, Church, Briefcase, Users, BookOpen, Send,
+  User, FileText, Phone, MapPin, Church, Briefcase, Users, BookOpen, Send, Building2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { MemberWalletCard } from "@/components/MemberWalletCard";
 import { MemberInviteModal } from "@/components/MemberInviteModal";
@@ -27,6 +28,8 @@ import {
   ADMINISTRATIVE_ROLES,
   GENDER_OPTIONS,
   MARITAL_STATUS_OPTIONS,
+  CIVIL_DOCUMENT_STATUS_OPTIONS,
+  getCivilDocLabel,
 } from "@/lib/secretariaConstants";
 import { getMemberInvites, buildInviteUrl, buildWhatsappLink } from "@/lib/memberInvites";
 
@@ -66,6 +69,13 @@ type Member = {
   mother_name: string | null;
   spouse_name: string | null;
   notes: string | null;
+  // Documentação civil
+  civil_document_type: string | null;
+  civil_document_status: string | null;
+  civil_document_notes: string | null;
+  // Dados eclesiásticos adicionais
+  holy_spirit_baptism_date: string | null;
+  consecration_date: string | null;
 };
 
 type SubOrg = { id: string; name: string; organization_type: string };
@@ -105,6 +115,11 @@ const EMPTY_FORM: Omit<Member, "id"> = {
   mother_name: "",
   spouse_name: "",
   notes: "",
+  civil_document_type: "",
+  civil_document_status: "Pendente",
+  civil_document_notes: "",
+  holy_spirit_baptism_date: "",
+  consecration_date: "",
 };
 
 // ─── Tabs definition ─────────────────────────────────────────────────────────
@@ -117,14 +132,14 @@ type Tab = {
 };
 
 const TABS: Tab[] = [
-  { id: "pessoal",     label: "Dados Pessoais",       icon: User,    short: "Pessoal"  },
-  { id: "documentos",  label: "Documentos",            icon: FileText, short: "Docs"   },
-  { id: "contato",     label: "Contato",               icon: Phone,   short: "Contato" },
-  { id: "endereco",    label: "Endereço",              icon: MapPin,  short: "Endereço" },
-  { id: "eclesiastico",label: "Dados Eclesiásticos",   icon: Church,  short: "Igreja"  },
-  { id: "funcao",      label: "Função / Cargo",        icon: Briefcase, short: "Cargo" },
-  { id: "familia",     label: "Família",               icon: Users,   short: "Família" },
-  { id: "observacoes", label: "Observações",           icon: BookOpen, short: "Obs."   },
+  { id: "pessoal",     label: "Dados Pessoais",       icon: User,    short: "Pessoal"   },
+  { id: "documentos",  label: "Documentação Civil",   icon: FileText, short: "Doc. Civil" },
+  { id: "contato",     label: "Contato",               icon: Phone,   short: "Contato"  },
+  { id: "endereco",    label: "Endereço",              icon: MapPin,  short: "Endereço"  },
+  { id: "eclesiastico",label: "Dados Eclesiásticos",   icon: Church,  short: "Igreja"   },
+  { id: "funcao",      label: "Função / Cargo",        icon: Briefcase, short: "Cargo"  },
+  { id: "familia",     label: "Família",               icon: Users,   short: "Família"  },
+  { id: "observacoes", label: "Observações",           icon: BookOpen, short: "Obs."    },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -218,6 +233,28 @@ export default function Membros() {
   const { church, loading: churchLoading } = useChurch();
   const { canonicalRole } = useRole();
   const canWrite = canWriteSecretaria(canonicalRole);
+  const location = useLocation();
+
+  // Context filter: when navigated from Hierarquia/Congregacoes
+  type ContextFilter = { orgId: string; orgName: string; orgType: string } | null;
+  const [contextFilter, setContextFilter] = useState<ContextFilter>(() => {
+    const s = location.state as Record<string, unknown> | null;
+    if (s?.contextOrganizationId && s?.contextOrganizationName) {
+      return { orgId: s.contextOrganizationId as string, orgName: s.contextOrganizationName as string, orgType: (s.contextOrganizationType as string) ?? "" };
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    const s = location.state as Record<string, unknown> | null;
+    if (s?.contextOrganizationId && s?.contextOrganizationName) {
+      setContextFilter({
+        orgId: s.contextOrganizationId as string,
+        orgName: s.contextOrganizationName as string,
+        orgType: (s.contextOrganizationType as string) ?? "",
+      });
+    }
+  }, [location.state]);
 
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
@@ -309,6 +346,13 @@ export default function Membros() {
   // ── Filtering ───────────────────────────────────────────────────────────────
 
   const filtered = members.filter(m => {
+    // Context filter: show only members linked to the selected sub-organization
+    if (contextFilter) {
+      const inContext =
+        m.congregation_id === contextFilter.orgId ||
+        m.sector_id       === contextFilter.orgId;
+      if (!inContext) return false;
+    }
     if (filterStatus !== "all" && m.status !== filterStatus) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -406,6 +450,11 @@ export default function Membros() {
       mother_name:       m.mother_name || "",
       spouse_name:       m.spouse_name || "",
       notes:             m.notes || "",
+      civil_document_type:   m.civil_document_type || getCivilDocLabel(m.marital_status || "") || "",
+      civil_document_status: m.civil_document_status || "Pendente",
+      civil_document_notes:  m.civil_document_notes || "",
+      holy_spirit_baptism_date: m.holy_spirit_baptism_date || "",
+      consecration_date:        m.consecration_date || "",
     });
     setPhotoPreview(m.photo_url || null);
     setPhotoFile(null);
@@ -469,28 +518,41 @@ export default function Membros() {
    * Extended payload — ONLY the new columns added by migration 20260617120000.
    * Separated from core so it can fail gracefully if the migration is not applied.
    */
-  const buildExtendedPayload = (photoUrl: string | null) => ({
-    photo_url:          photoUrl,
-    whatsapp:           form.whatsapp?.trim() || null,
-    gender:             form.gender || null,
-    marital_status:     form.marital_status || null,
-    cpf:                form.cpf?.trim() || null,
-    rg:                 form.rg?.trim() || null,
-    rg_issuer:          form.rg_issuer?.trim() || null,
-    rg_issue_date:      form.rg_issue_date || null,
-    zip_code:           form.zip_code?.trim() || null,
-    street:             form.street?.trim() || null,
-    address_number:     form.address_number?.trim() || null,
-    address_complement: form.address_complement?.trim() || null,
-    neighborhood:       form.neighborhood?.trim() || null,
-    conversion_date:    form.conversion_date || null,
-    administrative_role: form.administrative_role === "Nenhum" ? null : (form.administrative_role || null),
-    father_name:        form.father_name?.trim() || null,
-    mother_name:        form.mother_name?.trim() || null,
-    spouse_name:        form.spouse_name?.trim() || null,
-    sector_id:          form.sector_id || null,
-    congregation_id:    form.congregation_id || null,
-  });
+  const buildExtendedPayload = (photoUrl: string | null) => {
+    // civil_document_type: auto-compute from marital_status, fallback to form value
+    const civilDocType = getCivilDocLabel(form.marital_status || "") || form.civil_document_type?.trim() || null;
+    return {
+      photo_url:          photoUrl,
+      whatsapp:           form.whatsapp?.trim() || null,
+      gender:             form.gender || null,
+      marital_status:     form.marital_status || null,
+      cpf:                form.cpf?.trim() || null,
+      // RG fields kept for backward compat — not exposed in UI anymore
+      rg:                 form.rg?.trim() || null,
+      rg_issuer:          form.rg_issuer?.trim() || null,
+      rg_issue_date:      form.rg_issue_date || null,
+      zip_code:           form.zip_code?.trim() || null,
+      street:             form.street?.trim() || null,
+      address_number:     form.address_number?.trim() || null,
+      address_complement: form.address_complement?.trim() || null,
+      neighborhood:       form.neighborhood?.trim() || null,
+      // conversion_date kept for backward compat — not exposed in UI anymore
+      conversion_date:    form.conversion_date || null,
+      administrative_role: form.administrative_role === "Nenhum" ? null : (form.administrative_role || null),
+      father_name:        form.father_name?.trim() || null,
+      mother_name:        form.mother_name?.trim() || null,
+      spouse_name:        form.spouse_name?.trim() || null,
+      sector_id:          form.sector_id || null,
+      congregation_id:    form.congregation_id || null,
+      // Documentação civil
+      civil_document_type:   civilDocType,
+      civil_document_status: form.civil_document_status || "Pendente",
+      civil_document_notes:  form.civil_document_notes?.trim() || null,
+      // Dados eclesiásticos adicionais
+      holy_spirit_baptism_date: form.holy_spirit_baptism_date || null,
+      consecration_date:        form.consecration_date || null,
+    };
+  };
 
   // ── Save ─────────────────────────────────────────────────────────────────────
 
@@ -697,7 +759,6 @@ export default function Membros() {
     email: m.email,
     photo_url: m.photo_url,
     cpf: m.cpf,
-    rg: m.rg,
     birth_date: m.birth_date,
     baptism_date: m.baptized_at,
     congregation: orgName(m.congregation_id) ?? orgName(m.sector_id) ?? null,
@@ -770,6 +831,24 @@ export default function Membros() {
           )}
         </div>
 
+        {/* Context filter banner — shown when navigated from Hierarquia */}
+        {contextFilter && (
+          <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-accent/10 border border-accent/20 text-sm">
+            <Building2 size={15} className="text-accent flex-shrink-0" />
+            <span className="flex-1">
+              Visualizando membros de <strong>{contextFilter.orgName}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => setContextFilter(null)}
+              className="text-muted-foreground hover:text-foreground p-0.5"
+              title="Mostrar todos os membros"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
         {/* Search + Filter */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
@@ -820,7 +899,22 @@ export default function Membros() {
                         <div className="flex items-center gap-3">
                           <MemberAvatar member={m} size="sm" />
                           <div>
-                            <p className="font-medium">{m.full_name}</p>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="font-medium">{m.full_name}</p>
+                              {m.civil_document_status === "Pendente" && m.marital_status && (
+                                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" title="Documentação civil pendente">
+                                  doc. pendente
+                                </span>
+                              )}
+                              {m.civil_document_status === "Rejeitado" && (
+                                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" title="Documentação civil rejeitada">
+                                  doc. rejeitado
+                                </span>
+                              )}
+                              {m.civil_document_status === "Validado" && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0 inline-block" title="Documentação civil validada" />
+                              )}
+                            </div>
                             {m.birth_date && (
                               <p className="text-[11px] text-muted-foreground">
                                 Admissão: {m.joined_at ?? "—"}
@@ -1055,19 +1149,81 @@ export default function Membros() {
                       <FormInput label="Data de nascimento" value={form.birth_date || ""} onChange={v => setField("birth_date", v)} type="date" />
                       <FormSelect label="Sexo" value={form.gender || ""} onChange={v => setField("gender", v)} options={GENDER_OPTIONS} />
                       <FormSelect label="Estado civil" value={form.marital_status || ""} onChange={v => setField("marital_status", v)} options={MARITAL_STATUS_OPTIONS} />
+                      <FormInput label="CPF" value={form.cpf || ""} onChange={v => setField("cpf", v)} placeholder="000.000.000-00" />
                     </div>
                   </div>
                 )}
 
-                {/* ── Tab 2: Documentos ── */}
-                {activeTab === "documentos" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <FormInput label="CPF" value={form.cpf || ""} onChange={v => setField("cpf", v)} placeholder="000.000.000-00" />
-                    <FormInput label="RG" value={form.rg || ""} onChange={v => setField("rg", v)} placeholder="Número do RG" />
-                    <FormInput label="Órgão emissor" value={form.rg_issuer || ""} onChange={v => setField("rg_issuer", v)} placeholder="Ex: SSP/RS" />
-                    <FormInput label="Data de emissão (RG)" value={form.rg_issue_date || ""} onChange={v => setField("rg_issue_date", v)} type="date" />
-                  </div>
-                )}
+                {/* ── Tab 2: Documentação Civil ── */}
+                {activeTab === "documentos" && (() => {
+                  const civilDocLabel = getCivilDocLabel(form.marital_status || "");
+                  const statusColors: Record<string, string> = {
+                    Pendente:     "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+                    Apresentado:  "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+                    Validado:     "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
+                    Rejeitado:    "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+                  };
+                  return (
+                    <div className="space-y-5">
+                      {/* Info box: what document is expected */}
+                      {civilDocLabel ? (
+                        <div className="rounded-lg border border-border/60 bg-muted/40 p-4 space-y-1">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Documento exigido</p>
+                          <p className="text-sm font-semibold">{civilDocLabel}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Baseado no estado civil: <span className="font-medium">{form.marital_status}</span>
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
+                          <p className="text-sm text-muted-foreground">
+                            Selecione o <strong>estado civil</strong> na aba Dados Pessoais para ver o documento exigido.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Status badge + selector */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-medium text-muted-foreground">Status da documentação</label>
+                          {form.civil_document_status && (
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusColors[form.civil_document_status] ?? "bg-muted text-muted-foreground"}`}>
+                              {form.civil_document_status}
+                            </span>
+                          )}
+                        </div>
+                        <select
+                          value={form.civil_document_status || "Pendente"}
+                          onChange={e => setField("civil_document_status", e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          {CIVIL_DOCUMENT_STATUS_OPTIONS.map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Notes */}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-medium text-muted-foreground">Observações sobre a documentação</label>
+                        <textarea
+                          value={form.civil_document_notes || ""}
+                          onChange={e => setField("civil_document_notes", e.target.value)}
+                          rows={3}
+                          placeholder="Ex: Certidão entregue em mãos, aguardando validação..."
+                          className="px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+                        />
+                      </div>
+
+                      {/* Upload placeholder */}
+                      <div className="rounded-lg border border-dashed border-border/60 p-4 text-center space-y-1">
+                        <FileText size={20} className="mx-auto text-muted-foreground/50" />
+                        <p className="text-xs text-muted-foreground">Upload de anexo disponível em breve.</p>
+                        <p className="text-[10px] text-muted-foreground">O sistema de arquivos será integrado via Supabase Storage.</p>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* ── Tab 3: Contato ── */}
                 {activeTab === "contato" && (
@@ -1099,9 +1255,10 @@ export default function Membros() {
                 {activeTab === "eclesiastico" && (
                   <div className="space-y-5">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <FormInput label="Data de conversão" value={form.conversion_date || ""} onChange={v => setField("conversion_date", v)} type="date" />
-                      <FormInput label="Data de batismo nas águas" value={form.baptized_at || ""} onChange={v => setField("baptized_at", v)} type="date" />
+                      <FormInput label="Batismo nas águas" value={form.baptized_at || ""} onChange={v => setField("baptized_at", v)} type="date" />
+                      <FormInput label="Batismo com o Espírito Santo" value={form.holy_spirit_baptism_date || ""} onChange={v => setField("holy_spirit_baptism_date", v)} type="date" />
                       <FormInput label="Data de admissão" value={form.joined_at || ""} onChange={v => setField("joined_at", v)} type="date" />
+                      <FormInput label="Data de consagração" value={form.consecration_date || ""} onChange={v => setField("consecration_date", v)} type="date" />
                       <FormSelect label="Situação do membro" value={form.status} onChange={v => setField("status", v as MemberStatus)} options={MEMBER_STATUSES} required />
                     </div>
 

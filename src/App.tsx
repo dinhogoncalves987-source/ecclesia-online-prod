@@ -16,6 +16,8 @@ import { LanguageProvider } from "@/hooks/useLanguage";
 
 import { ChurchProvider } from "@/hooks/useChurch";
 
+import { SupportContextProvider } from "@/contexts/SupportContext";
+
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 import { OfflineBanner } from "@/components/OfflineBanner";
@@ -122,6 +124,8 @@ const App = () => (
 
         <LanguageProvider>
 
+        <SupportContextProvider>
+
         <ChurchProvider>
 
         <OfflineBanner />
@@ -222,6 +226,8 @@ const App = () => (
         </BrowserRouter>
 
         </ChurchProvider>
+
+        </SupportContextProvider>
 
         </LanguageProvider>
 

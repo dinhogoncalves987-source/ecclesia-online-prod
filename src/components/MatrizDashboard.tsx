@@ -29,14 +29,33 @@ export function MatrizDashboard() {
   const { t } = useLanguage();
 
   const orgType = church?.organization_type;
-  const panelTitle = orgType === "convencao"
-    ? "Painel Consolidado da Convenção"
+
+  // ── Labels configuráveis com fallback ───────────────────────────────────────
+  // uses_intermediate_level: null/undefined = true (mantém comportamento legado)
+  const _matrizUsesIntermediate = (orgType === "matriz" || orgType === "sede")
+    ? church?.uses_intermediate_level !== false
+    : true;
+
+  const childUnitLabel = orgType === "convencao"
+    ? (church?.municipal_level_label ?? "Matriz")
+    : (orgType === "matriz" || orgType === "sede") && _matrizUsesIntermediate
+      ? (church?.intermediate_level_label ?? "Setor")
+      : (church?.local_unit_label ?? "Congregação");
+
+  const childUnitLabelPlural = orgType === "convencao"
+    ? (church?.municipal_level_label_plural ?? "Matrizes")
+    : (orgType === "matriz" || orgType === "sede") && _matrizUsesIntermediate
+      ? (church?.intermediate_level_label_plural ?? "Setores")
+      : (church?.local_unit_label_plural ?? "Congregações");
+
+  const selfLabel = orgType === "convencao"
+    ? (church?.top_level_label ?? "Convenção")
     : orgType === "setor"
-      ? "Painel Consolidado do Setor"
-      : "Painel Consolidado da Matriz";
-  const childUnitLabel = orgType === "convencao" ? "Matriz" : orgType === "matriz" ? "Setor" : "Congregação";
-  const childUnitLabelPlural = orgType === "convencao" ? "Matrizes" : orgType === "matriz" ? "Setores" : "Congregações";
-  const parentBadgeLabel = orgType === "convencao" ? "Convenção" : orgType === "setor" ? "Setor" : "Matriz";
+      ? (church?.intermediate_level_label ?? "Setor")
+      : (church?.municipal_level_label ?? "Matriz");
+
+  const panelTitle = `Painel Consolidado da ${selfLabel}`;
+  const parentBadgeLabel = selfLabel;
   const [stats, setStats] = useState<CongregationStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);

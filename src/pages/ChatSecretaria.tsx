@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   HeadphonesIcon,
   Loader2,
@@ -73,7 +73,9 @@ export default function ChatSecretaria() {
   const { toast } = useToast();
   const { church, loading: churchLoading } = useChurch();
   const { isAdmin } = useRole();
-  const { pathname } = useLocation();
+  const location    = useLocation();
+  const navigate    = useNavigate();
+  const { pathname } = location;
 
   // On the global route /admin/chat the title is "Conversas".
   // On the legacy /admin/chat-secretaria it stays as "Chat da Secretaria".
@@ -89,6 +91,30 @@ export default function ChatSecretaria() {
   const [creating, setCreating] = useState(false);
   const [refetchKey, setRefetchKey] = useState(0);
   const [forcedThread, setForcedThread] = useState<InternalThread | null>(null);
+
+  // ── Auto-open DM when navigated from GerenciarAcessos ───────────────────
+  const processedNavState = useRef(false);
+  useEffect(() => {
+    if (processedNavState.current) return;
+    const state = location.state as { openDm?: boolean; userId?: string; userName?: string } | null;
+    if (!state?.openDm || !state.userId || !church?.id || !user?.id) return;
+
+    processedNavState.current = true;
+    // Clear nav state so back-navigation doesn't re-trigger
+    navigate(pathname, { replace: true, state: {} });
+
+    void findOrCreateDirectThread(church.id, user.id, state.userId, state.userName || "Usuário")
+      .then((result) => {
+        if (result.ok && result.thread) {
+          setForcedThread(result.thread);
+          setRefetchKey((k) => k + 1);
+          toast({ title: `Conversa com ${state.userName || "usuário"} aberta` });
+        } else {
+          toast({ title: "Erro ao abrir conversa", description: result.error, variant: "destructive" });
+        }
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [church?.id, user?.id]);
 
   // tópico geral
   const [newSubject, setNewSubject] = useState("");
