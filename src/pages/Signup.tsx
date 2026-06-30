@@ -82,7 +82,7 @@ export default function Signup() {
         <form ref={formRef} onSubmit={handleSignup} className="bg-card rounded-xl shadow-executive p-6 space-y-4">
           <div>
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("Nome completo")}</label>
-            <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={t("Ex: Pastor João Silva")} required
+            <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={t("Ex: Nome Completo")} required
               className="mt-1.5 w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30" />
           </div>
 

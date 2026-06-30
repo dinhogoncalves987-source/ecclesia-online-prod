@@ -36,7 +36,7 @@ export default function Login() {
     if (error) {
       toast({ title: t("Erro ao entrar"), description: error.message, variant: "destructive" });
     } else {
-      navigate("/app");
+      navigate("/admin");
     }
     setLoading(false);
   };
@@ -128,7 +128,7 @@ export default function Login() {
               const { error } = await supabase.auth.signInWithOAuth({
                 provider: "google",
                 options: {
-                  redirectTo: `${window.location.origin}/app`,
+                  redirectTo: `${window.location.origin}/admin`,
                   queryParams: {
                     access_type: "offline",
                     prompt: "consent",

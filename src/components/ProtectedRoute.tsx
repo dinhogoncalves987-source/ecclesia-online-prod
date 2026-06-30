@@ -4,23 +4,28 @@ import { useRole } from "@/hooks/useRole";
 import { useChurch } from "@/hooks/useChurchContext";
 import { Loader2 } from "lucide-react";
 
-const UNIVERSAL_MEMBER_PATHS = [
+const MEMBER_ACCESSIBLE_PATHS = [
+  "/admin",
   "/admin/biblia",
   "/admin/oracoes",
   "/admin/chat",
-  "/admin/chat-secretaria",
-  "/admin/comunidade",
-  "/admin/marketplace",
+  "/admin/comunicacao",
+  "/admin/agenda",
+  "/admin/escalas",
+  "/admin/assembleia-geral",
+  "/admin/cartas-recomendacao",
+  "/admin/campanhas",
   "/admin/culto",
   "/admin/perfil",
-  "/admin/campanhas",
+  "/admin/marketplace",
+  "/admin/comunidade",
 ];
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { user, loading } = useAuth();
-  const { canAccess, isSuperAdmin, loading: roleLoading } = useRole();
-  const { church, hasActiveMembership, loading: churchLoading } = useChurch();
+  const { canAccess, canonicalRole, loading: roleLoading } = useRole();
+  const { loading: churchLoading } = useChurch();
 
   if (loading || (user && (roleLoading || churchLoading))) {
     return (
@@ -34,16 +39,16 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  const isUniversalPath = UNIVERSAL_MEMBER_PATHS.some((p) =>
-    location.pathname.startsWith(p),
+  const isMemberAccessiblePath = MEMBER_ACCESSIBLE_PATHS.some((p) =>
+    location.pathname === p || location.pathname.startsWith(`${p}/`),
   );
 
-  if (!church && !isSuperAdmin && !hasActiveMembership) {
-    if (isUniversalPath) {
+  if (!canonicalRole) {
+    if (isMemberAccessiblePath) {
       return <>{children}</>;
     }
 
-    return <Navigate to="/app" replace />;
+    return <Navigate to="/admin" replace />;
   }
 
   if (!canAccess(location.pathname)) {
