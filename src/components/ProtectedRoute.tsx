@@ -1,17 +1,28 @@
-import { Navigate, useLocation } from "react-router-dom";
+﻿import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
 import { useChurch } from "@/hooks/useChurchContext";
-import { OrganizationPending } from "@/components/OrganizationPending";
 import { Loader2 } from "lucide-react";
+
+const UNIVERSAL_MEMBER_PATHS = [
+  "/admin/biblia",
+  "/admin/oracoes",
+  "/admin/chat",
+  "/admin/chat-secretaria",
+  "/admin/comunidade",
+  "/admin/marketplace",
+  "/admin/culto",
+  "/admin/perfil",
+  "/admin/campanhas",
+];
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { user, loading } = useAuth();
-  const { canAccess, canonicalRole, isSuperAdmin, loading: roleLoading } = useRole();
+  const { canAccess, isSuperAdmin, loading: roleLoading } = useRole();
   const { church, hasActiveMembership, loading: churchLoading } = useChurch();
 
-  if (loading || (user && (roleLoading || churchLoading || !canonicalRole))) {
+  if (loading || (user && (roleLoading || churchLoading))) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 size={32} className="animate-spin text-accent" />
@@ -23,12 +34,16 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  // OrganizationPending só deve aparecer quando o usuário realmente não tem
-  // vínculo: não é super admin, não tem organização ativa resolvida E não
-  // possui nenhum vínculo ativo em organization_users. Um church_admin com
-  // vínculo ativo (is_active = true) NUNCA deve cair aqui.
+  const isUniversalPath = UNIVERSAL_MEMBER_PATHS.some((p) =>
+    location.pathname.startsWith(p),
+  );
+
   if (!church && !isSuperAdmin && !hasActiveMembership) {
-    return <OrganizationPending />;
+    if (isUniversalPath) {
+      return <>{children}</>;
+    }
+
+    return <Navigate to="/app" replace />;
   }
 
   if (!canAccess(location.pathname)) {

@@ -48,6 +48,8 @@ import DevocionalPublic from "./pages/DevocionalPublic";
 
 import NotFound from "./pages/NotFound";
 
+const AppHome = lazy(() => import("./pages/AppHome"));
+
 
 
 // Admin — lazy loaded (not needed until user navigates)
@@ -157,6 +159,9 @@ const App = () => (
               <Route path="/convite-acesso/:token" element={<ConviteAcesso />} />
 
               <Route path="/devocional" element={<DevocionalPublic />} />
+
+              {/* Member app — accessible to any authenticated user, no org required */}
+              <Route path="/app" element={<AppHome />} />
 
               <Route path="/admin" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
 
