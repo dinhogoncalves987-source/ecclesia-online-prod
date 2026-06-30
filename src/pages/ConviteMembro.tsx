@@ -7,7 +7,7 @@
  *  2. Show member name, church, congregation.
  *  3. If NOT logged in → show inline login/signup.
  *  4. If logged in → button "Ativar meu acesso" → accept_member_invite RPC.
- *  5. Redirect to /admin.
+ *  5. Redirect to app home.
  */
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
@@ -83,7 +83,7 @@ export default function ConviteMembro() {
       return;
     }
     setStep("done");
-    setTimeout(() => navigate("/admin"), 2500);
+    setTimeout(() => navigate("/"), 2500);
   };
 
   // ── Login / Signup ────────────────────────────────────────────────────────────
