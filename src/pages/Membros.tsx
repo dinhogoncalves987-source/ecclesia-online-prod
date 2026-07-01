@@ -557,8 +557,8 @@ export default function Membros() {
   // ── Save ─────────────────────────────────────────────────────────────────────
 
   const handleSave = async (openWallet = false) => {
-    if (!form.full_name.trim()) {
-      toast.error("Nome completo é obrigatório.");
+    if (!form.full_name.trim() || !form.cpf?.trim() || !form.phone?.trim()) {
+      toast.error("Preencha nome completo, CPF e telefone antes de salvar o membro.");
       setActiveTab("pessoal");
       return;
     }
