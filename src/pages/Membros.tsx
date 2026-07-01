@@ -72,6 +72,8 @@ type Member = {
   // Documentação civil
   civil_document_type: string | null;
   civil_document_status: string | null;
+  civil_document_url: string | null;
+  civil_document_uploaded_at: string | null;
   civil_document_notes: string | null;
   // Dados eclesiásticos adicionais
   holy_spirit_baptism_date: string | null;
@@ -117,6 +119,8 @@ const EMPTY_FORM: Omit<Member, "id"> = {
   notes: "",
   civil_document_type: "",
   civil_document_status: "Pendente",
+  civil_document_url: null,
+  civil_document_uploaded_at: null,
   civil_document_notes: "",
   holy_spirit_baptism_date: "",
   consecration_date: "",
@@ -276,6 +280,9 @@ export default function Membros() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const civilDocumentInputRef = useRef<HTMLInputElement>(null);
+  const [civilDocumentFile, setCivilDocumentFile] = useState<File | null>(null);
+  const [uploadingCivilDocument, setUploadingCivilDocument] = useState(false);
 
   // Sub-organizations (sectors + congregations)
   const [subOrgs, setSubOrgs] = useState<SubOrg[]>([]);
@@ -404,12 +411,77 @@ export default function Membros() {
 
   // ── Open modal ───────────────────────────────────────────────────────────────
 
+  const handleCivilDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Documento invalido. Use PDF, JPG, PNG ou WEBP.");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Documento muito grande (max. 10MB).");
+      return;
+    }
+
+    setCivilDocumentFile(file);
+  };
+
+  const uploadCivilDocumentIfNeeded = async (memberId: string): Promise<string | null> => {
+    if (!civilDocumentFile) return form.civil_document_url || null;
+    if (!church) return null;
+
+    setUploadingCivilDocument(true);
+    try {
+      const ext = civilDocumentFile.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "pdf";
+      const path = `${church.id}/${memberId}/civil-document.${ext}`;
+
+      const { error } = await supabase.storage
+        .from("member-documents")
+        .upload(path, civilDocumentFile, { upsert: true, contentType: civilDocumentFile.type });
+
+      if (error) {
+        toast.error("Erro ao enviar documento civil", { description: error.message });
+        return null;
+      }
+
+      return path;
+    } catch {
+      toast.error("Erro inesperado no upload do documento civil.");
+      return null;
+    } finally {
+      setUploadingCivilDocument(false);
+    }
+  };
+
+  const openCivilDocument = async () => {
+    if (!form.civil_document_url) return;
+
+    if (form.civil_document_url.startsWith("http")) {
+      window.open(form.civil_document_url, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    const { data, error } = await supabase.storage
+      .from("member-documents")
+      .createSignedUrl(form.civil_document_url, 60 * 10);
+
+    if (error || !data?.signedUrl) {
+      toast.error("Nao foi possivel abrir o documento.", { description: error?.message });
+      return;
+    }
+
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  };
   const openNew = () => {
     setIsNewMember(true);
     setEditingId(null);
     setForm({ ...EMPTY_FORM });
     setPhotoPreview(null);
     setPhotoFile(null);
+    setCivilDocumentFile(null);
     setActiveTab("pessoal");
     setModalOpen(true);
   };
@@ -452,12 +524,15 @@ export default function Membros() {
       notes:             m.notes || "",
       civil_document_type:   m.civil_document_type || getCivilDocLabel(m.marital_status || "") || "",
       civil_document_status: m.civil_document_status || "Pendente",
+      civil_document_url:    m.civil_document_url || null,
+      civil_document_uploaded_at: m.civil_document_uploaded_at || null,
       civil_document_notes:  m.civil_document_notes || "",
       holy_spirit_baptism_date: m.holy_spirit_baptism_date || "",
       consecration_date:        m.consecration_date || "",
     });
     setPhotoPreview(m.photo_url || null);
     setPhotoFile(null);
+    setCivilDocumentFile(null);
     setActiveTab("pessoal");
     setModalOpen(true);
   };
@@ -467,6 +542,7 @@ export default function Membros() {
     setEditingId(null);
     setPhotoPreview(null);
     setPhotoFile(null);
+    setCivilDocumentFile(null);
   };
 
   // ── Schema / RLS error detection ─────────────────────────────────────────────
@@ -518,7 +594,7 @@ export default function Membros() {
    * Extended payload — ONLY the new columns added by migration 20260617120000.
    * Separated from core so it can fail gracefully if the migration is not applied.
    */
-  const buildExtendedPayload = (photoUrl: string | null) => {
+  const buildExtendedPayload = (photoUrl: string | null, civilDocumentUrl: string | null) => {
     // civil_document_type: auto-compute from marital_status, fallback to form value
     const civilDocType = getCivilDocLabel(form.marital_status || "") || form.civil_document_type?.trim() || null;
     return {
@@ -547,6 +623,8 @@ export default function Membros() {
       // Documentação civil
       civil_document_type:   civilDocType,
       civil_document_status: form.civil_document_status || "Pendente",
+      civil_document_url:    civilDocumentUrl,
+      civil_document_uploaded_at: civilDocumentUrl ? (civilDocumentFile ? new Date().toISOString() : form.civil_document_uploaded_at || new Date().toISOString()) : null,
       civil_document_notes:  form.civil_document_notes?.trim() || null,
       // Dados eclesiásticos adicionais
       holy_spirit_baptism_date: form.holy_spirit_baptism_date || null,
@@ -572,10 +650,10 @@ export default function Membros() {
     setSaving(true);
     try {
       // ── Helpers ───────────────────────────────────────────────────────────
-      const tryExtended = async (memberId: string, photoUrl: string | null) => {
+      const tryExtended = async (memberId: string, photoUrl: string | null, civilDocumentUrl: string | null) => {
         const { error } = await supabase
           .from("members")
-          .update(buildExtendedPayload(photoUrl))
+          .update(buildExtendedPayload(photoUrl, civilDocumentUrl))
           .eq("id", memberId)
           .select("id")
           .single();
@@ -612,12 +690,13 @@ export default function Membros() {
         console.log("[Membros] new member created:", newId);
 
         const photoUrl  = await uploadPhotoIfNeeded(newId);
-        const allSaved  = await tryExtended(newId, photoUrl);
+        const civilDocumentUrl = await uploadCivilDocumentIfNeeded(newId);
+        const allSaved  = await tryExtended(newId, photoUrl, civilDocumentUrl);
         if (allSaved) toast.success("Membro cadastrado com sucesso!");
 
         await reloadMembers();
         if (openWallet) {
-          const saved = members.find(m => m.id === newId) || { ...(form as Member), id: newId, photo_url: photoUrl };
+          const saved = members.find(m => m.id === newId) || { ...(form as Member), id: newId, photo_url: photoUrl, civil_document_url: civilDocumentUrl };
           setWalletMember(saved as Member);
         }
         closeModal();
@@ -665,7 +744,8 @@ export default function Membros() {
 
         // Step 2 — photo upload + extended columns (best-effort)
         const photoUrl = await uploadPhotoIfNeeded(editingId);
-        const allSaved = await tryExtended(editingId, photoUrl);
+        const civilDocumentUrl = await uploadCivilDocumentIfNeeded(editingId);
+        const allSaved = await tryExtended(editingId, photoUrl, civilDocumentUrl);
         if (allSaved) toast.success("Membro atualizado com sucesso!");
 
         await reloadMembers();
@@ -1215,11 +1295,64 @@ export default function Membros() {
                         />
                       </div>
 
-                      {/* Upload placeholder */}
-                      <div className="rounded-lg border border-dashed border-border/60 p-4 text-center space-y-1">
-                        <FileText size={20} className="mx-auto text-muted-foreground/50" />
-                        <p className="text-xs text-muted-foreground">Upload de anexo disponível em breve.</p>
-                        <p className="text-[10px] text-muted-foreground">O sistema de arquivos será integrado via Supabase Storage.</p>
+                      {/* Civil document upload */}
+                      <div className="rounded-lg border border-dashed border-border/60 p-4 space-y-3">
+                        <div className="flex items-start gap-3">
+                          <FileText size={20} className="text-muted-foreground/60 mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium">Documento civil</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {civilDocumentFile ? civilDocumentFile.name : form.civil_document_url ? "Documento anexado" : "PDF, JPG, PNG ou WEBP - max. 10MB"}
+                            </p>
+                            {form.civil_document_uploaded_at && (
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                Enviado em {new Date(form.civil_document_uploaded_at).toLocaleDateString("pt-BR")}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <input
+                          ref={civilDocumentInputRef}
+                          type="file"
+                          accept="application/pdf,image/jpeg,image/png,image/webp"
+                          className="hidden"
+                          onChange={handleCivilDocumentChange}
+                        />
+
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => civilDocumentInputRef.current?.click()}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
+                          >
+                            <Upload size={14} /> Selecionar arquivo
+                          </button>
+
+                          {form.civil_document_url && (
+                            <button
+                              type="button"
+                              onClick={openCivilDocument}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
+                            >
+                              <FileText size={14} /> Abrir documento
+                            </button>
+                          )}
+
+                          {(civilDocumentFile || form.civil_document_url) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCivilDocumentFile(null);
+                                setField("civil_document_url", null);
+                                setField("civil_document_uploaded_at", null);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
+                            >
+                              Remover documento
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -1452,11 +1585,11 @@ export default function Membros() {
                   <button
                     type="button"
                     onClick={() => handleSave(false)}
-                    disabled={saving || uploadingPhoto}
+                    disabled={saving || uploadingPhoto || uploadingCivilDocument}
                     className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
                   >
-                    {(saving || uploadingPhoto) && <Loader2 size={14} className="animate-spin" />}
-                    {saving ? "Salvando..." : uploadingPhoto ? "Enviando foto..." : "Salvar Membro"}
+                    {(saving || uploadingPhoto || uploadingCivilDocument) && <Loader2 size={14} className="animate-spin" />}
+                    {saving ? "Salvando..." : uploadingPhoto ? "Enviando foto..." : uploadingCivilDocument ? "Enviando documento..." : "Salvar Membro"}
                   </button>
                 </div>
               </div>
