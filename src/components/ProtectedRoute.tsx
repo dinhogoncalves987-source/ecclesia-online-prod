@@ -39,11 +39,17 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
+  const isInitialEntry = location.pathname === "/admin" && new URLSearchParams(location.search).get("entry") === "1";
+
   const isMemberAccessiblePath = MEMBER_ACCESSIBLE_PATHS.some((p) =>
     location.pathname === p || location.pathname.startsWith(`${p}/`),
   );
 
   if (!canonicalRole) {
+    if (isInitialEntry) {
+      return <Navigate to="/admin/biblia" replace />;
+    }
+
     if (isMemberAccessiblePath) {
       return <>{children}</>;
     }

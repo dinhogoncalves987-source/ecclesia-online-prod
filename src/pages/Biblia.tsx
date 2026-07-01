@@ -89,7 +89,7 @@ export default function Biblia() {
   const [largeFont, setLargeFont] = useState(false);
   const [bookPickerOpen, setBookPickerOpen] = useState(false);
   const [selectedBookIndex, setSelectedBookIndex] = useState(0);
-  const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
+  const [selectedChapter, setSelectedChapter] = useState<number | null>(1);
   const [verses, setVerses] = useState<Verse[]>([]);
   const [verseError, setVerseError] = useState("");
   const [versesFromCache, setVersesFromCache] = useState(false);

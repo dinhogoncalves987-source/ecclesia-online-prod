@@ -55,8 +55,16 @@ export default function Signup() {
       if (inviteSlug && data.session) {
         await supabase.auth.updateUser({ data: { church_slug: inviteSlug, full_name: metadata.full_name } });
       }
-      toast({ title: t("Conta criada!"), description: t("Verifique seu e-mail para confirmar o cadastro.") });
-      navigate(loginPathWithChurch(inviteSlug));
+      if (data.session) {
+        toast({ title: t("Conta criada!"), description: t("Entrando no Ecclesia...") });
+        navigate("/admin?entry=1");
+      } else {
+        toast({
+          title: t("Conta criada!"),
+          description: t("Seu cadastro foi criado, mas ainda depende de confirmacao por e-mail. Se o e-mail nao chegar, entre com Google ou fale com a secretaria."),
+        });
+        navigate(loginPathWithChurch(inviteSlug));
+      }
     }
     setLoading(false);
   };
@@ -123,7 +131,7 @@ export default function Signup() {
               const { error } = await supabase.auth.signInWithOAuth({
                 provider: "google",
                 options: {
-                  redirectTo: `${window.location.origin}/`,
+                  redirectTo: `${window.location.origin}/admin?entry=1`,
                   queryParams: {
                     access_type: "offline",
                     prompt: "consent",
