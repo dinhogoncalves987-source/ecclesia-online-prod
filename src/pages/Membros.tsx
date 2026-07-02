@@ -457,7 +457,14 @@ export default function Membros() {
   };
 
   const openCivilDocument = async () => {
-    if (!form.civil_document_url) return;
+  if (civilDocumentFile) {
+    const localUrl = URL.createObjectURL(civilDocumentFile);
+    window.open(localUrl, "_blank", "noopener,noreferrer");
+    setTimeout(() => URL.revokeObjectURL(localUrl), 60 * 1000);
+    return;
+  }
+
+  if (!form.civil_document_url) return;
 
     if (form.civil_document_url.startsWith("http")) {
       window.open(form.civil_document_url, "_blank", "noopener,noreferrer");
@@ -632,12 +639,55 @@ export default function Membros() {
     };
   };
 
+  // ── Wizard tab validation ────────────────────────────────────────────────────
+
+  /**
+   * Validates the current tab before allowing forward navigation.
+   * Returns true if navigation is allowed, false (+ toast) if blocked.
+   * Backward navigation is always allowed.
+   */
+  const validateCurrentTabBeforeLeaving = (fromTabId: string, toTabId: string): boolean => {
+    const fromIdx = TABS.findIndex(t => t.id === fromTabId);
+    const toIdx   = TABS.findIndex(t => t.id === toTabId);
+    if (toIdx <= fromIdx) return true; // backward — always ok
+
+    if (fromTabId === "pessoal") {
+      if (!form.full_name.trim()) {
+        toast.error("Informe o nome completo antes de continuar.");
+        return false;
+      }
+      if (!form.cpf?.trim()) {
+        toast.error("Informe o CPF antes de continuar.");
+        return false;
+      }
+    }
+
+    if (fromTabId === "contato") {
+      if (!form.phone?.trim()) {
+        toast.error("Informe o telefone antes de continuar.");
+        return false;
+      }
+    }
+
+    return true;
+  };
+
   // ── Save ─────────────────────────────────────────────────────────────────────
 
   const handleSave = async (openWallet = false) => {
-    if (!form.full_name.trim() || !form.cpf?.trim() || !form.phone?.trim()) {
-      toast.error("Preencha nome completo, CPF e telefone antes de salvar o membro.");
+    if (!form.full_name.trim()) {
+      toast.error("Informe o nome completo antes de salvar.");
       setActiveTab("pessoal");
+      return;
+    }
+    if (!form.cpf?.trim()) {
+      toast.error("Informe o CPF antes de salvar.");
+      setActiveTab("pessoal");
+      return;
+    }
+    if (!form.phone?.trim()) {
+      toast.error("Informe o telefone antes de salvar.");
+      setActiveTab("contato");
       return;
     }
     if (!form.member_role) {
@@ -780,28 +830,30 @@ export default function Membros() {
   // ── Bulk import ──────────────────────────────────────────────────────────────
 
   const memberFields = [
-    { key: "name", label: t("Nome"), required: true },
-    { key: "role", label: t("Função") },
-    { key: "phone", label: t("Telefone") },
-    { key: "email", label: t("E-mail") },
+    { key: "name",   label: t("Nome"),      required: true },
+    { key: "cpf",    label: t("CPF"),       required: true },
+    { key: "phone",  label: t("Telefone"),  required: true },
+    { key: "role",   label: t("Função") },
+    { key: "email",  label: t("E-mail") },
     { key: "status", label: t("Status") },
   ];
 
   const memberTemplate = [
-    { name: "João Silva", role: "Diácono", phone: "(11) 99999-0001", email: "joao@email.com", status: "Ativo" },
-    { name: "Maria Souza", role: "Membro", phone: "(11) 99999-0002", email: "maria@email.com", status: "Ativo" },
+    { name: "João Silva",  cpf: "000.000.000-01", phone: "(11) 99999-0001", role: "Diácono", email: "joao@email.com",  status: "Ativo" },
+    { name: "Maria Souza", cpf: "000.000.000-02", phone: "(11) 99999-0002", role: "Membro",  email: "maria@email.com", status: "Ativo" },
   ];
 
   const handleBulkImport = async (rows: Record<string, string>[]) => {
     if (!user || !church) return { success: 0, errors: 0 };
     let success = 0, errors = 0;
     for (const row of rows) {
-      if (!row.name) { errors++; continue; }
+      if (!row.name || !row.cpf || !row.phone) { errors++; continue; }
       const status = row.status && isMemberStatus(row.status) ? row.status : "Ativo";
       const { error } = await insertWithOrganizationScope("members", church.id, {
         created_by: user.id,
         full_name: row.name,
         member_role: row.role || "Membro",
+        cpf: row.cpf || null,
         phone: row.phone || null,
         email: row.email || null,
         joined_at: new Date().toISOString().split("T")[0],
@@ -1163,7 +1215,11 @@ export default function Membros() {
                   return (
                     <button
                       key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
+                      onClick={() => {
+                        if (validateCurrentTabBeforeLeaving(activeTab, tab.id)) {
+                          setActiveTab(tab.id);
+                        }
+                      }}
                       className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
                         activeTab === tab.id
                           ? "border-primary text-primary"
@@ -1329,13 +1385,13 @@ export default function Membros() {
                             <Upload size={14} /> Selecionar arquivo
                           </button>
 
-                          {form.civil_document_url && (
+                          {(civilDocumentFile || form.civil_document_url) && (
                             <button
                               type="button"
                               onClick={openCivilDocument}
                               className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
                             >
-                              <FileText size={14} /> Abrir documento
+                              <FileText size={14} /> Visualizar documento
                             </button>
                           )}
 
@@ -1523,7 +1579,10 @@ export default function Membros() {
                     type="button"
                     onClick={() => {
                       const idx = TABS.findIndex(t => t.id === activeTab);
-                      if (idx < TABS.length - 1) setActiveTab(TABS[idx + 1].id);
+                      const nextTab = TABS[idx + 1];
+                      if (nextTab && validateCurrentTabBeforeLeaving(activeTab, nextTab.id)) {
+                        setActiveTab(nextTab.id);
+                      }
                     }}
                     disabled={activeTab === TABS[TABS.length - 1].id}
                     className="px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:bg-secondary transition-colors disabled:opacity-30 flex items-center gap-1"
@@ -1587,7 +1646,10 @@ export default function Membros() {
                     onClick={() => {
                       const idx = TABS.findIndex(t => t.id === activeTab);
                       if (idx < TABS.length - 1) {
-                        setActiveTab(TABS[idx + 1].id);
+                        const nextTab = TABS[idx + 1];
+                        if (validateCurrentTabBeforeLeaving(activeTab, nextTab.id)) {
+                          setActiveTab(nextTab.id);
+                        }
                         return;
                       }
                       handleSave(false);
@@ -1624,15 +1686,14 @@ export default function Membros() {
       )}
 
       {/* Bulk import */}
-      {showImport && (
-        <BulkImportModal
-          title={t("Importar Membros")}
-          fields={memberFields}
-          template={memberTemplate}
-          onImport={handleBulkImport}
-          onClose={() => setShowImport(false)}
-        />
-      )}
+      <BulkImportModal
+        open={showImport}
+        title={t("Importar Membros")}
+        fields={memberFields}
+        templateData={memberTemplate}
+        onImport={handleBulkImport}
+        onClose={() => setShowImport(false)}
+      />
 
       {/* Invite modal */}
       {inviteModal && (
@@ -1652,5 +1713,6 @@ export default function Membros() {
     </AdminLayout>
   );
 }
+
 
 
