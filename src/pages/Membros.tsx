@@ -1584,12 +1584,22 @@ export default function Membros() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleSave(false)}
+                    onClick={() => {
+                      const idx = TABS.findIndex(t => t.id === activeTab);
+                      if (idx < TABS.length - 1) {
+                        setActiveTab(TABS[idx + 1].id);
+                        return;
+                      }
+                      handleSave(false);
+                    }}
                     disabled={saving || uploadingPhoto || uploadingCivilDocument}
                     className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
                   >
                     {(saving || uploadingPhoto || uploadingCivilDocument) && <Loader2 size={14} className="animate-spin" />}
-                    {saving ? "Salvando..." : uploadingPhoto ? "Enviando foto..." : uploadingCivilDocument ? "Enviando documento..." : "Salvar Membro"}
+                    {activeTab === TABS[TABS.length - 1].id
+                      ? saving ? "Salvando..." : uploadingPhoto ? "Enviando foto..." : uploadingCivilDocument ? "Enviando documento..." : "Salvar Membro"
+                      : "Próximo"}
+                    {activeTab !== TABS[TABS.length - 1].id && <ChevronRight size={14} />}
                   </button>
                 </div>
               </div>
@@ -1642,3 +1652,4 @@ export default function Membros() {
     </AdminLayout>
   );
 }
+
