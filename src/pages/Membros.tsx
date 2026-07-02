@@ -1598,7 +1598,7 @@ export default function Membros() {
                     {(saving || uploadingPhoto || uploadingCivilDocument) && <Loader2 size={14} className="animate-spin" />}
                     {activeTab === TABS[TABS.length - 1].id
                       ? saving ? "Salvando..." : uploadingPhoto ? "Enviando foto..." : uploadingCivilDocument ? "Enviando documento..." : "Salvar Membro"
-                      : "Próximo"}
+                      : "Pr\u00F3ximo"}
                     {activeTab !== TABS[TABS.length - 1].id && <ChevronRight size={14} />}
                   </button>
                 </div>
@@ -1652,4 +1652,5 @@ export default function Membros() {
     </AdminLayout>
   );
 }
+
 
