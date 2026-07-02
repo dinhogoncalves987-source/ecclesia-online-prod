@@ -286,6 +286,24 @@ export default function ChatSecretaria() {
     );
   }
 
+  // ── Sem vínculo com organização ────────────────────────────────────────────
+
+  if (!church) {
+    return (
+      <AdminLayout>
+        <div className="flex flex-col items-center justify-center h-full py-20 gap-4 text-center px-6">
+          <MessageSquarePlus size={40} className="text-muted-foreground/40" />
+          <div>
+            <p className="text-base font-semibold">Chat não disponível</p>
+            <p className="text-sm text-muted-foreground mt-1 max-w-xs">
+              Sua conta ainda não está vinculada a uma igreja. Use um convite recebido ou solicite vínculo à secretaria.
+            </p>
+          </div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
   // ── Header slot ────────────────────────────────────────────────────────────
 
   const headerSlot = (

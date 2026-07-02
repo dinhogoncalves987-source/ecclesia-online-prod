@@ -62,7 +62,7 @@ export function TransactionList({
   const { t, lang } = useLanguage();
   const formatCurrency = makeCurrencyFormatter(lang);
   const formatDate = makeDateFormatter(lang);
-  const canWriteFinance = hasRole(["super_admin", "church_admin", "tesoureiro"]);
+  const canWriteFinance = hasRole(["super_admin", "church_admin", "tesoureiro", "contador"]);
   const [accountCategories, setAccountCategories] = useState<FinanceAccountCategory[]>(DEFAULT_ACCOUNT_CATEGORIES);
   const [costCenters, setCostCenters] = useState<FinanceCostCenter[]>(DEFAULT_COST_CENTERS);
   const [financialAccounts, setFinancialAccounts] = useState<FinanceAccount[]>(DEFAULT_FINANCIAL_ACCOUNTS);

@@ -749,6 +749,16 @@ export default function SuperAdmin() {
 
   // ─── Access guard ────────────────────────────────────────────────────────────
 
+  if (roleLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 size={28} className="animate-spin text-muted-foreground" />
+        </div>
+      </AdminLayout>
+    );
+  }
+
   if (!isSuperAdmin) {
     return (
       <AdminLayout>
