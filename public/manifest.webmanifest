@@ -1,15 +1,17 @@
 {
   "id": "/",
   "lang": "pt-BR",
-  "name": "Ecclesia Admin",
+  "name": "Ecclesia",
   "short_name": "Ecclesia",
-  "description": "Gestão eclesiástica — Ecclesia Admin",
+  "description": "Plataforma Ecclesia — gestão pastoral, membros, agenda, TV e comunicação da igreja.",
   "display": "standalone",
-  "orientation": "portrait",
-  "start_url": "/",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "start_url": "/?source=pwa",
   "scope": "/",
   "theme_color": "#0B0B0F",
   "background_color": "#0B0B0F",
+  "categories": ["productivity", "education", "social"],
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -34,6 +36,15 @@
       "sizes": "180x180",
       "type": "image/png",
       "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Abrir Ecclesia",
+      "short_name": "Ecclesia",
+      "description": "Abrir o painel principal",
+      "url": "/?source=shortcut",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

@@ -7,6 +7,7 @@ type Props = {
   threads: InternalThread[];
   selectedId: string | null;
   loading?: boolean;
+  unreadCounts?: Record<string, number>;
   onSelect: (thread: InternalThread) => void;
 };
 
@@ -21,6 +22,7 @@ export function InternalThreadList({
   threads,
   selectedId,
   loading = false,
+  unreadCounts,
   onSelect,
 }: Props) {
   const { t, lang } = useLanguage();
@@ -52,6 +54,7 @@ export function InternalThreadList({
           day: "2-digit",
           month: "short",
         });
+        const unread = unreadCounts?.[thread.id] ?? 0;
 
         return (
           <li key={thread.id}>
@@ -71,14 +74,23 @@ export function InternalThreadList({
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">
-                  <p className="text-sm font-medium truncate">
+                  <p className={cn("text-sm truncate", unread > 0 ? "font-semibold" : "font-medium")}>
                     {thread.participantName ?? thread.subject}
                   </p>
-                  <span className="text-[10px] text-muted-foreground flex-shrink-0 tabular-nums">
-                    {time}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {unread > 0 && (
+                      <span className="inline-flex items-center justify-center bg-primary text-primary-foreground text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 tabular-nums leading-none">
+                        {unread > 99 ? "99+" : unread}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-muted-foreground tabular-nums">
+                      {time}
+                    </span>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground truncate mt-0.5">{thread.subject}</p>
+                <p className={cn("text-xs truncate mt-0.5", unread > 0 ? "text-foreground/70 font-medium" : "text-muted-foreground")}>
+                  {thread.subject}
+                </p>
               </div>
             </button>
           </li>

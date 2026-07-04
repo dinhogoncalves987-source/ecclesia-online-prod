@@ -1,0 +1,504 @@
+﻿C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceAssets.tsx:41: csv += `"${a.name}","${a.category}",${a.estimatedValue},"${getStatus(a)}","${a.responsible}","${a.location}"\n`;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceAssets.tsx:134: <p className="flex items-center gap-1.5"><User size={11} /> {asset.responsible}</p>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceAssets.tsx:176: <p className="font-medium mt-1">{selectedAsset.responsible}</p>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:7: HIERARCHY_LEVELS,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:18: type HierarchyItem = typeof HIERARCHY_LEVELS[number];
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:29: const [selectedHierarchy, setSelectedHierarchy] = useState<HierarchyItem | null>(null);
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:91: HIERARCHY_LEVELS.forEach(h => {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:127: {/* Hierarchy */}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:131: {HIERARCHY_LEVELS.map((item) => (
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:135: onClick={() => setSelectedHierarchy(item)}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:156: <h3 className="font-serif text-lg font-semibold mb-1">{t("Desempenho por setor")}</h3>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:223: {/* ── Hierarchy detail modal ───────────────────────────────────── */}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:225: open={!!selectedHierarchy}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:226: onClose={() => setSelectedHierarchy(null)}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:227: title={selectedHierarchy?.name ?? ""}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:228: subtitle={selectedHierarchy ? t(selectedHierarchy.level) : undefined}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:231: {selectedHierarchy && (
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:236: <p className="text-xl font-bold tabular-nums mt-1">{fmt(selectedHierarchy.revenue)}</p>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:240: <p className="text-xl font-bold mt-1">{selectedHierarchy.share}%</p>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:246: <span className="font-semibold text-foreground">{selectedHierarchy.share}%</span>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:251: style={{ width: `${selectedHierarchy.share}%` }}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:256: <p>Total convenção: {fmt(HIERARCHY_LEVELS[0].revenue)}</p>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceExecutive.tsx:267: subtitle="Desempenho do setor"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceTithesOfferings.tsx:28: { title: t("Média por congregação"), value: fmt(data.avgPerCongregation), icon: Users },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceTithesOfferings.tsx:32: let csv = "Congregação,Dízimos,Ofertas,Total,Crescimento\n";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceTithesOfferings.tsx:53: <h3 className="font-serif text-lg font-semibold">{t("Por congregação")}</h3>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceTithesOfferings.tsx:61: moduleTitle: t("Dízimos e Ofertas por Congregação"),
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\FinanceTithesOfferings.tsx:73: <th className="pb-2 font-medium">{t("Congregação")}</th>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\TransactionList.tsx:173: responsible_id: user.id,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\financeiro\TransactionList.tsx:228: responsible_id: user.id,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\AdminLayout.tsx:134: const orgType = church?.organization_type;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\AdminLayout.tsx:135: if (orgType === "convencao") return t("Matrizes");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\AdminLayout.tsx:136: if (orgType === "matriz") return t("Setores / Distritos");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\MatrizDashboard.tsx:27: export function MatrizDashboard() {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\MatrizDashboard.tsx:31: const orgType = church?.organization_type;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\MatrizDashboard.tsx:32: const panelTitle = orgType === "convencao"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\MatrizDashboard.tsx:33: ? "Painel Consolidado da Convenção"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\MatrizDashboard.tsx:34: : orgType === "setor"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\MatrizDashboard.tsx:35: ? "Painel Consolidado do Setor"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\MatrizDashboard.tsx:36: : "Painel Consolidado da Matriz";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\MatrizDashboard.tsx:37: const childUnitLabel = orgType === "convencao" ? "Matriz" : orgType === "matriz" ? "Setor" : "Congregação";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\MatrizDashboard.tsx:38: const childUnitLabelPlural = orgType === "convencao" ? "Matrizes" : orgType === "matriz" ? "Setores" : "Congregações";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\MatrizDashboard.tsx:39: const parentBadgeLabel = orgType === "convencao" ? "Convenção" : orgType === "setor" ? "Setor" : "Matriz";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\MatrizDashboard.tsx:58: // Include matriz + all congregations
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\MatrizDashboard.tsx:189: const isMatriz = s.id === church?.id;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\MatrizDashboard.tsx:195: {isMatriz && (
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\MatrizDashboard.tsx:222: const isMatriz = s.id === church?.id;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\MatrizDashboard.tsx:233: {isMatriz && (
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\MemberWalletCard.tsx:145: <span className="text-slate-500">Congregação:</span> {member.congregation}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\components\MemberWalletCard.tsx:260: member.congregation ? `Congregação: ${member.congregation}` : null,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useChurch.tsx:12: parent_id: string | null;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useChurch.tsx:15: organization_type: string | null;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useChurch.tsx:30: parent_church_id: org.parent_id,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useChurch.tsx:31: is_matriz: org.organization_type === "matriz" || org.organization_type === "sede",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useChurch.tsx:32: organization_type: org.organization_type ?? null,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useChurch.tsx:42: "id,parent_id,name,slug,organization_type,city,state,email,phone,logo_url,active";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useChurch.tsx:103: .from("organization_users")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useChurch.tsx:127: .from("organization_users")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useChurch.tsx:213: const isMatriz = church?.is_matriz ?? false;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useChurch.tsx:225: isMatriz,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useChurchContext.ts:10: is_matriz: boolean;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useChurchContext.ts:11: organization_type: string | null;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useChurchContext.ts:27: isMatriz: boolean;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useChurchContext.ts:41: isMatriz: false,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:203: "Painel Consolidado da Matriz": { pt: "Painel Consolidado da Matriz", en: "Headquarters Consolidated Panel", es: "Panel Consolidado de la Matriz" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:207: "Detalhamento por Congregação": { pt: "Detalhamento por Congregação", en: "Breakdown by Congregation", es: "Desglose por Congregación" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:209: "Congregação": { pt: "Congregação", en: "Congregation", es: "Congregación" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:264: "Matriz": { pt: "Matriz", en: "Headquarters", es: "Matriz" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:325: "Consolidado por hierarquia": { pt: "Consolidado por hierarquia", en: "Hierarchy consolidation", es: "Consolidado por jerarquía" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:326: "Convenção": { pt: "Convenção", en: "Convention", es: "Convención" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:327: "Setor Norte": { pt: "Setor Norte", en: "North Sector", es: "Sector Norte" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:328: "Setor Sul": { pt: "Setor Sul", en: "South Sector", es: "Sector Sur" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:329: "Setor Leste": { pt: "Setor Leste", en: "East Sector", es: "Sector Este" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:330: "Setor Oeste": { pt: "Setor Oeste", en: "West Sector", es: "Sector Oeste" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:331: "Desempenho por setor": { pt: "Desempenho por setor", en: "Performance by sector", es: "Desempeño por sector" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:334: "Setor Norte abaixo da média": { pt: "Setor Norte abaixo da média", en: "North Sector below average", es: "Sector Norte por debajo del promedio" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:337: "Revisar orçamento do Setor Oeste": { pt: "Revisar orçamento do Setor Oeste", en: "Review West Sector budget", es: "Revisar presupuesto del Sector Oeste" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:342: "Média por congregação": { pt: "Média por congregação", en: "Average per congregation", es: "Promedio por congregación" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:343: "Por congregação": { pt: "Por congregação", en: "By congregation", es: "Por congregación" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:404: "Congregação São José cresceu 18% em dízimos": { pt: "Congregação São José cresceu 18% em dízimos", en: "São José congregation grew 18% in tithes", es: "Congregación São José creció 18% en diezmos" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:407: "Setor Sul está 9% acima da meta": { pt: "Setor Sul está 9% acima da meta", en: "South Sector is 9% above goal", es: "Sector Sur está 9% por encima de la meta" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:666: en: "Members can talk with the team responsible for the campaign.",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:745: "Responsável": { pt: "Responsável", en: "Responsible party", es: "Responsable" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1195: "Gerencie as congregações vinculadas à matriz": { pt: "Gerencie as congregações vinculadas à matriz", en: "Manage congregations linked to headquarters", es: "Gestione las congregaciones vinculadas a la matriz" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1196: "Visualize informações da sua congregação": { pt: "Visualize informações da sua congregação", en: "View your congregation information", es: "Visualice información de su congregación" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1197: "Nova Congregação": { pt: "Nova Congregação", en: "New Congregation", es: "Nueva Congregación" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1198: "Editar Congregação": { pt: "Editar Congregação", en: "Edit Congregation", es: "Editar Congregación" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1199: "Nome da congregação *": { pt: "Nome da congregação *", en: "Congregation name *", es: "Nombre de la congregación *" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1204: "Criar Congregação": { pt: "Criar Congregação", en: "Create Congregation", es: "Crear Congregación" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1205: "Congregação atualizada com sucesso!": { pt: "Congregação atualizada com sucesso!", en: "Congregation updated successfully!", es: "¡Congregación actualizada con éxito!" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1206: "Congregação criada com sucesso!": { pt: "Congregação criada com sucesso!", en: "Congregation created successfully!", es: "¡Congregación creada con éxito!" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1207: "Congregação excluída": { pt: "Congregação excluída", en: "Congregation deleted", es: "Congregación eliminada" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1209: "Erro ao criar congregação": { pt: "Erro ao criar congregação", en: "Error creating congregation", es: "Error al crear congregación" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1211: "Nenhuma congregação cadastrada": { pt: "Nenhuma congregação cadastrada", en: "No congregations registered", es: "Ninguna congregación registrada" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1212: "Compartilhe este link para convidar membros para esta congregação.": { pt: "Compartilhe este link para convidar membros para esta congregação.", en: "Share this link to invite members to this congregation.", es: "Comparta este enlace para invitar miembros a esta congregación." },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1213: "Informações da Matriz": { pt: "Informações da Matriz", en: "Headquarters Information", es: "Información de la Matriz" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1342: "* O upload de áudio será habilitado em breve. Você poderá enviar gravações de ensaios, louvores próprios da congregação e muito mais.": { pt: "* O upload de áudio será habilitado em breve. Você poderá enviar gravações de ensaios, louvores próprios da congregação e muito mais.", en: "* Audio upload will be available soon. You'll be able to upload rehearsal recordings, congregation's own worship songs and much more.", es: "* La subida de audio estará disponible pronto. Podrá enviar grabaciones de ensayos, alabanzas propias de la congregación y mucho más." },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1364: // Admin Matriz label
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1365: "Admin Matriz": { pt: "Admin Matriz", en: "HQ Admin", es: "Admin Matriz" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1445: // Institutional hierarchy
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1446: "Matrizes": { pt: "Matrizes", en: "Main Churches", es: "Matrices" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1447: "Setores": { pt: "Setores", en: "Districts", es: "Sectores" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1448: "Matrizes Municipais": { pt: "Matrizes Municipais", en: "Municipal Main Churches", es: "Sedes Municipales" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1449: "Painel da Convenção / Regional": { pt: "Painel da Convenção / Regional", en: "Convention / Regional Panel", es: "Panel de la Convención / Regional" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1450: "Painel da Matriz Municipal": { pt: "Painel da Matriz Municipal", en: "Municipal Headquarters Panel", es: "Panel de la Sede Municipal" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1451: "Painel do Setor": { pt: "Painel do Setor", en: "District Panel", es: "Panel del Sector" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1452: "Gerenciar matrizes municipais": { pt: "Gerenciar matrizes municipais", en: "Manage main churches", es: "Gestionar sedes municipales" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1453: "Gerenciar setores": { pt: "Gerenciar setores", en: "Manage districts", es: "Gestionar sectores" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1454: "Convenção / Regional": { pt: "Convenção / Regional", en: "Convention / Regional", es: "Convención / Regional" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1455: "Matriz municipal": { pt: "Matriz municipal", en: "Main Church", es: "Sede municipal" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1456: "Setor": { pt: "Setor", en: "District", es: "Sector" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1460: "Cadastre matrizes municipais vinculadas a esta convenção ou regional. Unidades são permanentes; responsáveis serão atribuídos separadamente da estrutura.": {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1461: pt: "Cadastre matrizes municipais vinculadas a esta convenção ou regional. Unidades são permanentes; responsáveis serão atribuídos separadamente da estrutura.",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1465: "Cadastre setores vinculados a esta matriz. Unidades são permanentes; pastores, supervisores e tesoureiros podem mudar sem recriar a unidade.": {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1466: pt: "Cadastre setores vinculados a esta matriz. Unidades são permanentes; pastores, supervisores e tesoureiros podem mudar sem recriar a unidade.",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1470: "Cadastre congregações vinculadas a este setor. Unidades são permanentes; responsáveis serão atribuídos separadamente da estrutura.": {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1471: pt: "Cadastre congregações vinculadas a este setor. Unidades são permanentes; responsáveis serão atribuídos separadamente da estrutura.",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1475: "Esta congregação não cria novas unidades. Membros, tesouraria e histórico permanecem na unidade quando os responsáveis mudam.": {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1476: pt: "Esta congregação não cria novas unidades. Membros, tesouraria e histórico permanecem na unidade quando os responsáveis mudam.",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1480: "Nenhuma matriz municipal cadastrada.": { pt: "Nenhuma matriz municipal cadastrada.", en: "No main churches registered.", es: "Ninguna sede municipal registrada." },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1481: "Nenhum setor cadastrado.": { pt: "Nenhum setor cadastrado.", en: "No districts registered.", es: "Ningún sector registrado." },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1483: "Nova matriz municipal": { pt: "Nova matriz municipal", en: "New Main Church", es: "Nueva sede municipal" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1484: "Novo setor": { pt: "Novo setor", en: "New District", es: "Nuevo sector" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1485: "Nova congregação": { pt: "Nova congregação", en: "New Congregation", es: "Nueva congregación" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1487: "Criar matriz municipal": { pt: "Criar matriz municipal", en: "Create Main Church", es: "Crear sede municipal" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1488: "Criar setor": { pt: "Criar setor", en: "Create District", es: "Crear sector" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1489: "Criar congregação": { pt: "Criar congregação", en: "Create Congregation", es: "Crear congregación" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1496: "Setor criado.": { pt: "Setor criado.", en: "District created.", es: "Sector creado." },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1497: "Matriz municipal criada.": { pt: "Matriz municipal criada.", en: "Main church created.", es: "Sede municipal creada." },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1498: "Congregação criada.": { pt: "Congregação criada.", en: "Congregation created.", es: "Congregación creada." },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1510: "Nome da matriz municipal *": { pt: "Nome da matriz municipal *", en: "Main church name *", es: "Nombre de la sede municipal *" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1511: "Nome do setor *": { pt: "Nome do setor *", en: "District name *", es: "Nombre del sector *" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1589: "Igrejas Matriz": { pt: "Igrejas Matriz", en: "Main Churches", es: "Iglesias Principales" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1592: "Matriz ou congregação": { pt: "Matriz ou congregação", en: "Main church or congregation", es: "Sede o congregación" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1678: pt: "Faça upload da sua Harpa Cristã e cadastre músicas da sua congregação",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1695: "Projete letras e versículos para a congregação em tempo real": {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useLanguage.tsx:1696: pt: "Projete letras e versículos para a congregação em tempo real",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\hooks\useRole.tsx:80: .from("organization_users")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\integrations\supabase\types.ts:351: organization_users: {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\integrations\supabase\types.ts:381: foreignKeyName: "organization_users_organization_id_fkey"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\integrations\supabase\types.ts:400: organization_type: string
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\integrations\supabase\types.ts:401: parent_id: string | null
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\integrations\supabase\types.ts:417: organization_type?: string
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\integrations\supabase\types.ts:418: parent_id?: string | null
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\integrations\supabase\types.ts:434: organization_type?: string
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\integrations\supabase\types.ts:435: parent_id?: string | null
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\integrations\supabase\types.ts:443: foreignKeyName: "organizations_parent_id_fkey"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\integrations\supabase\types.ts:444: columns: ["parent_id"]
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\integrations\supabase\types.ts:557: responsible_id: string | null
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\integrations\supabase\types.ts:581: responsible_id?: string | null
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\integrations\supabase\types.ts:605: responsible_id?: string | null
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\integrations\supabase\types.ts:1934: is_valid_organization_hierarchy: {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\campaignsDemo.ts:85: title: "Construção Congregação São José",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\campaignsDemo.ts:87: "Obra da nova congregação São José em Caxias do Sul/RS: fundação concluída, fase de alvenaria e cobertura.",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\campaignsDemo.ts:93: organization: "Congregação São José — AD Caxias",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\campaignsDemo.ts:119: organization: "Congregação Jardim América",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\campaignsDemo.ts:166: "Projeto ministerial de capela de oração contínua na Congregação Jardim América: adequação do espaço, climatização e mobiliário.",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\campaignsDemo.ts:172: organization: "Congregação Jardim América",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\campaignsDemo.ts:232: campaignTitle: "Construção Congregação São José",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\campaignsDemo.ts:257: message: "Projeto apresentado à congregação",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\churchContext.ts:9: /** Congregação demo (Jardim América) — referência para platform admin sem org ativa. */
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\churchContext.ts:19: * Choose active org for platform admins: saved preference, demo congregação, then first congregação.
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\churchContext.ts:35: const demoSlug = churches.find((c) => c.slug === "congregacao-jardim-america");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\churchContext.ts:38: const congregacao = churches.filter((c) => c.organization_type === "congregacao");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\churchContext.ts:39: if (congregacao.length > 0) return congregacao[0];
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:31: function isCongregacao(church: Church): boolean {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:32: const type = church.organization_type ?? "congregacao";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:33: return type === "congregacao" || (!church.is_matriz && type !== "setor" && type !== "matriz" && type !== "convencao");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:53: organizationType: church.organization_type,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:56: const orgType = church.organization_type ?? "congregacao";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:58: if (isCongregacao(church)) {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:65: .select("id, name, organization_type, parent_id")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:75: organizationType: parent.organization_type,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:78: parentId = parent.parent_id;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:85: if (orgType === "setor") {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:88: .select("id, name, organization_type")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:89: .eq("parent_id", church.id)
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:90: .eq("organization_type", "congregacao")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:99: organizationType: row.organization_type,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:104: const { data: matriz } = await supabase
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:106: .select("id, name, organization_type")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:110: if (matriz) {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:112: id: matriz.id,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:113: name: matriz.name,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:115: organizationType: matriz.organization_type,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:123: if (orgType === "matriz" || church.is_matriz) {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:124: const { data: setores } = await supabase
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:126: .select("id, name, organization_type")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:127: .eq("parent_id", church.id)
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:128: .eq("organization_type", "setor")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:132: for (const row of setores ?? []) {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:137: organizationType: row.organization_type,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:141: const setorIds = (setores ?? []).map((s) => s.id);
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:143: const [underSetores, directUnderMatriz] = await Promise.all([
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:144: setorIds.length > 0
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:147: .select("id, name, organization_type")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:148: .in("parent_id", setorIds)
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:149: .eq("organization_type", "congregacao")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:152: : Promise.resolve({ data: [] as { id: string; name: string; organization_type: string | null }[] }),
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:155: .select("id, name, organization_type")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:156: .eq("parent_id", church.id)
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:157: .eq("organization_type", "congregacao")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:162: for (const row of [...(underSetores.data ?? []), ...(directUnderMatriz.data ?? [])]) {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:167: organizationType: row.organization_type,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:174: if (orgType === "convencao") {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:175: const { data: matrizes } = await supabase
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:177: .select("id, name, organization_type")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:178: .eq("parent_id", church.id)
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:179: .in("organization_type", ["matriz", "sede"])
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:183: for (const row of matrizes ?? []) {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:188: organizationType: row.organization_type,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:192: const matrizIds = (matrizes ?? []).map((m) => m.id);
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:193: if (matrizIds.length > 0) {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:194: const { data: setoresConvencao } = await supabase
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:196: .select("id, name, organization_type")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:197: .in("parent_id", matrizIds)
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:198: .eq("organization_type", "setor")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:202: for (const row of setoresConvencao ?? []) {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:207: organizationType: row.organization_type,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\dashboardCampaigns.ts:308: /** Campanhas + timeline — escopo hierárquico (matriz/setor/congregação). */
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\finance.ts:17: type: "matriz" | "congregacao" | "departamento" | "evento" | string;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\finance.ts:44: responsible_id?: string | null;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\finance.ts:75: { name: "Matriz", type: "matriz", is_active: true },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\finance.ts:76: { name: "Congregacoes", type: "congregacao", is_active: true },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:26: export const HIERARCHY_LEVELS = [
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:27: { level: "Convenção", name: "AD — Rio Grande do Sul", revenue: 4_250_000, share: 100 },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:28: { level: "Matriz", name: "AD Caxias do Sul — Sede", revenue: 1_842_500, share: 43 },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:29: { level: "Setor Norte", name: "Setor Norte", revenue: 612_000, share: 14 },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:30: { level: "Setor Sul", name: "Setor Sul", revenue: 698_400, share: 16 },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:31: { level: "Congregação São José", name: "Congregação São José", revenue: 248_900, share: 6 },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:32: { level: "Congregação Jardim América", name: "Congregação Jardim América", revenue: 183_200, share: 4 },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:36: { sector: "Setor Norte", revenue: 612_000, goal: 680_000, pct: 90 },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:37: { sector: "Setor Sul", revenue: 698_400, goal: 640_000, pct: 109 },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:38: { sector: "Setor Leste", revenue: 531_100, goal: 580_000, pct: 92 },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:39: { sector: "Setor Oeste", revenue: 445_800, goal: 520_000, pct: 86 },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:43: { id: "a1", type: "warning", messageKey: "Setor Norte abaixo da média" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:49: { id: "r1", messageKey: "Revisar orçamento do Setor Oeste", targetTab: "budget" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:62: { name: "Sede — Matriz", tithes: 98_400, offerings: 42_100, growth: 6.2 },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:63: { name: "Congregação São José", tithes: 52_800, offerings: 24_600, growth: 18.0 },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:64: { name: "Congregação Jardim América", tithes: 41_200, offerings: 18_900, growth: 4.1 },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:65: { name: "Congregação Santa Catarina", tithes: 38_600, offerings: 16_400, growth: 9.5 },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:66: { name: "Congregação São Pelegrino", tithes: 35_100, offerings: 14_200, growth: 3.8 },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:93: { id: "ar3", description: "Repasse congregação filial", amount: 22_100, dueDate: "2026-06-01", status: "Pendente", category: "Consolidação" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:123: responsible: string;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:128: { id: "as1", name: "Van 15 lugares — Missões", category: "Veículos", estimatedValue: 185_000, status: "Ativo", responsible: "Dep. Missões", location: "Garagem Sede" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:129: { id: "as2", name: "Mesa de som digital 32 canais", category: "Equipamentos de som", estimatedValue: 42_000, status: "Ativo", responsible: "Louvor", location: "Templo Central" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:130: { id: "as3", name: "Violão elétrico — worship", category: "Instrumentos", estimatedValue: 3_800, status: "Ativo", responsible: "Min. Louvor", location: "Sala de ensaio" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:131: { id: "as4", name: "Templo Central — imóvel", category: "Imóveis", estimatedValue: 2_400_000, status: "Ativo", responsible: "Administrativo", location: "Centro — Caxias do Sul" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:132: { id: "as5", name: "Cadeiras empilháveis (120 un.)", category: "Móveis", estimatedValue: 28_000, status: "Ativo", responsible: "Secretaria", location: "Salão principal" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:133: { id: "as6", name: "Kit transmissão ao vivo", category: "Equipamentos de transmissão", estimatedValue: 18_500, status: "Em manutenção", responsible: "Mídia", location: "Cabine técnica" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:134: { id: "as7", name: "Projetor antigo — auditório", category: "Equipamentos de transmissão", estimatedValue: 2_200, status: "Baixado", responsible: "Patrimônio", location: "Depósito" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:226: { id: "i1", messageKey: "Congregação São José cresceu 18% em dízimos", category: "growth" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\financeDemo.ts:229: { id: "i4", messageKey: "Setor Sul está 9% acima da meta", category: "growth" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\lib\secretariaConstants.ts:50: "Pastor Setorial",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\AssembleiaGeral.tsx:387: const churchName = church?.name ?? "Congregação Jardim América";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\CartasRecomendacao.tsx:101: observations = "Membro solicita carta de recomendação em razão de mudança de endereço para a área desta congregação.";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\CartasRecomendacao.tsx:110: observations = "Membro se mudará temporariamente para fins acadêmicos e solicita carta de apresentação à congregação local.";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\CartasRecomendacao.tsx:116: observations = "Membro solicita carta para apresentação formal e comunhão com nova congregação.";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\CartasRecomendacao.tsx:434: placeholder={t("Buscar por nome, congregação ou cidade...")}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:33: type ChildOrganizationType = "matriz" | "setor" | "congregacao" | string;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:36: const UNIT_STATUS_OPTIONS: UnitStatus[] = ["Ativa", "Em implantação", "Inativa", "Arquivada"];
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:46: organization_type: ChildOrganizationType;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:47: parent_id: string | null;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:48: unit_status: string | null;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:51: interface OrgResponsible {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:73: function responsibleLabel(r: OrgResponsible | undefined, role: string): string {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:107: const { church, isMatriz } = useChurch();
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:117: // Sub-congregações carregadas para cada setor expandido (chave = setor.id)
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:128: unit_status: "Ativa" as UnitStatus,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:130: // Criação de congregação vinculada a um setor específico (a partir do card do setor)
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:132: const [congForm, setCongForm] = useState({ name: "", city: "", state: "", phone: "", email: "", unit_status: "Ativa" as UnitStatus });
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:135: const [orgResponsibles, setOrgResponsibles] = useState<Record<string, OrgResponsible[]>>({});
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:138: const loadResponsiblesForOrgs = useCallback(async (orgIds: string[]) => {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:141: .from("organization_users")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:153: const newResponsibles: Record<string, OrgResponsible[]> = {};
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:155: if (!newResponsibles[m.organization_id]) newResponsibles[m.organization_id] = [];
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:157: newResponsibles[m.organization_id].push({
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:164: setOrgResponsibles((prev) => ({ ...prev, ...newResponsibles }));
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:167: const isSetorContext = activeOrgType === "setor";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:168: const isConvencaoContext = activeOrgType === "convencao";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:170: && (isMatriz || isSetorContext || isConvencaoContext)
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:171: && (isMatriz || activeOrgTypeResolved);
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:174: if (isConvencaoContext) return t("Matrizes Municipais");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:175: if (isMatriz) return t("Setores / Distritos");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:184: .select("id,name,slug,city,state,phone,email,organization_type,parent_id,unit_status")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:185: .eq("parent_id", sectorId)
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:187: .eq("organization_type", "congregacao")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:194: email: row.email, organization_type: row.organization_type,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:195: parent_id: row.parent_id,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:196: unit_status: (row as Record<string, unknown>).unit_status as string ?? null,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:202: void loadResponsiblesForOrgs(congs.map((c) => c.id));
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:205: }, [sectorCongregations, loadResponsiblesForOrgs]);
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:217: .select("organization_type")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:225: setActiveOrgType(data?.organization_type ?? null);
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:239: if (isMatriz) {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:242: .select("id,name,slug,city,state,phone,email,organization_type,parent_id,unit_status")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:243: .eq("parent_id", church.id)
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:245: .eq("organization_type", "setor")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:256: email: row.email, organization_type: row.organization_type,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:257: parent_id: row.parent_id,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:258: unit_status: (row as Record<string, unknown>).unit_status as string ?? null,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:266: .select("id,parent_id")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:267: .in("parent_id", sectorIds)
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:269: .eq("organization_type", "congregacao");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:272: for (const c of congs) { counts[c.parent_id!] = (counts[c.parent_id!] ?? 0) + 1; }
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:275: // Carregar responsáveis dos setores em batch
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:276: void loadResponsiblesForOrgs(sectorIds);
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:283: if (activeOrgType === "convencao") {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:286: .select("id,name,slug,city,state,phone,email,organization_type,parent_id,unit_status")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:287: .eq("parent_id", church.id)
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:289: .eq("organization_type", "matriz")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:301: email: row.email, organization_type: row.organization_type,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:302: parent_id: row.parent_id,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:303: unit_status: (row as Record<string, unknown>).unit_status as string ?? null,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:311: if (activeOrgType === "setor") {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:314: .select("id,name,slug,city,state,phone,email,organization_type,parent_id,unit_status")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:315: .eq("parent_id", church.id)
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:317: .eq("organization_type", "congregacao")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:328: email: row.email, organization_type: row.organization_type,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:329: parent_id: row.parent_id,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:330: unit_status: (row as Record<string, unknown>).unit_status as string ?? null,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:333: if (congs.length > 0) void loadResponsiblesForOrgs(congs.map((c) => c.id));
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:341: }, [church, isMatriz, activeOrgType, t, loadResponsiblesForOrgs]);
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:349: if (!isMatriz && !activeOrgTypeResolved) return;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:351: }, [user, roleLoading, church, isMatriz, activeOrgType, activeOrgTypeResolved, loadChildOrganizations]);
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:361: const insertOrganizationType = (): "matriz" | "setor" | "congregacao" => {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:362: if (isMatriz) return "setor";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:363: if (isConvencaoContext) return "matriz";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:364: return "congregacao";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:384: unit_status: form.unit_status,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:398: parent_id: church!.id,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:399: organization_type: orgType,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:404: unit_status: form.unit_status,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:409: toast({ title: t("Erro ao criar congregação"), description: error.message, variant: "destructive" });
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:412: orgType === "setor" ? t("Setor criado.") : orgType === "matriz" ? t("Matriz municipal criada.") : t("Congregação criada.");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:420: setForm({ name: "", city: "", state: "", phone: "", email: "", unit_status: "Ativa" });
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:433: unit_status: (c.unit_status as UnitStatus) || "Ativa",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:451: setCongForm({ name: "", city: sector.city ?? "", state: sector.state ?? "", phone: "", email: "", unit_status: "Ativa" });
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:466: parent_id: congModal.sectorId,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:467: organization_type: "congregacao",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:472: unit_status: congForm.unit_status,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:476: toast({ title: t("Erro ao criar congregação"), description: error.message, variant: "destructive" });
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:479: title: t("Congregação criada."),
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:484: setCongForm({ name: "", city: "", state: "", phone: "", email: "", unit_status: "Ativa" });
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:499: * Navega para GerenciarAcessos NO CONTEXTO desta unidade (setor/congregação).
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:501: * criados na unidade correta — e NÃO na Matriz ativa.
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:503: const handleInviteResponsible = (c: ChildOrganization) => {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:509: contextOrganizationType: c.organization_type,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:510: contextParentId: c.parent_id,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:516: if (orgType === "convencao") return t("Convenção / Regional");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:517: if (orgType === "matriz") return t("Matriz municipal");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:518: if (orgType === "setor") return t("Setor");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:519: if (orgType === "congregacao") return t("Congregação");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:524: if (isConvencaoContext) return t("Cadastre matrizes municipais vinculadas a esta convenção ou regional. Unidades são permanentes; responsáveis serão atribuídos separadamente da estrutura.");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:525: if (isMatriz) return t("Cadastre setores vinculados a esta matriz. Unidades são permanentes; pastores, supervisores e tesoureiros podem mudar sem recriar a unidade.");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:526: if (isSetorContext) return t("Cadastre congregações vinculadas a este setor. Unidades são permanentes; responsáveis serão atribuídos separadamente da estrutura.");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:527: return t("Esta congregação não cria novas unidades. Membros, tesouraria e histórico permanecem na unidade quando os responsáveis mudam.");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:531: if (isConvencaoContext) return t("Nenhuma matriz municipal cadastrada.");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:532: if (isMatriz) return t("Nenhum setor cadastrado.");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:533: if (isSetorContext) return t("Nenhuma congregação cadastrada");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:538: if (isConvencaoContext) return t("Nova matriz municipal");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:539: if (isMatriz) return t("Novo setor");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:540: return t("Nova congregação");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:545: if (isConvencaoContext) return t("Nova matriz municipal");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:546: if (isMatriz) return t("Novo setor");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:547: return t("Nova congregação");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:552: if (isConvencaoContext) return t("Criar matriz municipal");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:553: if (isMatriz) return t("Criar setor");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:554: return t("Criar congregação");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:577: setForm({ name: "", city: "", state: "", phone: "", email: "", unit_status: "Ativa" });
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:606: isConvencaoContext ? t("Nome da matriz municipal *") : isMatriz ? t("Nome do setor *") : t("Nome da congregação *")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:637: value={form.unit_status}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:638: onChange={(e) => setForm((f) => ({ ...f, unit_status: e.target.value as UnitStatus }))}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:641: {UNIT_STATUS_OPTIONS.map((s) => (
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:664: const resp = orgResponsibles[editingId] ?? [];
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:740: const resp = orgResponsibles[c.id] ?? [];
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:749: if (next && isMatriz && c.organization_type === "setor") {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:757: if (next && isMatriz && c.organization_type === "setor") {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:771: {typeBadgeLabel(c.organization_type)}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:773: {statusBadge(c.unit_status)}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:774: {isMatriz && c.organization_type === "setor" && congregationCounts[c.id] !== undefined && (
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:813: const resp = orgResponsibles[c.id] ?? [];
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:840: contextOrganizationType: c.organization_type,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:878: <div className="mt-0.5">{statusBadge(c.unit_status)}</div>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:882: <p className="font-medium">{typeBadgeLabel(c.organization_type)}</p>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:916: onClick={(e) => { (e as React.MouseEvent).stopPropagation(); handleInviteResponsible(c); }}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:947: {/* Congregações vinculadas (apenas para setores sob Matriz) */}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:948: {isMatriz && c.organization_type === "setor" && (
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:961: <Plus size={11} /> Nova Congregação
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:976: Nenhuma congregação vinculada a este setor.
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:984: <Plus size={11} /> Criar primeira congregação
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:995: {statusBadge(cong.unit_status)}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:1004: const congResp = orgResponsibles[cong.id] ?? [];
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:1021: onClick={(e) => { e.stopPropagation(); handleInviteResponsible(cong); }}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:1065: A unidade (convenção, matriz municipal, setor ou congregação) é permanente no sistema. Quem administra
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:1093: {isConvencaoContext
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:1094: ? "Total de matrizes municipais nesta convenção"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:1095: : isMatriz
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:1096: ? "Total de setores nesta matriz"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:1097: : isSetorContext
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:1098: ? "Total de congregações neste setor"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:1108: {/* Modal — Nova congregação vinculada a um setor específico */}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:1114: <ChurchIcon size={16} className="text-accent" /> {t("Nova congregação")}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:1121: {t("Será vinculada ao setor")}: <span className="font-medium text-foreground">{congModal.sectorName}</span>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:1127: placeholder={t("Nome da congregação *")}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:1159: value={congForm.unit_status}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:1160: onChange={(e) => setCongForm((f) => ({ ...f, unit_status: e.target.value as UnitStatus }))}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:1163: {UNIT_STATUS_OPTIONS.map((s) => (
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Congregacoes.tsx:1177: {t("Criar congregação")}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\CultoLouvor.tsx:47: descKey: "Projete letras e versículos para a congregação em tempo real",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Dashboard.tsx:3: import { MatrizDashboard } from "@/components/MatrizDashboard";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Dashboard.tsx:77: const { church, isMatriz } = useChurch();
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Dashboard.tsx:373: {/* Matriz consolidated panel */}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Dashboard.tsx:374: {false && isMatriz && isAdmin && <MatrizDashboard />}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Dashboard.tsx:453: label: church?.organization_type === "convencao" ? t("Matrizes")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Dashboard.tsx:454: : church?.organization_type === "matriz" ? t("Setores")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Dashboard.tsx:456: desc: church?.organization_type === "convencao" ? t("Gerenciar matrizes municipais")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Dashboard.tsx:457: : church?.organization_type === "matriz" ? t("Gerenciar setores")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Dashboard.tsx:494: : church?.organization_type === "convencao"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Dashboard.tsx:495: ? t("Painel da Convenção / Regional")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Dashboard.tsx:496: : church?.organization_type === "matriz"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Dashboard.tsx:497: ? t("Painel da Matriz Municipal")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Dashboard.tsx:498: : church?.organization_type === "setor"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Dashboard.tsx:499: ? t("Painel do Setor")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Documentos.tsx:50: { title: "Ata de Reunião Ministerial — Maio 2026", category: "Atas", description: "Reunião das lideranças — AD Caxias do Sul / Congregação Jardim América" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Documentos.tsx:51: { title: "Estatuto Interno — AD Caxias do Sul", category: "Estatuto", description: "Regimento interno da Congregação Jardim América" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\GerenciarAcessos.tsx:175: // ── Contexto de unidade (setor/congregação) vindo de Congregacoes ──────────
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\GerenciarAcessos.tsx:177: // unidade, e NÃO na Matriz ativa (church). Isso evita criar acesso no escopo
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\GerenciarAcessos.tsx:232: .from("organization_users")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\GerenciarAcessos.tsx:303: .from("organization_users")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\GerenciarAcessos.tsx:322: .from("organization_users")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\GerenciarAcessos.tsx:370: const { error } = await supabase.from("organization_users").upsert({
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\GerenciarAcessos.tsx:455: {contextOrg.type ? ` (${contextOrg.type})` : ""} — não à Matriz.
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Membros.tsx:80: type SubOrg = { id: string; name: string; organization_type: string };
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Membros.tsx:282: // ── Load sub-organizations for selectors (matrix + setores + congregações) ────
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Membros.tsx:286: // Step 1: direct children of matrix (setores)
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Membros.tsx:289: .select("id, name, organization_type")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Membros.tsx:290: .eq("parent_id", church.id)
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Membros.tsx:293: // Step 2: grandchildren (congregações under setores) — only if setores exist
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Membros.tsx:298: .select("id, name, organization_type")
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Membros.tsx:299: .in("parent_id", childIds)
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Membros.tsx:305: { id: church.id, name: church.name, organization_type: church.organization_type || "matriz" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Membros.tsx:741: const sectors       = subOrgs.filter(o => o.organization_type === "setor" || o.organization_type === "district");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Membros.tsx:742: const congregations = subOrgs.filter(o => o.organization_type === "congregacao" || o.organization_type === "congregation" || o.organization_type === "church");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Membros.tsx:1220: <label className="text-xs font-medium text-muted-foreground">Setor / Distrito</label>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Membros.tsx:1229: <option disabled>Nenhum setor cadastrado</option>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Membros.tsx:1236: <label className="text-xs font-medium text-muted-foreground">Congregação onde congrega</label>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Membros.tsx:1245: {o.name} ({o.organization_type})
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\Signup.tsx:78: <p className="text-xs text-accent mt-2 font-medium">{t("Você foi convidado para uma congregação")}</p>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SolicitacoesAdministrativas.tsx:106: const { church, loading: churchLoading, isMatriz } = useChurch();
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SolicitacoesAdministrativas.tsx:108: // Nomenclatura adaptada por perfil: Matriz/Admin cria, Congregação solicita
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SolicitacoesAdministrativas.tsx:109: const isCreatorProfile = isMatriz || isAdmin;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:19: is_matriz: boolean;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:20: organization_type: string;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:24: parent_id: string | null;
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:73: organization_type: "matriz" as string, parent_id: "",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:118: const { data: memberships } = await supabase.from("organization_users" as any).select("organization_id").eq("is_active", true);
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:129: id: c.id, name: c.name, slug: c.slug, is_matriz: c.organization_type === "matriz" || c.organization_type === "sede",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:130: organization_type: c.organization_type || "congregacao",
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:132: parent_id: c.parent_id,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:162: if (c.parent_id && map.has(c.parent_id)) {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:163: map.get(c.parent_id)!.children.push(c);
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:179: organization_type: churchForm.organization_type,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:180: parent_id: churchForm.parent_id || null,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:188: setChurchForm({ name: "", city: "", state: "", pastor_name: "", email: "", phone: "", address: "", organization_type: "matriz", parent_id: "" });
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:450: const sedeChurches = flatChurches.filter(c => c.organization_type === "sede");
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:451: const matrizChurches = flatChurches.filter(c => c.organization_type === "matriz" || (c.is_matriz && c.organization_type !== "sede"));
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:456: c.organization_type === "matriz" ||
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:457: c.organization_type === "sede" ||
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:458: c.organization_type === "convencao";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:470: {c.organization_type === "sede" && (
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:475: {c.organization_type === "convencao" && (
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:477: {t("Convenção / Regional")}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:480: {c.organization_type === "matriz" && (
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:482: {t("Matriz municipal")}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:485: {c.organization_type === "setor" && (
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:487: {t("Setor")}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:490: {c.organization_type === "congregacao" && (
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:492: {t("Congregação")}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:495: {!["sede", "convencao", "matriz", "setor", "congregacao"].includes(c.organization_type) && (
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:497: {c.organization_type}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:558: { label: t("Igrejas Matriz"), value: matrizChurches.length, icon: Building2, color: "text-blue-600 bg-blue-500/10" },
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:583: <p className="text-xs text-muted-foreground">{t("Matriz ou congregação")}</p>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:651: <select value={churchForm.organization_type}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:654: organization_type: e.target.value,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:655: parent_id: e.target.value === "sede" || e.target.value === "convencao" ? "" : f.parent_id,
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:659: <option value="convencao">Convenção / Regional</option>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:660: <option value="matriz">Matriz municipal</option>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:661: <option value="congregacao">{t("Congregação")}</option>
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:665: {churchForm.organization_type !== "sede" && (
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:666: <select value={churchForm.parent_id}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:667: onChange={e => setChurchForm(f => ({ ...f, parent_id: e.target.value }))}
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:671: if (churchForm.organization_type === "convencao") {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:672: return c.organization_type === "sede";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:674: if (churchForm.organization_type === "matriz") {
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:675: return c.organization_type === "sede" || c.organization_type === "convencao";
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:681: {c.organization_type === "sede"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:683: : c.organization_type === "convencao"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:684: ? "Convenção / Regional"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:685: : c.organization_type === "matriz"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:686: ? "Matriz municipal"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:687: : c.organization_type === "setor"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:688: ? "Setor"
+C:\Users\User\OneDrive\Documentos\snuggle-db-hub\src\pages\SuperAdmin.tsx:689: : t("Congregação")}

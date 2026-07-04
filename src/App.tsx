@@ -109,6 +109,24 @@ const SolicitacoesAdministrativas = lazy(() => import("./pages/SolicitacoesAdmin
 
 const CarteiraEcclesia = lazy(() => import("./pages/CarteiraEcclesia"));
 
+const TvHome = lazy(() => import("./pages/TvHome"));
+const TvChannel = lazy(() => import("./pages/TvChannel"));
+const TvAdmin = lazy(() => import("./pages/admin/TvAdmin"));
+const TvCanais = lazy(() => import("./pages/admin/TvCanais"));
+const TvProgramacao = lazy(() => import("./pages/admin/TvProgramacao"));
+const TvAoVivo = lazy(() => import("./pages/admin/TvAoVivo"));
+const TvBiblioteca = lazy(() => import("./pages/admin/TvBiblioteca"));
+const TvConfiguracoes = lazy(() => import("./pages/admin/TvConfiguracoes"));
+const TvStudioCamera = lazy(() => import("./pages/TvStudioCamera"));
+
+const CanalHome = lazy(() => import("./pages/CanalHome"));
+const CanalChannel = lazy(() => import("./pages/CanalChannel"));
+const VideoPlayer = lazy(() => import("./pages/VideoPlayer"));
+const CanalUpload = lazy(() => import("./pages/CanalUpload"));
+const CanalPlaylists = lazy(() => import("./pages/CanalPlaylists"));
+const CanalCreateChannel = lazy(() => import("./pages/CanalCreateChannel"));
+const CanalMyChannel = lazy(() => import("./pages/CanalMyChannel"));
+
 
 
 const queryClient = new QueryClient();
@@ -218,6 +236,27 @@ const App = () => (
               <Route path="/admin/solicitacoes" element={<ProtectedRoute><SolicitacoesAdministrativas /></ProtectedRoute>} />
 
               <Route path="/admin/carteira-ecclesia" element={<ProtectedRoute><CarteiraEcclesia /></ProtectedRoute>} />
+
+              {/* TV Digital */}
+              <Route path="/tv" element={<ProtectedRoute><TvHome /></ProtectedRoute>} />
+              <Route path="/tv/:channelSlug" element={<ProtectedRoute><TvChannel /></ProtectedRoute>} />
+              <Route path="/admin/tv" element={<ProtectedRoute><TvAdmin /></ProtectedRoute>} />
+              <Route path="/admin/tv/canais" element={<ProtectedRoute><TvCanais /></ProtectedRoute>} />
+              <Route path="/admin/tv/programacao" element={<ProtectedRoute><TvProgramacao /></ProtectedRoute>} />
+              <Route path="/admin/tv/ao-vivo" element={<ProtectedRoute><TvAoVivo /></ProtectedRoute>} />
+              <Route path="/admin/tv/biblioteca" element={<ProtectedRoute><TvBiblioteca /></ProtectedRoute>} />
+              <Route path="/admin/tv/configuracoes" element={<ProtectedRoute><TvConfiguracoes /></ProtectedRoute>} />
+              {/* Ecclesia Studio — câmera (rota pública, acessível sem login) */}
+              <Route path="/tv/studio/:roomId/camera" element={<TvStudioCamera />} />
+
+              {/* Canal Ecclesia (VOD) */}
+              <Route path="/canal" element={<ProtectedRoute><CanalHome /></ProtectedRoute>} />
+              <Route path="/canal/upload" element={<ProtectedRoute><CanalUpload /></ProtectedRoute>} />
+              <Route path="/canal/playlists" element={<ProtectedRoute><CanalPlaylists /></ProtectedRoute>} />
+              <Route path="/canal/criar" element={<ProtectedRoute><CanalCreateChannel /></ProtectedRoute>} />
+              <Route path="/canal/meu-canal" element={<ProtectedRoute><CanalMyChannel /></ProtectedRoute>} />
+              <Route path="/canal/:slug" element={<ProtectedRoute><CanalChannel /></ProtectedRoute>} />
+              <Route path="/video/:id" element={<ProtectedRoute><VideoPlayer /></ProtectedRoute>} />
 
               <Route path="*" element={<NotFound />} />
 

@@ -1,0 +1,417 @@
+/**
+ * Canal Eclésia — Dados Mockados para Fase 1 Visual
+ *
+ * Usados quando não há dados reais no banco ou como complemento visual.
+ * Não contém dados reais de membros ou informações sensíveis.
+ */
+
+import type { EcclesiaChannel, EcclesiaVideo } from "@/lib/canalEcclesia";
+
+// ── Canais Mockados ───────────────────────────────────────────────────────────
+
+export const MOCK_CHANNELS: EcclesiaChannel[] = [
+  {
+    id: "mock-ch-01",
+    organizationId: "mock-org",
+    ownerUserId: null,
+    name: "Assembleia de Deus Caxias do Sul",
+    slug: "ad-caxias",
+    description: "Canal oficial da Assembleia de Deus de Caxias do Sul. Cultos, pregações e acervo completo da congregação.",
+    logoUrl: null,
+    bannerUrl: null,
+    visibility: "org_members",
+    status: "active",
+    subscriberCount: 1842,
+    videoCount: 312,
+    createdAt: "2024-01-15T00:00:00Z",
+  },
+  {
+    id: "mock-ch-02",
+    organizationId: "mock-org",
+    ownerUserId: null,
+    name: "Ministério de Louvor",
+    slug: "ministerio-louvor",
+    description: "Louvor e adoração. Clipes, ensaios e registros dos momentos de adoração coletiva.",
+    logoUrl: null,
+    bannerUrl: null,
+    visibility: "org_members",
+    status: "active",
+    subscriberCount: 634,
+    videoCount: 87,
+    createdAt: "2024-03-10T00:00:00Z",
+  },
+  {
+    id: "mock-ch-03",
+    organizationId: "mock-org",
+    ownerUserId: null,
+    name: "Escola Bíblica",
+    slug: "escola-biblica",
+    description: "Aulas, estudos e recursos da Escola Bíblica Dominical e grupos de discipulado.",
+    logoUrl: null,
+    bannerUrl: null,
+    visibility: "org_members",
+    status: "active",
+    subscriberCount: 421,
+    videoCount: 156,
+    createdAt: "2024-02-20T00:00:00Z",
+  },
+  {
+    id: "mock-ch-04",
+    organizationId: "mock-org",
+    ownerUserId: null,
+    name: "Pastor Presidente",
+    slug: "pastor-presidente",
+    description: "Mensagens, devocionais e orientações pastorais.",
+    logoUrl: null,
+    bannerUrl: null,
+    visibility: "org_members",
+    status: "active",
+    subscriberCount: 998,
+    videoCount: 74,
+    createdAt: "2024-01-20T00:00:00Z",
+  },
+  {
+    id: "mock-ch-05",
+    organizationId: "mock-org",
+    ownerUserId: null,
+    name: "Jovens & Juventude",
+    slug: "jovens",
+    description: "Canal do ministério de jovens. Programas, pregações especiais e registros dos encontros.",
+    logoUrl: null,
+    bannerUrl: null,
+    visibility: "org_members",
+    status: "active",
+    subscriberCount: 276,
+    videoCount: 43,
+    createdAt: "2024-04-05T00:00:00Z",
+  },
+];
+
+// ── Vídeos Mockados ───────────────────────────────────────────────────────────
+
+export const MOCK_VIDEOS: EcclesiaVideo[] = [
+  {
+    id: "mock-v-01",
+    channelId: "mock-ch-01",
+    organizationId: "mock-org",
+    title: "Culto de Domingo — Série Fé que Move Montanhas",
+    description: "Culto completo de domingo com pregação, louvor e oração. Série de mensagens sobre a fé como fundamento da vida cristã. Pastor Alexandre Souza ministrando a Palavra de Deus.",
+    category: "culto",
+    durationSeconds: 5400,
+    thumbnailUrl: null,
+    r2StorageKey: null,
+    playbackUrl: null,
+    hlsUrl: null,
+    tvLiveSessionId: null,
+    visibility: "org_members",
+    status: "ready",
+    uploadedBy: null,
+    viewCount: 1247,
+    likeCount: 89,
+    commentCount: 23,
+    publishedAt: "2026-06-29T10:00:00Z",
+    createdAt: "2026-06-29T10:00:00Z",
+  },
+  {
+    id: "mock-v-02",
+    channelId: "mock-ch-04",
+    organizationId: "mock-org",
+    title: "Palavra Pastoral — Propósito no Deserto",
+    description: "Mensagem sobre como Deus usa os momentos difíceis para nos preparar para o propósito que Ele tem para nossas vidas.",
+    category: "pregacao",
+    durationSeconds: 3120,
+    thumbnailUrl: null,
+    r2StorageKey: null,
+    playbackUrl: null,
+    hlsUrl: null,
+    tvLiveSessionId: null,
+    visibility: "org_members",
+    status: "ready",
+    uploadedBy: null,
+    viewCount: 843,
+    likeCount: 67,
+    commentCount: 15,
+    publishedAt: "2026-06-26T18:00:00Z",
+    createdAt: "2026-06-26T18:00:00Z",
+  },
+  {
+    id: "mock-v-03",
+    channelId: "mock-ch-03",
+    organizationId: "mock-org",
+    title: "Escola Bíblica — Aula 12: Cartas de Paulo",
+    description: "Estudo detalhado das cartas paulinas: contexto histórico, destinatários e aplicação prática para a vida cristã contemporânea.",
+    category: "estudo",
+    durationSeconds: 2700,
+    thumbnailUrl: null,
+    r2StorageKey: null,
+    playbackUrl: null,
+    hlsUrl: null,
+    tvLiveSessionId: null,
+    visibility: "org_members",
+    status: "ready",
+    uploadedBy: null,
+    viewCount: 362,
+    likeCount: 41,
+    commentCount: 8,
+    publishedAt: "2026-06-22T09:30:00Z",
+    createdAt: "2026-06-22T09:30:00Z",
+  },
+  {
+    id: "mock-v-04",
+    channelId: "mock-ch-05",
+    organizationId: "mock-org",
+    title: "Programa da Juventude — Episódio 7: Identidade em Cristo",
+    description: "Programa semanal da Juventude. Neste episódio: identidade, propósito e como viver para Deus na geração atual.",
+    category: "jovens",
+    durationSeconds: 2160,
+    thumbnailUrl: null,
+    r2StorageKey: null,
+    playbackUrl: null,
+    hlsUrl: null,
+    tvLiveSessionId: null,
+    visibility: "org_members",
+    status: "ready",
+    uploadedBy: null,
+    viewCount: 498,
+    likeCount: 55,
+    commentCount: 31,
+    publishedAt: "2026-06-20T19:00:00Z",
+    createdAt: "2026-06-20T19:00:00Z",
+  },
+  {
+    id: "mock-v-05",
+    channelId: "mock-ch-02",
+    organizationId: "mock-org",
+    title: "Clipe de Louvor — Digno És",
+    description: "Gravação ao vivo do clipe \"Digno És\" pelo Ministério de Louvor durante o culto especial de adoração.",
+    category: "louvor",
+    durationSeconds: 420,
+    thumbnailUrl: null,
+    r2StorageKey: null,
+    playbackUrl: null,
+    hlsUrl: null,
+    tvLiveSessionId: null,
+    visibility: "org_members",
+    status: "ready",
+    uploadedBy: null,
+    viewCount: 2104,
+    likeCount: 218,
+    commentCount: 47,
+    publishedAt: "2026-06-18T20:00:00Z",
+    createdAt: "2026-06-18T20:00:00Z",
+  },
+  {
+    id: "mock-v-06",
+    channelId: "mock-ch-01",
+    organizationId: "mock-org",
+    title: "Replay — Culto de Pentecostes 2026",
+    description: "Gravação completa do Culto Especial de Pentecostes realizado na Assembleia de Deus. Um momento histórico de renovação e avivamento.",
+    category: "culto",
+    durationSeconds: 7200,
+    thumbnailUrl: null,
+    r2StorageKey: null,
+    playbackUrl: null,
+    hlsUrl: null,
+    tvLiveSessionId: "mock-tv-session-01",
+    visibility: "org_members",
+    status: "ready",
+    uploadedBy: null,
+    viewCount: 3861,
+    likeCount: 312,
+    commentCount: 89,
+    publishedAt: "2026-06-08T22:00:00Z",
+    createdAt: "2026-06-08T22:00:00Z",
+  },
+  {
+    id: "mock-v-07",
+    channelId: "mock-ch-03",
+    organizationId: "mock-org",
+    title: "Aula Bíblica — Apocalipse: Introdução",
+    description: "Primeira aula da série sobre o livro do Apocalipse. Contexto histórico, autor, destinatários e propósito da revelação.",
+    category: "estudo",
+    durationSeconds: 3600,
+    thumbnailUrl: null,
+    r2StorageKey: null,
+    playbackUrl: null,
+    hlsUrl: null,
+    tvLiveSessionId: null,
+    visibility: "org_members",
+    status: "ready",
+    uploadedBy: null,
+    viewCount: 512,
+    likeCount: 63,
+    commentCount: 19,
+    publishedAt: "2026-06-15T09:00:00Z",
+    createdAt: "2026-06-15T09:00:00Z",
+  },
+  {
+    id: "mock-v-08",
+    channelId: "mock-ch-04",
+    organizationId: "mock-org",
+    title: "Devocional — Gratidão que Transforma",
+    description: "Devocional matinal sobre o poder da gratidão na vida cristã. Como desenvolver uma atitude de agradecimento em todas as circunstâncias.",
+    category: "pregacao",
+    durationSeconds: 900,
+    thumbnailUrl: null,
+    r2StorageKey: null,
+    playbackUrl: null,
+    hlsUrl: null,
+    tvLiveSessionId: null,
+    visibility: "org_members",
+    status: "ready",
+    uploadedBy: null,
+    viewCount: 724,
+    likeCount: 88,
+    commentCount: 14,
+    publishedAt: "2026-06-10T07:00:00Z",
+    createdAt: "2026-06-10T07:00:00Z",
+  },
+  {
+    id: "mock-v-09",
+    channelId: "mock-ch-01",
+    organizationId: "mock-org",
+    title: "Culto de Quarta — Intercessão e Oração",
+    description: "Culto de oração e intercessão. Momento especial de busca a Deus em comunidade.",
+    category: "culto",
+    durationSeconds: 4200,
+    thumbnailUrl: null,
+    r2StorageKey: null,
+    playbackUrl: null,
+    hlsUrl: null,
+    tvLiveSessionId: null,
+    visibility: "org_members",
+    status: "ready",
+    uploadedBy: null,
+    viewCount: 689,
+    likeCount: 52,
+    commentCount: 11,
+    publishedAt: "2026-06-04T19:30:00Z",
+    createdAt: "2026-06-04T19:30:00Z",
+  },
+  {
+    id: "mock-v-10",
+    channelId: "mock-ch-02",
+    organizationId: "mock-org",
+    title: "Ensaio Aberto — Novas Músicas de Adoração",
+    description: "Ensaio aberto do Ministério de Louvor com as novas músicas que serão apresentadas nos cultos do segundo semestre.",
+    category: "louvor",
+    durationSeconds: 5100,
+    thumbnailUrl: null,
+    r2StorageKey: null,
+    playbackUrl: null,
+    hlsUrl: null,
+    tvLiveSessionId: null,
+    visibility: "org_members",
+    status: "ready",
+    uploadedBy: null,
+    viewCount: 287,
+    likeCount: 34,
+    commentCount: 7,
+    publishedAt: "2026-05-28T19:00:00Z",
+    createdAt: "2026-05-28T19:00:00Z",
+  },
+  {
+    id: "mock-v-11",
+    channelId: "mock-ch-01",
+    organizationId: "mock-org",
+    title: "Conferência de Missões 2026 — Dia 1",
+    description: "Abertura da Conferência Anual de Missões. Testemunhos de missionários e chamado para o campo missionário.",
+    category: "missoes",
+    durationSeconds: 6300,
+    thumbnailUrl: null,
+    r2StorageKey: null,
+    playbackUrl: null,
+    hlsUrl: null,
+    tvLiveSessionId: null,
+    visibility: "org_members",
+    status: "ready",
+    uploadedBy: null,
+    viewCount: 943,
+    likeCount: 97,
+    commentCount: 26,
+    publishedAt: "2026-05-20T19:00:00Z",
+    createdAt: "2026-05-20T19:00:00Z",
+  },
+  {
+    id: "mock-v-12",
+    channelId: "mock-ch-05",
+    organizationId: "mock-org",
+    title: "Reel — Batismos de Maio 2026",
+    description: "Registros dos batismos realizados no mês de maio. Momentos preciosos de confirmação pública da fé.",
+    category: "testemunho",
+    durationSeconds: 180,
+    thumbnailUrl: null,
+    r2StorageKey: null,
+    playbackUrl: null,
+    hlsUrl: null,
+    tvLiveSessionId: null,
+    visibility: "org_members",
+    status: "ready",
+    uploadedBy: null,
+    viewCount: 1562,
+    likeCount: 187,
+    commentCount: 44,
+    publishedAt: "2026-05-15T12:00:00Z",
+    createdAt: "2026-05-15T12:00:00Z",
+  },
+];
+
+// ── Comentários Mockados ──────────────────────────────────────────────────────
+
+export const MOCK_COMMENTS = [
+  { id: "mc-01", body: "Que mensagem abençoada! Deus confirme cada palavra na nossa vida.", userName: "Maria S.", time: "3 dias" },
+  { id: "mc-02", body: "Assistindo pela segunda vez. Muito edificante.", userName: "João P.", time: "2 dias" },
+  { id: "mc-03", body: "Amém! Compartilhei com toda a família.", userName: "Ana L.", time: "1 dia" },
+  { id: "mc-04", body: "Pastor pregou com unção hoje. Obrigado Senhor!", userName: "Carlos M.", time: "5h" },
+  { id: "mc-05", body: "Essa série está sendo uma bênção enorme.", userName: "Fernanda R.", time: "3h" },
+];
+
+// ── Vídeos relacionados por categoria ────────────────────────────────────────
+
+export function getMockRelated(currentId: string, category: string, count = 6): EcclesiaVideo[] {
+  return MOCK_VIDEOS
+    .filter((v) => v.id !== currentId)
+    .sort((a, b) => {
+      if (a.category === category && b.category !== category) return -1;
+      if (b.category === category && a.category !== category) return 1;
+      return b.viewCount - a.viewCount;
+    })
+    .slice(0, count);
+}
+
+// ── Vídeos por canal ──────────────────────────────────────────────────────────
+
+export function getMockChannelVideos(channelId: string): EcclesiaVideo[] {
+  return MOCK_VIDEOS.filter((v) => v.channelId === channelId);
+}
+
+export function getMockChannel(channelId: string): EcclesiaChannel | undefined {
+  return MOCK_CHANNELS.find((c) => c.id === channelId);
+}
+
+export function getMockChannelBySlug(slug: string): EcclesiaChannel | undefined {
+  return MOCK_CHANNELS.find((c) => c.slug === slug);
+}
+
+// ── Canais oficiais (ids) ─────────────────────────────────────────────────────
+
+export const OFFICIAL_CHANNEL_IDS = new Set(["mock-ch-01"]);
+
+export function isOfficialChannel(channelId: string): boolean {
+  return OFFICIAL_CHANNEL_IDS.has(channelId);
+}
+
+// ── Categorias de filtro para Home ───────────────────────────────────────────
+
+export type HomeCategory = "all" | "culto" | "pregacao" | "louvor" | "estudo" | "jovens" | "missoes" | "testemunho";
+
+export const HOME_CATEGORY_LABELS: Record<HomeCategory, string> = {
+  all: "Início",
+  culto: "Cultos",
+  pregacao: "Pregações",
+  louvor: "Louvor & Clipes",
+  estudo: "Estudos",
+  jovens: "Jovens",
+  missoes: "Missões",
+  testemunho: "Testemunhos",
+};

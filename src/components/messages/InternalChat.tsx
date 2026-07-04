@@ -57,20 +57,25 @@ export function InternalChat({
 }: Props) {
   const { user } = useAuth();
 
+  // ── State must be declared BEFORE any hook that references them ───────────
+  const [selectedThread, setSelectedThread] = useState<InternalThread | null>(null);
+  const [mobileShowPanel, setMobileShowPanel] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
   // ── INBOX: lista de threads ───────────────────────────────────────────────
   const {
     threads,
     loading: threadsLoading,
     refetch: refetchThreads,
+    unreadCounts,
+    zeroUnreadCount,
   } = useInternalThreads({
     organizationId,
     source,
+    currentUserId: user?.id,
+    activeThreadId: selectedThread?.id,
     enabled: mode === "inbox" && Boolean(organizationId),
   });
-
-  const [selectedThread, setSelectedThread] = useState<InternalThread | null>(null);
-  const [mobileShowPanel, setMobileShowPanel] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
 
   // Auto-selecionar primeira conversa ao carregar (inbox) ou forcedThread
   useEffect(() => {
@@ -206,9 +211,11 @@ export function InternalChat({
             threads={filteredThreads}
             selectedId={activeThread?.id ?? null}
             loading={threadsLoading}
+            unreadCounts={unreadCounts}
             onSelect={(t) => {
               setSelectedThread(t);
               setMobileShowPanel(true);
+              zeroUnreadCount(t.id);
             }}
           />
           {!threadsLoading && searchQuery && filteredThreads.length === 0 && (
