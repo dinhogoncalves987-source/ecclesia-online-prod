@@ -1,4 +1,4 @@
-import { Check, CheckCheck, EyeOff, MoreVertical, Trash2 } from "lucide-react";
+import { EyeOff, MoreVertical, Trash2 } from "lucide-react";
 import { InternalAudioPreview } from "@/components/messages/InternalAudioPreview";
 import { InternalDocumentPreview } from "@/components/messages/InternalDocumentPreview";
 import { InternalImagePreview } from "@/components/messages/InternalImagePreview";
@@ -194,27 +194,15 @@ export function InternalMessageBubble({
             return <InternalDocumentPreview key={att.id} attachment={att} />;
           })}
 
-          {/* Timestamp + read indicator */}
-          <div
+          {/* Timestamp */}
+          <p
             className={cn(
-              "flex items-center gap-1 mt-1",
-              isOwn ? "justify-end" : "justify-end",
+              "text-[10px] mt-1 text-right tabular-nums",
+              isOwn ? "text-primary-foreground/70" : "text-muted-foreground",
             )}
           >
-            <p
-              className={cn(
-                "text-[10px] tabular-nums",
-                isOwn ? "text-primary-foreground/70" : "text-muted-foreground",
-              )}
-            >
-              {time}
-            </p>
-            {isOwn && (
-              message.readAt
-                ? <CheckCheck size={12} className="text-blue-300 flex-shrink-0" title="Lida" />
-                : <Check size={12} className="opacity-60 flex-shrink-0 text-primary-foreground" title="Enviada" />
-            )}
-          </div>
+            {time}
+          </p>
         </div>
 
         {/* Menu lado direito (mensagens próprias) */}

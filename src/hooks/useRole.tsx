@@ -46,19 +46,6 @@ const MODULE_ACCESS: Record<string, AppRole[]> = {
   "/admin/chat-secretaria": ["super_admin", "church_admin", "pastor", "secretary"],
   "/admin/solicitacoes": ["super_admin", "church_admin", "pastor", "secretary"],
   "/admin/carteira-ecclesia": ["super_admin", "church_admin", "pastor", "secretary"],
-  // TV Digital — acesso ao vivo, grade e configuração de canais
-  "/admin/tv":              ["super_admin", "church_admin", "pastor", "secretary"],
-  "/admin/tv/canais":       ["super_admin", "church_admin", "pastor", "secretary"],
-  "/admin/tv/programacao":  ["super_admin", "church_admin", "pastor", "secretary"],
-  "/admin/tv/ao-vivo":      ["super_admin", "church_admin", "pastor", "secretary"],
-  "/admin/tv/biblioteca":   ["super_admin", "church_admin", "pastor", "secretary"],
-  "/admin/tv/configuracoes":["super_admin", "church_admin", "pastor", "secretary"],
-  "/tv/studio":             ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
-  "/tv":                    ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
-  // Canal Ecclesia — plataforma de vídeo estilo YouTube
-  "/canal":                 ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
-  "/canal/upload":          ["super_admin", "church_admin", "pastor", "secretary"],
-  "/canal/playlists":       ["super_admin", "church_admin", "pastor", "secretary"],
 };
 
 export function useRole() {

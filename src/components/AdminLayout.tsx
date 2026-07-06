@@ -5,7 +5,7 @@ import {
   Heart, MessageSquare, UsersRound, Archive, BarChart3, Menu, X,
   Bell, ChevronLeft, ChevronDown, Settings, LogOut, Maximize, Minimize, Globe,
   Shield, User, Building2, Music2, Gavel, Briefcase, ShoppingBag, MessageCircle, Megaphone, ScrollText,
-  MessagesSquare, ClipboardList, CreditCard, LayoutGrid, Tv2, PlayCircle
+  MessagesSquare, ClipboardList, CreditCard, LayoutGrid
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -55,8 +55,6 @@ const navSections: NavSection[] = [
     items: [
       { icon: BookOpen, label: "Bíblia Sagrada", path: "/admin/biblia" },
       { icon: Music2, label: "Culto & Louvor", path: "/admin/culto" },
-      { icon: Tv2, label: "TV Digital", path: "/admin/tv/ao-vivo" },
-      { icon: PlayCircle, label: "Canal Ecclesia", path: "/canal" },
       { icon: Megaphone, label: "Campanhas", path: "/admin/campanhas" },
     ],
   },

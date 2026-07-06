@@ -7,33 +7,19 @@ export type InternalThreadSource =
   | "campaign"
   | "community"
   | "group"
-  | "ministry"
   | "pastoral"
   | "finance"
   | "secretariat"
   | "prayer"
-  | "general"
-  | "direct"
-  | "broadcast"
-  | "support";
+  | "general";
 
-export type InternalMessageType =
-  | "text"
-  | "image"
-  | "audio"
-  | "video"
-  | "document"
-  | "system"
-  | "deleted"
-  | "call"
-  | "location";
+export type InternalMessageType = "text" | "image" | "audio" | "video" | "document" | "system" | "deleted";
 
 export type DbInternalThreadRow = {
   id: string;
   organization_id: string;
   campaign_id: string | null;
   member_id: string | null;
-  group_id: string | null;
   created_by: string | null;
   assigned_to: string | null;
   subject: string;
@@ -44,8 +30,6 @@ export type DbInternalThreadRow = {
   closed_at: string | null;
   created_at: string;
   updated_at: string;
-  /** Duração em segundos para mensagens temporárias. NULL = desativado. */
-  ephemeral_duration: number | null;
 };
 
 export type DbInternalMessageRow = {
@@ -60,9 +44,6 @@ export type DbInternalMessageRow = {
   reply_to_message_id: string | null;
   created_at: string;
   read_at: string | null;
-  deleted_for_everyone: boolean;
-  deleted_by: string | null;
-  deleted_at: string | null;
 };
 
 export type DbInternalAttachmentRow = {
@@ -86,7 +67,6 @@ export type InternalThread = {
   organizationId: string;
   campaignId: string | null;
   memberId: string | null;
-  groupId: string | null;
   createdBy: string | null;
   assignedTo: string | null;
   subject: string;
@@ -98,14 +78,6 @@ export type InternalThread = {
   createdAt: string;
   updatedAt: string;
   participantName?: string;
-  /** Computed client-side from message_read_receipts. Not stored in DB. */
-  unreadCount?: number;
-  /**
-   * Duração em segundos das mensagens temporárias (opt-in). NULL = desativado.
-   * Qualquer participante pode ativar/alterar (comportamento WhatsApp).
-   * Aplica-se apenas a NOVAS mensagens após ativação.
-   */
-  ephemeralDuration: number | null;
 };
 
 export type InternalMessageAttachment = {
@@ -135,9 +107,6 @@ export type InternalMessage = {
   replyToMessageId: string | null;
   createdAt: string;
   readAt: string | null;
-  deletedForEveryone: boolean;
-  deletedBy: string | null;
-  deletedAt: string | null;
   attachments: InternalMessageAttachment[];
   senderName?: string;
   isOwn?: boolean;
@@ -181,7 +150,6 @@ export function mapDbThreadToUi(row: DbInternalThreadRow): InternalThread {
     organizationId: row.organization_id,
     campaignId: row.campaign_id,
     memberId: row.member_id,
-    groupId: row.group_id,
     createdBy: row.created_by,
     assignedTo: row.assigned_to,
     subject: row.subject,
@@ -192,7 +160,6 @@ export function mapDbThreadToUi(row: DbInternalThreadRow): InternalThread {
     closedAt: row.closed_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    ephemeralDuration: row.ephemeral_duration ?? null,
   };
 }
 
@@ -229,9 +196,6 @@ export function mapDbMessageToUi(
     replyToMessageId: row.reply_to_message_id,
     createdAt: row.created_at,
     readAt: row.read_at,
-    deletedForEveryone: row.deleted_for_everyone ?? false,
-    deletedBy: row.deleted_by ?? null,
-    deletedAt: row.deleted_at ?? null,
     attachments,
   };
 }
@@ -294,28 +258,9 @@ export async function fetchThreadMessages(
       return { messages: [], fromDatabase: false };
     }
 
-    let rows = (messagesData ?? []) as DbInternalMessageRow[];
+    const rows = (messagesData ?? []) as DbInternalMessageRow[];
     if (rows.length === 0) {
       return { messages: [], fromDatabase: true };
-    }
-
-    // Filtrar mensagens apagadas para o usuário atual ("apagar para mim")
-    if (currentUserId) {
-      const { data: userDeletions } = await supabase
-        .from("message_user_deletions")
-        .select("message_id")
-        .eq("user_id", currentUserId)
-        .in("message_id", rows.map((r) => r.id));
-
-      const deletedForMeIds = new Set(
-        (userDeletions ?? []).map(
-          (d) => (d as { message_id: string }).message_id,
-        ),
-      );
-
-      if (deletedForMeIds.size > 0) {
-        rows = rows.filter((r) => !deletedForMeIds.has(r.id));
-      }
     }
 
     const messageIds = rows.map((r) => r.id);
@@ -389,51 +334,6 @@ export async function resolveMemberIdForUser(
 
   return (data as { id?: string } | null)?.id ?? null;
 }
-
-// ── Read Receipts ─────────────────────────────────────────────────────────────
-
-/**
- * Marca todas as mensagens não-lidas de uma thread como lidas pelo usuário atual.
- * Também atualiza internal_messages.read_at para a primeira leitura (indicador ✓✓).
- * Chamado via RPC SECURITY DEFINER para evitar problemas de RLS.
- */
-export async function markThreadMessagesRead(
-  threadId: string,
-  organizationId: string,
-): Promise<void> {
-  try {
-    await supabase.rpc("mark_thread_messages_read", {
-      p_thread_id: threadId,
-      p_organization_id: organizationId,
-    });
-  } catch {
-    // Silencioso — falha de leitura não deve interromper o chat
-  }
-}
-
-/**
- * Retorna um mapa { thread_id → unread_count } para a organização dada.
- * Usa RPC para eficiência (uma única query no servidor).
- */
-export async function fetchThreadUnreadCounts(
-  organizationId: string,
-): Promise<Record<string, number>> {
-  try {
-    const { data, error } = await supabase.rpc("get_unread_counts_by_org", {
-      p_organization_id: organizationId,
-    });
-    if (error || !data) return {};
-    const result: Record<string, number> = {};
-    for (const row of data as Array<{ thread_id: string; unread_count: number }>) {
-      result[row.thread_id] = Number(row.unread_count);
-    }
-    return result;
-  } catch {
-    return {};
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 /** Busca a thread compartilhada de uma campanha (modelo conversa única). */
 export async function fetchCampaignSharedThread(

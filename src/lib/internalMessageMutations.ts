@@ -89,90 +89,10 @@ function inferMessageType(file: File): InternalMessageType {
 }
 
 /**
- * Busca conversa DIRETA (DM) existente entre dois usuários (source='direct'),
- * ou cria nova caso não exista. Garante no máximo 1 thread por par (org + users).
- *
- * REGRA: Não cria DM se o membro não tiver user_id vinculado.
- * Retorna error='member_not_activated' se isso ocorrer.
+ * Busca conversa individual existente com um membro (deduplicação)
+ * ou cria nova caso não exista. Garante no máximo 1 thread por par (org + member).
  */
 export async function findOrCreateDirectThread(
-  organizationId: string,
-  userId: string,
-  memberId: string,
-  memberName: string,
-  targetMemberUserId?: string | null,
-): Promise<{ ok: boolean; thread?: InternalThread; isNew?: boolean; error?: string }> {
-  // Verificar se o membro tem usuário vinculado (necessário para DM)
-  if (!targetMemberUserId) {
-    // Tentar buscar user_id do membro
-    const { data: memberData } = await supabase
-      .from("members")
-      .select("user_id")
-      .eq("id", memberId)
-      .eq("organization_id", organizationId)
-      .maybeSingle();
-
-    const resolvedUserId = (memberData as { user_id?: string | null } | null)?.user_id;
-
-    if (!resolvedUserId) {
-      return {
-        ok: false,
-        error: "member_not_activated",
-      };
-    }
-    targetMemberUserId = resolvedUserId;
-  }
-
-  // Buscar thread direta existente
-  const { data: existing, error: findError } = await supabase
-    .from("internal_threads")
-    .select("*")
-    .eq("organization_id", organizationId)
-    .eq("source", "direct")
-    .eq("created_by", userId)
-    .eq("member_id", memberId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (findError) {
-    return { ok: false, error: String(findError.message ?? findError) };
-  }
-
-  if (existing) {
-    return { ok: true, thread: mapDbThreadToUi(existing as DbInternalThreadRow), isNew: false };
-  }
-
-  // Criar nova thread direta
-  const { data, error } = await insertWithOrganizationScope<DbInternalThreadRow>(
-    "internal_threads",
-    organizationId,
-    {
-      created_by: userId,
-      member_id: memberId,
-      subject: memberName.trim() || "Conversa direta",
-      source: "direct",
-      status: "open",
-      reply_enabled: true,
-    },
-    (query) => query.select("*").single(),
-  );
-
-  if (error) {
-    return { ok: false, error: String((error as { message?: string }).message ?? error) };
-  }
-
-  const row = Array.isArray(data) ? data[0] : data;
-  if (!row) return { ok: false, error: "missing_thread" };
-
-  return { ok: true, thread: mapDbThreadToUi(row as DbInternalThreadRow), isNew: true };
-}
-
-/**
- * Busca conversa de secretaria existente com um membro ou cria nova.
- * Para conversas administrativas (secretariat source).
- */
-export async function findOrCreateSecretariatThread(
   organizationId: string,
   userId: string,
   memberId: string,
@@ -197,7 +117,7 @@ export async function findOrCreateSecretariatThread(
     return { ok: true, thread: mapDbThreadToUi(existing as DbInternalThreadRow), isNew: false };
   }
 
-  // Criar nova thread de secretaria
+  // Criar nova thread direta com o membro
   const { data, error } = await insertWithOrganizationScope<DbInternalThreadRow>(
     "internal_threads",
     organizationId,
@@ -490,34 +410,6 @@ export async function uploadInternalAttachment(
   return { ok: true, attachment: mapDbAttachmentToUi(row) };
 }
 
-/**
- * Opções de duração para mensagens temporárias em conversas normais.
- * null = desativado; número = duração em segundos.
- */
-export type NormalEphemeralDuration = null | 86400 | 604800 | 2592000 | 7776000;
-
-/**
- * Ativa, altera ou desativa mensagens temporárias em uma conversa normal (internal_threads).
- * Qualquer participante pode alterar — comportamento estilo WhatsApp.
- *
- * Quando ativado, aplica-se apenas a novas mensagens.
- * Para conversas normais, mensagens expiradas são ocultadas na UI (não deletadas fisicamente).
- */
-export async function setThreadEphemeralDuration(
-  organizationId: string,
-  threadId: string,
-  durationSeconds: NormalEphemeralDuration,
-): Promise<InternalMutationResult> {
-  const { error } = await supabase
-    .from("internal_threads")
-    .update({ ephemeral_duration: durationSeconds })
-    .eq("id", threadId)
-    .eq("organization_id", organizationId);
-
-  if (error) return { ok: false, error: String(error.message ?? error) };
-  return { ok: true, id: threadId };
-}
-
 export async function closeInternalThread(
   organizationId: string,
   threadId: string,
@@ -558,64 +450,39 @@ export async function deleteInternalMessage(
   organizationId: string,
   messageId: string,
 ): Promise<InternalMutationResult> {
-  return deleteMessageForEveryone(organizationId, messageId);
-}
+  // Remove arquivos do storage (privacidade)
+  const { data: attachments } = await supabase
+    .from("internal_message_attachments")
+    .select("storage_bucket, storage_path")
+    .eq("organization_id", organizationId)
+    .eq("message_id", messageId);
 
-/**
- * Apaga mensagem para TODOS os participantes da conversa.
- * Usa RPC SECURITY DEFINER para validar permissões (autor ou admin).
- */
-export async function deleteMessageForEveryone(
-  organizationId: string,
-  messageId: string,
-): Promise<InternalMutationResult> {
-  // Tentativa via RPC (mais segura, valida permissões no servidor)
-  const { data: rpcOk, error: rpcError } = await supabase.rpc(
-    "delete_message_for_everyone",
-    { p_message_id: messageId, p_organization_id: organizationId },
-  );
+  for (const att of attachments ?? []) {
+    if (att.storage_bucket && att.storage_path) {
+      await supabase.storage.from(att.storage_bucket).remove([att.storage_path]);
+    }
+  }
 
-  if (!rpcError && rpcOk) return { ok: true, id: messageId };
-
-  // Fallback: atualização direta (para ambientes onde a RPC ainda não foi aplicada)
+  // Tentativa 1: soft-delete via UPDATE (apaga conteúdo mas mantém registro)
   const { error: updateError } = await supabase
     .from("internal_messages")
-    .update({
-      message_type: "deleted",
-      body: null,
-      deleted_for_everyone: true,
-      deleted_at: new Date().toISOString(),
-    })
+    .update({ message_type: "deleted", body: null })
     .eq("id", messageId)
     .eq("organization_id", organizationId);
 
   if (!updateError) return { ok: true, id: messageId };
 
-  console.warn("[deleteMessageForEveryone] falha:", updateError.message);
-  return { ok: false, error: updateError.message };
-}
+  // Tentativa 2: hard DELETE (caso UPDATE seja bloqueado por RLS ou constraint de tipo)
+  const { error: deleteError } = await supabase
+    .from("internal_messages")
+    .delete()
+    .eq("id", messageId)
+    .eq("organization_id", organizationId);
 
-/**
- * Apaga mensagem APENAS para o usuário atual.
- * Os outros participantes continuam vendo a mensagem.
- * Registra em message_user_deletions.
- */
-export async function deleteMessageForMe(
-  organizationId: string,
-  messageId: string,
-  userId: string,
-): Promise<InternalMutationResult> {
-  const { error } = await supabase
-    .from("message_user_deletions")
-    .upsert(
-      { message_id: messageId, user_id: userId },
-      { onConflict: "message_id,user_id" },
-    );
+  if (!deleteError) return { ok: true, id: messageId };
 
-  if (error) {
-    console.warn("[deleteMessageForMe] falha:", error.message);
-    return { ok: false, error: error.message };
-  }
-
-  return { ok: true, id: messageId };
+  // Ambas as operações falharam. Retorna ok: false com mensagem de erro real.
+  // A UI deve tratar o estado local separadamente (see useInternalMessages).
+  console.warn("[deleteInternalMessage] falha no banco:", deleteError.message);
+  return { ok: false, error: deleteError.message };
 }
