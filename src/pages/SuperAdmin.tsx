@@ -406,6 +406,7 @@ export default function SuperAdmin() {
       parent_id: churchForm.parent_id || null, city: churchForm.city || null,
       state: churchForm.state || null, email: churchForm.email || null,
       phone: churchForm.phone || null, active: true,
+      pastor_president_name: churchForm.pastor_name.trim() || null,
     } as any);
     if (error) { toast.error(error.message); return; }
     toast.success("Igreja criada com sucesso!");

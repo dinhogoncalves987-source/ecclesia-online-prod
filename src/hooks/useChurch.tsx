@@ -45,6 +45,9 @@ type OrganizationRow = {
   financially_consolidates_to_id?: string | null;
   cnpj?: string | null;
   financial_policy_notes?: string | null;
+  short_name?: string | null;
+  acronym?: string | null;
+  pastor_president_name?: string | null;
 };
 
 const mapOrganizationToChurch = (org: OrganizationRow): Church => ({
@@ -82,6 +85,9 @@ const mapOrganizationToChurch = (org: OrganizationRow): Church => ({
   financially_consolidates_to_id: org.financially_consolidates_to_id ?? null,
   cnpj: org.cnpj ?? null,
   financial_policy_notes: org.financial_policy_notes ?? null,
+  short_name: org.short_name ?? null,
+  acronym: org.acronym ?? null,
+  pastor_president_name: org.pastor_president_name ?? null,
 });
 
 const ORGANIZATION_SELECT = [
@@ -97,6 +103,8 @@ const ORGANIZATION_SELECT = [
   "uses_intermediate_level", "uses_local_units",
   "has_operational_cashbox", "is_financially_autonomous",
   "financially_consolidates_to_id", "cnpj", "financial_policy_notes",
+  // short_name, acronym, pastor_president_name: selecionados diretamente em
+  // ConfiguracaoIgreja.tsx para evitar quebra antes de migration ser aplicada.
 ].join(",");
 
 async function resolvePlatformAdmin(userId: string): Promise<boolean> {

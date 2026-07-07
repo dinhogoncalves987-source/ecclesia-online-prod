@@ -277,6 +277,7 @@ export default function CarteiraEcclesia() {
               churchName={church?.name ?? "Ecclesia"}
               churchCity={church?.city ?? undefined}
               churchState={church?.state ?? undefined}
+              churchLogoUrl={church?.logo_url ?? null}
               onClose={() => setWalletMember(null)}
             />
           )}

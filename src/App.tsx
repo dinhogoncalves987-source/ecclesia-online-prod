@@ -97,6 +97,8 @@ const Congregacoes = lazy(() => import("./pages/Congregacoes"));
 
 const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
 
+const ConfiguracaoIgreja = lazy(() => import("./pages/ConfiguracaoIgreja"));
+
 const AssembleiaGeral = lazy(() => import("./pages/AssembleiaGeral"));
 
 const Marketplace = lazy(() => import("./pages/Marketplace"));
@@ -205,6 +207,8 @@ const App = () => (
               <Route path="/admin/assembleia-geral" element={<ProtectedRoute><AssembleiaGeral /></ProtectedRoute>} />
 
               <Route path="/admin/super-admin" element={<ProtectedRoute><SuperAdmin /></ProtectedRoute>} />
+
+              <Route path="/admin/configuracao-igreja" element={<ProtectedRoute><ConfiguracaoIgreja /></ProtectedRoute>} />
 
               <Route path="/admin/marketplace" element={<ProtectedRoute><Marketplace /></ProtectedRoute>} />
 

@@ -430,6 +430,9 @@ export type Database = {
           financially_consolidates_to_id: string | null
           cnpj: string | null
           financial_policy_notes: string | null
+          short_name: string | null
+          acronym: string | null
+          pastor_president_name: string | null
         }
         Insert: {
           active?: boolean
@@ -473,6 +476,9 @@ export type Database = {
           financially_consolidates_to_id?: string | null
           cnpj?: string | null
           financial_policy_notes?: string | null
+          short_name?: string | null
+          acronym?: string | null
+          pastor_president_name?: string | null
         }
         Update: {
           active?: boolean
@@ -516,6 +522,9 @@ export type Database = {
           financially_consolidates_to_id?: string | null
           cnpj?: string | null
           financial_policy_notes?: string | null
+          short_name?: string | null
+          acronym?: string | null
+          pastor_president_name?: string | null
         }
         Relationships: [
           {

@@ -1685,6 +1685,7 @@ export default function Membros() {
               churchName={church?.name ?? "Igreja"}
               churchCity={church?.city ?? undefined}
               churchState={church?.state ?? undefined}
+              churchLogoUrl={church?.logo_url ?? null}
               onClose={() => setWalletMember(null)}
             />
           </DialogContent>

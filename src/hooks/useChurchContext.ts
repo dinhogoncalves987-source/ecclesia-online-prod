@@ -41,6 +41,9 @@ export interface Church {
   financially_consolidates_to_id: string | null;
   cnpj: string | null;
   financial_policy_notes: string | null;
+  short_name: string | null;
+  acronym: string | null;
+  pastor_president_name: string | null;
 }
 
 export interface ChurchContextType {

@@ -41,6 +41,7 @@ type Props = {
   churchName: string;
   churchCity?: string;
   churchState?: string;
+  churchLogoUrl?: string | null;
   onClose?: () => void;
 };
 
@@ -82,10 +83,10 @@ const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
 // ── Frente ────────────────────────────────────────────────────────────────────
 
 function CardFront({
-  id, member, churchName, churchCity, churchState, code, issueDate, validUntil, qrValue,
+  id, member, churchName, churchCity, churchState, churchLogoUrl, code, issueDate, validUntil, qrValue,
 }: {
   id: string; member: WalletMember; churchName: string;
-  churchCity?: string; churchState?: string;
+  churchCity?: string; churchState?: string; churchLogoUrl?: string | null;
   code: string; issueDate: string; validUntil: string; qrValue: string;
 }) {
   const statusInfo = STATUS_BADGE[member.status] ?? STATUS_BADGE.Ativo;
@@ -104,12 +105,21 @@ function CardFront({
 
       <div className="relative z-10 h-full p-4 flex flex-col justify-between">
         <div className="flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <Shield size={9} className="text-blue-300" />
-              <span className="text-[7px] font-bold tracking-[0.18em] text-blue-200 uppercase">Carteira de Membro</span>
+          <div className="flex items-start gap-2">
+            {churchLogoUrl && (
+              <img
+                src={churchLogoUrl}
+                alt={churchName}
+                className="w-7 h-7 rounded object-contain flex-shrink-0 mt-0.5"
+              />
+            )}
+            <div>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                {!churchLogoUrl && <Shield size={9} className="text-blue-300" />}
+                <span className="text-[7px] font-bold tracking-[0.18em] text-blue-200 uppercase">Carteira de Membro</span>
+              </div>
+              <p className="text-[9px] text-slate-300 leading-tight max-w-[55%] line-clamp-2 whitespace-pre-line">{churchDisplay}</p>
             </div>
-            <p className="text-[9px] text-slate-300 leading-tight max-w-[55%] line-clamp-2 whitespace-pre-line">{churchDisplay}</p>
           </div>
           <span className={cn("text-[7px] font-bold tracking-wider px-1.5 py-0.5 rounded-full uppercase flex-shrink-0", statusInfo.cls)}>
             {statusInfo.label}
@@ -236,7 +246,7 @@ function CardBack({ id, member, churchName }: { id: string; member: WalletMember
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
-export function MemberWalletCard({ member, churchName, churchCity, churchState, onClose }: Props) {
+export function MemberWalletCard({ member, churchName, churchCity, churchState, churchLogoUrl, onClose }: Props) {
   const [showBack, setShowBack] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
@@ -315,7 +325,7 @@ export function MemberWalletCard({ member, churchName, churchCity, churchState, 
     }
   };
 
-  const cardProps = { member, churchName, churchCity, churchState, code, issueDate, validUntil, qrValue };
+  const cardProps = { member, churchName, churchCity, churchState, churchLogoUrl, code, issueDate, validUntil, qrValue };
 
   return (
     <div className="flex flex-col items-center gap-4 py-2">

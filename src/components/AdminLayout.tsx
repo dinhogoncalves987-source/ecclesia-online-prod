@@ -91,6 +91,7 @@ const navSections: NavSection[] = [
     separator: true,
     items: [
       { icon: Building2, label: "Congregações", path: "/admin/congregacoes" },
+      { icon: Settings, label: "Configuração da Igreja", path: "/admin/configuracao-igreja" },
       { icon: Shield, label: "Gerenciar Acessos", path: "/admin/gerenciar-acessos" },
       { icon: LayoutGrid, label: "Cockpit", path: "/admin/super-admin" },
     ],
