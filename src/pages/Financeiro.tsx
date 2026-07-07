@@ -7,7 +7,6 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { FinanceOverview } from "@/components/financeiro/FinanceOverview";
 import { TransactionList } from "@/components/financeiro/TransactionList";
 import { FinanceExecutive } from "@/components/financeiro/FinanceExecutive";
-import { FinanceTithesOfferings } from "@/components/financeiro/FinanceTithesOfferings";
 import { FinanceCampaigns } from "@/components/financeiro/FinanceCampaigns";
 import { FinanceAccounts } from "@/components/financeiro/FinanceAccounts";
 import { FinanceBudget } from "@/components/financeiro/FinanceBudget";
@@ -16,23 +15,22 @@ import { FinanceAccountability } from "@/components/financeiro/FinanceAccountabi
 import { FinanceAudit } from "@/components/financeiro/FinanceAudit";
 import { FinanceIntelligence } from "@/components/financeiro/FinanceIntelligence";
 import {
-  BarChart3, ChevronLeft, ChevronRight, Wallet, Heart, Megaphone, ArrowLeftRight, PieChart,
+  BarChart3, ChevronLeft, ChevronRight, Wallet, Megaphone, ArrowLeftRight, PieChart,
   Building2, FileCheck, ShieldCheck, Sparkles,
 } from "lucide-react";
-import { runScopedOrganizationQuery } from "@/lib/organizationScope";
+import { supabase } from "@/integrations/supabase/client";
 import type { TreasuryTransaction } from "@/lib/finance";
 
 const TABS = [
-  { key: "executive", icon: BarChart3, labelKey: "Executivo" },
-  { key: "treasury", icon: Wallet, labelKey: "Tesouraria" },
-  { key: "tithes", icon: Heart, labelKey: "Dízimos & Ofertas" },
-  { key: "campaigns", icon: Megaphone, labelKey: "Campanhas" },
-  { key: "accounts", icon: ArrowLeftRight, labelKey: "Contas" },
-  { key: "budget", icon: PieChart, labelKey: "Orçamento" },
-  { key: "assets", icon: Building2, labelKey: "Patrimônio" },
-  { key: "accountability", icon: FileCheck, labelKey: "Prestação de Contas" },
-  { key: "audit", icon: ShieldCheck, labelKey: "Auditoria" },
-  { key: "intelligence", icon: Sparkles, labelKey: "Inteligência" },
+  { key: "executive",      icon: BarChart3,    labelKey: "Executivo" },
+  { key: "treasury",       icon: Wallet,       labelKey: "Tesouraria" },
+  { key: "campaigns",      icon: Megaphone,    labelKey: "Campanhas" },
+  { key: "accounts",       icon: ArrowLeftRight, labelKey: "Contas" },
+  { key: "budget",         icon: PieChart,     labelKey: "Orçamento" },
+  { key: "assets",         icon: Building2,    labelKey: "Patrimônio" },
+  { key: "accountability", icon: FileCheck,    labelKey: "Prestação de Contas" },
+  { key: "audit",          icon: ShieldCheck,  labelKey: "Auditoria" },
+  { key: "intelligence",   icon: Sparkles,     labelKey: "Inteligência" },
 ] as const;
 
 type TabKey = typeof TABS[number]["key"];
@@ -86,11 +84,13 @@ export default function Financeiro() {
     if (!user || !church) { setLoading(false); return; }
     const load = async () => {
       setLoading(true);
-      const { data, error } = await runScopedOrganizationQuery<TreasuryTransaction[]>("transactions", church.id, query =>
-        query.select("*").order("date", { ascending: false })
-      );
-      if (error) { console.error(error); toast.error(t("Erro ao carregar transações")); }
-      else setTransactions(data || []);
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("organization_id", church.id)
+        .order("date", { ascending: false });
+      if (error) { console.error("[Financeiro] Erro ao carregar transações:", error); toast.error(t("Erro ao carregar transações")); }
+      else setTransactions((data as TreasuryTransaction[]) || []);
       setLoading(false);
     };
     load();
@@ -156,11 +156,17 @@ export default function Financeiro() {
         {activeTab === "executive" && <FinanceExecutive onTabChange={setActiveTab} />}
         {activeTab === "treasury" && (
           <div className="space-y-6">
-            <FinanceOverview transactions={transactions} />
+            {/* Operacional primeiro — tabela, filtros, ações */}
             <TransactionList transactions={transactions} setTransactions={setTransactions} loading={loading} />
+            {/* Dashboard / visão geral depois da operação */}
+            <div className="pt-2 border-t border-border/30">
+              <p className="text-xs text-muted-foreground uppercase tracking-widest font-medium mb-4 px-1">
+                {t("Visão Geral")}
+              </p>
+              <FinanceOverview transactions={transactions} />
+            </div>
           </div>
         )}
-        {activeTab === "tithes" && <FinanceTithesOfferings />}
         {activeTab === "campaigns" && <FinanceCampaigns />}
         {activeTab === "accounts" && <FinanceAccounts />}
         {activeTab === "budget" && <FinanceBudget />}

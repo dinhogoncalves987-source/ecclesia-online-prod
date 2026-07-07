@@ -17,7 +17,7 @@ import { useRole } from "@/hooks/useRole";
 import { toast } from "sonner";
 import { BulkImportModal } from "@/components/BulkImportModal";
 import { OperationalAssistant } from "@/components/OperationalAssistant";
-import { insertWithOrganizationScope, runScopedOrganizationQuery } from "@/lib/organizationScope";
+import { insertWithOrganizationScope } from "@/lib/organizationScope";
 import { canWriteSecretaria } from "@/lib/permissions";
 import {
   MEMBER_STATUSES,
@@ -302,11 +302,17 @@ export default function Membros() {
 
   const reloadMembers = useCallback(async () => {
     if (!church) return;
-    const { data, error } = await runScopedOrganizationQuery<Member[]>("members", church.id, query =>
-      query.select("*").order("full_name"),
-    );
-    if (error) { toast.error(t("Erro ao carregar membros")); return; }
-    setMembers(data || []);
+    // Filtro aplicado ANTES do order para garantir que o PostgREST respeite o escopo
+    const { data, error } = await supabase
+      .from("members")
+      .select("*")
+      .eq("organization_id", church.id)
+      .order("full_name", { ascending: true });
+    if (import.meta.env.DEV) {
+      console.log("[Membros] Supabase retornou", data?.length ?? 0, data?.slice(0, 3));
+    }
+    if (error) { console.error("[Membros] Erro ao carregar:", error); toast.error(t("Erro ao carregar membros")); return; }
+    setMembers((data as Member[]) || []);
   }, [church, t]);
 
   // ── Load sub-organizations for selectors (matrix + setores + congregações) ────

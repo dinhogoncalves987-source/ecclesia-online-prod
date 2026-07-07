@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 import { BulkImportModal } from "@/components/BulkImportModal";
 import { AIImportModal } from "@/components/AIImportModal";
+import { SpreadsheetImportModal } from "@/components/financeiro/SpreadsheetImportModal";
 import { OperationalAssistant } from "@/components/OperationalAssistant";
 import { insertWithOrganizationScope, runScopedOrganizationQuery } from "@/lib/organizationScope";
 import {
@@ -90,6 +91,7 @@ export function TransactionList({
   });
   const [showImport, setShowImport] = useState(false);
   const [showAIImport, setShowAIImport] = useState(false);
+  const [showSpreadsheetImport, setShowSpreadsheetImport] = useState(false);
   const [page, setPage] = useState(0);
   const perPage = 25;
 
@@ -142,10 +144,13 @@ export function TransactionList({
 
   const reloadTransactions = async () => {
     if (!church) return;
-    const { data } = await runScopedOrganizationQuery<TreasuryTransaction[]>("transactions", church.id, query =>
-      query.select("*").order("date", { ascending: false }),
-    );
-    setTransactions(data || []);
+    const { data, error } = await supabase
+      .from("transactions")
+      .select("*")
+      .eq("organization_id", church.id)
+      .order("date", { ascending: false });
+    if (error) { console.error("[TransactionList] reloadTransactions:", error); return; }
+    setTransactions((data as TreasuryTransaction[]) || []);
   };
 
   const handleBulkImport = async (rows: Record<string, string>[]) => {
@@ -360,47 +365,60 @@ export function TransactionList({
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 flex-wrap">
-        <button onClick={exportCSV} className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
-          <Download size={14} strokeWidth={1.5} /> {t("Exportar CSV")}
-        </button>
-        {canWriteFinance && (
-          <>
-            <OperationalAssistant
-              module="financial"
-              fields={[
-                { key: "desc", label: t("Descrição"), required: true },
-                { key: "value", label: t("Valor"), required: true, type: "number" },
-                { key: "type", label: t("Tipo"), options: ["Entrada", "Saida"] },
-                { key: "category", label: t("Categoria"), options: accountCategories.map(c => c.name) },
-                { key: "date", label: t("Data") },
-                { key: "notes", label: t("Observações") },
-              ]}
-              onEdit={(data) => {
-                setNewTx(prev => ({
-                  ...prev,
-                  desc: data.desc || "",
-                  value: data.value || "",
-                  type: (data.type === "Saida" || data.type === "Saída") ? "Saida" : "Entrada",
-                  category: data.category || DEFAULT_ACCOUNT_CATEGORIES[0].name,
-                  date: data.date || today(),
-                  notes: data.notes || "",
-                }));
-                setEditingId(null);
-                setShowForm(true);
-              }}
-            />
-            <button onClick={() => setShowAIImport(true)} className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
-              <Sparkles size={14} strokeWidth={1.5} /> {t("Importar com IA")}
-            </button>
-            <button onClick={() => setShowImport(true)} className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
-              <Upload size={14} strokeWidth={1.5} /> {t("Importar CSV")}
-            </button>
-            <button onClick={() => { resetForm(); setShowForm(true); }} className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
-              <Plus size={16} strokeWidth={1.5} /> {t("Lançamento")}
-            </button>
-          </>
-        )}
+      {/* Cabeçalho operacional da Tesouraria */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-serif font-semibold tracking-tight">{t("Tesouraria")}</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {t("Lançamentos financeiros, filtros, importação e conferência operacional.")}
+          </p>
+        </div>
+
+        {/* Barra de ações: Exportar | Assistente IA | Importar | Importar com IA | + Lançamento */}
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={exportCSV} className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
+            <Download size={14} strokeWidth={1.5} /> {t("Exportar CSV")}
+          </button>
+          {canWriteFinance && (
+            <>
+              <OperationalAssistant
+                module="financial"
+                fields={[
+                  { key: "desc", label: t("Descrição"), required: true },
+                  { key: "value", label: t("Valor"), required: true, type: "number" },
+                  { key: "type", label: t("Tipo"), options: ["Entrada", "Saida"] },
+                  { key: "category", label: t("Categoria"), options: accountCategories.map(c => c.name) },
+                  { key: "date", label: t("Data") },
+                  { key: "notes", label: t("Observações") },
+                ]}
+                onEdit={(data) => {
+                  setNewTx(prev => ({
+                    ...prev,
+                    desc: data.desc || "",
+                    value: data.value || "",
+                    type: (data.type === "Saida" || data.type === "Saída") ? "Saida" : "Entrada",
+                    category: data.category || DEFAULT_ACCOUNT_CATEGORIES[0].name,
+                    date: data.date || today(),
+                    notes: data.notes || "",
+                  }));
+                  setEditingId(null);
+                  setShowForm(true);
+                }}
+              />
+              {/* Importar — abre SpreadsheetImportModal (XLSM/XLSX/CSV via RPC) */}
+              <button onClick={() => setShowSpreadsheetImport(true)} className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
+                <Upload size={14} strokeWidth={1.5} /> {t("Importar")}
+              </button>
+              {/* Importar com IA — fluxo separado */}
+              <button onClick={() => setShowAIImport(true)} className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors">
+                <Sparkles size={14} strokeWidth={1.5} /> {t("Importar com IA")}
+              </button>
+              <button onClick={() => { resetForm(); setShowForm(true); }} className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+                <Plus size={16} strokeWidth={1.5} /> {t("Lançamento")}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <AnimatePresence>
@@ -620,8 +638,16 @@ export function TransactionList({
 
       {canWriteFinance && (
         <>
-          <BulkImportModal open={showImport} onClose={() => setShowImport(false)} onImport={handleBulkImport} fields={financeFields} templateData={financeTemplate} title={t("Importar Lançamentos")} />
+          {/* Modal CONFIADCS — .xlsm/.xlsx/.csv via RPC */}
+          <SpreadsheetImportModal
+            open={showSpreadsheetImport}
+            onClose={() => setShowSpreadsheetImport(false)}
+            onImported={reloadTransactions}
+          />
+          {/* Importar com IA — fluxo genérico separado */}
           <AIImportModal open={showAIImport} onClose={() => setShowAIImport(false)} onImport={handleBulkImport} fields={financeFields} title={t("Importar Lançamentos com IA")} moduleName="Financeiro" />
+          {/* BulkImport CSV manual — mantido mas não exposto na barra principal */}
+          <BulkImportModal open={showImport} onClose={() => setShowImport(false)} onImport={handleBulkImport} fields={financeFields} templateData={financeTemplate} title={t("Importar Lançamentos")} />
         </>
       )}
     </div>
