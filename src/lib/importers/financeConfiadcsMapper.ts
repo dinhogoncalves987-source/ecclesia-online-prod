@@ -1,8 +1,13 @@
 /**
  * financeConfiadcsMapper.ts
  * Transforma linhas brutas da planilha CONFIADCS em transações válidas.
+ *
+ * Prioridade de data:
+ *   1. "date"      (DATA CONTÁBIL)
+ *   2. "issue_date" (DATA EMISSÃO)
+ *   3. "timestamp" (Carimbo de data/hora)
  */
-import { buildColumnMap } from "./headerNormalizer";
+import { buildColumnMap, normalizeHeader } from "./headerNormalizer";
 
 export interface AuxLookup {
   accountingGroups: { id: string; name: string }[];
@@ -14,15 +19,13 @@ export interface AuxLookup {
 }
 
 export interface MappedTransaction {
-  // Campos principais
   date: string;
   amount: number;
   type: "Entrada" | "Saida";
   category: string;
   description: string;
-  // CONFIADCS
   issue_date?: string;
-  document_number?: string;
+  document_number?: string | null;
   document_type_id?: string | null;
   accounting_group_id?: string | null;
   account_category_id?: string | null;
@@ -38,7 +41,6 @@ export interface MappedTransaction {
   period_label?: string | null;
   legacy_record_number?: string | null;
   notes?: string | null;
-  // Extras para payload
   origin: "confiadcs";
   status: "Confirmado";
 }
@@ -49,18 +51,18 @@ export interface InvalidRow {
   raw: string[];
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Utilitários de data ───────────────────────────────────────────────────────
 
 function excelSerialToDate(serial: number): string | null {
-  if (serial < 1) return null;
+  if (serial < 1 || serial > 73050) return null;
   const utcDays = serial - 25569;
   const date = new Date(utcDays * 86400000);
   if (isNaN(date.getTime())) return null;
   const y = date.getUTCFullYear();
-  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(date.getUTCDate()).padStart(2, "0");
-  if (Number(m) > 12 || Number(d) > 31 || y < 1900 || y > 2100) return null;
-  return `${y}-${m}-${d}`;
+  const m = date.getUTCMonth() + 1;
+  const d = date.getUTCDate();
+  if (m > 12 || d > 31 || y < 1900 || y > 2100) return null;
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
 function toISO(y: number, m: number, d: number): string | null {
@@ -69,21 +71,22 @@ function toISO(y: number, m: number, d: number): string | null {
 }
 
 export function parseDateToISO(raw: string | number | undefined | null): string | null {
-  if (raw === null || raw === undefined || raw === "") return null;
+  if (raw === null || raw === undefined || String(raw).trim() === "") return null;
 
+  // Serial numérico do Excel
   if (typeof raw === "number") {
-    if (raw > 1000 && raw < 73050) return excelSerialToDate(raw);
+    if (Number.isInteger(raw) && raw > 1000 && raw < 73050) return excelSerialToDate(raw);
     return null;
   }
 
   const s = String(raw).trim();
   if (!s) return null;
 
-  // ISO yyyy-mm-dd
+  // ISO yyyy-mm-dd (possivelmente com hora: 2024-12-02 09:43:00)
   const isoMatch = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (isoMatch) return toISO(+isoMatch[1], +isoMatch[2], +isoMatch[3]);
 
-  // Brasileiro dd/mm/yyyy ou dd-mm-yyyy ou dd.mm.yyyy [hora]
+  // Brasileiro dd/mm/yyyy ou d/m/yyyy ou dd-mm-yyyy ou dd.mm.yyyy (opcionalmente com hora)
   const dmyMatch = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})(?:\s.*)?$/);
   if (dmyMatch) {
     let y = +dmyMatch[3];
@@ -91,8 +94,8 @@ export function parseDateToISO(raw: string | number | undefined | null): string 
     return toISO(y, +dmyMatch[2], +dmyMatch[1]);
   }
 
-  // Fallback serial embutido em string
-  const numericStr = s.replace(/[^\d]/g, "");
+  // Fallback: serial embutido em string (ex: "45000")
+  const numericStr = s.replace(/\D/g, "");
   if (numericStr.length >= 4) {
     const n = parseInt(numericStr, 10);
     if (n > 1000 && n < 73050) return excelSerialToDate(n);
@@ -101,29 +104,45 @@ export function parseDateToISO(raw: string | number | undefined | null): string 
   return null;
 }
 
+// ── Utilitários de valor e tipo ────────────────────────────────────────────────
+
 function parseAmount(raw: string): number | null {
   if (!raw) return null;
-  const cleaned = raw.replace(/[^\d,.-]/g, "").replace(",", ".");
-  const n = parseFloat(cleaned);
+  // Remove símbolos de moeda, mantém dígitos, vírgula e ponto
+  const cleaned = raw.replace(/[^\d,.-]/g, "");
+  // Converte separador decimal brasileiro
+  const normalized = cleaned.includes(",") && !cleaned.includes(".")
+    ? cleaned.replace(",", ".")
+    : cleaned.replace(/\./g, "").replace(",", ".");
+  const n = parseFloat(normalized);
   return isNaN(n) || n <= 0 ? null : n;
 }
 
 function parseType(raw: string): "Entrada" | "Saida" | null {
   const s = raw.trim().toLowerCase();
-  if (s === "e" || s.startsWith("entra") || s === "1") return "Entrada";
-  if (s === "s" || s.startsWith("sai") || s.startsWith("saí") || s === "2") return "Saida";
+  if (!s) return null;
+  if (s === "e" || s.startsWith("entr") || s === "1") return "Entrada";
+  if (s === "s" || s.startsWith("sai") || s === "2") return "Saida";
   return null;
 }
 
-function findById(list: { id: string; name: string; code?: string }[], value: string): string | null {
+function findById(
+  list: { id: string; name: string; code?: string }[],
+  value: string,
+): string | null {
   if (!value.trim()) return null;
   const v = value.trim().toLowerCase();
-  return list.find(i =>
-    i.name.toLowerCase() === v || i.code?.toLowerCase() === v || i.name.toLowerCase().includes(v)
-  )?.id ?? null;
+  return (
+    list.find(
+      i =>
+        i.name.toLowerCase() === v ||
+        i.code?.toLowerCase() === v ||
+        i.name.toLowerCase().includes(v),
+    )?.id ?? null
+  );
 }
 
-// ── Mapper principal ──────────────────────────────────────────────────────────
+// ── Mapper principal ───────────────────────────────────────────────────────────
 
 export function mapConfiadcsRows(
   headerRow: string[],
@@ -132,22 +151,54 @@ export function mapConfiadcsRows(
   startRowIndex = 1,
 ): { valid: MappedTransaction[]; invalid: InvalidRow[] } {
   const colMap = buildColumnMap(headerRow);
-  const get = (row: string[], key: string) => (colMap.has(key) ? (row[colMap.get(key)!] ?? "").trim() : "");
+
+  if (import.meta.env.DEV) {
+    console.log("[CONFIADCS] headers normalizados:", headerRow.map(h => ({
+      original: h,
+      mapeado: Array.from(colMap.entries()).find(([, idx]) => idx === headerRow.indexOf(h))?.[0] ?? "(não mapeado)",
+    })));
+  }
+
+  const get = (row: string[], key: string): string =>
+    colMap.has(key) ? (row[colMap.get(key)!] ?? "").trim() : "";
 
   const valid: MappedTransaction[] = [];
   const invalid: InvalidRow[] = [];
 
   dataRows.forEach((row, idx) => {
     const rowIndex = startRowIndex + idx + 1;
-    if (!row.some(c => String(c ?? "").trim())) return; // linha vazia
+    if (!row.some(c => String(c ?? "").trim())) return; // pula linha vazia
 
-    const rawDate = get(row, "date");
-    const date = parseDateToISO(rawDate);
-    if (!date) {
-      invalid.push({ rowIndex, reason: `Data contábil inválida: "${rawDate}"`, raw: row });
+    // ── Data principal: prioridade accounting_date > issue_date > timestamp ──
+    const rawDate        = get(row, "date");
+    const rawIssueDate   = get(row, "issue_date");
+    const rawTimestamp   = get(row, "timestamp");
+
+    const parsedDate      = parseDateToISO(rawDate);
+    const parsedIssue     = parseDateToISO(rawIssueDate);
+    const parsedTimestamp = parseDateToISO(rawTimestamp);
+
+    const finalDate = parsedDate ?? parsedIssue ?? parsedTimestamp;
+
+    if (import.meta.env.DEV && idx === 0) {
+      console.log("[CONFIADCS] primeira linha normalizada:", {
+        accounting_date: rawDate,
+        issue_date: rawIssueDate,
+        timestamp: rawTimestamp,
+        finalDate,
+      });
+    }
+
+    if (!finalDate) {
+      invalid.push({
+        rowIndex,
+        reason: `Data inválida — DATA CONTÁBIL: "${rawDate}", DATA EMISSÃO: "${rawIssueDate}", TIMESTAMP: "${rawTimestamp}"`,
+        raw: row,
+      });
       return;
     }
 
+    // ── Valor ────────────────────────────────────────────────────────────────
     const rawAmount = get(row, "amount");
     const amount = parseAmount(rawAmount);
     if (!amount) {
@@ -155,56 +206,66 @@ export function mapConfiadcsRows(
       return;
     }
 
+    // ── Tipo ─────────────────────────────────────────────────────────────────
     const rawType = get(row, "type");
     const type = parseType(rawType);
     if (!type) {
-      invalid.push({ rowIndex, reason: `Tipo inválido: "${rawType}" (esperado E/S ou Entrada/Saída)`, raw: row });
+      invalid.push({
+        rowIndex,
+        reason: `Tipo inválido: "${rawType}" (esperado E/S ou Entrada/Saída)`,
+        raw: row,
+      });
       return;
     }
 
-    // Campos opcionais
-    const issue_date = parseDateToISO(get(row, "issue_date")) ?? date;
-    const document_number = get(row, "document_number") || null;
-    const period_label = get(row, "period_label") || null;
-    const supplier_beneficiary_name = get(row, "supplier_beneficiary_name") || null;
+    // ── Campos opcionais ─────────────────────────────────────────────────────
+    const issue_date              = parsedIssue ?? finalDate;
+    const document_number         = get(row, "document_number") || null;
+    const period_label            = get(row, "period_label") || null;
+    const supplier_beneficiary_name     = get(row, "supplier_beneficiary_name") || null;
     const supplier_beneficiary_document = get(row, "supplier_beneficiary_document") || null;
-    const contributor_name = get(row, "contributor_name") || null;
-    const contributor_document = get(row, "contributor_document") || null;
-    const collector_name = get(row, "collector_name") || null;
-    const treasurer_name = get(row, "treasurer_name") || null;
-    const rawNotes = get(row, "notes");
-    const legacy_record_number = get(row, "legacy_record_number") || null;
+    const contributor_name        = get(row, "contributor_name") || null;
+    const contributor_document    = get(row, "contributor_document") || null;
+    const collector_name          = get(row, "collector_name") || null;
+    const treasurer_name          = get(row, "treasurer_name") || null;
+    const rawNotes                = get(row, "notes");
+    const legacy_record_number    = get(row, "legacy_record_number") || null;
 
-    // Lookups por nome
-    const accounting_group_id = findById(aux.accountingGroups, get(row, "accounting_group"));
-    const account_category_id = findById(aux.accountCategories, get(row, "account_category"));
-    const document_type_id = findById(aux.documentTypes, get(row, "document_type"));
+    // Lookups
+    const accounting_group_id  = findById(aux.accountingGroups,  get(row, "accounting_group"));
+    const account_category_id  = findById(aux.accountCategories, get(row, "account_category"));
+    const document_type_id     = findById(aux.documentTypes,     get(row, "document_type"));
     const financial_account_id = findById(aux.financialAccounts, get(row, "portador"));
-    const congregation_id = findById(aux.congregations, get(row, "congregation"));
-    const district_id = findById(aux.districts, get(row, "district"));
+    const congregation_id      = findById(aux.congregations,     get(row, "congregation"));
+    const district_id          = findById(aux.districts,         get(row, "district"));
 
-    // Categoria para campo obrigatório
-    const category = aux.accountCategories.find(c => c.id === account_category_id)?.name
-      || (type === "Entrada" ? "Receita" : "Despesa");
+    const category =
+      aux.accountCategories.find(c => c.id === account_category_id)?.name ||
+      (type === "Entrada" ? "Receita" : "Despesa");
 
-    // Descrição sintética
-    const description = [
-      supplier_beneficiary_name || contributor_name || "",
-      document_number ? `Doc. ${document_number}` : "",
-    ].filter(Boolean).join(" — ") || (type === "Entrada" ? "Lançamento de entrada" : "Lançamento de saída");
+    const description =
+      [supplier_beneficiary_name || contributor_name || "", document_number ? `Doc. ${document_number}` : ""]
+        .filter(Boolean)
+        .join(" — ") ||
+      (type === "Entrada" ? "Lançamento de entrada" : "Lançamento de saída");
 
-    // Notas consolidadas (campos CONFIADCS não mapeados diretamente)
+    // Notas consolidadas
     const noteParts: string[] = [];
     if (rawNotes) noteParts.push(rawNotes);
     if (period_label) noteParts.push(`Período: ${period_label}`);
-    if (get(row, "accounting_group")) noteParts.push(`Grupo: ${get(row, "accounting_group")}`);
-    if (get(row, "document_type")) noteParts.push(`Tipo doc: ${get(row, "document_type")}`);
-    if (get(row, "portador") && !financial_account_id) noteParts.push(`Portador: ${get(row, "portador")}`);
-    if (get(row, "congregation") && !congregation_id) noteParts.push(`Congregação: ${get(row, "congregation")}`);
-    if (get(row, "district") && !district_id) noteParts.push(`Distrito: ${get(row, "district")}`);
+    const rawGroup = get(row, "accounting_group");
+    if (rawGroup) noteParts.push(`Grupo: ${rawGroup}`);
+    const rawDocType = get(row, "document_type");
+    if (rawDocType) noteParts.push(`Tipo doc: ${rawDocType}`);
+    const rawPortador = get(row, "portador");
+    if (rawPortador && !financial_account_id) noteParts.push(`Portador: ${rawPortador}`);
+    const rawCong = get(row, "congregation");
+    if (rawCong && !congregation_id) noteParts.push(`Congregação: ${rawCong}`);
+    const rawDist = get(row, "district");
+    if (rawDist && !district_id) noteParts.push(`Distrito: ${rawDist}`);
 
     valid.push({
-      date,
+      date: finalDate,
       issue_date,
       amount,
       type,
@@ -230,6 +291,13 @@ export function mapConfiadcsRows(
       status: "Confirmado",
     });
   });
+
+  if (import.meta.env.DEV) {
+    console.log(`[CONFIADCS] Resultado: ${valid.length} válidas, ${invalid.length} inválidas`);
+    if (invalid.length > 0) {
+      console.log("[CONFIADCS] Primeiros 3 erros:", invalid.slice(0, 3));
+    }
+  }
 
   return { valid, invalid };
 }
