@@ -6,7 +6,7 @@
 
 ## Metodologia
 
-Cada um dos 64 arquivos em `supabase/migrations/` foi classificado por nome +
+Cada um dos 68 arquivos em `supabase/migrations/` foi classificado por nome +
 inspeção do cabeçalho/comentários (e, nos casos ambíguos, uma leitura direta
 das primeiras linhas do SQL). Categorias usadas:
 
@@ -22,6 +22,10 @@ das primeiras linhas do SQL). Categorias usadas:
 - **E — Precisa de revisão manual**: mistura estrutura/correção **e** seed no
   mesmo arquivo (confirmado por inspeção direta) — precisa ser dividida em
   "estrutura" + "seed" antes de qualquer promoção para produção.
+- **F — Estrutura de feature exclusiva de staging nesta release**: DDL/RLS
+  sem dados demo, mas pertencente a módulo fora da allowlist urgente de
+  produção. Não é perigosa por conter seed; é bloqueada pelo destino
+  funcional desta etapa.
 
 Nenhuma migration desta lista foi alterada nesta execução.
 
@@ -81,10 +85,8 @@ porque a feature já está na allowlist de produção).
 | `20260519140000_staging_documents_table.sql` | Documentos (produção) |
 | `20260519150000_staging_schedules_table.sql` | Escalas (produção) |
 | `20260519160000_staging_secretaria_core_tables.sql` | Secretaria/Membros (produção) |
-| `20260526100000_staging_worship_tables.sql` | Culto & Louvor (staging-only — estrutura inofensiva de manter, feature desativada por módulo) |
 | `20260527100000_assemblies_rls_platform_admin.sql` | Assembleia Geral (produção) |
 | `20260527200000_assemblies_storage_rls.sql` | Assembleia Geral (produção) |
-| `20260608160000_staging_campaigns_crud_fields.sql` | Campanhas (staging-only — estrutura inofensiva de manter) |
 | `20260609100000_staging_internal_messages.sql` | Chat/Cockpit (produção) — confirmado sem seed embutido |
 | `20260611120000_chat_campaign_single_thread.sql` | Chat/Cockpit (produção) |
 | `20260616100000_administrative_requests.sql` | Solicitações administrativas (produção) |
@@ -94,9 +96,6 @@ porque a feature já está na allowlist de produção).
 | `20260707100000_production_finance_confiadcs_extension.sql` | Financeiro — CONFIADCS (produção, já nomeada "production") |
 | `20260707200000_organizations_institutional_fields.sql` | Configuração institucional (produção) |
 | `20260708_member_validation_tokens.sql` | Convite de membro (produção, hardened) |
-| `20260615120000_staging_recommendation_letters.sql` | Cartas de Recomendação (staging-only por ora — não está na allowlist urgente de produção) |
-| `20260615130000_recommendation_letters_public_token.sql` | idem acima |
-| `20260608150000_staging_campaign_media_storage.sql` | Campanhas (staging-only) |
 
 ## B — Correção comum promovível
 
@@ -108,7 +107,6 @@ porque a feature já está na allowlist de produção).
 | `20260526300000_members_block_terminal_status_delete.sql` |
 | `20260612150000_profiles_rls_restrict_select.sql` |
 | `20260617130000_members_status_constraint_fix.sql` |
-| `20260617150000_fix_campaign_writer_rls.sql` (Campanhas é staging-only, mas a correção de RLS em si é inócua de promover) |
 | `20260618130000_fix_accept_access_invite_email_check.sql` |
 | `20260708_fix_member_invites_permissions.sql` |
 | `20260708_fix_member_invite_accept_safety.sql` |
@@ -118,6 +116,21 @@ porque a feature já está na allowlist de produção).
 | `20260715141000_remove_open_slug_join.sql` (hardening desta revisão — Fase 2, sem dados fixos) |
 | `20260715150000_harden_access_invites.sql` (hardening desta revisão — Fase 3, sem dados fixos) |
 | `20260715151000_idempotent_remove_finalize_member_invite.sql` (hardening desta revisão — Fase 3, sem dados fixos) |
+
+## F — Estrutura de feature exclusiva de staging nesta release
+
+Estes arquivos não contêm dados demo, mas também não pertencem à release
+urgente de gestão. Portanto, não são candidatos à promoção para produção
+agora; permanecem preservados e funcionais somente no banco de staging.
+
+| Arquivo | Módulo relacionado |
+|---|---|
+| `20260526100000_staging_worship_tables.sql` | Culto & Louvor |
+| `20260608150000_staging_campaign_media_storage.sql` | Campanhas |
+| `20260608160000_staging_campaigns_crud_fields.sql` | Campanhas |
+| `20260615120000_staging_recommendation_letters.sql` | Cartas de Recomendação |
+| `20260615130000_recommendation_letters_public_token.sql` | Cartas de Recomendação |
+| `20260617150000_fix_campaign_writer_rls.sql` | Campanhas |
 
 ## C — Seed/demo exclusivo de staging (nunca aplicar em produção)
 
@@ -160,6 +173,8 @@ DDL/RLS (promovível) da seção de seed (fica em staging).
      de estrutura/RLS para a nova migration de produção — nunca a seção de
      seed;
    - Os arquivos da categoria **C** nunca são copiados para produção.
+   - Os arquivos da categoria **F** só entram nesse processo quando o módulo
+     correspondente for formalmente liberado para produção.
 3. Estrutura futura de seeds propria (proposta, não criada agora com dados):
    `supabase/seeds/staging/` — ver `supabase/seeds/staging/README.md`.
 4. Todos os scripts `seed-*.mjs`/`demo:*` agora exigem, antes de gravar
@@ -178,12 +193,12 @@ promovido.
 
 ## Manifesto machine-readable
 
-A mesma classificação (já com a correção da categoria E acima) está disponível
+A mesma classificação (incluindo destino funcional de produção/staging) está disponível
 em formato JSON em `supabase/migration-manifest.json`, consumido por
 `scripts/supabase-guard.mjs` (Fase 7 — wrapper obrigatório para qualquer
 operação futura da Supabase CLI; `checkMigrationManifestGate` bloqueia
 qualquer promoção para produção enquanto houver item em
-`staging_only`/`mixed_needs_split` não resolvido). `src/config/
+`staging_feature`/`staging_only`/`mixed_needs_split` não resolvido). `src/config/
 migrationManifest.test.ts` garante que o manifesto JSON cobre exatamente os
 arquivos presentes em `supabase/migrations/` (nenhum arquivo esquecido,
 nenhuma entrada órfã, nenhuma duplicata) e exercita o preflight de bloqueio

@@ -22,7 +22,7 @@
  *      migration-a-migration (ver supabase/migration-manifest.json).
  *   4. Para `--target=staging`, avisa (mas não bloqueia — staging aceita
  *      tudo) quando `supabase/migration-manifest.json` tiver qualquer
- *      entrada em `staging_only`/`mixed_needs_split`, deixando o preflight
+ *      entrada em `staging_feature`/`staging_only`/`mixed_needs_split`, deixando o preflight
  *      já pronto para quando a promoção a produção for liberada.
  *   5. NUNCA executa `push`/`up` de fato — apenas valida e IMPRIME o comando
  *      exato para um humano rodar manualmente, com o project ref já
@@ -123,20 +123,20 @@ function main() {
         "promoção/escrita em PRODUÇÃO está desabilitada nesta etapa (Regras Absolutas 2/3/8). " +
           "Nenhum comando `db push`/`migration up` para produção é executado por esta ferramenta — " +
           "isso deve ser um processo manual, revisado, migration a migration, depois de zerar " +
-          "supabase/migration-manifest.json#mixed_needs_split e aprovar cada item de staging_only " +
-          "que precisa de contraparte de produção.",
+          "supabase/migration-manifest.json#mixed_needs_split e revisar cada item exclusivo " +
+          "de staging que precisa de contraparte de produção.",
       );
     }
 
     const manifest = loadMigrationManifest();
     // Informativo apenas: para --target=staging este gate NUNCA bloqueia
-    // (staging aceita staging_only/mixed_needs_split). Reaproveitamos a
+    // (staging aceita staging_feature/staging_only/mixed_needs_split). Reaproveitamos a
     // mesma função checando "production" só para saber o que already
     // bloquearia uma promoção futura, e avisar com antecedência.
     const productionGate = checkMigrationManifestGate(manifest, "production");
     if (productionGate.blocked) {
       console.warn(
-        `⚠️  supabase-guard: ${productionGate.reasons.length} migration(s) em staging_only/mixed_needs_split ` +
+        `⚠️  supabase-guard: ${productionGate.reasons.length} migration(s) fora da release de produção ` +
           `(ok para staging, mas bloqueiam qualquer promoção futura a produção sem split manual):`,
       );
       for (const reason of productionGate.reasons) console.warn(`   - ${reason}`);

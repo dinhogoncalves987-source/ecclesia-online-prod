@@ -9,8 +9,8 @@ import { checkMigrationManifestGate } from "../../scripts/lib/migrationManifest.
  * (consumido por `scripts/supabase-guard.mjs`) cobre EXATAMENTE os arquivos
  * presentes em `supabase/migrations/` — nenhum arquivo real esquecido,
  * nenhuma entrada órfã no manifesto — e que o preflight de promoção para
- * produção bloqueia corretamente quando há migration staging_only ou
- * mixed_needs_split pendente.
+ * produção bloqueia corretamente quando há migration staging_feature,
+ * staging_only ou mixed_needs_split pendente.
  *
  * Este teste é somente leitura: nunca aplica, move ou edita nenhuma
  * migration.
@@ -28,7 +28,13 @@ function loadRealMigrationFiles(): string[] {
   return readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql"));
 }
 
-const CATEGORY_KEYS = ["historical", "production_safe", "staging_only", "mixed_needs_split"] as const;
+const CATEGORY_KEYS = [
+  "historical",
+  "production_management",
+  "staging_feature",
+  "staging_only",
+  "mixed_needs_split",
+] as const;
 
 describe("migration-manifest.json (Fase 7 — manifesto de migrations)", () => {
   it("cobre exatamente os arquivos .sql presentes em supabase/migrations (nenhum esquecido)", () => {
@@ -68,9 +74,9 @@ describe("migration-manifest.json (Fase 7 — manifesto de migrations)", () => {
     expect(duplicates, `arquivo(s) classificado(s) em mais de uma categoria: ${duplicates.join(", ")}`).toEqual([]);
   });
 
-  it("staging_only e mixed_needs_split contêm apenas nomes de arquivo não vazios", () => {
+  it("categorias não promovíveis contêm apenas nomes de arquivo não vazios", () => {
     const manifest = loadManifest();
-    for (const key of ["staging_only", "mixed_needs_split"] as const) {
+    for (const key of ["staging_feature", "staging_only", "mixed_needs_split"] as const) {
       for (const file of manifest[key] ?? []) {
         expect(typeof file).toBe("string");
         expect(file.length).toBeGreaterThan(0);
@@ -80,35 +86,50 @@ describe("migration-manifest.json (Fase 7 — manifesto de migrations)", () => {
 });
 
 describe("checkMigrationManifestGate (preflight de promoção — Fase 7)", () => {
-  it("nunca bloqueia --target=staging, mesmo com migrations staging_only/mixed", () => {
-    const manifest = { staging_only: ["a.sql"], mixed_needs_split: ["b.sql"] };
+  it("nunca bloqueia --target=staging, mesmo com migrations exclusivas/mistas", () => {
+    const manifest = {
+      staging_feature: ["feature.sql"],
+      staging_only: ["seed.sql"],
+      mixed_needs_split: ["mixed.sql"],
+    };
     const result = checkMigrationManifestGate(manifest, "staging");
     expect(result.blocked).toBe(false);
     expect(result.reasons).toEqual([]);
   });
 
+  it("bloqueia --target=production quando a migration é de feature mantida no staging", () => {
+    const manifest = {
+      staging_feature: ["20260526100000_staging_worship_tables.sql"],
+      staging_only: [],
+      mixed_needs_split: [],
+    };
+    const result = checkMigrationManifestGate(manifest, "production");
+    expect(result.blocked).toBe(true);
+    expect(result.reasons.join(" ")).toContain("20260526100000_staging_worship_tables.sql");
+  });
+
   it("bloqueia --target=production quando há migration staging_only pendente", () => {
-    const manifest = { staging_only: ["20260519200000_demo_seed.sql"], mixed_needs_split: [] };
+    const manifest = { staging_feature: [], staging_only: ["20260519200000_demo_seed.sql"], mixed_needs_split: [] };
     const result = checkMigrationManifestGate(manifest, "production");
     expect(result.blocked).toBe(true);
     expect(result.reasons.join(" ")).toContain("20260519200000_demo_seed.sql");
   });
 
   it("bloqueia --target=production quando há migration mixed_needs_split pendente", () => {
-    const manifest = { staging_only: [], mixed_needs_split: ["20260526200000_staging_secretaria_rls.sql"] };
+    const manifest = { staging_feature: [], staging_only: [], mixed_needs_split: ["20260526200000_staging_secretaria_rls.sql"] };
     const result = checkMigrationManifestGate(manifest, "production");
     expect(result.blocked).toBe(true);
     expect(result.reasons.join(" ")).toContain("20260526200000_staging_secretaria_rls.sql");
   });
 
-  it("não bloqueia --target=production quando staging_only e mixed_needs_split estão vazios", () => {
-    const manifest = { staging_only: [], mixed_needs_split: [] };
+  it("não bloqueia --target=production quando todas as categorias não promovíveis estão vazias", () => {
+    const manifest = { staging_feature: [], staging_only: [], mixed_needs_split: [] };
     const result = checkMigrationManifestGate(manifest, "production");
     expect(result.blocked).toBe(false);
     expect(result.reasons).toEqual([]);
   });
 
-  it("o manifesto real do repositório bloquearia produção hoje (há itens staging_only/mixed pendentes)", () => {
+  it("o manifesto real bloquearia produção hoje (há features, seeds e arquivos mistos pendentes)", () => {
     const manifest = loadManifest();
     const result = checkMigrationManifestGate(manifest, "production");
     // Este é o estado ESPERADO nesta fase: nenhuma migration staging-only ou

@@ -91,18 +91,21 @@ describe("supabase-guard: link local", () => {
 });
 
 describe("supabase-guard: migration manifest blockers", () => {
-  it("reports every staging_only + mixed_needs_split entry as a production blocker", () => {
+  it("reports every staging_feature + staging_only + mixed entry as a production blocker", () => {
     const manifest = loadMigrationManifest();
     const blockers = getUnresolvedProductionBlockers(manifest);
-    expect(blockers.length).toBe(manifest.staging_only.length + manifest.mixed_needs_split.length);
+    expect(blockers.length).toBe(
+      manifest.staging_feature.length + manifest.staging_only.length + manifest.mixed_needs_split.length,
+    );
+    for (const entry of manifest.staging_feature) expect(blockers).toContain(entry);
     for (const entry of manifest.staging_only) expect(blockers).toContain(entry);
     for (const entry of manifest.mixed_needs_split) expect(blockers).toContain(entry);
   });
 
-  it("never lists a production_safe entry as a blocker", () => {
+  it("never lists a production_management entry as a blocker", () => {
     const manifest = loadMigrationManifest();
     const blockers = new Set(getUnresolvedProductionBlockers(manifest));
-    for (const entry of manifest.production_safe) {
+    for (const entry of manifest.production_management) {
       expect(blockers.has(entry)).toBe(false);
     }
   });

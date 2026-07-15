@@ -1,8 +1,9 @@
 {
-  "$comment": "Manifesto explícito de classificação de supabase/migrations (Fase 7). Gerado a partir de RELATORIO_CLASSIFICACAO_MIGRATIONS.md — mesma classificação, em formato lido por scripts/supabase-guard.mjs para bloquear promoção a produção enquanto houver item em staging_only ou mixed_needs_split. NENHUMA migration foi movida, editada ou aplicada ao gerar este arquivo.",
+  "$comment": "Manifesto explícito de classificação de supabase/migrations. Além de separar seed e arquivos mistos, distingue a release urgente de gestão em produção das features preservadas apenas em staging. NENHUMA migration foi movida, editada ou aplicada ao gerar este arquivo.",
   "generated_at": "2026-07-15",
   "categories": {
-    "production_safe": "DDL/RLS/hardening sem dados fixos de demonstração — promovível para produção quando a feature correspondente for liberada (categorias A e B do relatório .md).",
+    "production_management": "DDL/RLS/hardening da allowlist urgente de gestão — candidato a promoção manual e revisada para produção (categorias A e B do relatório .md).",
+    "staging_feature": "DDL/RLS sem dados demo, mas pertencente a módulo fora da release urgente de produção — permanece somente em staging (categoria F do relatório .md).",
     "staging_only": "Insere dados fixos de demonstração — nunca deve ser aplicado em produção (categoria C do relatório .md).",
     "historical": "Schema fundacional/bootstrap ou migration já superada por hardening posterior — mantida no histórico, sem ação (categoria D do relatório .md).",
     "mixed_needs_split": "Mistura DDL/RLS promovível e dados fixos de demonstração no MESMO arquivo — precisa ser dividida antes de qualquer promoção para produção (categoria E do relatório .md)."
@@ -24,17 +25,15 @@
     "20260331051703_5c9d5cfc-1d4e-4cf1-baf3-fe50f4edd7cb.sql",
     "20260709190000_finalize_member_invite_activation.sql"
   ],
-  "production_safe": [
+  "production_management": [
     "20260512090000_staging_core_baseline.sql",
     "20260512100000_staging_treasury_mvp.sql",
     "20260513120000_staging_org_invite_link.sql",
     "20260519140000_staging_documents_table.sql",
     "20260519150000_staging_schedules_table.sql",
     "20260519160000_staging_secretaria_core_tables.sql",
-    "20260526100000_staging_worship_tables.sql",
     "20260527100000_assemblies_rls_platform_admin.sql",
     "20260527200000_assemblies_storage_rls.sql",
-    "20260608160000_staging_campaigns_crud_fields.sql",
     "20260609100000_staging_internal_messages.sql",
     "20260611120000_chat_campaign_single_thread.sql",
     "20260616100000_administrative_requests.sql",
@@ -44,16 +43,12 @@
     "20260707100000_production_finance_confiadcs_extension.sql",
     "20260707200000_organizations_institutional_fields.sql",
     "20260708_member_validation_tokens.sql",
-    "20260615120000_staging_recommendation_letters.sql",
-    "20260615130000_recommendation_letters_public_token.sql",
-    "20260608150000_staging_campaign_media_storage.sql",
     "20260513110000_fix_finance_audit_rls.sql",
     "20260513111500_fix_finance_delete_audit_fk.sql",
     "20260513121000_staging_organizations_child_insert_rls.sql",
     "20260526300000_members_block_terminal_status_delete.sql",
     "20260612150000_profiles_rls_restrict_select.sql",
     "20260617130000_members_status_constraint_fix.sql",
-    "20260617150000_fix_campaign_writer_rls.sql",
     "20260618130000_fix_accept_access_invite_email_check.sql",
     "20260708_fix_member_invites_permissions.sql",
     "20260708_fix_member_invite_accept_safety.sql",
@@ -63,6 +58,14 @@
     "20260715141000_remove_open_slug_join.sql",
     "20260715150000_harden_access_invites.sql",
     "20260715151000_idempotent_remove_finalize_member_invite.sql"
+  ],
+  "staging_feature": [
+    "20260526100000_staging_worship_tables.sql",
+    "20260608150000_staging_campaign_media_storage.sql",
+    "20260608160000_staging_campaigns_crud_fields.sql",
+    "20260615120000_staging_recommendation_letters.sql",
+    "20260615130000_recommendation_letters_public_token.sql",
+    "20260617150000_fix_campaign_writer_rls.sql"
   ],
   "staging_only": [
     "20260519200000_demo_seed.sql",
