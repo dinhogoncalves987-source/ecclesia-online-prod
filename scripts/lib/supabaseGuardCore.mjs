@@ -18,6 +18,16 @@ export const CANONICAL_REFS = {
 // nenhum outro script operacional deste repositório.
 export const BLOCKED_UNRELATED_PROJECTS = { afxaytvrmgszzigxsbcd: "xceleiro" };
 
+export const PRODUCTION_BASELINE_FILE =
+  "20260715170000_production_baseline_marker.sql";
+export const PRODUCTION_BASELINE_CONFIRMATION =
+  "BASELINE_PRODUCTION_20260715";
+
+export const TARGET_WORKDIRS = {
+  production: "supabase-production",
+  staging: ".",
+};
+
 export class GuardError extends Error {}
 
 export function resolveTarget(target) {
@@ -82,4 +92,41 @@ export function parseArgs(argv) {
     if (match) out[match[1]] = match[2];
   }
   return out;
+}
+
+/**
+ * Autoriza somente a migration-marcadora, no workdir exclusivo da produção.
+ * Nenhuma outra migration pode aproveitar a ação excepcional `baseline`.
+ */
+export function assertProductionBaselineRequest({
+  target,
+  action,
+  confirmation,
+  migrationFiles,
+}) {
+  const resolved = resolveTarget(target);
+
+  if (resolved.target !== "production" || action !== "baseline") {
+    throw new GuardError("a ação baseline existe somente para o alvo production");
+  }
+
+  if (confirmation !== PRODUCTION_BASELINE_CONFIRMATION) {
+    throw new GuardError(
+      `confirmação inválida; use --confirm=${PRODUCTION_BASELINE_CONFIRMATION}`,
+    );
+  }
+
+  const files = Array.isArray(migrationFiles) ? [...migrationFiles].sort() : [];
+  if (files.length !== 1 || files[0] !== PRODUCTION_BASELINE_FILE) {
+    throw new GuardError(
+      `workdir de produção deve conter somente ${PRODUCTION_BASELINE_FILE} durante o baseline`,
+    );
+  }
+
+  return {
+    target: resolved.target,
+    ref: resolved.ref,
+    workdir: TARGET_WORKDIRS.production,
+    migration: PRODUCTION_BASELINE_FILE,
+  };
 }

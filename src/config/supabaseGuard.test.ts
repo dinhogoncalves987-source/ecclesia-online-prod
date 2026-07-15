@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
+  PRODUCTION_BASELINE_CONFIRMATION,
+  PRODUCTION_BASELINE_FILE,
+  TARGET_WORKDIRS,
+  assertProductionBaselineRequest,
   assertLinkedProjectRef,
   resolveTarget,
 } from "../../scripts/lib/supabaseGuardCore.mjs";
@@ -87,6 +91,49 @@ describe("supabase-guard: link local", () => {
         linkedRef: "qkiiwopkbcslquyfhdec",
       }),
     ).toThrow(/diverge do ref canônico/i);
+  });
+});
+
+describe("supabase-guard: baseline isolado de produção", () => {
+  const validRequest = {
+    target: "production",
+    action: "baseline",
+    confirmation: PRODUCTION_BASELINE_CONFIRMATION,
+    migrationFiles: [PRODUCTION_BASELINE_FILE],
+  };
+
+  it("autoriza somente a marcadora no workdir exclusivo de produção", () => {
+    expect(assertProductionBaselineRequest(validRequest)).toEqual({
+      target: "production",
+      ref: "zsonukpxahaxffugavfu",
+      workdir: "supabase-production",
+      migration: PRODUCTION_BASELINE_FILE,
+    });
+    expect(TARGET_WORKDIRS.staging).toBe(".");
+  });
+
+  it("recusa staging e confirmação ausente ou incorreta", () => {
+    expect(() =>
+      assertProductionBaselineRequest({ ...validRequest, target: "staging" }),
+    ).toThrow(/somente.*production/i);
+    expect(() =>
+      assertProductionBaselineRequest({ ...validRequest, confirmation: "" }),
+    ).toThrow(/confirmação inválida/i);
+  });
+
+  it("recusa qualquer migration antiga, staging ou adicional no workdir", () => {
+    expect(() =>
+      assertProductionBaselineRequest({
+        ...validRequest,
+        migrationFiles: [PRODUCTION_BASELINE_FILE, "20260519200000_demo_seed.sql"],
+      }),
+    ).toThrow(/deve conter somente/i);
+    expect(() =>
+      assertProductionBaselineRequest({
+        ...validRequest,
+        migrationFiles: ["20260715160000_reconcile_production_security.sql"],
+      }),
+    ).toThrow(/deve conter somente/i);
   });
 });
 

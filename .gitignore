@@ -35,6 +35,7 @@ dist-ssr
 
 .vercel/
 supabase/.temp/
+supabase-production/supabase/.temp/
 
 # Dumps, restores, backups e diagnósticos locais — nunca versionar dados
 # reais nem artefatos de depuração ad-hoc.

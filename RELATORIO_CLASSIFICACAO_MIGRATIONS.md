@@ -1,5 +1,10 @@
 # Relatório de Classificação — `supabase/migrations`
 
+> Escopo: este inventário classifica o workdir de staging/teste localizado em
+> `supabase/`. O histórico isolado da produção fica em
+> `supabase-production/supabase/migrations/` e começa com uma marcadora
+> somente de validação; ele não importa automaticamente nenhum item abaixo.
+
 > Preparado como parte da separação de ambientes e atualizado após o
 > inventário real de produção. **Nenhuma migration foi aplicada ao banco por
 > este relatório.** As migrations ainda não aplicadas tiveram timestamps

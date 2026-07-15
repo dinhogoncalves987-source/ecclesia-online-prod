@@ -15,16 +15,15 @@
  *   2. Confirma o project ref alvo contra os dois refs canônicos e
  *      IMUTÁVEIS deste projeto (ver src/config/environment.ts) — nunca
  *      aceita um terceiro ref, e nunca aceita produção e staging trocados.
- *   3. Para `--target=production`, RECUSA incondicionalmente qualquer
- *      operação de escrita (`push`, `up`) nesta etapa (Regra Absoluta 2/3/8
- *      da tarefa de hardening) — não existe flag que libere isso aqui.
- *      Promoção real para produção é um processo manual, revisado,
- *      migration-a-migration (ver supabase/migration-manifest.json).
+ *   3. Produção usa um workdir fisicamente separado (`supabase-production/`).
+ *      A única escrita excepcional permitida é `--action=baseline`, com
+ *      confirmação literal e exatamente uma migration-marcadora somente de
+ *      validação. `push`/`up` genéricos continuam recusados em produção.
  *   4. Para `--target=staging`, avisa (mas não bloqueia — staging aceita
  *      tudo) quando `supabase/migration-manifest.json` tiver qualquer
  *      entrada em `staging_feature`/`staging_only`/`mixed_needs_split`, deixando o preflight
  *      já pronto para quando a promoção a produção for liberada.
- *   5. NUNCA executa `push`/`up` de fato — apenas valida e IMPRIME o comando
+ *   5. NUNCA executa `push`/`up` genérico de fato — apenas valida e IMPRIME o comando
  *      exato para um humano rodar manualmente, com o project ref já
  *      resolvido (nunca digitado à mão). Isso é intencional nesta etapa:
  *      nenhuma promoção real deve acontecer sem revisão humana explícita.
@@ -45,23 +44,65 @@
  * Uso:
  *   node scripts/supabase-guard.mjs --target=staging --action=list
  *   node scripts/supabase-guard.mjs --target=staging --action=push   (dry-run — só imprime)
- *   node scripts/supabase-guard.mjs --target=production --action=push (sempre recusado)
+ *   node scripts/supabase-guard.mjs --target=production --action=baseline --confirm=BASELINE_PRODUCTION_20260715
  */
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadMigrationManifest, checkMigrationManifestGate } from "./lib/migrationManifest.mjs";
 import {
   GuardError,
+  PRODUCTION_BASELINE_CONFIRMATION,
+  TARGET_WORKDIRS,
+  assertProductionBaselineRequest,
   assertLinkedProjectRef,
   resolveTarget,
   parseArgs,
 } from "./lib/supabaseGuardCore.mjs";
 
-const LINKED_PROJECT_REF_FILE = fileURLToPath(
-  new URL("../supabase/.temp/project-ref", import.meta.url),
-);
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(SCRIPT_DIR, "..");
+
+function workdirFor(target) {
+  return path.resolve(REPO_ROOT, TARGET_WORKDIRS[target]);
+}
+
+function linkedProjectRefFileFor(target) {
+  return path.join(workdirFor(target), "supabase", ".temp", "project-ref");
+}
+
+function readAndValidateLinkedRef(resolved) {
+  const linkedFile = linkedProjectRefFileFor(resolved.target);
+  let linkedRef = "";
+  try {
+    linkedRef = readFileSync(linkedFile, "utf8");
+  } catch (err) {
+    if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") {
+      throw new GuardError(
+        `link local de ${resolved.target} ausente. Execute primeiro: npx supabase link ` +
+          `--project-ref ${resolved.ref} --workdir ${TARGET_WORKDIRS[resolved.target]}`,
+      );
+    }
+    throw err;
+  }
+
+  return assertLinkedProjectRef({
+    target: resolved.target,
+    expectedRef: resolved.ref,
+    linkedRef,
+  });
+}
+
+function runSupabaseCli(args, target) {
+  const workdir = TARGET_WORKDIRS[target];
+  const workdirArgs = workdir === "." ? [] : ["--workdir", workdir];
+  return spawnSync("npx", ["supabase", ...args, ...workdirArgs], {
+    cwd: REPO_ROOT,
+    stdio: "inherit",
+    shell: process.platform === "win32",
+  });
+}
 
 function fail(message) {
   console.error(`\n❌ supabase-guard: ${message}\n`);
@@ -79,7 +120,7 @@ function main() {
   }
 
   const action = args.action;
-  if (!action) return fail('--action é obrigatório ("list" ou "push"/"up").');
+  if (!action) return fail('--action é obrigatório ("list", "baseline" ou "push"/"up").');
 
   console.log(`── supabase-guard: target="${resolved.target}" ref="${resolved.ref}" action="${action}" ──`);
 
@@ -87,34 +128,54 @@ function main() {
     // `--target` não altera o link usado por `--linked`. Confirme o arquivo
     // local escrito por `supabase link` ANTES de executar até mesmo uma ação
     // somente-leitura, evitando consultar silenciosamente o banco errado.
-    let linkedRef = "";
     try {
-      linkedRef = readFileSync(LINKED_PROJECT_REF_FILE, "utf8");
-    } catch (err) {
-      if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") {
-        return fail(
-          `link local da Supabase ausente. Execute primeiro: supabase link --project-ref ${resolved.ref}`,
-        );
-      }
-      throw err;
-    }
-
-    try {
-      assertLinkedProjectRef({
-        target: resolved.target,
-        expectedRef: resolved.ref,
-        linkedRef,
-      });
+      readAndValidateLinkedRef(resolved);
     } catch (err) {
       if (err instanceof GuardError) return fail(err.message);
       throw err;
     }
 
-    const result = spawnSync("supabase", ["migration", "list", "--linked"], {
-      stdio: "inherit",
-      shell: process.platform === "win32",
-    });
+    const result = runSupabaseCli(["migration", "list", "--linked"], resolved.target);
     process.exit(result.status ?? 1);
+  }
+
+  if (action === "baseline") {
+    let baseline;
+    try {
+      const migrationsDir = path.join(
+        workdirFor("production"),
+        "supabase",
+        "migrations",
+      );
+      const migrationFiles = readdirSync(migrationsDir)
+        .filter((file) => file.endsWith(".sql"))
+        .sort();
+
+      baseline = assertProductionBaselineRequest({
+        target: resolved.target,
+        action,
+        confirmation: args.confirm,
+        migrationFiles,
+      });
+      readAndValidateLinkedRef(resolved);
+    } catch (err) {
+      if (err instanceof GuardError) return fail(err.message);
+      throw err;
+    }
+
+    console.log(
+      `\n✅ baseline autorizado: ${baseline.migration}. Executando preflight da CLI sem aplicar SQL...\n`,
+    );
+    const dryRun = runSupabaseCli(["db", "push", "--linked", "--dry-run"], "production");
+    if (dryRun.status !== 0) {
+      return fail("preflight do baseline falhou; nenhuma migration foi aplicada");
+    }
+
+    console.log(
+      "\n✅ preflight aprovado. Aplicando somente a marcadora fail-closed no histórico de produção...\n",
+    );
+    const push = runSupabaseCli(["db", "push", "--linked"], "production");
+    process.exit(push.status ?? 1);
   }
 
   if (action === "push" || action === "up") {
@@ -146,12 +207,15 @@ function main() {
       "\n✅ supabase-guard: validação de preflight passou para staging. Esta ferramenta NUNCA executa " +
         "push/up automaticamente — rode manualmente, com o ref já confirmado acima:\n",
     );
-    console.log(`   supabase link --project-ref ${resolved.ref}`);
-    console.log(`   supabase db push --linked\n`);
+    console.log(`   npx supabase link --project-ref ${resolved.ref}`);
+    console.log(`   npx supabase db push --linked\n`);
     process.exit(0);
   }
 
-  return fail(`--action="${action}" não reconhecida (use "list" ou "push"/"up").`);
+  return fail(
+    `--action="${action}" não reconhecida (use "list", "baseline" ou "push"/"up"). ` +
+      `Confirmação do baseline: ${PRODUCTION_BASELINE_CONFIRMATION}.`,
+  );
 }
 
 // CORREÇÃO (Windows) — mesma razão de scripts/check-environment.mjs: comparar
