@@ -1,5 +1,5 @@
 {
-  "$comment": "Manifesto explícito de classificação de supabase/migrations. Além de separar seed e arquivos mistos, distingue a release urgente de gestão em produção das features preservadas apenas em staging. NENHUMA migration foi movida, editada ou aplicada ao gerar este arquivo.",
+  "$comment": "Manifesto explícito de classificação de supabase/migrations. Além de separar seed e arquivos mistos, distingue a release urgente de gestão em produção das features preservadas apenas em staging. Nenhuma migration já aplicada remotamente foi reescrita; a reconciliação de produção foi adicionada em migration nova.",
   "generated_at": "2026-07-15",
   "categories": {
     "production_management": "DDL/RLS/hardening da allowlist urgente de gestão — candidato a promoção manual e revisada para produção (categorias A e B do relatório .md).",
@@ -57,7 +57,8 @@
     "20260715130000_harden_platform_role_escalation.sql",
     "20260715141000_remove_open_slug_join.sql",
     "20260715150000_harden_access_invites.sql",
-    "20260715151000_idempotent_remove_finalize_member_invite.sql"
+    "20260715151000_idempotent_remove_finalize_member_invite.sql",
+    "20260715160000_reconcile_production_security.sql"
   ],
   "staging_feature": [
     "20260526100000_staging_worship_tables.sql",

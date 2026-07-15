@@ -1,12 +1,14 @@
 # Relatório de Classificação — `supabase/migrations`
 
-> Preparado como parte da Fase 6 (separação de ambientes). **Nenhuma migration
-> foi editada, renomeada, movida ou aplicada** — este documento é somente
-> leitura/planejamento, para revisão do Alfred/Codex antes de qualquer ação.
+> Preparado como parte da separação de ambientes e atualizado após o
+> inventário real de produção. **Nenhuma migration foi aplicada ao banco por
+> este relatório.** As migrations ainda não aplicadas tiveram timestamps
+> normalizados; a migration P0 de autoridade foi tornada autocontida e a
+> reconciliação atômica de produção foi adicionada em arquivo novo.
 
 ## Metodologia
 
-Cada um dos 68 arquivos em `supabase/migrations/` foi classificado por nome +
+Cada um dos 69 arquivos em `supabase/migrations/` foi classificado por nome +
 inspeção do cabeçalho/comentários (e, nos casos ambíguos, uma leitura direta
 das primeiras linhas do SQL). Categorias usadas:
 
@@ -27,7 +29,7 @@ das primeiras linhas do SQL). Categorias usadas:
   produção. Não é perigosa por conter seed; é bloqueada pelo destino
   funcional desta etapa.
 
-Nenhuma migration desta lista foi alterada nesta execução.
+Nenhuma migration já aplicada remotamente foi reescrita nesta execução.
 
 > **Correção desta revisão (2026-07-15, Fase 7):** uma leitura anterior deste
 > relatório havia classificado `20260526200000_staging_secretaria_rls.sql` e
@@ -116,6 +118,7 @@ porque a feature já está na allowlist de produção).
 | `20260715141000_remove_open_slug_join.sql` (hardening desta revisão — Fase 2, sem dados fixos) |
 | `20260715150000_harden_access_invites.sql` (hardening desta revisão — Fase 3, sem dados fixos) |
 | `20260715151000_idempotent_remove_finalize_member_invite.sql` (hardening desta revisão — Fase 3, sem dados fixos) |
+| `20260715160000_reconcile_production_security.sql` (reconciliação atômica baseada no inventário real de produção; preserva `organizations`) |
 
 ## F — Estrutura de feature exclusiva de staging nesta release
 
@@ -184,8 +187,8 @@ DDL/RLS (promovível) da seção de seed (fica em staging).
 
 ## Observação de metodologia
 
-Dado o volume (68 arquivos, incluindo as 4 novas migrations de hardening desta
-revisão), a classificação acima é baseada primariamente em nome de arquivo +
+Dado o volume (69 arquivos, incluindo hardenings e a reconciliação atômica
+desta revisão), a classificação acima é baseada primariamente em nome de arquivo +
 cabeçalho/comentários, com inspeção direta do SQL nos casos ambíguos
 (categoria E e alguns da A/B). Antes de qualquer promoção real para produção,
 recomenda-se uma segunda leitura completa do arquivo específico que será

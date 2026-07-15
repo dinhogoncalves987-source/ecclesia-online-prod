@@ -80,6 +80,46 @@
 -- NÃO aplicar em produção sem revisão e aprovação explícita.
 -- ============================================================================
 
+-- ── 0. Garantir a raiz de autoridade antes de trocar os helpers ────────────
+-- O schema de produção inspecionado em 2026-07-15 ainda não possuía esta
+-- tabela, embora as funções abaixo dependam dela. Criá-la aqui torna a
+-- migration autocontida e evita falha no primeiro CREATE FUNCTION/policy.
+CREATE TABLE IF NOT EXISTS public.super_admins (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  notes      text
+);
+
+ALTER TABLE public.super_admins ENABLE ROW LEVEL SECURITY;
+
+-- Bootstrap controlado: somente quando a nova raiz ainda está vazia, captura
+-- as autoridades legadas que o próprio schema antigo já reconhecia. Depois
+-- desta migration, profiles/user_roles deixam definitivamente de conceder a
+-- autoridade raiz; novas promoções exigem inserção explícita em super_admins.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.super_admins) THEN
+    INSERT INTO public.super_admins (user_id, notes)
+    SELECT legacy.user_id, 'Migrado automaticamente da autoridade legada em 2026-07-15'
+    FROM (
+      SELECT p.user_id
+      FROM public.profiles p
+      WHERE p.platform_role IN ('platform_admin', 'super_admin', 'superadmin')
+
+      UNION
+
+      SELECT ur.user_id
+      FROM public.user_roles ur
+      WHERE ur.organization_id IS NULL
+        AND ur.role IN ('platform_admin', 'super_admin', 'superadmin')
+    ) AS legacy
+    JOIN auth.users au ON au.id = legacy.user_id
+    ON CONFLICT (user_id) DO NOTHING;
+  END IF;
+END;
+$$;
+
 -- ── A. handle_new_user(): nunca copiar platform_role/roles/permissões ───────
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
