@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { resolveTarget } from "../../scripts/lib/supabaseGuardCore.mjs";
+import {
+  assertLinkedProjectRef,
+  resolveTarget,
+} from "../../scripts/lib/supabaseGuardCore.mjs";
 import { loadMigrationManifest, getUnresolvedProductionBlockers } from "../../scripts/lib/migrationManifest.mjs";
 
 /**
@@ -35,6 +38,55 @@ describe("supabase-guard: resolveTarget", () => {
         // failure would be resolving successfully to the blocked ref.
       }
     }
+  });
+});
+
+describe("supabase-guard: link local", () => {
+  it.each([
+    ["production", "zsonukpxahaxffugavfu"],
+    ["staging", "qkiiwopkbcslquyfhdec"],
+  ])("accepts only the canonical linked ref for %s", (target, ref) => {
+    expect(assertLinkedProjectRef({ target, expectedRef: ref, linkedRef: ` ${ref}\n` })).toEqual({
+      target,
+      ref,
+    });
+  });
+
+  it("rejects an absent local link", () => {
+    expect(() =>
+      assertLinkedProjectRef({
+        target: "staging",
+        expectedRef: "qkiiwopkbcslquyfhdec",
+        linkedRef: "",
+      }),
+    ).toThrow(/link local.*ausente/i);
+  });
+
+  it.each([
+    ["production", "zsonukpxahaxffugavfu", "qkiiwopkbcslquyfhdec"],
+    ["staging", "qkiiwopkbcslquyfhdec", "zsonukpxahaxffugavfu"],
+  ])("rejects a %s target when another environment is linked", (target, expectedRef, linkedRef) => {
+    expect(() => assertLinkedProjectRef({ target, expectedRef, linkedRef })).toThrow(/diverge do alvo/i);
+  });
+
+  it("always rejects the unrelated xceleiro project", () => {
+    expect(() =>
+      assertLinkedProjectRef({
+        target: "staging",
+        expectedRef: "qkiiwopkbcslquyfhdec",
+        linkedRef: "afxaytvrmgszzigxsbcd",
+      }),
+    ).toThrow(/xceleiro.*bloqueado|bloqueado.*xceleiro/i);
+  });
+
+  it("rejects a caller-supplied expected ref that is not canonical", () => {
+    expect(() =>
+      assertLinkedProjectRef({
+        target: "production",
+        expectedRef: "qkiiwopkbcslquyfhdec",
+        linkedRef: "qkiiwopkbcslquyfhdec",
+      }),
+    ).toThrow(/diverge do ref canônico/i);
   });
 });
 

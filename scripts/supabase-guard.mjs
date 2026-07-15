@@ -48,10 +48,20 @@
  *   node scripts/supabase-guard.mjs --target=production --action=push (sempre recusado)
  */
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadMigrationManifest, checkMigrationManifestGate } from "./lib/migrationManifest.mjs";
-import { GuardError, resolveTarget, parseArgs } from "./lib/supabaseGuardCore.mjs";
+import {
+  GuardError,
+  assertLinkedProjectRef,
+  resolveTarget,
+  parseArgs,
+} from "./lib/supabaseGuardCore.mjs";
+
+const LINKED_PROJECT_REF_FILE = fileURLToPath(
+  new URL("../supabase/.temp/project-ref", import.meta.url),
+);
 
 function fail(message) {
   console.error(`\n❌ supabase-guard: ${message}\n`);
@@ -74,9 +84,32 @@ function main() {
   console.log(`── supabase-guard: target="${resolved.target}" ref="${resolved.ref}" action="${action}" ──`);
 
   if (action === "list") {
-    // Somente leitura — seguro por definição. Ainda assim, nunca escreve
-    // nem imprime credenciais; o próprio comando não recebe nem expõe
-    // segredos (usa o link/config local já autenticado do usuário).
+    // `--target` não altera o link usado por `--linked`. Confirme o arquivo
+    // local escrito por `supabase link` ANTES de executar até mesmo uma ação
+    // somente-leitura, evitando consultar silenciosamente o banco errado.
+    let linkedRef = "";
+    try {
+      linkedRef = readFileSync(LINKED_PROJECT_REF_FILE, "utf8");
+    } catch (err) {
+      if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") {
+        return fail(
+          `link local da Supabase ausente. Execute primeiro: supabase link --project-ref ${resolved.ref}`,
+        );
+      }
+      throw err;
+    }
+
+    try {
+      assertLinkedProjectRef({
+        target: resolved.target,
+        expectedRef: resolved.ref,
+        linkedRef,
+      });
+    } catch (err) {
+      if (err instanceof GuardError) return fail(err.message);
+      throw err;
+    }
+
     const result = spawnSync("supabase", ["migration", "list", "--linked"], {
       stdio: "inherit",
       shell: process.platform === "win32",

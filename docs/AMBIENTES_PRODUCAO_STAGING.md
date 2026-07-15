@@ -134,6 +134,27 @@ expostas ao bundle do frontend, usadas só por `scripts/check-environment.mjs`):
 Nenhuma dessas configurações foi alterada nesta tarefa — é uma checklist para
 configuração manual futura no painel do Supabase de cada projeto.
 
+### 3.1 Vínculo seguro da CLI
+
+`supabase/config.toml#project_id` identifica somente o projeto **local** dos
+containers; ele não seleciona o banco remoto. O projeto remoto usado por
+`--linked` é registrado pela CLI em `supabase/.temp/project-ref` após
+`supabase link`.
+
+Por isso, comandos remotos deste repositório devem passar pelo wrapper com
+alvo explícito. Antes de executar `migration list --linked`, o wrapper lê o
+link local e aborta se ele estiver ausente, trocado ou apontando para o
+projeto não relacionado `xceleiro`:
+
+```powershell
+supabase link --project-ref qkiiwopkbcslquyfhdec
+npm run supabase:guard -- --target=staging --action=list
+```
+
+Para produção, substitua os dois valores por `production` e
+`zsonukpxahaxffugavfu`. Operações de escrita em produção continuam bloqueadas
+por esta ferramenta até a aprovação migration a migration.
+
 ## 4. GitHub — proposta de proteção
 
 Repositório: `dinhogoncalves987-source/ecclesia-online-prod`.

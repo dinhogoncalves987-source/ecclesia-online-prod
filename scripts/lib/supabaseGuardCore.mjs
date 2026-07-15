@@ -37,6 +37,44 @@ export function resolveTarget(target) {
   return { target, ref };
 }
 
+/**
+ * Confirma que o link local criado por `supabase link` aponta exatamente
+ * para o ambiente declarado. O `--target` sozinho não muda o projeto usado
+ * por comandos com `--linked`; por isso esta validação deve acontecer antes
+ * de qualquer spawn da CLI.
+ */
+export function assertLinkedProjectRef({ target, expectedRef, linkedRef }) {
+  const resolved = resolveTarget(target);
+
+  if (expectedRef !== resolved.ref) {
+    throw new GuardError(
+      `ref esperado (${JSON.stringify(expectedRef ?? null)}) diverge do ref canônico de ${target} (${resolved.ref}).`,
+    );
+  }
+
+  const normalizedLinkedRef = typeof linkedRef === "string" ? linkedRef.trim() : "";
+  if (!normalizedLinkedRef) {
+    throw new GuardError(
+      `link local da Supabase ausente. Execute primeiro: supabase link --project-ref ${resolved.ref}`,
+    );
+  }
+
+  if (Object.prototype.hasOwnProperty.call(BLOCKED_UNRELATED_PROJECTS, normalizedLinkedRef)) {
+    throw new GuardError(
+      `projeto linkado (${normalizedLinkedRef}, ${BLOCKED_UNRELATED_PROJECTS[normalizedLinkedRef]}) está bloqueado e não pertence ao Ecclesia Online.`,
+    );
+  }
+
+  if (normalizedLinkedRef !== resolved.ref) {
+    throw new GuardError(
+      `projeto linkado (${normalizedLinkedRef}) diverge do alvo ${target} (${resolved.ref}). ` +
+        `Relinke explicitamente antes de continuar: supabase link --project-ref ${resolved.ref}`,
+    );
+  }
+
+  return { target, ref: normalizedLinkedRef };
+}
+
 export function parseArgs(argv) {
   const out = {};
   for (const arg of argv) {
