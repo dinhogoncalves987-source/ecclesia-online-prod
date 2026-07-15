@@ -16,6 +16,7 @@ import { createClient } from "@supabase/supabase-js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { assertSafeToSeedStagingFromProcessEnv, SeedGuardError } from "./lib/seedGuard.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
@@ -55,6 +56,18 @@ if (!supabaseUrl || !serviceKey) {
       "   Exemplo: $env:SUPABASE_SERVICE_ROLE_KEY=\"...\"; npm run chat:seed-staging\n",
   );
   process.exit(1);
+}
+
+// Guarda de ambiente — recusa produção e exige confirmação explícita.
+// Requer: APP_ENV=staging e SEED_STAGING="SEED_STAGING" no ambiente.
+try {
+  assertSafeToSeedStagingFromProcessEnv({ supabaseUrl });
+} catch (err) {
+  if (err instanceof SeedGuardError) {
+    console.error(`\n❌ ${err.message}\n`);
+    process.exit(1);
+  }
+  throw err;
 }
 
 const sb = createClient(supabaseUrl, serviceKey, {

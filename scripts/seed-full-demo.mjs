@@ -16,6 +16,7 @@ import { createClient } from "@supabase/supabase-js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { assertSafeToSeedStagingFromProcessEnv, SeedGuardError } from "./lib/seedGuard.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
@@ -43,6 +44,18 @@ if (!SUPABASE_URL || !SERVICE_ROLE) {
   console.error("❌ SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são obrigatórios.");
   console.error("   Passe via: $env:SUPABASE_SERVICE_ROLE_KEY='eyJ...'; npm run demo:seed-full");
   process.exit(1);
+}
+
+// Guarda de ambiente — recusa produção e exige confirmação explícita.
+// Requer: APP_ENV=staging e SEED_STAGING="SEED_STAGING" no ambiente.
+try {
+  assertSafeToSeedStagingFromProcessEnv({ supabaseUrl: SUPABASE_URL });
+} catch (err) {
+  if (err instanceof SeedGuardError) {
+    console.error(`\n❌ ${err.message}\n`);
+    process.exit(1);
+  }
+  throw err;
 }
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {

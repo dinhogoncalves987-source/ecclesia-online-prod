@@ -1,5 +1,12 @@
-﻿export const DEVOTIONAL_PUBLIC_URL = "https://ecclesiabr.online/devocional";
-export const DEVOTIONAL_OG_IMAGE = "https://ecclesiabr.online/og-devocional.png";
+﻿import { environment } from "@/config/environment";
+
+/**
+ * Compostas a partir de VITE_PUBLIC_APP_URL (via src/config/environment.ts)
+ * — nunca um domínio fixo. Isso garante que staging nunca gere links de
+ * compartilhamento apontando para o domínio oficial de produção.
+ */
+export const DEVOTIONAL_PUBLIC_URL = `${environment.publicAppUrl}/devocional`;
+export const DEVOTIONAL_OG_IMAGE = `${environment.publicAppUrl}/og-devocional.png`;
 
 export const DEVOTIONAL_SHARE_TITLE = "Devocional Ecclesia";
 

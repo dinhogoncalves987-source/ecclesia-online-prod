@@ -6,6 +6,14 @@
 
     <!-- PWA: manifesto injetado automaticamente pelo vite-plugin-pwa (ver vite.config.ts) -->
     <meta name="theme-color" content="#0B0B0F" />
+
+    <!--
+      robots: valor seguro por padrão (noindex/nofollow). Em produção, é
+      atualizado em runtime para "index, follow" por EnvironmentBanner (ver
+      src/config/environment.ts) — nunca o contrário, para que uma falha na
+      detecção de ambiente jamais resulte em staging sendo indexado.
+    -->
+    <meta name="robots" content="noindex, nofollow" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Ecclesia" />
@@ -23,18 +31,23 @@
     <meta property="og:site_name" content="Ecclesia Online" />
     <meta property="og:title" content="Devocional Ecclesia" />
     <meta property="og:description" content="Uma palavra diária para fortalecer a fé e aproximar sua igreja." />
-    <meta property="og:image" content="https://ecclesiabr.online/og-devocional.png" />
+    <!--
+      Interpolação nativa do Vite (%VITE_X% → valor de VITE_X em build time,
+      lido de .env.*/variáveis da Vercel). Nunca um domínio fixo: staging
+      nunca gera meta tags apontando para o domínio oficial de produção.
+    -->
+    <meta property="og:image" content="%VITE_PUBLIC_APP_URL%/og-devocional.png" />
     <meta property="og:image:alt" content="Devocional Ecclesia — Ecclesia Online" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:url" content="https://ecclesiabr.online/devocional" />
+    <meta property="og:url" content="%VITE_PUBLIC_APP_URL%/devocional" />
 
     <!-- Twitter / X card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Devocional Ecclesia" />
     <meta name="twitter:description" content="Uma palavra diária para fortalecer a fé e aproximar sua igreja." />
-    <meta name="twitter:image" content="https://ecclesiabr.online/og-devocional.png" />
-    <meta name="twitter:url" content="https://ecclesiabr.online/devocional" />
+    <meta name="twitter:image" content="%VITE_PUBLIC_APP_URL%/og-devocional.png" />
+    <meta name="twitter:url" content="%VITE_PUBLIC_APP_URL%/devocional" />
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />

@@ -26,6 +26,10 @@ import { PWAUpdatePrompt } from "@/components/PWAUpdatePrompt";
 
 import { PageLoader } from "@/components/PageLoader";
 
+import { ModuleGate } from "@/components/ModuleGate";
+
+import { EnvironmentBanner } from "@/components/EnvironmentBanner";
+
 
 
 // Public / auth — kept synchronous (entry points, small footprint)
@@ -135,6 +139,8 @@ const App = () => (
 
         <ChurchProvider>
 
+        <EnvironmentBanner />
+
         <OfflineBanner />
 
         <PWAUpdatePrompt />
@@ -170,7 +176,7 @@ const App = () => (
 
               <Route path="/admin" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
 
-              <Route path="/admin/campanhas" element={<ProtectedRoute><Campanhas /></ProtectedRoute>} />
+              <Route path="/admin/campanhas" element={<ProtectedRoute><ModuleGate moduleId="campaigns"><Campanhas /></ModuleGate></ProtectedRoute>} />
 
               <Route path="/admin/financeiro" element={<ProtectedRoute><Financeiro /></ProtectedRoute>} />
 
@@ -178,17 +184,17 @@ const App = () => (
 
               <Route path="/admin/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
 
-              <Route path="/admin/biblia" element={<ProtectedRoute><Biblia /></ProtectedRoute>} />
+              <Route path="/admin/biblia" element={<ProtectedRoute><ModuleGate moduleId="bible-ai"><Biblia /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/culto" element={<ProtectedRoute><CultoLouvor /></ProtectedRoute>} />
+              <Route path="/admin/culto" element={<ProtectedRoute><ModuleGate moduleId="worship"><CultoLouvor /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/culto/biblioteca" element={<ProtectedRoute><CultoBiblioteca /></ProtectedRoute>} />
+              <Route path="/admin/culto/biblioteca" element={<ProtectedRoute><ModuleGate moduleId="worship"><CultoBiblioteca /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/culto/roteiros" element={<ProtectedRoute><CultoRoteiros /></ProtectedRoute>} />
+              <Route path="/admin/culto/roteiros" element={<ProtectedRoute><ModuleGate moduleId="worship"><CultoRoteiros /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/culto/telao" element={<ProtectedRoute><CultoTelao /></ProtectedRoute>} />
+              <Route path="/admin/culto/telao" element={<ProtectedRoute><ModuleGate moduleId="worship"><CultoTelao /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/culto/assistente" element={<ProtectedRoute><CultoAssistente /></ProtectedRoute>} />
+              <Route path="/admin/culto/assistente" element={<ProtectedRoute><ModuleGate moduleId="worship"><CultoAssistente /></ModuleGate></ProtectedRoute>} />
 
               <Route path="/admin/oracoes" element={<ProtectedRoute><Oracoes /></ProtectedRoute>} />
 
@@ -198,9 +204,9 @@ const App = () => (
 
               <Route path="/admin/documentos" element={<ProtectedRoute><Documentos /></ProtectedRoute>} />
 
-              <Route path="/admin/cartas-recomendacao" element={<ProtectedRoute><CartasRecomendacao /></ProtectedRoute>} />
+              <Route path="/admin/cartas-recomendacao" element={<ProtectedRoute><ModuleGate moduleId="recommendation-letters"><CartasRecomendacao /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/relatorios" element={<ProtectedRoute><Relatorios /></ProtectedRoute>} />
+              <Route path="/admin/relatorios" element={<ProtectedRoute><ModuleGate moduleId="reports"><Relatorios /></ModuleGate></ProtectedRoute>} />
 
               <Route path="/admin/escalas" element={<ProtectedRoute><Escalas /></ProtectedRoute>} />
 
@@ -216,9 +222,9 @@ const App = () => (
 
               <Route path="/admin/configuracao-igreja" element={<ProtectedRoute><ConfiguracaoIgreja /></ProtectedRoute>} />
 
-              <Route path="/admin/marketplace" element={<ProtectedRoute><Marketplace /></ProtectedRoute>} />
+              <Route path="/admin/marketplace" element={<ProtectedRoute><ModuleGate moduleId="marketplace"><Marketplace /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/comunidade" element={<ProtectedRoute><Comunidade /></ProtectedRoute>} />
+              <Route path="/admin/comunidade" element={<ProtectedRoute><ModuleGate moduleId="community"><Comunidade /></ModuleGate></ProtectedRoute>} />
 
               {/* Global chat — accessible to all roles */}
               <Route path="/admin/chat" element={<ProtectedRoute><ChatSecretaria /></ProtectedRoute>} />

@@ -3,6 +3,7 @@ import { ExecutiveCard } from "@/components/ExecutiveCard";
 import { MatrizDashboard } from "@/components/MatrizDashboard";
 import { DailyDevotional } from "@/components/DailyDevotional";
 import { DashboardCampaignSections } from "@/components/campanhas/DashboardCampaignSections";
+import { isModuleEnabled } from "@/config/modules";
 import { motion } from "framer-motion";
 import { Wallet, Users, TrendingUp, Calendar, Clock, Bell, Plus, ChevronRight, Loader2, Shield, Building2, Globe, BookOpen, Heart, Music2, MessageSquare, FileText } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -550,8 +551,8 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Daily Devotional - always visible */}
-        <DailyDevotional />
+        {/* Devocional — em teste, restrito a staging (ver src/config/modules.ts) */}
+        {isModuleEnabled("devotional") && <DailyDevotional />}
         {/* TODO: Campanhas module disabled until visual bug is resolved */}
         {/*{!loading && church && <DashboardCampaignSections />}*/}
 

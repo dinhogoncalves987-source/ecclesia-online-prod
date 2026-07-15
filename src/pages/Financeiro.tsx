@@ -20,20 +20,27 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { TreasuryTransaction } from "@/lib/finance";
+import { isModuleEnabled, type ModuleId } from "@/config/modules";
 
-const TABS = [
-  { key: "executive",      icon: BarChart3,    labelKey: "Executivo" },
-  { key: "treasury",       icon: Wallet,       labelKey: "Tesouraria" },
-  { key: "campaigns",      icon: Megaphone,    labelKey: "Campanhas" },
-  { key: "accounts",       icon: ArrowLeftRight, labelKey: "Contas" },
-  { key: "budget",         icon: PieChart,     labelKey: "Orçamento" },
-  { key: "assets",         icon: Building2,    labelKey: "Patrimônio" },
-  { key: "accountability", icon: FileCheck,    labelKey: "Prestação de Contas" },
-  { key: "audit",          icon: ShieldCheck,  labelKey: "Auditoria" },
-  { key: "intelligence",   icon: Sparkles,     labelKey: "Inteligência" },
-] as const;
+const ALL_TABS = [
+  { key: "executive",      icon: BarChart3,    labelKey: "Executivo",           moduleId: "finance.executive" },
+  { key: "treasury",       icon: Wallet,       labelKey: "Tesouraria",          moduleId: "finance.treasury" },
+  { key: "campaigns",      icon: Megaphone,    labelKey: "Campanhas",           moduleId: "finance.campaigns" },
+  { key: "accounts",       icon: ArrowLeftRight, labelKey: "Contas",            moduleId: "finance.accounts" },
+  { key: "budget",         icon: PieChart,     labelKey: "Orçamento",           moduleId: "finance.budget" },
+  { key: "assets",         icon: Building2,    labelKey: "Patrimônio",          moduleId: "finance.assets" },
+  { key: "accountability", icon: FileCheck,    labelKey: "Prestação de Contas", moduleId: "finance.accountability" },
+  { key: "audit",          icon: ShieldCheck,  labelKey: "Auditoria",           moduleId: "finance.audit" },
+  { key: "intelligence",   icon: Sparkles,     labelKey: "Inteligência",        moduleId: "finance.intelligence" },
+] as const satisfies ReadonlyArray<{ key: string; icon: unknown; labelKey: string; moduleId: ModuleId }>;
 
-type TabKey = typeof TABS[number]["key"];
+// Apenas Tesouraria usa dados reais na allowlist urgente de produção; as
+// demais abas dependem de financeDemo/campaignsDemo e ficam restritas a
+// staging (ver src/config/modules.ts). Filtrado aqui — nunca uma regra
+// paralela de gating.
+const TABS = ALL_TABS.filter(tab => isModuleEnabled(tab.moduleId));
+
+type TabKey = typeof ALL_TABS[number]["key"];
 
 export default function Financeiro() {
   const { user } = useAuth();
@@ -41,7 +48,7 @@ export default function Financeiro() {
   const { church } = useChurch();
   const [transactions, setTransactions] = useState<TreasuryTransaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabKey>("executive");
+  const [activeTab, setActiveTab] = useState<TabKey>(TABS[0]?.key ?? "treasury");
 
   // ── Tab scroll state ────────────────────────────────────────────────────
   const tabsRef = useRef<HTMLDivElement>(null);

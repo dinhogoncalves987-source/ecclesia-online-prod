@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { SupportModeBanner } from "@/components/platform/SupportModeBanner";
 import { RequireSupportOrganization } from "@/components/platform/RequireSupportOrganization";
 import { useSupportContext } from "@/contexts/SupportContext";
+import { isRouteEnabled } from "@/config/modules";
 import flagBR from "@/assets/flag-br.png";
 import flagUS from "@/assets/flag-us.png";
 import flagES from "@/assets/flag-es.png";
@@ -274,7 +275,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const renderNavSections = (collapsed: boolean, onLinkClick?: () => void) => (
     <nav className="flex-1 px-3 py-2 overflow-y-auto">
       {resolvedSections.map(section => {
-        const visibleItems = section.items.filter(item => canAccess(item.path));
+        const visibleItems = section.items.filter(item => canAccess(item.path) && isRouteEnabled(item.path));
         if (visibleItems.length === 0) return null;
 
         const isSecretaria = section.id === "secretaria";
@@ -641,7 +642,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile bottom nav */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-card shadow-[0_-1px_0_0_hsl(var(--border)/0.5)] flex justify-around items-center z-30">
-        {mobileNavItems.filter(item => canAccess(item.path)).map((item) => (
+        {mobileNavItems.filter(item => canAccess(item.path) && isRouteEnabled(item.path)).map((item) => (
           <Link
             key={item.path}
             to={item.path}

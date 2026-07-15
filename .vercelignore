@@ -1,6 +1,41 @@
-﻿.env.vercel.production
+﻿# Nenhum arquivo .env real deve ser enviado ao build da Vercel — as
+# variáveis efetivas vêm do painel da Vercel (Project Settings → Environment
+# Variables), nunca de um arquivo local copiado no deploy.
+.env
+.env.*
+!.env.example
+!.env.staging.example
+!.env.production.example
+!.env.seed.example
+
+# Dumps, backups, diagnósticos e artefatos locais de depuração.
+*.dump
+*.dump.sql
+*-dump.sql
+*.restore.sql
+*-restore.sql
+*.backup
+*.backup-*
+*-backup.sql
+DIAGNOSTICO_*.txt
+DIAGNOSTICO_*.md
 DIFF_*.txt
+AUDITORIA_*.txt
+BUILD_SUBSEDE*.txt
 EDGE_*.txt
+REVISAO_*.txt
+TRECHOS_*.txt
+diagnostico-*.txt
+codigo-pwa-real.txt
+RELATORIO_*.md
+
+# supabase/ e docs/ não são usados pelo build do frontend (migrations e
+# functions são implantadas separadamente via Supabase CLI) — MAS
+# scripts/check-environment.mjs É necessário no build (build:production /
+# build:staging chamam este script antes do `vite build`), por isso
+# scripts/ NUNCA deve ser ignorado aqui.
 supabase/.temp/
 supabase/migrations/
 supabase/functions/
+supabase/seeds/
+docs/

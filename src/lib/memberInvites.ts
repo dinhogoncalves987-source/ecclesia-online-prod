@@ -257,6 +257,34 @@ export async function getInviteByToken(
   return { data: null, error: "network_error" };
 }
 
+// ── E-mail helpers ─────────────────────────────────────────────────────────────
+
+/** Normalize an e-mail for comparison: trim + lowercase. Never throws. */
+export function normalizeEmail(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase();
+}
+
+/** True when both e-mails are non-empty and equal after normalization. */
+export function emailsMatch(a: string | null | undefined, b: string | null | undefined): boolean {
+  const na = normalizeEmail(a);
+  const nb = normalizeEmail(b);
+  return na.length > 0 && na === nb;
+}
+
+/**
+ * Supabase's documented (non-enumerating) way to signal "this e-mail already
+ * has a confirmed account" from a `signUp()` response: no explicit error is
+ * returned (that would leak account existence to an unauthenticated caller),
+ * but the returned user has an empty `identities` array instead of a new
+ * identity. See https://supabase.com/docs/reference/javascript/auth-signup.
+ */
+export function isAlreadyRegisteredSignUp(
+  data: { user: { identities?: unknown[] | null } | null } | null | undefined,
+): boolean {
+  if (!data?.user) return false;
+  return Array.isArray(data.user.identities) && data.user.identities.length === 0;
+}
+
 // ── Accept invite (authenticated) ─────────────────────────────────────────────
 
 export type AcceptMemberInviteResult = {
@@ -296,76 +324,36 @@ export async function acceptMemberInvite(
   return result;
 }
 
-// ── Activate invite via Edge Function (server-side Auth user + linking) ──────
+// ── Create account for a new member (official Supabase sign-up) ──────────────
 //
-// This is the ONLY path that turns a pending invite into an active account.
-// The Edge Function resolves the e-mail from members.email itself — the
-// frontend never sends an e-mail or a user id, only the token and the
-// password the member just chose.
-
-export type ActivateMemberInviteResult = {
-  success: boolean;
-  email?: string;
-  member_id?: string;
-  organization_id?: string;
-  error?: string;
-  message?: string;
-};
-
-export async function activateMemberInviteWithPassword(
-  token: string,
+// SECURITY: this is the ONLY client-side path that creates an Auth account for
+// a member invite, and it goes through the official, unmodified Supabase
+// `signUp` flow — never `admin.*`, never a service-role endpoint, never
+// `email_confirm: true`. The e-mail is always the member's fixed registered
+// e-mail (from the invite payload), never something the user can edit.
+//
+// Because Supabase project e-mail confirmations are required, a successful
+// call here does NOT yet grant a session — the caller must wait for the user
+// to click the confirmation link (which redirects back to `emailRedirectTo`,
+// i.e. this same invite page) before an authenticated session exists. Only
+// then can `acceptMemberInvite` be called to finalize the link — never before.
+//
+// If the e-mail already belongs to a confirmed account, Supabase signals this
+// WITHOUT an explicit error (to avoid e-mail enumeration): the response
+// contains a user with an empty `identities` array. Callers should check this
+// with `isAlreadyRegisteredSignUp` and, if true, direct the member to log in
+// or recover their existing password instead — never attempt to change that
+// account's password from here.
+export async function signUpForMemberInvite(
+  email: string,
   password: string,
-): Promise<ActivateMemberInviteResult> {
-  const baseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const apiKey  = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-  let response: Response;
-  try {
-    response = await fetch(`${baseUrl}/functions/v1/activate-member-invite`, {
-      method: "POST",
-      headers: {
-        "apikey": apiKey,
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ token, password }),
-    });
-  } catch (e) {
-    console.error("[memberInvites] activateMemberInviteWithPassword network error", e);
-    return {
-      success: false,
-      error: "network_error",
-      message: "Falha de conexão ao ativar o convite. Verifique sua internet e tente novamente.",
-    };
-  }
-
-  let payload: unknown = null;
-  try {
-    payload = await response.json();
-  } catch (e) {
-    console.error("[memberInvites] activateMemberInviteWithPassword invalid JSON response", e);
-  }
-
-  if (!payload || typeof payload !== "object") {
-    return {
-      success: false,
-      error: "invalid_response",
-      message: "Resposta inválida do servidor ao ativar o convite.",
-    };
-  }
-
-  const result = payload as ActivateMemberInviteResult;
-
-  if (!response.ok && result.success !== true) {
-    console.error("[memberInvites] activateMemberInviteWithPassword HTTP error", response.status, result);
-  }
-
-  return {
-    success: result.success === true,
-    email: result.email,
-    member_id: result.member_id,
-    organization_id: result.organization_id,
-    error: result.error,
-    message: result.message,
-  };
+  token: string,
+) {
+  return supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: buildInviteUrl(token),
+    },
+  });
 }
