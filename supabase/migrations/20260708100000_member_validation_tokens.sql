@@ -1,5 +1,6 @@
 -- ============================================================================
 -- Migration: member_validation_tokens
+-- Version: 20260708100000 (timestamp único definido antes da primeira aplicação remota)
 -- Phase: QR Code seguro da Carteira + Modo Porteiro (database foundation)
 -- Created: 2026-07-08
 --

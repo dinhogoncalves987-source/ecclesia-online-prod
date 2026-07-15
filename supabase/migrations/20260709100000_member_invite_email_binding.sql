@@ -1,5 +1,6 @@
 -- ============================================================================
 -- Migration: member_invite_email_binding
+-- Version: 20260709100000 (timestamp único definido antes da primeira aplicação remota)
 -- Corrige o conceito do convite de membro: nao e cadastro/login livre.
 -- O convite pertence a um membro JA CADASTRADO, e o e-mail do cadastro
 -- (public.members.email) e a chave fixa de vinculo entre a conta Auth e o

@@ -95,7 +95,7 @@ porque a feature já está na allowlist de produção).
 | `20260618120000_access_invites.sql` | Gerenciamento de acessos (produção) |
 | `20260707100000_production_finance_confiadcs_extension.sql` | Financeiro — CONFIADCS (produção, já nomeada "production") |
 | `20260707200000_organizations_institutional_fields.sql` | Configuração institucional (produção) |
-| `20260708_member_validation_tokens.sql` | Convite de membro (produção, hardened) |
+| `20260708100000_member_validation_tokens.sql` | Convite de membro (produção, hardened) |
 
 ## B — Correção comum promovível
 
@@ -108,9 +108,9 @@ porque a feature já está na allowlist de produção).
 | `20260612150000_profiles_rls_restrict_select.sql` |
 | `20260617130000_members_status_constraint_fix.sql` |
 | `20260618130000_fix_accept_access_invite_email_check.sql` |
-| `20260708_fix_member_invites_permissions.sql` |
-| `20260708_fix_member_invite_accept_safety.sql` |
-| `20260709_member_invite_email_binding.sql` |
+| `20260708101000_fix_member_invites_permissions.sql` |
+| `20260708102000_fix_member_invite_accept_safety.sql` |
+| `20260709100000_member_invite_email_binding.sql` |
 | `20260715120000_harden_remove_finalize_member_invite_activation.sql` (hardening desta revisão) |
 | `20260715130000_harden_platform_role_escalation.sql` (hardening desta revisão — Fase 1, sem dados fixos) |
 | `20260715141000_remove_open_slug_join.sql` (hardening desta revisão — Fase 2, sem dados fixos) |

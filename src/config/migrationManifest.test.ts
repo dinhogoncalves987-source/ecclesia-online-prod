@@ -74,6 +74,25 @@ describe("migration-manifest.json (Fase 7 — manifesto de migrations)", () => {
     expect(duplicates, `arquivo(s) classificado(s) em mais de uma categoria: ${duplicates.join(", ")}`).toEqual([]);
   });
 
+  it("usa um timestamp completo e único para cada migration", () => {
+    const files = loadRealMigrationFiles();
+    const invalidNames = files.filter((file) => !/^\d{14}_.+\.sql$/.test(file));
+    expect(
+      invalidNames,
+      `migration(s) sem timestamp de 14 dígitos: ${invalidNames.join(", ")}`,
+    ).toEqual([]);
+
+    const byVersion = new Map<string, string[]>();
+    for (const file of files) {
+      const version = file.slice(0, 14);
+      byVersion.set(version, [...(byVersion.get(version) ?? []), file]);
+    }
+    const duplicates = [...byVersion.entries()]
+      .filter(([, versionFiles]) => versionFiles.length > 1)
+      .map(([version, versionFiles]) => `${version}: ${versionFiles.join(", ")}`);
+    expect(duplicates, `timestamp(s) duplicado(s): ${duplicates.join(" | ")}`).toEqual([]);
+  });
+
   it("categorias não promovíveis contêm apenas nomes de arquivo não vazios", () => {
     const manifest = loadManifest();
     for (const key of ["staging_feature", "staging_only", "mixed_needs_split"] as const) {

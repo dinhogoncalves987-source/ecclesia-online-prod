@@ -57,8 +57,8 @@ describe("memberInvites — mailbox proof by magic link", () => {
 // CENÁRIO OBRIGATÓRIO: admin existente não é rebaixado / e-mail divergente é
 // recusado / convite já usado é recusado — a proteção real vive na RPC SQL
 // (accept_member_invite / finalize_member_invite_activation, migrations
-// 20260708_fix_member_invite_accept_safety.sql e
-// 20260709_member_invite_email_binding.sql, inalteradas nesta revisão). Estes
+// 20260708102000_fix_member_invite_accept_safety.sql e
+// 20260709100000_member_invite_email_binding.sql). Estes
 // testes garantem que o wrapper JS repassa fielmente cada código de erro da
 // RPC para a UI, em vez de mascará-los como sucesso.
 describe("memberInvites — acceptMemberInvite relays RPC-level protections faithfully", () => {

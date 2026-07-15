@@ -1,5 +1,6 @@
 -- ============================================================================
 -- Migration: fix_member_invites_permissions
+-- Version: 20260708101000 (timestamp único definido antes da primeira aplicação remota)
 -- Phase: PASSO 2.9 — corrigir permissao da tabela member_invites
 -- Created: 2026-07-08
 --
