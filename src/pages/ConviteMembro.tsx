@@ -2,108 +2,238 @@
  * Public invite page — no auth required to view the invite.
  * Route: /convite-membro/:token
  *
- * Flow:
- *  1. Load invite info via public RPC (get_member_invite_by_token).
- *  2. Show member name, church, congregation.
- *  3. If NOT logged in → show inline login/signup.
- *  4. If logged in → button "Ativar meu acesso" → accept_member_invite RPC.
- *  5. Redirect to app home.
+ * IMPORTANT CONCEPT: this is NOT a free signup/login page. The invite belongs
+ * to a member who is ALREADY REGISTERED in public.members. The member's
+ * registered e-mail (member_email, from members.email) is the fixed binding
+ * key between the Auth account and the member record. The user only creates
+ * a password — they never choose or edit an e-mail here.
+ *
+ * The frontend does NOT create/update the Auth user, does NOT decide the
+ * user id, and does NOT perform the DB linking. All of that happens
+ * server-side in the `activate-member-invite` Edge Function (service role),
+ * which delegates the actual linking to the `finalize_member_invite_activation`
+ * RPC. The frontend only:
+ *   1. Loads and displays the invite (member card + fixed e-mail).
+ *   2. Collects a password (+ confirmation).
+ *   3. Signs out any stale session on the device.
+ *   4. Calls the Edge Function with { token, password }.
+ *   5. On success, signs in with the fixed e-mail + password.
+ *   6. Full-reloads to /admin only if that sign-in succeeds.
  */
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import {
   CheckCircle2, XCircle, Loader2, Church, User, MapPin,
-  LogIn, UserPlus, Eye, EyeOff,
+  Eye, EyeOff, Mail, Lock, AlertTriangle,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { getInviteByToken, acceptMemberInvite, type MemberInvitePublic } from "@/lib/memberInvites";
+import {
+  getInviteByToken,
+  activateMemberInviteWithPassword,
+  type MemberInvitePublic,
+} from "@/lib/memberInvites";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Step = "loading" | "error" | "preview" | "auth" | "accepting" | "done";
+type Step = "loading" | "error" | "preview" | "activating" | "done";
+
+// ── Error message mapping ─────────────────────────────────────────────────────
+
+const INVITE_LOAD_ERRORS: Record<string, string> = {
+  invalid_token:     "Link de convite inválido.",
+  not_found:         "Convite não encontrado.",
+  already_accepted:  "Este convite já foi utilizado.",
+  revoked:           "Este convite foi revogado.",
+  expired:           "Este convite expirou. Solicite um novo ao secretário.",
+  invalid_invite:    "Convite inválido.",
+  invalid_shape:     "Resposta inválida ao verificar o convite.",
+  http_error:        "Não foi possível verificar este convite agora.",
+  timeout:           "A verificação do convite demorou muito. Tente novamente.",
+  network_error:     "Falha de conexão ao verificar o convite.",
+};
+
+const ACTIVATE_ERRORS: Record<string, string> = {
+  invalid_token:          "Link de convite inválido.",
+  invalid_password:       "A senha deve ter pelo menos 6 caracteres.",
+  invite_not_found:       "Convite não encontrado.",
+  invite_not_pending:     "Este convite já foi utilizado ou não está mais disponível.",
+  invite_expired:         "Este convite expirou. Solicite um novo link à secretaria.",
+  organization_mismatch:  "Este convite está inconsistente. Solicite um novo link à secretaria.",
+  member_not_found:       "Membro não encontrado.",
+  member_email_missing:   "Este membro ainda não possui e-mail cadastrado. Procure a secretaria para atualizar o cadastro.",
+  email_mismatch:         "O e-mail da conta não corresponde ao e-mail cadastrado do membro.",
+  member_already_linked:  "Este membro já está vinculado a outra conta.",
+  existing_org_access:    "Esta conta já possui acesso nesta igreja com outro perfil. Contate o administrador.",
+  auth_create_failed:     "Não foi possível criar seu acesso agora. Tente novamente.",
+  auth_update_failed:     "Não foi possível atualizar sua senha agora. Tente novamente.",
+  auth_user_not_found:    "Não foi possível localizar sua conta. Contate a secretaria.",
+  auth_lookup_failed:     "Não foi possível verificar sua conta agora. Tente novamente.",
+  server_misconfigured:   "O servidor está temporariamente indisponível. Tente novamente em breve.",
+  network_error:          "Falha de conexão ao ativar o convite.",
+  invalid_response:       "Resposta inválida do servidor ao ativar o convite.",
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function hasMemberEmail(invite: MemberInvitePublic | null): boolean {
+  return !!invite?.member_email && invite.member_email.trim().length > 0;
+}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ConviteMembro() {
   const { token = "" } = useParams<{ token: string }>();
-  const navigate        = useNavigate();
 
-  const [step, setStep]       = useState<Step>("loading");
-  const [invite, setInvite]   = useState<MemberInvitePublic | null>(null);
-  const [errMsg, setErrMsg]   = useState("");
-  const [session, setSession] = useState<boolean | null>(null); // null = unknown
+  const [step, setStep]     = useState<Step>("loading");
+  const [invite, setInvite] = useState<MemberInvitePublic | null>(null);
+  const [errMsg, setErrMsg] = useState("");
 
-  // Auth state
-  const [authMode, setAuthMode]         = useState<"login" | "signup">("login");
-  const [email, setEmail]               = useState("");
-  const [password, setPassword]         = useState("");
-  const [showPass, setShowPass]         = useState(false);
-  const [authLoading, setAuthLoading]   = useState(false);
-  const [authError, setAuthError]       = useState("");
+  // Password-creation form state — single fixed-e-mail form, no tabs, no login.
+  const [password, setPassword]               = useState("");
+  const [confirmPassword, setConfirmPassword]  = useState("");
+  const [showPass, setShowPass]                = useState(false);
+  const [formError, setFormError]              = useState("");
+  const [submitting, setSubmitting]             = useState(false);
 
-  // ── Load invite + check session ──────────────────────────────────────────────
+  // ── Load invite ───────────────────────────────────────────────────────────────
   useEffect(() => {
-    const init = async () => {
-      // Check if user is logged in
-      const { data: { session: s } } = await supabase.auth.getSession();
-      setSession(!!s);
+    let cancelled = false;
 
-      const { data, error } = await getInviteByToken(token);
-      if (error || !data) {
-        const friendlyErrors: Record<string, string> = {
-          not_found:        "Convite não encontrado.",
-          already_accepted: "Este convite já foi utilizado.",
-          revoked:          "Este convite foi revogado.",
-          expired:          "Este convite expirou. Solicite um novo ao secretário.",
-        };
-        setErrMsg(friendlyErrors[error ?? ""] ?? error ?? "Convite inválido.");
+    const init = async () => {
+      if (!token || !token.trim()) {
+        console.error("[ConviteMembro] token is empty or missing");
+        setErrMsg(INVITE_LOAD_ERRORS.invalid_token);
         setStep("error");
         return;
       }
+
+      console.info("[ConviteMembro] token received", token);
+
+      let data: MemberInvitePublic | null = null;
+      let error: string | null = null;
+      try {
+        const result = await getInviteByToken(token);
+        data  = result.data;
+        error = result.error;
+      } catch (e) {
+        console.error("[ConviteMembro] getInviteByToken failed", e);
+        if (!cancelled) {
+          setErrMsg(INVITE_LOAD_ERRORS.network_error);
+          setStep("error");
+        }
+        return;
+      }
+
+      if (cancelled) return;
+
+      if (error || !data) {
+        console.error("[ConviteMembro] invite load error", error);
+        setErrMsg(INVITE_LOAD_ERRORS[error ?? ""] ?? error ?? "Convite inválido.");
+        setStep("error");
+        return;
+      }
+
+      console.info("[ConviteMembro] invite loaded", data.member_name);
       setInvite(data);
       setStep("preview");
     };
-    init();
+
+    init().catch((e) => {
+      console.error("[ConviteMembro] init() unhandled exception", e);
+      if (!cancelled) {
+        setErrMsg("Erro inesperado ao carregar o convite. Tente novamente.");
+        setStep("error");
+      }
+    });
+
+    // Absolute safety net: getInviteByToken already has its own 20s timeout +
+    // 1 retry internally; this just guarantees the UI never stays stuck.
+    const loadingTimeout = setTimeout(() => {
+      if (!cancelled) {
+        setStep((current) => {
+          if (current === "loading") {
+            console.error("[ConviteMembro] loading timeout — stuck in loading state");
+            setErrMsg(INVITE_LOAD_ERRORS.timeout);
+            return "error";
+          }
+          return current;
+        });
+      }
+    }, 25000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(loadingTimeout);
+    };
   }, [token]);
 
-  // ── Accept invite (after auth check) ─────────────────────────────────────────
-  const doAccept = async () => {
-    setStep("accepting");
-    const result = await acceptMemberInvite(token);
-    if (!result.ok) {
-      const msgs: Record<string, string> = {
-        not_authenticated:   "Você precisa estar logado.",
-        not_found:           "Convite não encontrado.",
-        already_accepted:    "Este convite já foi utilizado.",
-        expired_or_revoked:  "Este convite expirou ou foi revogado.",
-      };
-      setErrMsg(msgs[result.error ?? ""] ?? result.error ?? "Erro ao aceitar convite.");
-      setStep("error");
+  // ── Create password → activate on server → sign in → redirect ────────────────
+  const handleCreatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (submitting) return;
+
+    const fixedEmail = invite?.member_email?.trim();
+    if (!fixedEmail) {
+      setFormError("Este membro ainda não possui e-mail cadastrado.");
       return;
     }
-    setStep("done");
-    setTimeout(() => navigate("/"), 2500);
-  };
-
-  // ── Login / Signup ────────────────────────────────────────────────────────────
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) return;
-    setAuthLoading(true);
-    setAuthError("");
-
-    if (authMode === "login") {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) { setAuthError(error.message); setAuthLoading(false); return; }
-    } else {
-      const { error } = await supabase.auth.signUp({ email, password });
-      if (error) { setAuthError(error.message); setAuthLoading(false); return; }
+    if (!password || password.length < 6) {
+      setFormError("A senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setFormError("As senhas não coincidem.");
+      return;
     }
 
-    setAuthLoading(false);
-    setSession(true);
-    // Don't navigate — let user confirm via "Ativar meu acesso" button
+    setSubmitting(true);
+    setFormError("");
+
+    try {
+      // Always clear any stale session on this device BEFORE activating,
+      // so the activation never gets mixed up with a previously logged-in
+      // account (e.g. an admin testing on the same phone).
+      await supabase.auth.signOut();
+
+      const result = await activateMemberInviteWithPassword(token, password);
+
+      if (!result.success) {
+        setFormError(ACTIVATE_ERRORS[result.error ?? ""] ?? result.message ?? "Não foi possível ativar o convite agora.");
+        setSubmitting(false);
+        return;
+      }
+
+      setStep("activating");
+
+      const loginEmail = result.email ?? fixedEmail;
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password,
+      });
+
+      if (signInError) {
+        console.error("[ConviteMembro] post-activation signIn failed", signInError);
+        setFormError(
+          "Sua conta foi ativada, mas não foi possível entrar automaticamente. " +
+          "Vá para a tela de login e entre com a senha que você acabou de criar.",
+        );
+        setStep("preview");
+        setSubmitting(false);
+        return;
+      }
+
+      // Success: full page reload is mandatory — ChurchProvider must re-fetch
+      // organization_users, which now contains the new member row. A client
+      // side navigate() would leave the app believing the user has no church.
+      setStep("done");
+      setTimeout(() => { window.location.href = "/admin"; }, 1200);
+    } catch (err) {
+      console.error("[ConviteMembro] handleCreatePassword unexpected exception", err);
+      setFormError("Erro inesperado ao ativar o convite. Tente novamente.");
+      setStep("preview");
+      setSubmitting(false);
+    }
   };
 
   // ── Render helpers ────────────────────────────────────────────────────────────
@@ -149,6 +279,19 @@ export default function ConviteMembro() {
     );
   }
 
+  // ── Activating ────────────────────────────────────────────────────────────────
+  if (step === "activating") {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <Header />
+        <div className="flex-1 flex items-center justify-center gap-3 text-muted-foreground">
+          <Loader2 size={22} className="animate-spin" />
+          <span className="text-sm">Ativando acesso...</span>
+        </div>
+      </div>
+    );
+  }
+
   // ── Done ──────────────────────────────────────────────────────────────────────
   if (step === "done") {
     return (
@@ -162,27 +305,16 @@ export default function ConviteMembro() {
               Bem-vindo(a), <strong>{invite?.member_name}</strong>.<br />
               Você está vinculado(a) à <strong>{invite?.church_name}</strong>.
             </p>
-            <p className="text-xs text-muted-foreground">Redirecionando para o painel...</p>
+            <p className="text-xs text-muted-foreground">Entrando no painel...</p>
           </div>
         </div>
       </div>
     );
   }
 
-  // ── Accepting ─────────────────────────────────────────────────────────────────
-  if (step === "accepting") {
-    return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <Header />
-        <div className="flex-1 flex items-center justify-center gap-3 text-muted-foreground">
-          <Loader2 size={22} className="animate-spin" />
-          <span className="text-sm">Ativando acesso...</span>
-        </div>
-      </div>
-    );
-  }
+  // ── Preview / form ────────────────────────────────────────────────────────────
+  const memberHasEmail = hasMemberEmail(invite);
 
-  // ── Preview + Auth ────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
@@ -190,10 +322,7 @@ export default function ConviteMembro() {
       <div className="flex-1 flex items-center justify-center px-4 py-10">
         <div className="max-w-md w-full space-y-5">
 
-          {/* Invite card */}
           <div className="bg-card rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.3)] overflow-hidden">
-
-            {/* Top accent */}
             <div className="h-1.5 bg-gradient-to-r from-primary to-primary/60" />
 
             <div className="px-6 py-6 space-y-5">
@@ -225,9 +354,7 @@ export default function ConviteMembro() {
                 {(invite?.church_city || invite?.church_state) && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <MapPin size={12} className="flex-shrink-0" />
-                    <span>
-                      {[invite?.church_city, invite?.church_state].filter(Boolean).join(" — ")}
-                    </span>
+                    <span>{[invite?.church_city, invite?.church_state].filter(Boolean).join(" — ")}</span>
                   </div>
                 )}
                 {invite?.congregation && (
@@ -238,60 +365,47 @@ export default function ConviteMembro() {
                 )}
               </div>
 
-              {/* ── LOGGED IN: show accept button ── */}
-              {session === true && (
-                <button
-                  onClick={doAccept}
-                  className="w-full py-3 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity"
-                >
-                  Ativar meu acesso
-                </button>
+              {/* ── BLOCKED: member has no registered e-mail ── */}
+              {!memberHasEmail && (
+                <div className="space-y-2 text-center bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3">
+                  <AlertTriangle size={22} className="text-amber-600 dark:text-amber-400 mx-auto" />
+                  <p className="text-sm text-amber-800 dark:text-amber-300">
+                    Este membro ainda não possui e-mail cadastrado. Procure a secretaria para
+                    atualizar o cadastro antes de ativar o acesso.
+                  </p>
+                </div>
               )}
 
-              {/* ── NOT LOGGED IN: show inline auth ── */}
-              {session === false && (
-                <div className="space-y-4">
-                  <p className="text-sm text-center text-muted-foreground">
-                    Para ativar seu acesso, entre ou crie uma conta.
-                  </p>
-
-                  {/* Tab selector */}
-                  <div className="flex gap-1 bg-muted rounded-lg p-0.5">
-                    <button
-                      onClick={() => setAuthMode("login")}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                        authMode === "login" ? "bg-card shadow-sm" : "text-muted-foreground"
-                      }`}
-                    >
-                      <LogIn size={13} /> Entrar
-                    </button>
-                    <button
-                      onClick={() => setAuthMode("signup")}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                        authMode === "signup" ? "bg-card shadow-sm" : "text-muted-foreground"
-                      }`}
-                    >
-                      <UserPlus size={13} /> Criar conta
-                    </button>
-                  </div>
-
-                  <form onSubmit={handleAuth} className="space-y-3">
+              {/* ── Single password-creation form, fixed/readonly e-mail ── */}
+              {memberHasEmail && (
+                <form onSubmit={handleCreatePassword} className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                      <Mail size={12} /> E-mail cadastrado
+                    </label>
                     <input
                       type="email"
-                      placeholder="E-mail"
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      required
-                      className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      value={invite?.member_email ?? ""}
+                      readOnly
+                      disabled
+                      className="w-full px-3 py-2.5 rounded-lg border border-input bg-muted/50 text-sm text-muted-foreground cursor-not-allowed"
                     />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                      <Lock size={12} /> Senha
+                    </label>
                     <div className="relative">
                       <input
                         type={showPass ? "text" : "password"}
-                        placeholder="Senha"
+                        placeholder="Crie uma senha"
                         value={password}
                         onChange={e => setPassword(e.target.value)}
                         required
-                        className="w-full px-3 py-2.5 pr-10 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        minLength={6}
+                        disabled={submitting}
+                        className="w-full px-3 py-2.5 pr-10 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
                       />
                       <button
                         type="button"
@@ -301,21 +415,37 @@ export default function ConviteMembro() {
                         {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                       </button>
                     </div>
+                  </div>
 
-                    {authError && (
-                      <p className="text-xs text-destructive">{authError}</p>
-                    )}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                      <Lock size={12} /> Confirmar senha
+                    </label>
+                    <input
+                      type={showPass ? "text" : "password"}
+                      placeholder="Repita a senha"
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      required
+                      minLength={6}
+                      disabled={submitting}
+                      className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+                    />
+                  </div>
 
-                    <button
-                      type="submit"
-                      disabled={authLoading}
-                      className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
-                    >
-                      {authLoading && <Loader2 size={14} className="animate-spin" />}
-                      {authMode === "login" ? "Entrar e ativar acesso" : "Criar conta e ativar acesso"}
-                    </button>
-                  </form>
-                </div>
+                  {formError && (
+                    <p className="text-xs text-destructive">{formError}</p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    {submitting && <Loader2 size={14} className="animate-spin" />}
+                    Criar senha e entrar
+                  </button>
+                </form>
               )}
             </div>
           </div>

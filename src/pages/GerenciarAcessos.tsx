@@ -8,8 +8,8 @@ import { toast } from "@/hooks/use-toast";
 import {
   ArrowLeft, BarChart3, BookOpen, Building2, CheckCircle2, ChevronDown,
   ChevronRight, ClipboardList, Clock, Copy, Eye, Key,
-  Loader2, Mail, MessageSquare, Phone, Plus, Send, Shield,
-  Sparkles, User, UserPlus, Users, UserX, Wallet, X, XCircle,
+  Loader2, Mail, MessageSquare, Phone, Plus, Search, Send, Shield,
+  Sparkles, User, UserCheck, UserPlus, Users, UserX, Wallet, X, XCircle,
 } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { Navigate, useNavigate, useLocation } from "react-router-dom";
@@ -25,7 +25,7 @@ import {
 
 type OrgMembershipRole =
   | "church_admin" | "tesoureiro" | "contador" | "pastor"
-  | "secretary" | "leader" | "member";
+  | "secretary" | "leader" | "porteiro" | "member";
 
 interface OrgMemberRow {
   membership_id: string;
@@ -38,13 +38,70 @@ interface OrgMemberRow {
   created_at?: string;
 }
 
+interface SearchedMember {
+  id: string;
+  full_name: string;
+  user_id: string | null;
+  member_role: string | null;
+  status: string;
+  photo_url: string | null;
+  congregation_id: string | null;
+  sector_id: string | null;
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const ASSIGNABLE_ROLES: OrgMembershipRole[] = [
-  "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member",
+  "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "porteiro", "member",
 ];
 
-const ROLE_LABELS: Record<OrgMembershipRole | "porteiro", string> = {
+// App access roles with labels
+const APP_ACCESS_OPTIONS: { value: OrgMembershipRole; label: string }[] = [
+  { value: "church_admin", label: "Administrador" },
+  { value: "pastor",       label: "Pastor" },
+  { value: "secretary",    label: "Secretaria" },
+  { value: "tesoureiro",   label: "Tesoureiro" },
+  { value: "contador",     label: "Contador" },
+  { value: "leader",       label: "Líder" },
+  { value: "porteiro",     label: "Porteiro" },
+  { value: "member",       label: "Membro" },
+];
+
+// Church roles/cargos (eclesiásticos — não dão permissão automática no app)
+const CHURCH_ROLES: string[] = [
+  "Membro",
+  "Auxiliar",
+  "Obreiro",
+  "Diácono",
+  "Presbítero",
+  "Evangelista",
+  "Pastor",
+  "Pastor auxiliar",
+  "Cooperador",
+  "Missionário",
+  "Missionária",
+  "Dirigente",
+  "Dirigente auxiliar",
+  "Secretário",
+  "Subsecretário",
+  "2º Secretário",
+  "Tesoureiro",
+  "2º Tesoureiro",
+  "Contador",
+  "Líder",
+  "Vice-líder",
+  "Líder de jovens",
+  "Líder de adolescentes",
+  "Líder infantil",
+  "Líder de louvor",
+  "Líder de intercessão",
+  "Líder de recepção",
+  "Porteiro",
+  "Recepcionista",
+  "Personalizado",
+];
+
+const ROLE_LABELS: Record<OrgMembershipRole, string> = {
   church_admin: "Administrador",
   pastor:       "Pastor",
   secretary:    "Secretário(a)",
@@ -62,10 +119,11 @@ const ROLE_COLORS: Record<OrgMembershipRole, string> = {
   tesoureiro:   "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
   contador:     "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
   leader:       "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+  porteiro:     "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
   member:       "bg-secondary text-muted-foreground",
 };
 
-const ROLE_DESC: Record<OrgMembershipRole | "porteiro", string> = {
+const ROLE_DESC: Record<OrgMembershipRole, string> = {
   church_admin: "Acesso total. Pode gerenciar usuários e todos os módulos.",
   pastor:       "Acesso a Membros, Comunicação e gestão pastoral.",
   secretary:    "Acesso a Membros, Comunicação e documentos.",
@@ -73,11 +131,11 @@ const ROLE_DESC: Record<OrgMembershipRole | "porteiro", string> = {
   contador:     "Acesso somente leitura a Financeiro e Relatórios.",
   leader:       "Acesso a Agenda, Grupos e módulos de liderança.",
   member:       "Acesso aos módulos básicos da comunidade.",
-  porteiro:     "Acesso mínimo. Futuramente habilitado para leitor de QR Code.",
+  porteiro:     "Acesso restrito ao Modo Porteiro para leitura de QR Code de membros.",
 };
 
 type RoleCardConfig = {
-  role: OrgMembershipRole | "porteiro";
+  role: OrgMembershipRole;
   Icon: React.ElementType;
   iconColor: string;
   cardAccent: string;
@@ -92,7 +150,7 @@ const ROLE_CARDS: RoleCardConfig[] = [
   { role: "contador",     Icon: BarChart3,   iconColor: "text-cyan-500",    cardAccent: "group-hover:border-cyan-300 dark:group-hover:border-cyan-700" },
   { role: "leader",       Icon: Users,       iconColor: "text-purple-500",  cardAccent: "group-hover:border-purple-300 dark:group-hover:border-purple-700" },
   { role: "member",       Icon: User,        iconColor: "text-slate-500",   cardAccent: "group-hover:border-slate-300 dark:group-hover:border-slate-700" },
-  { role: "porteiro",     Icon: Key,         iconColor: "text-emerald-500", cardAccent: "group-hover:border-emerald-300 dark:group-hover:border-emerald-700", future: true },
+  { role: "porteiro",     Icon: Key,         iconColor: "text-emerald-500", cardAccent: "group-hover:border-emerald-300 dark:group-hover:border-emerald-700" },
 ];
 
 const INVITE_STATUS_LABELS: Record<string, string> = {
@@ -116,6 +174,7 @@ function normalizeRole(role: string | null | undefined): OrgMembershipRole {
     case "pastor":     return "pastor";
     case "secretary":  return "secretary";
     case "leader": case "lider": case "obreiro": return "leader";
+    case "porteiro": return "porteiro";
     default: return "member";
   }
 }
@@ -414,6 +473,18 @@ export default function GerenciarAcessos() {
   });
   const [savingInvite, setSavingInvite]     = useState(false);
 
+  // Autorizar membro existente
+  const [authorizeModal, setAuthorizeModal]   = useState(false);
+  const [memberSearch, setMemberSearch]       = useState("");
+  const [searchResults, setSearchResults]     = useState<SearchedMember[]>([]);
+  const [searchingMembers, setSearchingMembers] = useState(false);
+  const [authorizingId, setAuthorizingId]     = useState<string | null>(null);
+  const [authorizeRole, setAuthorizeRole]     = useState<OrgMembershipRole>("member");
+  const [selectedMember, setSelectedMember]   = useState<SearchedMember | null>(null);
+  const [appAccessRole, setAppAccessRole]     = useState<OrgMembershipRole | "">("");
+  const [churchRole, setChurchRole]           = useState("");
+  const [customChurchRole, setCustomChurchRole] = useState("");
+
   // Contexto de unidade vindo da Hierarquia — inicializado sincronamente do state
   const [contextOrg, setContextOrg] = useState<
     { id: string; name: string; type?: string; source?: string } | null
@@ -488,28 +559,62 @@ export default function GerenciarAcessos() {
     if (rows.length === 0) { setUsers([]); return; }
 
     const userIds = rows.map((m) => m.user_id);
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("user_id, full_name, avatar_url, email")
-      .in("user_id", userIds);
+
+    // Name resolution priority: for members activated via invite (e.g. Modo
+    // Porteiro, Carteira), the reliable name lives in members.full_name
+    // (members.user_id = organization_users.user_id) — profiles.full_name may
+    // be empty/stale for accounts created through the invite Edge Function,
+    // which never had a "cadastro livre" step to fill it in.
+    const [{ data: profiles }, { data: linkedMembers }] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("user_id, full_name, avatar_url, email")
+        .in("user_id", userIds),
+      supabase
+        .from("members")
+        .select("user_id, full_name")
+        .eq("organization_id", effectiveOrgId)
+        .in("user_id", userIds),
+    ]);
 
     const profileMap = new Map((profiles || []).map((p) => [p.user_id, p]));
-    const merged: OrgMemberRow[] = rows.map((m) => {
-      const p = profileMap.get(m.user_id);
-      return {
-        membership_id: m.id, user_id: m.user_id,
-        full_name: p?.full_name ?? null, email: p?.email ?? null,
-        avatar_url: p?.avatar_url ?? null,
-        role: normalizeRole(m.role), is_active: m.is_active ?? true,
-        created_at: m.created_at,
-      };
-    });
+    const memberNameMap = new Map(
+      (linkedMembers || [])
+        .filter((m): m is { user_id: string; full_name: string | null } => !!m.user_id)
+        .map((m) => [m.user_id, m.full_name]),
+    );
 
-    merged.sort((a, b) => {
-      const diff = ASSIGNABLE_ROLES.indexOf(a.role) - ASSIGNABLE_ROLES.indexOf(b.role);
-      return diff !== 0 ? diff : (a.full_name || "").localeCompare(b.full_name || "", "pt-BR");
+    // Use the functional updater to safely read the previous list as a last
+    // resort fallback (`existingName`), without needing `users` in the
+    // dependency array — that would redefine `loadUsers` on every update and
+    // could re-trigger the loading effect in a loop.
+    setUsers((prev) => {
+      const existingNameMap = new Map(prev.map((u) => [u.user_id, u.full_name]));
+
+      const merged: OrgMemberRow[] = rows.map((m) => {
+        const p = profileMap.get(m.user_id);
+        const displayName =
+          memberNameMap.get(m.user_id) ||
+          p?.full_name ||
+          existingNameMap.get(m.user_id) ||
+          p?.email ||
+          null;
+        return {
+          membership_id: m.id, user_id: m.user_id,
+          full_name: displayName, email: p?.email ?? null,
+          avatar_url: p?.avatar_url ?? null,
+          role: normalizeRole(m.role), is_active: m.is_active ?? true,
+          created_at: m.created_at,
+        };
+      });
+
+      merged.sort((a, b) => {
+        const diff = ASSIGNABLE_ROLES.indexOf(a.role) - ASSIGNABLE_ROLES.indexOf(b.role);
+        return diff !== 0 ? diff : (a.full_name || "").localeCompare(b.full_name || "", "pt-BR");
+      });
+
+      return merged;
     });
-    setUsers(merged);
   }, [effectiveOrgId, t]);
 
   const loadInvites = useCallback(async () => {
@@ -539,6 +644,104 @@ export default function GerenciarAcessos() {
   const openNewAccess = (role?: OrgMembershipRole) => {
     setNewAccessForm((f) => ({ ...f, role: role ?? selectedRole ?? "member" }));
     setNewAccessModal(true);
+  };
+
+  const openAuthorizeExisting = (role?: OrgMembershipRole) => {
+    setAuthorizeRole(role ?? selectedRole ?? "member");
+    setAppAccessRole(role ?? selectedRole ?? "member");
+    setChurchRole("");
+    setCustomChurchRole("");
+    setSelectedMember(null);
+    setAuthorizeModal(true);
+    setMemberSearch("");
+    setSearchResults([]);
+  };
+
+  const searchMembers = async (query: string) => {
+    setMemberSearch(query);
+    if (query.trim().length < 2) { setSearchResults([]); return; }
+    setSearchingMembers(true);
+    const orgId = effectiveOrgId;
+    if (!orgId) { setSearchingMembers(false); return; }
+    const { data, error } = await supabase
+      .from("members")
+      .select("id, full_name, user_id, member_role, status, photo_url, congregation_id, sector_id")
+      .eq("organization_id", orgId)
+      .ilike("full_name", `%${query.trim()}%`)
+      .order("full_name")
+      .limit(20);
+    if (!error && data) {
+      setSearchResults(data as SearchedMember[]);
+    }
+    setSearchingMembers(false);
+  };
+
+  const handleSelectMember = (member: SearchedMember) => {
+    if (!member.user_id) {
+      toast({
+        title: "Membro sem login",
+        description: "Este membro ainda não possui acesso ao aplicativo. Crie o acesso do membro antes de autorizar esta função.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSelectedMember(member);
+  };
+
+  const handleConfirmAuthorize = async () => {
+    if (!selectedMember || !selectedMember.user_id || !effectiveOrgId) return;
+    if (!appAccessRole) {
+      toast({ title: "Acesso não selecionado", description: "Selecione o acesso no aplicativo.", variant: "destructive" });
+      return;
+    }
+    if (!churchRole) {
+      toast({ title: "Cargo não selecionado", description: "Selecione a função/cargo na igreja.", variant: "destructive" });
+      return;
+    }
+    if (churchRole === "Personalizado" && !customChurchRole.trim()) {
+      toast({ title: "Função personalizada vazia", description: "Digite a função/cargo personalizada.", variant: "destructive" });
+      return;
+    }
+
+    const effectiveChurchRole = churchRole === "Personalizado" ? customChurchRole.trim() : churchRole;
+    setAuthorizingId(selectedMember.id);
+
+    // 1) Save app access (organization_users.role)
+    const { error: orgErr } = await supabase
+      .from("organization_users")
+      .upsert({
+        user_id: selectedMember.user_id,
+        organization_id: effectiveOrgId,
+        role: appAccessRole,
+        is_active: true,
+      }, { onConflict: "user_id,organization_id" });
+
+    if (orgErr) {
+      toast({ title: "Erro ao autorizar", description: orgErr.message, variant: "destructive" });
+      setAuthorizingId(null);
+      return;
+    }
+
+    // 2) Save church role (members.member_role)
+    const { error: memErr } = await supabase
+      .from("members")
+      .update({ member_role: effectiveChurchRole })
+      .eq("id", selectedMember.id);
+
+    if (memErr) {
+      toast({ title: "Acesso criado, mas erro ao salvar cargo", description: memErr.message, variant: "destructive" });
+    }
+
+    const roleLabel = ROLE_LABELS[appAccessRole] || appAccessRole;
+    toast({ title: `${roleLabel} autorizado com sucesso.` });
+    await loadUsers();
+    setAuthorizeModal(false);
+    setMemberSearch("");
+    setSearchResults([]);
+    setSelectedMember(null);
+    setChurchRole("");
+    setCustomChurchRole("");
+    setAuthorizingId(null);
   };
 
   const handleRoleChange = async (membershipId: string, userId: string, newRole: OrgMembershipRole) => {
@@ -710,11 +913,11 @@ export default function GerenciarAcessos() {
           {isAdmin && (
             <button
               type="button"
-              onClick={() => openNewAccess()}
+              onClick={() => openAuthorizeExisting()}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors flex-shrink-0"
             >
-              <UserPlus size={16} />
-              Novo Acesso
+              <UserCheck size={16} />
+              Autorizar Acesso
             </button>
           )}
         </div>
@@ -923,9 +1126,9 @@ export default function GerenciarAcessos() {
               )}
             </h2>
             {selectedRole && (
-              <button type="button" onClick={() => openNewAccess(selectedRole)}
+              <button type="button" onClick={() => openAuthorizeExisting(selectedRole)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/90 transition-colors">
-                <UserPlus size={13} /> Convidar {ROLE_LABELS[selectedRole]}
+                <UserCheck size={13} /> Autorizar {ROLE_LABELS[selectedRole]}
               </button>
             )}
           </div>
@@ -943,11 +1146,11 @@ export default function GerenciarAcessos() {
                   </div>
                   <div>
                     <p className="font-medium text-sm">Nenhum {ROLE_LABELS[selectedRole]} cadastrado</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Convide alguém para assumir esta função nesta unidade.</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Autorize um membro existente para assumir esta função nesta unidade.</p>
                   </div>
-                  <button type="button" onClick={() => openNewAccess(selectedRole)}
+                  <button type="button" onClick={() => openAuthorizeExisting(selectedRole)}
                     className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
-                    <UserPlus size={15} /> Convidar {ROLE_LABELS[selectedRole]}
+                    <UserCheck size={15} /> Autorizar {ROLE_LABELS[selectedRole]}
                   </button>
                 </>
               ) : (
@@ -1267,6 +1470,225 @@ export default function GerenciarAcessos() {
                 </button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Authorize Existing Member Modal ────────────────────────────────── */}
+      {authorizeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between flex-shrink-0">
+              <h2 className="font-semibold text-base flex items-center gap-2">
+                <UserCheck size={16} className="text-accent" /> Autorizar acesso
+              </h2>
+              <button type="button" onClick={() => { setAuthorizeModal(false); setSearchResults([]); setMemberSearch(""); setSelectedMember(null); setChurchRole(""); setCustomChurchRole(""); }}
+                className="text-muted-foreground hover:text-foreground">
+                <X size={18} />
+              </button>
+            </div>
+
+            {!selectedMember ? (
+              <>
+                <p className="text-xs text-muted-foreground flex-shrink-0">
+                  Selecione um membro já cadastrado para autorizar o acesso no aplicativo.
+                  {isHierarchyContext && (
+                    <> Unidade alvo: <strong>{effectiveOrgName}</strong>.</>
+                  )}
+                </p>
+
+                {/* Search input */}
+                <div className="relative flex-shrink-0">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  <input
+                    type="text"
+                    value={memberSearch}
+                    onChange={(e) => { searchMembers(e.target.value); }}
+                    placeholder="Buscar membro por nome"
+                    autoFocus
+                    className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  />
+                </div>
+
+                {/* Results */}
+                <div className="flex-1 overflow-y-auto min-h-0 -mx-1 px-1">
+                  {searchingMembers ? (
+                    <div className="flex items-center justify-center py-6">
+                      <Loader2 size={18} className="animate-spin text-muted-foreground" />
+                    </div>
+                  ) : memberSearch.trim().length < 2 ? (
+                    <p className="text-xs text-muted-foreground text-center py-6">
+                      Digite pelo menos 2 caracteres para buscar membros.
+                    </p>
+                  ) : searchResults.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-6">
+                      Nenhum membro encontrado com este nome.
+                    </p>
+                  ) : (
+                    <div className="space-y-1">
+                      {searchResults.map((m) => {
+                        const hasLogin = Boolean(m.user_id);
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            disabled={!hasLogin}
+                            onClick={() => { handleSelectMember(m); }}
+                            title={!hasLogin ? "Membro sem acesso ao aplicativo" : "Selecionar este membro"}
+                            className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors text-left ${
+                              hasLogin
+                                ? "border-border/60 bg-card hover:bg-secondary/30 cursor-pointer"
+                                : "border-border/30 bg-muted/30 cursor-not-allowed opacity-60"
+                            }`}
+                          >
+                            {m.photo_url ? (
+                              <img src={m.photo_url} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-1 ring-border" />
+                            ) : (
+                              <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center text-xs font-bold text-accent flex-shrink-0">
+                                {m.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{m.full_name}</p>
+                              <p className="text-[11px] text-muted-foreground truncate flex items-center gap-1.5">
+                                {m.member_role ?? "Membro"}
+                                {m.status && (
+                                  <span className="text-[10px] px-1 py-0 rounded bg-muted">{m.status}</span>
+                                )}
+                              </p>
+                            </div>
+                            <div className="flex-shrink-0">
+                              {hasLogin ? (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 font-medium">
+                                  Com login
+                                </span>
+                              ) : (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 font-medium">
+                                  Sem login
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2 pt-1 flex-shrink-0 border-t border-border/40">
+                  <button type="button"
+                    onClick={() => { setAuthorizeModal(false); setSearchResults([]); setMemberSearch(""); }}
+                    className="w-full px-4 py-2.5 bg-secondary rounded-lg text-sm hover:bg-secondary/80">
+                    Fechar
+                  </button>
+                  <button type="button"
+                    onClick={() => { setAuthorizeModal(false); setSearchResults([]); setMemberSearch(""); openNewAccess(authorizeRole); }}
+                    className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-1">
+                    <UserPlus size={12} className="inline mr-1" />
+                    Precisa convidar alguém externo? Criar convite
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Selected member card */}
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-accent/10 border border-accent/20 flex-shrink-0">
+                  {selectedMember.photo_url ? (
+                    <img src={selectedMember.photo_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-1 ring-border" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center text-sm font-bold text-accent flex-shrink-0">
+                      {selectedMember.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate">{selectedMember.full_name}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {selectedMember.member_role ?? "Membro"}
+                      {selectedMember.status && (
+                        <span className="ml-1.5 text-[10px] px-1 py-0 rounded bg-muted">{selectedMember.status}</span>
+                      )}
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => { setSelectedMember(null); setAppAccessRole(authorizeRole); setChurchRole(""); setCustomChurchRole(""); }}
+                    className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg hover:bg-secondary transition-colors">
+                    Trocar
+                  </button>
+                </div>
+
+                <div className="space-y-3 flex-shrink-0">
+                  {/* Acesso no aplicativo */}
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Acesso no aplicativo</label>
+                    <select
+                      value={appAccessRole}
+                      onChange={(e) => setAppAccessRole(e.target.value as OrgMembershipRole)}
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    >
+                      <option value="" disabled>Selecione o acesso no aplicativo</option>
+                      {APP_ACCESS_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                    {appAccessRole && (
+                      <p className="text-[11px] text-muted-foreground mt-1">{ROLE_DESC[appAccessRole]}</p>
+                    )}
+                  </div>
+
+                  {/* Função/Cargo na igreja */}
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Função/Cargo na igreja</label>
+                    <select
+                      value={churchRole}
+                      onChange={(e) => {
+                        setChurchRole(e.target.value);
+                        if (e.target.value !== "Personalizado") setCustomChurchRole("");
+                      }}
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    >
+                      <option value="" disabled>Selecione a função/cargo</option>
+                      {CHURCH_ROLES.map((r) => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Função personalizada */}
+                  {churchRole === "Personalizado" && (
+                    <div>
+                      <label className="text-xs text-muted-foreground block mb-1">Digite a função/cargo</label>
+                      <input
+                        type="text"
+                        value={customChurchRole}
+                        onChange={(e) => setCustomChurchRole(e.target.value)}
+                        placeholder="Ex.: Coordenador de recepção"
+                        autoFocus
+                        className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Security note */}
+                <p className="text-[11px] text-muted-foreground flex-shrink-0">
+                  Cargo eclesiástico não concede permissão automática. O acesso ao app é definido exclusivamente pelo campo acima.
+                </p>
+
+                <div className="flex gap-2 pt-1 flex-shrink-0 border-t border-border/40">
+                  <button type="button"
+                    onClick={() => { setSelectedMember(null); setAppAccessRole(authorizeRole); setChurchRole(""); setCustomChurchRole(""); }}
+                    className="flex-1 px-4 py-2.5 bg-secondary rounded-lg text-sm hover:bg-secondary/80">
+                    Voltar
+                  </button>
+                  <button type="button"
+                    disabled={authorizingId !== null || !appAccessRole || !churchRole || (churchRole === "Personalizado" && !customChurchRole.trim())}
+                    onClick={() => { handleConfirmAuthorize(); }}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+                    {authorizingId !== null ? <Loader2 size={14} className="animate-spin" /> : <UserCheck size={14} />}
+                    Autorizar {appAccessRole ? ROLE_LABELS[appAccessRole] : "acesso"}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

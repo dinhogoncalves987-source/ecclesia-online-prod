@@ -526,7 +526,7 @@ export default function Dashboard() {
 
   return (
     <AdminLayout>
-      <div className="space-y-8">
+      <div className="isolate space-y-8 w-full max-w-full overflow-x-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">
@@ -552,8 +552,8 @@ export default function Dashboard() {
 
         {/* Daily Devotional - always visible */}
         <DailyDevotional />
-        {!loading && church && <DashboardCampaignSections />}
-        {false && !loading && canViewPlatformCampaigns && renderCampaignBanner()}
+        {/* TODO: Campanhas module disabled until visual bug is resolved */}
+        {/*{!loading && church && <DashboardCampaignSections />}*/}
 
         {loading ? (
           <div className="flex items-center justify-center py-12">

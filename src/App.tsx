@@ -22,6 +22,8 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 import { OfflineBanner } from "@/components/OfflineBanner";
 
+import { PWAUpdatePrompt } from "@/components/PWAUpdatePrompt";
+
 import { PageLoader } from "@/components/PageLoader";
 
 
@@ -111,6 +113,8 @@ const SolicitacoesAdministrativas = lazy(() => import("./pages/SolicitacoesAdmin
 
 const CarteiraEcclesia = lazy(() => import("./pages/CarteiraEcclesia"));
 
+const ModoPorteiro = lazy(() => import("./pages/ModoPorteiro"));
+
 
 
 const queryClient = new QueryClient();
@@ -132,6 +136,8 @@ const App = () => (
         <ChurchProvider>
 
         <OfflineBanner />
+
+        <PWAUpdatePrompt />
 
         <Toaster />
 
@@ -222,6 +228,8 @@ const App = () => (
               <Route path="/admin/solicitacoes" element={<ProtectedRoute><SolicitacoesAdministrativas /></ProtectedRoute>} />
 
               <Route path="/admin/carteira-ecclesia" element={<ProtectedRoute><CarteiraEcclesia /></ProtectedRoute>} />
+
+              <Route path="/admin/porteiro" element={<ProtectedRoute><ModoPorteiro /></ProtectedRoute>} />
 
               <Route path="*" element={<NotFound />} />
 

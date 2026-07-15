@@ -269,9 +269,9 @@ export function DailyDevotional() {
 
   return (
     <div
-      className={`relative overflow-hidden bg-gradient-to-br ${config.gradient} rounded-xl p-5 sm:p-6 border ${config.borderColor} animate-in fade-in duration-500`}
+      className={`relative overflow-hidden bg-gradient-to-br ${config.gradient} rounded-xl p-5 sm:p-6 border ${config.borderColor}`}
     >
-      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-1/3 translate-x-1/4 pointer-events-none" aria-hidden />
 
       <div className="relative z-10">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
@@ -336,14 +336,14 @@ export function DailyDevotional() {
           </div>
         ) : devotional ? (
           <>
-            <blockquote className="text-sm sm:text-base italic text-foreground/90 leading-relaxed mb-2 pl-3 border-l-2 border-primary/40">
+            <blockquote className="text-sm sm:text-base italic text-foreground/90 leading-relaxed mb-2 pl-3 border-l-2 border-primary/40 break-words">
               &ldquo;{devotional.verse}&rdquo;
             </blockquote>
             <p className="text-xs font-semibold text-primary mb-3">— {devotional.reference}</p>
 
-            <div className="flex gap-2 items-start bg-background/50 rounded-lg p-3">
+            <div className="flex gap-2 items-start bg-background/50 rounded-lg p-3 overflow-hidden">
               <Sparkles size={14} className="text-accent mt-0.5 flex-shrink-0" />
-              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed line-clamp-4 sm:line-clamp-5">
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed line-clamp-4 sm:line-clamp-5 overflow-hidden">
                 {displayReflection}
               </p>
             </div>

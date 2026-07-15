@@ -57,6 +57,17 @@ export interface ChurchContextType {
   congregations: Church[];
   /** true se o usuário tem pelo menos um vínculo ativo em organization_users */
   hasActiveMembership: boolean;
+  /**
+   * A REAL failure (network/server/RLS) occurred while loading the shared
+   * bootstrap data (profiles/user_roles/organization_users/super_admins)
+   * this church resolution depends on. When true, `church`/`churches`/
+   * `hasActiveMembership` are STALE (whatever was last known, possibly
+   * still the initial empty state) and must NOT be interpreted as "user has
+   * no membership" — callers must show a recoverable error state instead.
+   */
+  bootstrapError: boolean;
+  /** Retries the shared bootstrap query (profiles/roles/memberships/super_admins). */
+  retryBootstrap: () => void;
   switchChurch: (churchId: string) => boolean;
   clearActiveChurch: () => void;
   refetch: () => void;
@@ -72,6 +83,8 @@ export const ChurchContext = createContext<ChurchContextType>({
   isMatriz: false,
   congregations: [],
   hasActiveMembership: false,
+  bootstrapError: false,
+  retryBootstrap: () => {},
   switchChurch: () => false,
   clearActiveChurch: () => {},
   refetch: () => {},

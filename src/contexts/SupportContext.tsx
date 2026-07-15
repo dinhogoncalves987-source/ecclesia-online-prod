@@ -40,8 +40,10 @@ import {
 } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuthBootstrap } from "@/hooks/useAuthBootstrap";
 import { isPlatformRole, type PlatformRole } from "@/lib/platformSupportPermissions";
 import { logSupportAudit } from "@/lib/platformSupportAudit";
+import { isMatrizLevel, normalizeOrganizationType } from "@/lib/organizationHierarchy";
 import type { Church } from "@/hooks/useChurchContext";
 
 // ── Storage ──────────────────────────────────────────────────────────────────
@@ -71,6 +73,16 @@ export interface SupportContextType {
   isSupportModeActive: boolean;
   /** true enquanto detecta se o usuário é de plataforma */
   loadingPlatformRole: boolean;
+  /**
+   * true quando a consulta compartilhada de bootstrap (profiles/user_roles/
+   * organization_users/super_admins) falhou de verdade (rede/servidor/RLS).
+   * Nesse caso `platformRole`/`isPlatformUser` são dados obsoletos (ou o
+   * `null` inicial) e NÃO podem ser interpretados como "confirmado: não é
+   * usuário de plataforma".
+   */
+  bootstrapError: boolean;
+  /** Refaz a consulta compartilhada de bootstrap. */
+  retryBootstrap: () => void;
   /** Define a organização em atendimento */
   setSupportOrg: (org: Church) => void;
   /** Remove a organização em atendimento */
@@ -85,6 +97,8 @@ const SupportContext = createContext<SupportContextType>({
   activeSupportOrg:    null,
   isSupportModeActive: false,
   loadingPlatformRole: true,
+  bootstrapError:      false,
+  retryBootstrap:      () => undefined,
   setSupportOrg:       () => undefined,
   clearSupportOrg:     () => undefined,
 });
@@ -113,7 +127,8 @@ function mapRowToChurch(org: Record<string, unknown>): Church {
     logo_url:                      (org.logo_url as string) ?? null,
     primary_color:                 null,
     parent_church_id:              (org.parent_id as string) ?? null,
-    is_matriz:                     org.organization_type === "matriz" || org.organization_type === "sede",
+    // Normalizado para reconhecer também aliases legados (ex.: "church").
+    is_matriz:                     isMatrizLevel(normalizeOrganizationType(org.organization_type as string | null)),
     organization_type:             (org.organization_type as string) ?? null,
     address:                       null,
     city:                          (org.city as string) ?? null,
@@ -148,78 +163,74 @@ function mapRowToChurch(org: Record<string, unknown>): Church {
 
 export function SupportContextProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [platformRole, setPlatformRole]           = useState<PlatformRole | null>(null);
+  // profiles.platform_role and the super_admins fallback are both already
+  // fetched once by useAuthBootstrap (shared with ChurchProvider/useRole) —
+  // this context no longer issues its own queries for them, it only derives
+  // the platform role from the already-loaded bootstrap payload.
+  const { data: bootstrap, loading: bootstrapLoading, isError: bootstrapIsError, refetch: refetchBootstrap } = useAuthBootstrap(user?.id);
   const [activeSupportOrg, setActiveSupportOrg]   = useState<Church | null>(null);
-  const [loadingPlatformRole, setLoadingPlatformRole] = useState(true);
+  const [loadingSupportOrg, setLoadingSupportOrg] = useState(true);
 
-  // ── Detect platform role on login ─────────────────────────────────────────
+  // Note: while `bootstrap` is stale (kept from the last successful fetch
+  // by React Query even after a failed refetch), this still computes off
+  // that stale-but-real data — which is correct. It's only the ABSENCE of
+  // any successful `bootstrap` ever (still null) combined with
+  // `bootstrapIsError` that means "unknown", not "confirmed not platform
+  // user" — callers must check `bootstrapError` before trusting a `null`
+  // `platformRole` as a final answer.
+  const platformRole = useMemo<PlatformRole | null>(() => {
+    if (!user || !bootstrap) return null;
+    if (bootstrap.platformRole && isPlatformRole(bootstrap.platformRole)) {
+      return bootstrap.platformRole as PlatformRole;
+    }
+    if (bootstrap.isSuperAdminRow) return "super_admin";
+    return null;
+  }, [user, bootstrap]);
+
+  const loadingPlatformRole = Boolean(user) && (bootstrapLoading || loadingSupportOrg);
+
+  const retryBootstrap = useCallback(() => {
+    void refetchBootstrap();
+  }, [refetchBootstrap]);
+
+  // ── Restore persisted support org (session only) ──────────────────────────
   useEffect(() => {
-    if (!user) {
-      setPlatformRole(null);
+    if (!user || !platformRole) {
       setActiveSupportOrg(null);
-      setLoadingPlatformRole(false);
+      setLoadingSupportOrg(false);
       return;
     }
 
     let cancelled = false;
-    setLoadingPlatformRole(true);
+    setLoadingSupportOrg(true);
 
     (async () => {
-      // Check profiles.platform_role first
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("platform_role")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      const raw = sessionStorage.getItem(SUPPORT_ORG_KEY);
+      if (!raw) {
+        if (!cancelled) setLoadingSupportOrg(false);
+        return;
+      }
 
-      if (cancelled) return;
-
-      const profileRole = profile?.platform_role ?? null;
-
-      // Also check super_admins table fallback
-      let resolvedRole: PlatformRole | null = null;
-      if (profileRole && isPlatformRole(profileRole)) {
-        resolvedRole = profileRole as PlatformRole;
-      } else {
-        const { data: saRow } = await supabase
-          .from("super_admins")
-          .select("user_id")
-          .eq("user_id", user.id)
+      try {
+        const persisted: PersistedSupportOrg = JSON.parse(raw);
+        const { data } = await supabase
+          .from("organizations")
+          .select(ORG_SELECT)
+          .eq("id", persisted.id)
+          .eq("active", true)
           .maybeSingle();
         if (cancelled) return;
-        if (saRow?.user_id) resolvedRole = "super_admin";
+        if (data) setActiveSupportOrg(mapRowToChurch(data as Record<string, unknown>));
+        else sessionStorage.removeItem(SUPPORT_ORG_KEY);
+      } catch {
+        sessionStorage.removeItem(SUPPORT_ORG_KEY);
       }
 
-      if (cancelled) return;
-      setPlatformRole(resolvedRole);
-
-      // Restore persisted support org (session only)
-      if (resolvedRole) {
-        const raw = sessionStorage.getItem(SUPPORT_ORG_KEY);
-        if (raw) {
-          try {
-            const persisted: PersistedSupportOrg = JSON.parse(raw);
-            // Fetch full org to have up-to-date data
-            const { data } = await supabase
-              .from("organizations")
-              .select(ORG_SELECT)
-              .eq("id", persisted.id)
-              .eq("active", true)
-              .maybeSingle();
-            if (cancelled) return;
-            if (data) setActiveSupportOrg(mapRowToChurch(data as Record<string, unknown>));
-            else sessionStorage.removeItem(SUPPORT_ORG_KEY);
-          } catch {
-            sessionStorage.removeItem(SUPPORT_ORG_KEY);
-          }
-        }
-      }
-
-      setLoadingPlatformRole(false);
+      if (!cancelled) setLoadingSupportOrg(false);
     })();
 
     return () => { cancelled = true; };
-  }, [user]);
+  }, [user, platformRole]);
 
   // ── setSupportOrg ─────────────────────────────────────────────────────────
   const setSupportOrg = useCallback((org: Church) => {
@@ -269,9 +280,11 @@ export function SupportContextProvider({ children }: { children: ReactNode }) {
     activeSupportOrg,
     isSupportModeActive: activeSupportOrg !== null,
     loadingPlatformRole,
+    bootstrapError: bootstrapIsError,
+    retryBootstrap,
     setSupportOrg,
     clearSupportOrg,
-  }), [platformRole, activeSupportOrg, loadingPlatformRole, setSupportOrg, clearSupportOrg]);
+  }), [platformRole, activeSupportOrg, loadingPlatformRole, bootstrapIsError, retryBootstrap, setSupportOrg, clearSupportOrg]);
 
   return (
     <SupportContext.Provider value={value}>

@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
 import { useSupportContext } from "@/contexts/SupportContext";
 import { useState, useEffect, useCallback, type ChangeEvent, type DragEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { motion } from "framer-motion";
 import {
@@ -18,6 +19,7 @@ import {
 import { toast } from "sonner";
 import { PLATFORM_ROLE_LABELS, type PlatformRole } from "@/lib/platformSupportPermissions";
 import { logSupportAudit } from "@/lib/platformSupportAudit";
+import { isMatrizLevel, normalizeOrganizationType } from "@/lib/organizationHierarchy";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -100,6 +102,29 @@ const TICKET_PRIORITY_COLORS: Record<string, string> = {
   normal: "bg-secondary text-muted-foreground",
   low: "bg-secondary text-muted-foreground",
 };
+/** Orienta o Super Admin, em modo suporte, a usar o fluxo estrutural correto
+ * (Congregacoes.tsx) em vez do formulário genérico desta aba. */
+function structuralCreationGuidance(organizationType: string | null): string {
+  const normalized = normalizeOrganizationType(organizationType);
+  switch (normalized) {
+    case "matriz":
+    case "sede":
+      return "Matriz → use \"Distritos\" e clique em \"Novo Distrito\" (ou \"Nova Congregação\" se esta matriz não usa nível intermediário).";
+    case "setor":
+      return "Distrito → use \"Nova Subsede\" ou \"Nova Congregação\" conforme necessário. Subsedes agrupam congregações abaixo do distrito.";
+    case "subsede":
+      return "Subsede → use \"Congregações\" e clique em \"Nova Congregação\".";
+    case "congregacao":
+      return "Congregação → unidade local operacional, sem criação de unidades filhas.";
+    case "state_convention":
+    case "national_convention":
+    case "international_convention":
+      return "Use o botão de criação contextual na estrutura desta organização.";
+    default:
+      return "Use o botão de criação contextual na estrutura desta organização.";
+  }
+}
+
 const AUDIT_ACTION_LABELS: Record<string, string> = {
   set_support_org: "Ativou atendimento", clear_support_org: "Encerrou atendimento",
   accept_ticket: "Aceitou chamado", resolve_ticket: "Resolveu chamado",
@@ -115,7 +140,8 @@ export default function SuperAdmin() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const { isSuperAdmin, loading: roleLoading } = useRole();
-  const { setSupportOrg } = useSupportContext();
+  const { setSupportOrg, isSupportModeActive, activeSupportOrg } = useSupportContext();
+  const navigate = useNavigate();
 
   // ── General state ──
   const [loading, setLoading] = useState(true);
@@ -208,7 +234,7 @@ export default function SuperAdmin() {
     const allOrgs = (orgsRes.data as any[]) || [];
     const flat: ChurchSummary[] = allOrgs.map(c => ({
       id: c.id, name: c.name, slug: c.slug,
-      is_matriz: c.organization_type === "matriz" || c.organization_type === "sede",
+      is_matriz: isMatrizLevel(normalizeOrganizationType(c.organization_type)),
       organization_type: c.organization_type || "congregacao",
       city: c.city, state: c.state, pastor_name: null, parent_id: c.parent_id,
       memberCount: 0, children: [],
@@ -219,7 +245,7 @@ export default function SuperAdmin() {
     const tix = (ticketsRes.data as any[]) || [];
     setMetrics({
       totalOrgs: allOrgs.length,
-      matrizOrgs: allOrgs.filter((o: any) => o.organization_type === "matriz" || o.organization_type === "sede").length,
+      matrizOrgs: allOrgs.filter((o: any) => isMatrizLevel(normalizeOrganizationType(o.organization_type))).length,
       totalUsers: usersRes.count || 0,
       platformAgents: (agentsRes.data || []).length,
       activeDepartments: (deptRes.data || []).length,
@@ -774,7 +800,7 @@ export default function SuperAdmin() {
 
   const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
     { key: "overview",     label: "Visão Geral",  icon: LayoutGrid },
-    { key: "churches",     label: "Igrejas",       icon: Building2 },
+    { key: "churches",     label: "Organizações",  icon: Building2 },
     { key: "team",         label: "Equipe",        icon: Users },
     { key: "departments",  label: "Departamentos", icon: Layers },
     { key: "tickets",      label: "Chamados",      icon: Ticket },
@@ -884,21 +910,44 @@ export default function SuperAdmin() {
               </div>
             )}
 
-            {/* ── IGREJAS ─────────────────────────────────────────────────── */}
+            {/* ── ORGANIZAÇÕES ────────────────────────────────────────────── */}
             {activeTab === "churches" && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="font-serif text-lg">Todas as Igrejas</h2>
-                  <button onClick={() => setShowChurchForm(!showChurchForm)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:opacity-90">
-                    <Plus size={14} /> Nova Igreja
-                  </button>
+                  <h2 className="font-serif text-lg">Todas as Organizações</h2>
+                  {!isSupportModeActive && (
+                    <button onClick={() => setShowChurchForm(!showChurchForm)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:opacity-90">
+                      <Plus size={14} /> Nova Organização
+                    </button>
+                  )}
                 </div>
 
-                {showChurchForm && (
+                {isSupportModeActive && (
+                  <div className="bg-accent/5 border border-accent/20 rounded-xl p-4 flex items-start gap-3">
+                    <Layers size={18} className="text-accent flex-shrink-0 mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium">
+                        Atendendo {activeSupportOrg?.name ?? "organização"} — use o fluxo estrutural da organização ativa
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {structuralCreationGuidance(activeSupportOrg?.organization_type ?? null)}
+                      </p>
+                      <button onClick={() => navigate("/admin/congregacoes")}
+                        className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:opacity-90">
+                        <ArrowRight size={12} /> Ir para a estrutura da organização
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {!isSupportModeActive && showChurchForm && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
                     className="bg-card rounded-xl shadow-sm border border-border/50 p-5 space-y-4">
-                    <h3 className="text-sm font-medium">Criar Nova Igreja</h3>
+                    <h3 className="text-sm font-medium">Criar Nova Organização</h3>
+                    <p className="text-xs text-muted-foreground -mt-2">
+                      Use somente para cadastrar uma organização raiz nova (ex.: nova convenção/rede). Para distritos e congregações de uma organização já existente, use o fluxo estrutural em "Unidades Locais".
+                    </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {[
                         { key: "name", placeholder: "Nome da igreja *" },
@@ -940,7 +989,7 @@ export default function SuperAdmin() {
                     <div className="flex gap-2">
                       <button onClick={handleCreateChurch}
                         className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90">
-                        Criar Igreja
+                        Criar Organização
                       </button>
                       <button onClick={() => setShowChurchForm(false)}
                         className="px-4 py-2 bg-secondary text-foreground rounded-lg text-sm hover:bg-secondary/80">

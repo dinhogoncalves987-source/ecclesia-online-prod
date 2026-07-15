@@ -7,6 +7,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { getPublicAppUrl } from "@/lib/publicUrl";
+import { normalizeOrganizationType } from "@/lib/organizationHierarchy";
 import { Navigate, useNavigate } from "react-router-dom";
 import {
   AlertCircle,
@@ -250,13 +251,23 @@ function connPrep(label: string): string {
   return "ao";
 }
 
+// "Novo"/"Nova" — gênero gramatical do label configurável (ex.: "Distrito" é
+// masculino, "Congregação"/"Matriz Municipal" são femininos). Heurística
+// simples cobrindo os presets já oferecidos em INTERMEDIATE_PRESETS/LOCAL_PRESETS.
+const MASCULINE_UNIT_WORDS = ["distrito", "setor", "campo", "campus", "território", "grupo", "ministério", "polo"];
+function newUnitArticle(label: string): "Novo" | "Nova" {
+  const firstWord = label.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+  if (MASCULINE_UNIT_WORDS.includes(firstWord)) return "Novo";
+  return "Nova";
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Main component
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default function Congregacoes() {
-  const { user }                         = useAuth();
-  const { isAdmin, loading: roleLoading } = useRole();
+  const { user }                                     = useAuth();
+  const { isAdmin, loading: roleLoading }            = useRole();
   const { church, isMatriz, refetch: refetchChurch } = useChurch();
   const { t }                            = useLanguage();
   const navigate                         = useNavigate();
@@ -267,6 +278,7 @@ export default function Congregacoes() {
 
   // ── Data state ─────────────────────────────────────────────────────────────
   const [childOrganizations, setChildOrganizations] = useState<ChildOrganization[]>([]);
+  const [sectorSubsedes, setSectorSubsedes]         = useState<ChildOrganization[]>([]); // only for setor context
   const [loading, setLoading]                       = useState(true);
   const [sectorCongregations, setSectorCongregations]   = useState<Record<string, ChildOrganization[]>>({});
   const [loadingCongregations, setLoadingCongregations] = useState<Record<string, boolean>>({});
@@ -278,6 +290,8 @@ export default function Congregacoes() {
   const [editingId, setEditingId]   = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [form, setForm]             = useState<OrgForm>(EMPTY_ORG_FORM);
+  // For setor context: which child type is being created (subsede vs congregacao)
+  const [insertChildType, setInsertChildType] = useState<OrgType | null>(null);
 
   // ── Congregation modal ─────────────────────────────────────────────────────
   const [congModal, setCongModal] = useState<{ sectorId: string; sectorName: string } | null>(null);
@@ -306,10 +320,17 @@ export default function Congregacoes() {
   const [savingNomenclature, setSavingNomenclature] = useState(false);
 
   // ── Computed flags ─────────────────────────────────────────────────────────
-  const isSetorContext          = activeOrgType === "setor";
-  const isConvencaoContext      = activeOrgType === "convencao" || activeOrgType === "state_convention";
-  const isNationalContext       = activeOrgType === "national_convention";
-  const isInternationalContext  = activeOrgType === "international_convention";
+  // Normalizado (não comparação de string crua) — reconhece aliases legados
+  // (ex.: "district", "church") e evita que uma matriz/setor real caia no
+  // fallback genérico só por causa de um valor de organization_type diferente
+  // do canônico. Ver organizationHierarchy.ts.
+  const normalizedActiveOrgType = normalizeOrganizationType(activeOrgType);
+  const isSetorContext          = normalizedActiveOrgType === "setor";
+  const isSubsedeContext        = normalizedActiveOrgType === "subsede";
+  const isConvencaoContext      = normalizedActiveOrgType === "state_convention";
+  const isNationalContext       = normalizedActiveOrgType === "national_convention";
+  const isInternationalContext  = normalizedActiveOrgType === "international_convention";
+  const isCongregacaoContext    = normalizedActiveOrgType === "congregacao";
   const isAnyConventionContext  = isInternationalContext || isNationalContext || isConvencaoContext;
   const usesIntermediate   = isMatriz ? church?.uses_intermediate_level !== false : false;
   const usesLocalUnits     = church?.uses_local_units !== false;
@@ -320,24 +341,32 @@ export default function Congregacoes() {
     || church?.hierarchy_model === "single_church";
 
   const canManageChildUnits = isAdmin
-    && (isMatriz || isSetorContext || isConvencaoContext || isNationalContext || isInternationalContext)
+    && (isMatriz || isSetorContext || isSubsedeContext || isConvencaoContext || isNationalContext || isInternationalContext)
     && (isMatriz || activeOrgTypeResolved)
     && !isSingleChurchMode
     && (isInternationalContext || isNationalContext
       ? true
       : isConvencaoContext
         ? church?.uses_municipal_level !== false
-        : isSetorContext || usesLocalUnits);
+        : isSetorContext || isSubsedeContext
+          ? usesLocalUnits
+          // Matriz: pode criar Distrito/Setor (usesIntermediate) OU Congregação
+          // direto (modo "pular nível"). O botão só deve ficar oculto quando
+          // NENHUM dos dois modos está habilitado.
+          : usesIntermediate || usesLocalUnits);
 
   // ── Label helpers — ZERO hardcode de denominação ───────────────────────────
+  // Defaults seguem a nomenclatura padrão da Assembleia de Deus
+  // (matriz → distrito/setor → congregação); cada organização pode
+  // sobrescrever via "Estrutura" sem afetar este fallback.
   const topSingular         = church?.top_level_label              ?? "Convenção";
   const topPlural           = church?.top_level_label_plural       ?? "Convenções";
   const municipalSingular   = church?.municipal_level_label        ?? "Matriz Municipal";
   const municipalPlural     = church?.municipal_level_label_plural ?? "Matrizes Municipais";
-  const intermediateSingular = church?.intermediate_level_label    ?? "Unidade intermediária";
-  const intermediatePlural   = church?.intermediate_level_label_plural ?? "Unidades intermediárias";
-  const localSingular       = church?.local_unit_label             ?? "Unidade local";
-  const localPlural         = church?.local_unit_label_plural      ?? "Unidades locais";
+  const intermediateSingular = church?.intermediate_level_label    ?? "Distrito";
+  const intermediatePlural   = church?.intermediate_level_label_plural ?? "Distritos";
+  const localSingular       = church?.local_unit_label             ?? "Congregação";
+  const localPlural         = church?.local_unit_label_plural      ?? "Congregações";
 
   // Labels para nível nacional
   const nationalSingular = "Convenção Estadual";
@@ -356,9 +385,11 @@ export default function Congregacoes() {
       ? nationalSingular
       : isConvencaoContext
         ? municipalSingular
-        : isMatriz && usesIntermediate
-          ? intermediateSingular
-          : localSingular;
+        : isSubsedeContext
+          ? localSingular
+          : isMatriz && usesIntermediate
+            ? intermediateSingular
+            : localSingular;
 
   const childPlural = isInternationalContext
     ? intlPlural
@@ -366,9 +397,11 @@ export default function Congregacoes() {
       ? nationalPlural
       : isConvencaoContext
         ? municipalPlural
-        : isMatriz && usesIntermediate
-          ? intermediatePlural
-          : localPlural;
+        : isSubsedeContext
+          ? localPlural
+          : isMatriz && usesIntermediate
+            ? intermediatePlural
+            : localPlural;
 
   // "Será vinculada ao/à [intermediate]"
   const parentConnPrep = connPrep(intermediateSingular);
@@ -379,6 +412,7 @@ export default function Congregacoes() {
     if (isInternationalContext) return "Estrutura Internacional";
     if (isNationalContext) return "Estrutura Nacional";
     if (isSingleChurchMode) return municipalSingular;
+    if (isSubsedeContext) return localPlural;
     return childPlural;
   };
   const pageSubtitle = (): string => {
@@ -388,13 +422,29 @@ export default function Congregacoes() {
       return `Esta ${municipalSingular.toLowerCase()} opera de forma independente, sem unidades filhas. Gerencie dados, responsáveis e operações da própria unidade.`;
     }
     if (isConvencaoContext) return `Gerencie ${childPlural.toLowerCase()} vinculadas a esta ${topSingular.toLowerCase()}.`;
-    if (isMatriz) return `Gerencie ${childPlural.toLowerCase()} desta ${municipalSingular.toLowerCase()}. Responsáveis são atribuídos separadamente.`;
-    if (isSetorContext) return `Gerencie ${localPlural.toLowerCase()} deste ${intermediateSingular.toLowerCase()}.`;
+    if (isMatriz) {
+      return usesIntermediate
+        ? `Gerencie os ${childPlural.toLowerCase()} desta ${municipalSingular.toLowerCase()}.`
+        : `Gerencie ${childPlural.toLowerCase()} desta ${municipalSingular.toLowerCase()}. Responsáveis são atribuídos separadamente.`;
+    }
+    if (isSetorContext) return `Gerencie subsedes e ${localPlural.toLowerCase()} deste ${intermediateSingular.toLowerCase()}.`;
+    if (isSubsedeContext) {
+      return `${localPlural} vinculadas à subsede ${church?.name ?? ""}. Gerencie as congregações desta subsede.`;
+    }
+    if (isCongregacaoContext) {
+      return t("Esta é uma unidade local operacional. Gerencie membros, agenda e demais módulos abaixo — esta unidade não cria novas unidades filhas.");
+    }
     return t("Esta unidade não cria novas unidades filhas. Membros e histórico permanecem na unidade quando responsáveis mudam.");
   };
   const emptyListMessage   = () => `Nenhum(a) ${childSingular.toLowerCase()} cadastrado(a).`;
-  const newUnitButtonLabel = () => `Nova ${childSingular}`;
-  const formTitle          = () => editingId ? t("Editar unidade") : `Nova ${childSingular}`;
+  const newUnitButtonLabel = () => isSubsedeContext ? "Nova Congregação" : `${newUnitArticle(childSingular)} ${childSingular}`;
+  const formTitle          = () => {
+    if (editingId) return t("Editar unidade");
+    if (isSubsedeContext) return "Nova Congregação";
+    if (isSetorContext && insertChildType === "subsede") return "Nova Subsede";
+    if (isSetorContext && insertChildType === "congregacao") return "Nova Congregação";
+    return `${newUnitArticle(childSingular)} ${childSingular}`;
+  };
   const primarySaveLabel   = () => editingId ? t("Salvar Alterações") : `Criar ${childSingular.toLowerCase()}`;
 
   const typeBadgeLabel = (orgType: string) => {
@@ -404,8 +454,9 @@ export default function Congregacoes() {
     if (orgType === "convencao")  return church?.top_level_label   ?? "Convenção / Regional";
     if (orgType === "matriz")     return church?.municipal_level_label ?? "Matriz Municipal";
     if (orgType === "sede")       return church?.municipal_level_label ?? "Sede";
-    if (orgType === "setor")      return church?.intermediate_level_label ?? "Unidade intermediária";
-    if (orgType === "congregacao") return church?.local_unit_label ?? "Unidade local";
+    if (orgType === "setor")      return church?.intermediate_level_label ?? "Distrito";
+    if (orgType === "subsede")    return "Subsede";
+    if (orgType === "congregacao") return church?.local_unit_label ?? "Congregação";
     return orgType;
   };
 
@@ -415,6 +466,7 @@ export default function Congregacoes() {
     if (isConvencaoContext) return `${municipalPlural} nesta ${topSingular.toLowerCase()}`;
     if (isMatriz) return `${childPlural} nesta ${municipalSingular.toLowerCase()}`;
     if (isSetorContext) return `${localPlural} neste ${intermediateSingular.toLowerCase()}`;
+    if (isSubsedeContext) return `${localPlural} nesta subsede`;
     return "Unidades filhas";
   };
 
@@ -577,7 +629,7 @@ export default function Congregacoes() {
     setLoading(true);
 
     // ── Internacional: carrega tudo que pode ser filho direto ─────────────
-    if (activeOrgType === "international_convention") {
+    if (normalizedActiveOrgType === "international_convention") {
       const { data, error } = await supabase.from("organizations").select(ORG_SELECT)
         .eq("parent_id", church.id).eq("active", true)
         .in("organization_type", ["national_convention", "state_convention", "convencao", "matriz", "sede"])
@@ -589,7 +641,7 @@ export default function Congregacoes() {
     }
 
     // ── Nacional: carrega Convenções Estaduais + Matrizes/Sedes diretas ────
-    if (activeOrgType === "national_convention") {
+    if (normalizedActiveOrgType === "national_convention") {
       const { data, error } = await supabase.from("organizations").select(ORG_SELECT)
         .eq("parent_id", church.id).eq("active", true)
         .in("organization_type", ["state_convention", "convencao", "matriz", "sede"]).order("name");
@@ -600,7 +652,7 @@ export default function Congregacoes() {
     }
 
     // ── Estadual/Convenção: carrega Matrizes e Sedes ───────────────────────
-    if (activeOrgType === "convencao" || activeOrgType === "state_convention") {
+    if (normalizedActiveOrgType === "state_convention") {
       const { data, error } = await supabase.from("organizations").select(ORG_SELECT)
         .eq("parent_id", church.id).eq("active", true)
         .in("organization_type", ["matriz", "sede"]).order("name");
@@ -639,7 +691,26 @@ export default function Congregacoes() {
       return;
     }
 
-    if (activeOrgType === "setor") {
+    if (normalizedActiveOrgType === "setor") {
+      // Load both subsedes and direct congregations as children of the setor
+      const { data, error } = await supabase.from("organizations").select(ORG_SELECT)
+        .eq("parent_id", church.id).eq("active", true)
+        .in("organization_type", ["subsede", "congregacao"]).order("name");
+      if (error) {
+        toast({ title: t("Erro ao carregar"), description: error.message, variant: "destructive" });
+        setSectorSubsedes([]);
+        setChildOrganizations([]);
+      } else if (data) {
+        const all = (data as Record<string, unknown>[]).map(mapRow);
+        setSectorSubsedes(all.filter(c => c.organization_type === "subsede"));
+        setChildOrganizations(all.filter(c => c.organization_type === "congregacao"));
+        if (all.length > 0) void loadResponsiblesForOrgs(all.map((c) => c.id));
+      }
+      setLoading(false);
+      return;
+    }
+
+    if (normalizedActiveOrgType === "subsede") {
       const { data, error } = await supabase.from("organizations").select(ORG_SELECT)
         .eq("parent_id", church.id).eq("active", true).eq("organization_type", "congregacao").order("name");
       if (error) toast({ title: t("Erro ao carregar"), description: error.message, variant: "destructive" });
@@ -670,7 +741,8 @@ export default function Congregacoes() {
     name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
-  const insertOrganizationType = (): "international_convention" | "national_convention" | "state_convention" | "matriz" | "setor" | "congregacao" => {
+  const insertOrganizationType = (overrideType?: OrgType): "international_convention" | "national_convention" | "state_convention" | "matriz" | "setor" | "subsede" | "congregacao" | null => {
+    if (overrideType) return overrideType;
     if (isInternationalContext) {
       return church?.hierarchy_model === "international_flexible"
         ? "matriz"
@@ -678,6 +750,8 @@ export default function Congregacoes() {
     }
     if (isNationalContext) return "state_convention";
     if (isConvencaoContext) return "matriz";
+    if (isSetorContext) return null; // must be specified via overrideType
+    if (isSubsedeContext) return "congregacao";
     if (isMatriz) return usesIntermediate ? "setor" : "congregacao";
     return "congregacao";
   };
@@ -698,7 +772,11 @@ export default function Congregacoes() {
       if (error) toast({ title: t("Erro ao atualizar"), description: error.message, variant: "destructive" });
       else toast({ title: t("Dados da unidade atualizados.") });
     } else {
-      const orgType = insertOrganizationType();
+      const orgType = insertOrganizationType(insertChildType ?? undefined);
+      if (!orgType) {
+        toast({ title: "Tipo de unidade inválido", description: "Selecione se deseja criar uma subsede ou congregação.", variant: "destructive" });
+        return;
+      }
       const { error } = await supabase.from("organizations").insert({
         ...payload, slug: generateSlug(form.name) + "-" + Date.now().toString(36),
         parent_id: church!.id, organization_type: orgType, active: true,
@@ -707,11 +785,12 @@ export default function Congregacoes() {
       else {
       const unitLabel = orgType === "state_convention" ? nationalSingular
         : orgType === "setor" ? intermediateSingular
+        : orgType === "subsede" ? "Subsede"
         : orgType === "matriz" ? municipalSingular : localSingular;
         toast({ title: `${unitLabel} criado(a).` });
       }
     }
-    setForm(EMPTY_ORG_FORM); setShowForm(false); setEditingId(null);
+    setForm(EMPTY_ORG_FORM); setShowForm(false); setEditingId(null); setInsertChildType(null);
     void loadChildOrganizations();
   };
 
@@ -881,9 +960,34 @@ export default function Congregacoes() {
                 Estrutura
               </button>
             )}
-            {canManageChildUnits && (
+            {canManageChildUnits && isSetorContext && (
+              <>
+                <button
+                  onClick={() => {
+                    setInsertChildType("subsede");
+                    setShowForm(!showForm); setEditingId(null); setForm(EMPTY_ORG_FORM);
+                    if (!showForm) setShowNomenclatureForm(false);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                >
+                  <Plus size={16} /> Nova Subsede
+                </button>
+                <button
+                  onClick={() => {
+                    setInsertChildType("congregacao");
+                    setShowForm(!showForm); setEditingId(null); setForm(EMPTY_ORG_FORM);
+                    if (!showForm) setShowNomenclatureForm(false);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                >
+                  <Plus size={16} /> Nova Congregação
+                </button>
+              </>
+            )}
+            {canManageChildUnits && !isSetorContext && (
               <button
                 onClick={() => {
+                  setInsertChildType(null);
                   setShowForm(!showForm); setEditingId(null); setForm(EMPTY_ORG_FORM);
                   if (!showForm) setShowNomenclatureForm(false);
                 }}
@@ -1250,8 +1354,151 @@ export default function Congregacoes() {
           </div>
         )}
 
+        {/* ── Subsedes list (setor context only) ── */}
+        {isSetorContext && !loading && (
+          <div className="bg-card rounded-xl shadow-executive overflow-hidden">
+            {sectorSubsedes.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground px-4">
+                <Building2 size={40} className="mx-auto mb-2 opacity-30" />
+                <p className="text-sm">Nenhuma subsede cadastrada.</p>
+              </div>
+            ) : (
+              <>
+                <div className="px-4 py-2.5 border-b border-border/50 bg-secondary/20">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Subsedes</p>
+                </div>
+                <div className="divide-y divide-border">
+                  {sectorSubsedes.map((c) => {
+                    const isExpanded = expandedId === c.id;
+                    const slots = responsiblesByOrg[c.id] ?? {};
+                    const pastor    = slots.pastor;
+                    const secretary = slots.secretary;
+
+                    const navigateAccess = (presetRole: ResponsibleRole, openNew = false) => {
+                      navigate("/admin/gerenciar-acessos", {
+                        state: {
+                          contextOrganizationId:   c.id,
+                          contextOrganizationName: c.name,
+                          contextOrganizationType: c.organization_type,
+                          source: "hierarquia",
+                          ...(openNew ? { openNewAccess: true, presetRole } : {}),
+                        },
+                      });
+                    };
+
+                    return (
+                      <div key={c.id}>
+                        <div
+                          role="button" tabIndex={0}
+                          onClick={() => { setExpandedId(isExpanded ? null : c.id); }}
+                          onKeyDown={(e) => { if (e.key === "Enter") setExpandedId(isExpanded ? null : c.id); }}
+                          className="p-4 hover:bg-secondary/30 transition-colors cursor-pointer select-none"
+                        >
+                          <div className="flex items-start gap-4">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isExpanded ? "bg-accent/30" : "bg-accent/20"}`}>
+                              <ChurchIcon size={20} className="text-accent" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-sm font-semibold">{c.name}</p>
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-semibold shrink-0">
+                                  Subsede
+                                </span>
+                                {statusBadge(c.unit_status)}
+                              </div>
+                              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                                {c.city && (
+                                  <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                                    <MapPin size={10} /> {c.city}{c.state ? `, ${c.state}` : ""}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <span className="text-[11px] text-muted-foreground mr-1 hidden sm:inline">
+                                {isExpanded ? "Recolher" : "Ver detalhes"}
+                              </span>
+                              <ChevronDown size={15} className={`text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                            </div>
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div className="bg-muted/30 border-t border-border/40 px-4 pb-4 pt-3 space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                              {([
+                                { label: "Encarregado", roleKey: "pastor" as const,     Icon: BookOpen },
+                                { label: "Secretário",  roleKey: "secretary" as const,  Icon: UserCheck },
+                                { label: "Tesoureiro",  roleKey: "tesoureiro" as const, Icon: Wallet },
+                              ]).map(({ label, roleKey, Icon }) => (
+                                <ResponsibleRoleCard
+                                  key={roleKey}
+                                  label={label}
+                                  roleKey={roleKey}
+                                  responsible={slots[roleKey]}
+                                  Icon={Icon}
+                                  onDefine={(e) => { e.stopPropagation(); navigateAccess(roleKey, true); }}
+                                  onManageAccess={(e) => { e.stopPropagation(); navigateAccess(roleKey, false); }}
+                                />
+                              ))}
+                            </div>
+
+                            <div className="pt-1 border-t border-border/40 space-y-2">
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Ações operacionais</p>
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                <ShortcutBtn icon={Shield} label="Gerenciar Acessos"
+                                  onClick={(e) => { e.stopPropagation(); handleInviteResponsible(c); }} />
+                                <ShortcutBtn icon={Users} label="Ver Membros"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate("/admin/membros", {
+                                      state: {
+                                        contextOrganizationId:   c.id,
+                                        contextOrganizationName: c.name,
+                                        contextOrganizationType: c.organization_type,
+                                        source: "hierarquia",
+                                      },
+                                    });
+                                  }}
+                                />
+                                <ShortcutBtn icon={Calendar} label="Agenda"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate("/admin/agenda", {
+                                      state: { contextOrganizationId: c.id, contextOrganizationName: c.name, contextOrganizationType: c.organization_type },
+                                    });
+                                  }}
+                                />
+                                <ShortcutBtn icon={Wallet} label="Financeiro"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate("/admin/financeiro", {
+                                      state: { contextOrganizationId: c.id, contextOrganizationName: c.name, contextOrganizationType: c.organization_type },
+                                    });
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── Congregações diretas header (setor context) ── */}
+        {isSetorContext && !loading && childOrganizations.length > 0 && (
+          <div className="mt-4 px-4 py-2.5 border-b border-border/50 bg-secondary/20 rounded-t-xl">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Congregações diretas</p>
+          </div>
+        )}
+
         {/* ── Child organizations list ── */}
-        <div className="bg-card rounded-xl shadow-executive overflow-hidden">
+        <div className={`bg-card shadow-executive overflow-hidden ${isSetorContext && childOrganizations.length > 0 ? "rounded-b-xl" : "rounded-xl"}`}>
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 size={24} className="animate-spin text-muted-foreground" />
@@ -1270,6 +1517,26 @@ export default function Congregacoes() {
                   <p className="text-xs mt-2">
                     Use Gerenciar Acessos para responsáveis e os atalhos operacionais da unidade atual.
                   </p>
+                </>
+              ) : !canManageChildUnits && !isAnyConventionContext ? (
+                <>
+                  <p className="text-sm font-medium text-foreground">
+                    {church?.name ?? localSingular}
+                  </p>
+                  <p className="text-sm mt-2">
+                    Esta é uma unidade local operacional — não cria novas unidades filhas.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/admin/membros")}
+                    className="inline-flex items-center gap-1.5 mt-3 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+                  >
+                    <Users size={14} /> Ir para Membros
+                  </button>
+                </>
+              ) : isSetorContext ? (
+                <>
+                  <p className="text-sm">Nenhuma congregação direta cadastrada.</p>
                 </>
               ) : (
                 <>

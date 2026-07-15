@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Loader2, Megaphone } from "lucide-react";
 import { CampaignCover } from "@/components/campanhas/CampaignCover";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -18,6 +17,10 @@ type Props = {
   loading?: boolean;
 };
 
+/* ------------------------------------------------------------------ */
+/*  Slide content — zero animation, pure layout                       */
+/* ------------------------------------------------------------------ */
+
 function CarouselSlide({
   campaign,
   media,
@@ -30,6 +33,7 @@ function CarouselSlide({
 
   return (
     <div className="flex flex-col sm:flex-row h-full min-h-[180px]">
+      {/* Left: cover image */}
       <div className="relative sm:w-2/5 md:w-5/12 lg:w-2/5 flex-shrink-0 overflow-hidden">
         <CampaignCover
           campaign={campaign}
@@ -44,6 +48,7 @@ function CarouselSlide({
         )}
       </div>
 
+      {/* Right: info */}
       <div className="p-5 sm:p-6 flex flex-col justify-center gap-3 flex-1 min-w-0">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
@@ -54,6 +59,7 @@ function CarouselSlide({
           </h2>
         </div>
 
+        {/* Progress bar */}
         <div className="max-w-md">
           <div className="flex justify-between text-xs mb-1">
             <span className="text-muted-foreground">{pct}% {t("da meta")}</span>
@@ -63,7 +69,10 @@ function CarouselSlide({
             </span>
           </div>
           <div className="h-2 rounded-full bg-secondary overflow-hidden">
-            <div className="h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${pct}%` }} />
+            <div
+              className="h-full rounded-full bg-accent transition-all duration-500"
+              style={{ width: `${pct}%` }}
+            />
           </div>
         </div>
 
@@ -78,6 +87,11 @@ function CarouselSlide({
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  Main carousel — zero Framer Motion, zero CSS transitions           */
+/*  Clipping lives on a static <div> so Safari never breaks overflow   */
+/* ------------------------------------------------------------------ */
+
 export function DashboardCampaignCarousel({ campaigns, loading = false }: Props) {
   const { t } = useLanguage();
   const [index, setIndex] = useState(0);
@@ -90,9 +104,7 @@ export function DashboardCampaignCarousel({ campaigns, loading = false }: Props)
   );
   const campaignsKey = useMemo(() => campaigns.map((c) => c.id).join(","), [campaigns]);
 
-  const { mediaByCampaign, loading: mediaLoading } = useCampaignMedia({
-    campaignIds,
-  });
+  const { mediaByCampaign, loading: mediaLoading } = useCampaignMedia({ campaignIds });
 
   const count = campaigns.length;
   const countRef = useRef(count);
@@ -114,17 +126,17 @@ export function DashboardCampaignCarousel({ campaigns, loading = false }: Props)
     setIndex(0);
   }, [campaignsKey]);
 
+  /* auto-play */
   useEffect(() => {
     if (count <= 1) return;
-
     const timer = window.setInterval(() => {
       if (pausedRef.current) return;
       setIndex((i) => (i + 1) % countRef.current);
     }, AUTOPLAY_MS);
-
     return () => window.clearInterval(timer);
   }, [count]);
 
+  /* touch swipe */
   const handleTouchStart = (clientX: number) => {
     touchStartX.current = clientX;
     pausedRef.current = true;
@@ -138,10 +150,10 @@ export function DashboardCampaignCarousel({ campaigns, loading = false }: Props)
     if (total <= 1) return;
     if (delta > 50) setIndex((i) => (i - 1 + total) % total);
     else if (delta < -50) setIndex((i) => (i + 1) % total);
-    window.setTimeout(() => {
-      pausedRef.current = false;
-    }, AUTOPLAY_MS);
+    window.setTimeout(() => { pausedRef.current = false; }, AUTOPLAY_MS);
   };
+
+  /* ---------- early returns ---------- */
 
   if (loading) {
     return (
@@ -165,73 +177,72 @@ export function DashboardCampaignCarousel({ campaigns, loading = false }: Props)
 
   const current = campaigns[safeIndex];
 
+  /* ---------- main render ---------- */
+
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden rounded-2xl border border-border/50 bg-card shadow-executive"
-      onMouseEnter={() => {
-        pausedRef.current = true;
-      }}
-      onMouseLeave={() => {
-        pausedRef.current = false;
-      }}
+    <section
+      onMouseEnter={() => { pausedRef.current = true; }}
+      onMouseLeave={() => { pausedRef.current = false; }}
       onTouchStart={(e) => handleTouchStart(e.touches[0]?.clientX ?? 0)}
       onTouchEnd={(e) => handleTouchEnd(e.changedTouches[0]?.clientX ?? 0)}
     >
-      {mediaLoading && (
-        <div className="absolute top-3 right-3 z-20">
-          <Loader2 size={16} className="animate-spin text-muted-foreground" />
-        </div>
-      )}
-
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={current.id}
-          initial={{ opacity: 0, x: 12 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -12 }}
-          transition={{ duration: 0.35 }}
-        >
-          <CarouselSlide campaign={current} media={mediaByCampaign.get(current.id) ?? []} />
-        </motion.div>
-      </AnimatePresence>
-
-      {count > 1 && (
-        <>
-          <button
-            type="button"
-            onClick={prev}
-            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-9 w-9 items-center justify-center rounded-full bg-background/80 border border-border/50 shadow-sm hover:bg-background transition-colors"
-            aria-label={t("Anterior")}
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <button
-            type="button"
-            onClick={next}
-            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-9 w-9 items-center justify-center rounded-full bg-background/80 border border-border/50 shadow-sm hover:bg-background transition-colors"
-            aria-label={t("Próximo")}
-          >
-            <ChevronRight size={18} />
-          </button>
-
-          <div className="flex items-center justify-center gap-1.5 pb-4 pt-1">
-            {campaigns.map((item, i) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => goTo(i)}
-                className={cn(
-                  "h-1.5 rounded-full transition-all",
-                  i === safeIndex ? "w-6 bg-accent" : "w-2 bg-muted-foreground/35 hover:bg-muted-foreground/55",
-                )}
-                aria-label={`${t("Campanha")} ${i + 1}`}
-              />
-            ))}
+      {/*
+        CRITICAL: overflow-hidden + rounded-* + border live on a STATIC <div>, never animated.
+        isolation:isolate + backface-visibility:hidden prevents Safari from ignoring
+        overflow clipping when child content gets its own compositing layer.
+      */}
+      <div
+        className="relative rounded-2xl border border-border/50 bg-card shadow-executive"
+        style={{ overflow: "clip", isolation: "isolate", backfaceVisibility: "hidden" }}
+      >
+        {mediaLoading && (
+          <div className="absolute top-3 right-3 z-20">
+            <Loader2 size={16} className="animate-spin text-muted-foreground" />
           </div>
-        </>
-      )}
-    </motion.section>
+        )}
+
+        {/* Slide changes instantly — key triggers React re-render, not animation */}
+        <CarouselSlide
+          campaign={current}
+          media={mediaByCampaign.get(current.id) ?? []}
+        />
+
+        {count > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={prev}
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-9 w-9 items-center justify-center rounded-full bg-background/80 border border-border/50 shadow-sm hover:bg-background transition-colors"
+              aria-label={t("Anterior")}
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={next}
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-10 hidden sm:flex h-9 w-9 items-center justify-center rounded-full bg-background/80 border border-border/50 shadow-sm hover:bg-background transition-colors"
+              aria-label={t("Próximo")}
+            >
+              <ChevronRight size={18} />
+            </button>
+
+            <div className="flex items-center justify-center gap-1.5 pb-4 pt-1">
+              {campaigns.map((item, i) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => goTo(i)}
+                  className={cn(
+                    "h-1.5 rounded-full transition-all",
+                    i === safeIndex ? "w-6 bg-accent" : "w-2 bg-muted-foreground/35 hover:bg-muted-foreground/55",
+                  )}
+                  aria-label={`${t("Campanha")} ${i + 1}`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </section>
   );
 }

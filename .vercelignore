@@ -1,0 +1,6 @@
+﻿.env.vercel.production
+DIFF_*.txt
+EDGE_*.txt
+supabase/.temp/
+supabase/migrations/
+supabase/functions/

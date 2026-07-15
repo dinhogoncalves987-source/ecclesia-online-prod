@@ -4,7 +4,7 @@
  * Generates an invite token and offers WhatsApp + copy-link options.
  */
 import { useState, useEffect, useCallback } from "react";
-import { X, MessageCircle, Copy, Clock, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
+import { X, MessageCircle, Copy, Clock, CheckCircle2, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
@@ -29,6 +29,12 @@ interface Props {
   invitedBy?:     string;
   /** Phone OR WhatsApp number (raw, will be sanitised). */
   phone?:         string | null;
+  /**
+   * Registered e-mail of the member — required to generate the digital invite.
+   * The invite binds the Auth account to this fixed e-mail, so without it the
+   * invite cannot be created.
+   */
+  email?:         string | null;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -37,11 +43,13 @@ export function MemberInviteModal({
   open, onClose,
   memberId, memberName, organizationId, churchName,
   sectorId, congregationId, invitedBy,
-  phone,
+  phone, email,
 }: Props) {
   const [invite, setInvite]     = useState<InviteRecord | null>(null);
   const [loading, setLoading]   = useState(false);
   const [copied, setCopied]     = useState(false);
+
+  const hasEmail = !!email && email.trim().length > 0;
 
   const generate = useCallback(async () => {
     setLoading(true);
@@ -65,8 +73,10 @@ export function MemberInviteModal({
   }, [memberId, organizationId, sectorId, congregationId, invitedBy]);
 
   useEffect(() => {
-    if (open && !invite) generate();
-  }, [open, invite, generate]);
+    // The invite binds the Auth account to the member's registered e-mail —
+    // without an e-mail there is nothing to bind, so we never generate it.
+    if (open && !invite && hasEmail) generate();
+  }, [open, invite, hasEmail, generate]);
 
   const inviteUrl = invite ? buildInviteUrl(invite.token) : "";
 
@@ -115,10 +125,10 @@ export function MemberInviteModal({
           <div>
             <div className="flex items-center gap-2 mb-0.5">
               <CheckCircle2 size={18} className="text-emerald-500" />
-              <h2 className="font-serif text-base font-semibold">Membro cadastrado!</h2>
+              <h2 className="font-serif text-base font-semibold">Membro cadastrado com sucesso</h2>
             </div>
             <p className="text-xs text-muted-foreground">
-              Envie o link de convite para <span className="font-medium text-foreground">{memberName}</span> ativar o acesso.
+              Envie o link de ativação para que o membro crie o acesso ao aplicativo.
             </p>
           </div>
           <button
@@ -132,8 +142,18 @@ export function MemberInviteModal({
         {/* Body */}
         <div className="px-5 py-5 space-y-4">
 
+          {/* Blocked: member has no registered e-mail */}
+          {!hasEmail && (
+            <div className="flex flex-col items-center text-center gap-2 py-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-4">
+              <AlertTriangle size={22} className="text-amber-600 dark:text-amber-400" />
+              <p className="text-sm text-amber-800 dark:text-amber-300">
+                Cadastre um e-mail para este membro antes de enviar o convite digital.
+              </p>
+            </div>
+          )}
+
           {/* Loading state */}
-          {loading && (
+          {hasEmail && loading && (
             <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground">
               <Loader2 size={18} className="animate-spin" />
               <span className="text-sm">Gerando convite...</span>
@@ -141,7 +161,7 @@ export function MemberInviteModal({
           )}
 
           {/* Invite ready */}
-          {!loading && invite && (
+          {hasEmail && !loading && invite && (
             <>
               {/* Link preview */}
               <div className="bg-muted/40 rounded-lg px-3 py-2.5">
@@ -163,14 +183,18 @@ export function MemberInviteModal({
 
               {/* Actions */}
               <div className="space-y-2 pt-1">
-                {phone && (
+                {phone ? (
                   <button
                     onClick={handleWhatsApp}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#25D366] text-white rounded-lg text-sm font-medium hover:bg-[#1ebe5b] transition-colors"
                   >
                     <MessageCircle size={16} />
-                    Enviar convite pelo WhatsApp
+                    Enviar pelo WhatsApp
                   </button>
+                ) : (
+                  <p className="text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 text-center">
+                    Este membro não possui telefone cadastrado. Copie o link e envie manualmente.
+                  </p>
                 )}
 
                 <button
@@ -179,7 +203,7 @@ export function MemberInviteModal({
                 >
                   {copied
                     ? <><CheckCircle2 size={15} className="text-emerald-500" /> Link copiado!</>
-                    : <><Copy size={15} /> Copiar link de convite</>
+                    : <><Copy size={15} /> Copiar link</>
                   }
                 </button>
               </div>

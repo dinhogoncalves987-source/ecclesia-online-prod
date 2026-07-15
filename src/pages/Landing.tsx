@@ -1,16 +1,43 @@
-import { Link } from "react-router-dom";
+import { useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard, Wallet, Users, Calendar, BookOpen, Heart,
   MessageSquare, BarChart3, Shield, ChevronRight, ArrowRight
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AppBootScreen } from "@/components/AppBootScreen";
+import { ReconnectScreen } from "@/components/ReconnectScreen";
+import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 
 const transition = { duration: 0.5, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] };
 
 export default function Landing() {
   const { t } = useLanguage();
+  const { user, loading: authLoading, connectionIssue, retryConnection } = useAuth();
+  const navigate = useNavigate();
+
+  // Someone who already has a valid session should get straight into the
+  // app instead of seeing the public marketing page — this is reachable
+  // when the PWA's start_url resolves to "/" on an older cached shell, or
+  // when a browser tab is opened directly at the root.
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate("/admin", { replace: true });
+    }
+  }, [authLoading, user, navigate]);
+
+  // A persisted token exists but couldn't be confirmed — never show the
+  // public marketing page as if the user were logged out. See PROBLEMA
+  // CRÍTICO 1.
+  if (connectionIssue) {
+    return <ReconnectScreen onRetry={retryConnection} />;
+  }
+
+  if (authLoading || user) {
+    return <AppBootScreen />;
+  }
 
   const features = [
     { icon: LayoutDashboard, title: t("Dashboard Executivo"), desc: t("Visão gerencial completa com métricas em tempo real."), path: "/admin" },
