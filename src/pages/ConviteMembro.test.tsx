@@ -8,7 +8,7 @@ vi.mock("@/hooks/useAuth", () => ({ useAuth: () => mockUseAuth() }));
 
 const getInviteByTokenMock     = vi.fn();
 const acceptMemberInviteMock   = vi.fn();
-const signUpForMemberInviteMock = vi.fn();
+const sendMemberInviteMagicLinkMock = vi.fn();
 
 vi.mock("@/lib/memberInvites", async () => {
   const actual = await vi.importActual<typeof import("@/lib/memberInvites")>("@/lib/memberInvites");
@@ -16,18 +16,16 @@ vi.mock("@/lib/memberInvites", async () => {
     ...actual,
     getInviteByToken: (...args: unknown[]) => getInviteByTokenMock(...args),
     acceptMemberInvite: (...args: unknown[]) => acceptMemberInviteMock(...args),
-    signUpForMemberInvite: (...args: unknown[]) => signUpForMemberInviteMock(...args),
+    sendMemberInviteMagicLink: (...args: unknown[]) => sendMemberInviteMagicLinkMock(...args),
     buildInviteUrl: (token: string) => `https://app.example.com/convite-membro/${token}`,
   };
 });
 
 const signOutMock = vi.fn().mockResolvedValue(undefined);
-const resendMock  = vi.fn().mockResolvedValue({ data: {}, error: null });
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {
       signOut: (...args: unknown[]) => signOutMock(...args),
-      resend: (...args: unknown[]) => resendMock(...args),
     },
   },
 }));
@@ -73,50 +71,22 @@ describe("ConviteMembro — secure member invite flow", () => {
     mockUseAuth.mockReturnValue({ user: null, loading: false });
     getInviteByTokenMock.mockReset();
     acceptMemberInviteMock.mockReset();
-    signUpForMemberInviteMock.mockReset();
+    sendMemberInviteMagicLinkMock.mockReset();
     signOutMock.mockClear();
-    resendMock.mockClear();
     getInviteByTokenMock.mockResolvedValue({ data: VALID_INVITE, error: null });
   });
 
-  // CENÁRIO OBRIGATÓRIO: conta nova exige confirmação de e-mail.
-  it("does not finalize the link right after sign-up — waits for e-mail confirmation", async () => {
-    signUpForMemberInviteMock.mockResolvedValue({
-      data: { user: { id: "new-1", identities: [{ id: "x" }] }, session: null },
-      error: null,
-    });
+  // CENÁRIO OBRIGATÓRIO: nova ou existente exige prova da caixa postal.
+  it("does not finalize before the recipient opens the secure e-mail link", async () => {
+    sendMemberInviteMagicLinkMock.mockResolvedValue({ data: {}, error: null });
 
     renderPage();
     await screen.findByText("Fulano de Tal");
 
-    fireEvent.change(screen.getByPlaceholderText("Crie uma senha"), { target: { value: "senha123" } });
-    fireEvent.change(screen.getByPlaceholderText("Repita a senha"), { target: { value: "senha123" } });
-    fireEvent.click(screen.getByRole("button", { name: /criar senha e ativar acesso/i }));
+    fireEvent.click(screen.getByRole("button", { name: /enviar link seguro para meu e-mail/i }));
 
-    await screen.findByText(/enviamos um link de confirmação/i);
-    expect(signUpForMemberInviteMock).toHaveBeenCalledWith("fulano@example.com", "senha123", "tok-1");
-    expect(acceptMemberInviteMock).not.toHaveBeenCalled();
-  });
-
-  // CENÁRIO OBRIGATÓRIO: conta existente nunca tem a senha alterada.
-  it("never touches an existing account's password — detects it and points to login/recovery", async () => {
-    signUpForMemberInviteMock.mockResolvedValue({
-      data: { user: { id: "existing-1", identities: [] }, session: null },
-      error: null,
-    });
-
-    renderPage();
-    await screen.findByText("Fulano de Tal");
-
-    fireEvent.change(screen.getByPlaceholderText("Crie uma senha"), { target: { value: "senha123" } });
-    fireEvent.change(screen.getByPlaceholderText("Repita a senha"), { target: { value: "senha123" } });
-    fireEvent.click(screen.getByRole("button", { name: /criar senha e ativar acesso/i }));
-
-    await screen.findByText(/já existe uma conta/i);
-    expect(screen.getByRole("link", { name: /fazer login/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /esqueci minha senha/i })).toBeInTheDocument();
-    // No password of any pre-existing account was ever touched — the only
-    // account-creation call made was the official signUp; nothing else.
+    await screen.findByText(/enviamos um link seguro/i);
+    expect(sendMemberInviteMagicLinkMock).toHaveBeenCalledWith("fulano@example.com", "tok-1");
     expect(acceptMemberInviteMock).not.toHaveBeenCalled();
   });
 
@@ -163,21 +133,19 @@ describe("ConviteMembro — secure member invite flow", () => {
   });
 
   it("does not submit the sign-up form twice from a rapid double click", async () => {
-    signUpForMemberInviteMock.mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => resolve({ data: { user: { id: "n1", identities: [{ id: "x" }] }, session: null }, error: null }), 20)),
+    sendMemberInviteMagicLinkMock.mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve({ data: {}, error: null }), 20)),
     );
 
     renderPage();
     await screen.findByText("Fulano de Tal");
 
-    fireEvent.change(screen.getByPlaceholderText("Crie uma senha"), { target: { value: "senha123" } });
-    fireEvent.change(screen.getByPlaceholderText("Repita a senha"), { target: { value: "senha123" } });
-    const submitButton = screen.getByRole("button", { name: /criar senha e ativar acesso/i });
+    const submitButton = screen.getByRole("button", { name: /enviar link seguro para meu e-mail/i });
     fireEvent.click(submitButton);
     fireEvent.click(submitButton);
 
-    await screen.findByText(/enviamos um link de confirmação/i);
-    expect(signUpForMemberInviteMock).toHaveBeenCalledTimes(1);
+    await screen.findByText(/enviamos um link seguro/i);
+    expect(sendMemberInviteMagicLinkMock).toHaveBeenCalledTimes(1);
   });
 
   it("finalizes automatically and redirects once the session matches the invite's e-mail", async () => {

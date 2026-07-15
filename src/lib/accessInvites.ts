@@ -5,6 +5,11 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getPublicAppUrl } from "@/lib/publicUrl";
 
+const ASSIGNABLE_ACCESS_ROLES = new Set([
+  "church_admin", "pastor", "secretary", "tesoureiro",
+  "contador", "leader", "porteiro", "member",
+]);
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface AccessInvitePublic {
@@ -85,6 +90,9 @@ export async function createAccessInvite(input: {
   if (!email) {
     return { data: null, error: "E-mail é obrigatório para convites de acesso." };
   }
+  if (!ASSIGNABLE_ACCESS_ROLES.has(input.role)) {
+    return { data: null, error: "Função inválida para convite de acesso." };
+  }
 
   const { data, error } = await supabase
     .from("access_invites")
@@ -139,7 +147,6 @@ export async function acceptAccessInvite(token: string): Promise<{
   const result = data as {
     ok: boolean;
     error?: string;
-    invite_email?: string;
     organization_id?: string;
     role?: string;
   };

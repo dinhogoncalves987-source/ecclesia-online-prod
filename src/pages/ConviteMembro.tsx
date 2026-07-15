@@ -12,33 +12,29 @@
  * - There is NO server-side path (Edge Function or otherwise) that resets the
  *   password of a pre-existing Auth account from this public page. That
  *   capability has been removed entirely.
- * - New member (no account yet): we use the OFFICIAL Supabase `signUp` flow
- *   with the member's fixed e-mail. E-mail confirmation is REQUIRED — the
- *   invite is only finalized after Supabase reports a real, confirmed,
- *   authenticated session (never `email_confirm: true` bypasses).
+ * - New or existing member without a session: Supabase sends a magic link to
+ *   the fixed member e-mail. This proves mailbox ownership independently of
+ *   the project's password-signup confirmation toggle.
  * - Existing member (already has an Auth account): they must log in normally
  *   or recover their password through the official `/forgot-password` flow.
  *   Once authenticated, the invite is finalized using their real session
  *   (`auth.uid()` + a normalized `auth.email()` <-> `members.email` check),
  *   via the `accept_member_invite` RPC — never a service-role/admin path.
  * - The frontend never sends an e-mail or a user id to any backend call for
- *   linking — only the invite token, and (for sign-up only) a password the
- *   member just chose for the FIXED e-mail shown on screen.
+ *   linking — only the invite token. No password crosses this public page.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, Link, useLocation } from "react-router-dom";
 import {
   CheckCircle2, XCircle, Loader2, Church, User, MapPin,
-  Eye, EyeOff, Mail, Lock, AlertTriangle, LogOut, MailCheck,
+  Mail, AlertTriangle, LogOut, MailCheck,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import {
   getInviteByToken,
   acceptMemberInvite,
-  signUpForMemberInvite,
-  buildInviteUrl,
-  isAlreadyRegisteredSignUp,
+  sendMemberInviteMagicLink,
   emailsMatch,
   type MemberInvitePublic,
 } from "@/lib/memberInvites";
@@ -49,9 +45,8 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 type Step = "loading" | "error" | "form" | "linking" | "done";
 
 type FormMode =
-  | "signup"            // no session yet — password-creation form (default)
-  | "check_email"       // signed up, waiting for e-mail confirmation
-  | "existing_account"  // signUp detected an already-registered e-mail
+  | "signup"            // no session yet — request secure e-mail link
+  | "check_email"       // waiting for the magic link/OTP
   | "session_mismatch"  // authenticated, but with the WRONG account
   | "link_error";        // authenticated + matching, but acceptMemberInvite failed
 
@@ -106,9 +101,6 @@ export default function ConviteMembro() {
   const [errMsg, setErrMsg] = useState("");
 
   const [formMode, setFormMode] = useState<FormMode>("signup");
-  const [password, setPassword]               = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPass, setShowPass]                = useState(false);
   const [formError, setFormError]              = useState("");
   const [submitting, setSubmitting]             = useState(false);
   const [linkError, setLinkError]               = useState("");
@@ -241,7 +233,7 @@ export default function ConviteMembro() {
     runAcceptMemberInvite(user.id);
   }, [step, authLoading, user, invite, memberHasEmail, fixedEmail, runAcceptMemberInvite]);
 
-  // ── Create account (new member) → wait for e-mail confirmation ───────────────
+  // ── Prove mailbox ownership by magic link (new or existing account) ──────────
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting) return;
@@ -250,38 +242,21 @@ export default function ConviteMembro() {
       setFormError("Este membro ainda não possui e-mail cadastrado.");
       return;
     }
-    if (!password || password.length < 6) {
-      setFormError("A senha deve ter pelo menos 6 caracteres.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setFormError("As senhas não coincidem.");
-      return;
-    }
-
     setSubmitting(true);
     setFormError("");
 
     try {
-      const { data, error } = await signUpForMemberInvite(fixedEmail, password, token);
+      const { error } = await sendMemberInviteMagicLink(fixedEmail, token);
 
       if (error) {
-        console.error("[ConviteMembro] signUp error", error);
-        setFormError(error.message || "Não foi possível criar sua conta agora. Tente novamente.");
+        console.error("[ConviteMembro] magic-link error", error);
+        setFormError(error.message || "Não foi possível enviar o link seguro agora. Tente novamente.");
         setSubmitting(false);
         return;
       }
 
-      if (isAlreadyRegisteredSignUp(data)) {
-        setFormMode("existing_account");
-        setSubmitting(false);
-        return;
-      }
-
-      // Expected path: e-mail confirmation is required, so no session comes
-      // back yet. The user must click the link in their inbox, which
-      // redirects to this same page and lets the effect above finish the
-      // link automatically once `useAuth()` reports the confirmed session.
+      // A sessão só nasce depois que o destinatário abre o link recebido no
+      // e-mail fixo. O effect acima finaliza o convite no retorno autenticado.
       setFormMode("check_email");
       setSubmitting(false);
     } catch (err) {
@@ -295,11 +270,8 @@ export default function ConviteMembro() {
     if (resendState === "sending" || !fixedEmail) return;
     setResendState("sending");
     try {
-      await supabase.auth.resend({
-        type: "signup",
-        email: fixedEmail,
-        options: { emailRedirectTo: buildInviteUrl(token) },
-      });
+      const { error } = await sendMemberInviteMagicLink(fixedEmail, token);
+      if (error) throw error;
     } catch (e) {
       console.error("[ConviteMembro] resend confirmation failed", e);
     }
@@ -391,7 +363,7 @@ export default function ConviteMembro() {
     );
   }
 
-  // ── Form step: member card + password/login flow ─────────────────────────────
+  // ── Form step: member card + mailbox-proof/login flow ────────────────────────
   const MemberCard = () => (
     <div className="flex items-center gap-4">
       {invite?.member_photo ? (
@@ -508,45 +480,17 @@ export default function ConviteMembro() {
         )}
       </div>
     );
-  } else if (formMode === "existing_account") {
-    body = (
-      <div className="space-y-3 text-center">
-        <div className="bg-muted/40 border border-border/50 rounded-xl px-4 py-3 space-y-2">
-          <Mail size={22} className="text-primary mx-auto" />
-          <p className="text-sm text-foreground">
-            Já existe uma conta para <strong>{fixedEmail}</strong>.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Faça login normalmente ou recupere sua senha. Você voltará para esta página
-            automaticamente para concluir a ativação.
-          </p>
-        </div>
-        <Link
-          to="/login"
-          state={loginStateFrom}
-          className="w-full inline-flex items-center justify-center py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
-        >
-          Fazer login
-        </Link>
-        <Link
-          to="/forgot-password"
-          className="inline-block text-sm text-primary hover:underline"
-        >
-          Esqueci minha senha
-        </Link>
-      </div>
-    );
   } else if (formMode === "check_email") {
     body = (
       <div className="space-y-3 text-center">
         <div className="bg-muted/40 border border-border/50 rounded-xl px-4 py-3 space-y-2">
           <MailCheck size={26} className="text-primary mx-auto" />
           <p className="text-sm text-foreground">
-            Enviamos um link de confirmação para <strong>{fixedEmail}</strong>.
+            Enviamos um link seguro para <strong>{fixedEmail}</strong>.
           </p>
           <p className="text-xs text-muted-foreground">
-            Abra seu e-mail e clique no link para confirmar. Você voltará automaticamente
-            para esta página com o acesso ativado.
+            Abra o e-mail e clique no link para provar que esta caixa postal é sua.
+            Você voltará automaticamente para concluir o acesso.
           </p>
         </div>
         <button
@@ -557,12 +501,12 @@ export default function ConviteMembro() {
         >
           {resendState === "sending" && "Reenviando..."}
           {resendState === "sent" && "E-mail reenviado!"}
-          {resendState === "idle" && "Reenviar e-mail de confirmação"}
+          {resendState === "idle" && "Reenviar link seguro"}
         </button>
       </div>
     );
   } else {
-    // formMode === "signup" — default: password-creation form for a new member.
+    // formMode === "signup" — solicita link para o e-mail fixo do membro.
     body = (
       <form onSubmit={handleSignUp} className="space-y-3">
         <div className="space-y-1.5">
@@ -578,47 +522,6 @@ export default function ConviteMembro() {
           />
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Lock size={12} /> Senha
-          </label>
-          <div className="relative">
-            <input
-              type={showPass ? "text" : "password"}
-              placeholder="Crie uma senha"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              minLength={6}
-              disabled={submitting}
-              className="w-full px-3 py-2.5 pr-10 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPass(v => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
-            </button>
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Lock size={12} /> Confirmar senha
-          </label>
-          <input
-            type={showPass ? "text" : "password"}
-            placeholder="Repita a senha"
-            value={confirmPassword}
-            onChange={e => setConfirmPassword(e.target.value)}
-            required
-            minLength={6}
-            disabled={submitting}
-            className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
-          />
-        </div>
-
         {formError && (
           <p className="text-xs text-destructive">{formError}</p>
         )}
@@ -629,11 +532,11 @@ export default function ConviteMembro() {
           className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
         >
           {submitting && <Loader2 size={14} className="animate-spin" />}
-          Criar senha e ativar acesso
+          Enviar link seguro para meu e-mail
         </button>
 
         <p className="text-center text-xs text-muted-foreground">
-          Já tem uma conta com este e-mail?{" "}
+          Prefere entrar com sua senha atual?{" "}
           <Link to="/login" state={loginStateFrom} className="text-primary hover:underline">
             Fazer login
           </Link>

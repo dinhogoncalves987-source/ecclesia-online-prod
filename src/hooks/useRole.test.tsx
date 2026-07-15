@@ -71,7 +71,10 @@ describe("useRole", () => {
         platformRole: "super_admin",
         isSuperAdminRow: false,
         userRoles: [{ role: "superadmin", organization_id: null }],
-        memberships: [{ organization_id: "org-1", role: "member", is_active: true }],
+        memberships: [
+          { organization_id: "org-1", role: "member", is_active: true },
+          { organization_id: "org-1", role: "super_admin", is_active: true },
+        ],
       },
       loading: false,
       isError: false,

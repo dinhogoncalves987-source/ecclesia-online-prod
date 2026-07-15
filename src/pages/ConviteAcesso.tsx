@@ -33,7 +33,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Step = "loading" | "error" | "wrong_account" | "preview" | "auth" | "accepting" | "done";
+type Step = "loading" | "error" | "wrong_account" | "preview" | "auth" | "check_email" | "accepting" | "done";
 
 const ROLE_LABELS: Record<string, string> = {
   church_admin: "Administrador",
@@ -97,6 +97,12 @@ export default function ConviteAcesso() {
       }
       setInvite(data);
 
+      if (!data.email || !data.email.trim()) {
+        setErrMsg("Este convite não possui e-mail cadastrado. Solicite um novo link ao administrador.");
+        setStep("error");
+        return;
+      }
+
       // 3. Decide next step based on current session + email match
       if (!user) {
         // Not logged in → show login/signup form, pre-fill invite e-mail
@@ -129,6 +135,7 @@ export default function ConviteAcesso() {
         not_authenticated:    "Você precisa estar autenticado para aceitar este convite.",
         invite_email_missing: "Este convite não possui e-mail cadastrado. Solicite um novo link ao administrador.",
         existing_org_access:  "Esta conta já possui acesso nesta igreja. Contate o administrador para alterar o papel.",
+        invalid_invite_role:  "A função deste convite é inválida. Solicite um novo link ao administrador.",
       };
       setErrMsg(friendly[error] ?? `Erro: ${error}`);
       setStep("error");
@@ -157,11 +164,26 @@ export default function ConviteAcesso() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) { setAuthError(error.message); return; }
       } else {
-        const { error } = await supabase.auth.signUp({
-          email, password,
-          options: { data: { full_name: invite?.full_name || "" } },
+        const fixedInviteEmail = invite?.email?.trim() ?? "";
+        if (!fixedInviteEmail || isEmailMismatch(fixedInviteEmail, email)) {
+          setAuthError("Use exatamente o e-mail vinculado a este convite.");
+          return;
+        }
+
+        // Prova de caixa postal independente da configuração de confirmação
+        // de sign-up do projeto: a sessão só existe depois que o destinatário
+        // abre o magic link enviado ao e-mail fixo do convite.
+        const { error } = await supabase.auth.signInWithOtp({
+          email: fixedInviteEmail,
+          options: {
+            emailRedirectTo: buildAccessInviteUrl(token),
+            shouldCreateUser: true,
+            data: { full_name: invite?.full_name || "" },
+          },
         });
         if (error) { setAuthError(error.message); return; }
+        setStep("check_email");
+        return;
       }
 
       // Re-validate email after auth
@@ -338,6 +360,18 @@ export default function ConviteAcesso() {
             </div>
           )}
 
+          {/* ── Mailbox proof pending ── */}
+          {step === "check_email" && invite && (
+            <div className="flex flex-col items-center gap-3 py-8 text-center">
+              <CheckCircle2 size={40} className="text-emerald-500" />
+              <p className="font-semibold">Verifique seu e-mail</p>
+              <p className="text-sm text-muted-foreground">
+                Enviamos um link seguro para <strong>{invite.email}</strong>.
+                Abra o link para provar que o e-mail é seu e voltar a este convite.
+              </p>
+            </div>
+          )}
+
           {/* ── Auth form ── */}
           {step === "auth" && invite && (
             <div className="space-y-4">
@@ -362,7 +396,7 @@ export default function ConviteAcesso() {
               <p className="text-sm text-muted-foreground">
                 {authMode === "login"
                   ? "Entre com sua conta para ativar o acesso."
-                  : "Crie sua conta para ativar o acesso."}
+                  : "Receba um link seguro no e-mail do convite para criar ou acessar sua conta."}
               </p>
 
               <form onSubmit={(e) => void handleAuth(e)} className="space-y-3">
@@ -370,27 +404,30 @@ export default function ConviteAcesso() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  readOnly={authMode === "signup"}
                   placeholder="seu@email.com"
                   required
                   className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
                 />
-                <div className="relative">
-                  <input
-                    type={showPass ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Senha"
-                    required
-                    className="w-full px-3 py-2 pr-9 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPass((v) => !v)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
-                </div>
+                {authMode === "login" && (
+                  <div className="relative">
+                    <input
+                      type={showPass ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Senha"
+                      required
+                      className="w-full px-3 py-2 pr-9 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPass((v) => !v)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                )}
 
                 {authError && <p className="text-xs text-destructive">{authError}</p>}
 
@@ -406,13 +443,18 @@ export default function ConviteAcesso() {
                   ) : (
                     <UserPlus size={14} />
                   )}
-                  {authMode === "login" ? "Entrar e ativar acesso" : "Criar conta e ativar acesso"}
+                  {authMode === "login" ? "Entrar e ativar acesso" : "Enviar link seguro"}
                 </button>
               </form>
 
               <button
                 type="button"
-                onClick={() => setAuthMode((m) => (m === "login" ? "signup" : "login"))}
+                onClick={() => setAuthMode((current) => {
+                  const next = current === "login" ? "signup" : "login";
+                  setAuthError("");
+                  if (next === "signup" && invite.email) setEmail(invite.email);
+                  return next;
+                })}
                 className="w-full text-xs text-muted-foreground hover:text-foreground text-center"
               >
                 {authMode === "login" ? "Não tem conta? Criar agora" : "Já tem conta? Entrar"}

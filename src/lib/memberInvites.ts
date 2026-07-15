@@ -182,14 +182,13 @@ async function fetchInviteByTokenOnce(
       body: JSON.stringify({ _token: token }),
       signal,
     });
-  } catch (e) {
-    console.error("[memberInvites] REST getInviteByToken failed", e);
+  } catch {
+    console.error("[memberInvites] REST getInviteByToken network failure");
     return { data: null, error: "network_error", retriable: true };
   }
 
   if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    console.error("[memberInvites] REST getInviteByToken HTTP error", response.status, text);
+    console.error("[memberInvites] REST getInviteByToken HTTP error", response.status);
 
     // 4xx = client/permission/validation error — not retriable.
     // 5xx = server error — retriable.
@@ -206,7 +205,7 @@ async function fetchInviteByTokenOnce(
   const result = normalizeRpcPayload(raw) as ({ ok: boolean; error?: string } & MemberInvitePublic) | null;
 
   if (!result) {
-    console.error("[memberInvites] REST getInviteByToken unexpected shape", raw);
+    console.error("[memberInvites] REST getInviteByToken unexpected response shape");
     return { data: null, error: "invalid_shape", retriable: false };
   }
 
@@ -271,20 +270,6 @@ export function emailsMatch(a: string | null | undefined, b: string | null | und
   return na.length > 0 && na === nb;
 }
 
-/**
- * Supabase's documented (non-enumerating) way to signal "this e-mail already
- * has a confirmed account" from a `signUp()` response: no explicit error is
- * returned (that would leak account existence to an unauthenticated caller),
- * but the returned user has an empty `identities` array instead of a new
- * identity. See https://supabase.com/docs/reference/javascript/auth-signup.
- */
-export function isAlreadyRegisteredSignUp(
-  data: { user: { identities?: unknown[] | null } | null } | null | undefined,
-): boolean {
-  if (!data?.user) return false;
-  return Array.isArray(data.user.identities) && data.user.identities.length === 0;
-}
-
 // ── Accept invite (authenticated) ─────────────────────────────────────────────
 
 export type AcceptMemberInviteResult = {
@@ -326,34 +311,18 @@ export async function acceptMemberInvite(
 
 // ── Create account for a new member (official Supabase sign-up) ──────────────
 //
-// SECURITY: this is the ONLY client-side path that creates an Auth account for
-// a member invite, and it goes through the official, unmodified Supabase
-// `signUp` flow — never `admin.*`, never a service-role endpoint, never
-// `email_confirm: true`. The e-mail is always the member's fixed registered
-// e-mail (from the invite payload), never something the user can edit.
-//
-// Because Supabase project e-mail confirmations are required, a successful
-// call here does NOT yet grant a session — the caller must wait for the user
-// to click the confirmation link (which redirects back to `emailRedirectTo`,
-// i.e. this same invite page) before an authenticated session exists. Only
-// then can `acceptMemberInvite` be called to finalize the link — never before.
-//
-// If the e-mail already belongs to a confirmed account, Supabase signals this
-// WITHOUT an explicit error (to avoid e-mail enumeration): the response
-// contains a user with an empty `identities` array. Callers should check this
-// with `isAlreadyRegisteredSignUp` and, if true, direct the member to log in
-// or recover their existing password instead — never attempt to change that
-// account's password from here.
-export async function signUpForMemberInvite(
-  email: string,
-  password: string,
-  token: string,
-) {
-  return supabase.auth.signUp({
+// SECURITY: passwordless e-mail proof for both new and existing accounts.
+// Unlike password signUp(), this flow never depends on the project's
+// "Confirm e-mail" toggle to prove mailbox ownership: Supabase only creates
+// an authenticated session after the recipient opens the magic link/OTP sent
+// to the fixed member e-mail. The invite RPC is called only after that session
+// returns to this exact URL and its authenticated e-mail matches the member.
+export async function sendMemberInviteMagicLink(email: string, token: string) {
+  return supabase.auth.signInWithOtp({
     email,
-    password,
     options: {
       emailRedirectTo: buildInviteUrl(token),
+      shouldCreateUser: true,
     },
   });
 }

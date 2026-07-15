@@ -115,7 +115,7 @@ export function useRole() {
       // mesma regra e nunca conceder a rota /admin/super-admin por uma fonte
       // que o próprio backend não reconhece como autoridade raiz.
       ...legacyRows.filter((row) => normalizeRole(row.role) !== "super_admin"),
-      ...organizationRows,
+      ...organizationRows.filter((row) => normalizeRole(row.role) !== "super_admin"),
       ...(bootstrap.isSuperAdminRow ? [{ role: "super_admin" as AppRole }] : []),
     ];
 

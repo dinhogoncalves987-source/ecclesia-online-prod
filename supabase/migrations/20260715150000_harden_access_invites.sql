@@ -54,6 +54,17 @@ BEGIN
       ADD CONSTRAINT access_invites_email_required
       CHECK (email IS NOT NULL AND btrim(email) <> '') NOT VALID;
   END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'access_invites_role_allowed'
+  ) THEN
+    ALTER TABLE public.access_invites
+      ADD CONSTRAINT access_invites_role_allowed
+      CHECK (role IN (
+        'church_admin', 'pastor', 'secretary', 'tesoureiro',
+        'contador', 'leader', 'porteiro', 'member'
+      )) NOT VALID;
+  END IF;
 END;
 $$;
 
@@ -100,11 +111,14 @@ BEGIN
   END IF;
 
   IF caller_email = '' OR caller_email <> lower(btrim(inv.email)) THEN
-    RETURN jsonb_build_object(
-      'ok',           false,
-      'error',        'email_mismatch',
-      'invite_email', inv.email
-    );
+    RETURN jsonb_build_object('ok', false, 'error', 'email_mismatch');
+  END IF;
+
+  IF inv.role NOT IN (
+    'church_admin', 'pastor', 'secretary', 'tesoureiro',
+    'contador', 'leader', 'porteiro', 'member'
+  ) THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'invalid_invite_role');
   END IF;
 
   -- ── Nunca sobrescrever silenciosamente um vínculo já existente ──────────

@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const signUpMock = vi.fn();
+const signInWithOtpMock = vi.fn();
 const rpcMock = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    auth: { signUp: (...args: unknown[]) => signUpMock(...args) },
+    auth: { signInWithOtp: (...args: unknown[]) => signInWithOtpMock(...args) },
     rpc: (...args: unknown[]) => rpcMock(...args),
   },
 }));
@@ -17,9 +17,8 @@ vi.mock("@/lib/publicUrl", () => ({
 import {
   acceptMemberInvite,
   emailsMatch,
-  isAlreadyRegisteredSignUp,
   normalizeEmail,
-  signUpForMemberInvite,
+  sendMemberInviteMagicLink,
 } from "./memberInvites";
 
 describe("memberInvites — e-mail helpers", () => {
@@ -37,39 +36,21 @@ describe("memberInvites — e-mail helpers", () => {
   });
 });
 
-describe("memberInvites — isAlreadyRegisteredSignUp (no-enumeration detection)", () => {
-  it("is true when signUp returns a user with an empty identities array", () => {
-    expect(isAlreadyRegisteredSignUp({ user: { identities: [] } })).toBe(true);
-  });
-
-  it("is false for a genuinely new user (non-empty identities)", () => {
-    expect(isAlreadyRegisteredSignUp({ user: { identities: [{ id: "x" }] } })).toBe(false);
-  });
-
-  it("is false when there is no user at all", () => {
-    expect(isAlreadyRegisteredSignUp({ user: null })).toBe(false);
-    expect(isAlreadyRegisteredSignUp(null)).toBe(false);
-    expect(isAlreadyRegisteredSignUp(undefined)).toBe(false);
-  });
-});
-
-describe("memberInvites — signUpForMemberInvite (official Supabase sign-up only)", () => {
+describe("memberInvites — mailbox proof by magic link", () => {
   beforeEach(() => {
-    signUpMock.mockReset();
-    signUpMock.mockResolvedValue({ data: { user: null, session: null }, error: null });
+    signInWithOtpMock.mockReset();
+    signInWithOtpMock.mockResolvedValue({ data: {}, error: null });
   });
 
-  it("calls supabase.auth.signUp with the fixed e-mail and an emailRedirectTo back to this exact invite", async () => {
-    await signUpForMemberInvite("membro@example.com", "senha123", "tok-abc");
+  it("sends a magic link to the fixed e-mail and redirects back to this exact invite", async () => {
+    await sendMemberInviteMagicLink("membro@example.com", "tok-abc");
 
-    expect(signUpMock).toHaveBeenCalledTimes(1);
-    const arg = signUpMock.mock.calls[0][0];
+    expect(signInWithOtpMock).toHaveBeenCalledTimes(1);
+    const arg = signInWithOtpMock.mock.calls[0][0];
     expect(arg.email).toBe("membro@example.com");
-    expect(arg.password).toBe("senha123");
     expect(arg.options.emailRedirectTo).toBe("https://app.example.com/convite-membro/tok-abc");
-    // Never bypasses confirmation and never uses an admin-only option.
-    expect(arg).not.toHaveProperty("email_confirm");
-    expect(arg.options).not.toHaveProperty("data");
+    expect(arg.options.shouldCreateUser).toBe(true);
+    expect(arg).not.toHaveProperty("password");
   });
 });
 
