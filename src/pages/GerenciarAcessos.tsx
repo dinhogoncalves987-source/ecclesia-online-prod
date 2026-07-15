@@ -260,8 +260,8 @@ function PlatformTeamManager() {
   // 20260715130000_harden_platform_role_escalation.sql). A única forma
   // autorizada de conceder/revogar platform_role é a RPC SECURITY DEFINER
   // admin_set_platform_role, que internamente exige que quem chama já seja
-  // is_platform_admin (fonte de autoridade: super_admins / user_roles
-  // globais — nunca a própria coluna profiles.platform_role).
+  // is_platform_admin (fonte de autoridade: super_admins — nunca a própria
+  // coluna profiles.platform_role ou user_roles legado).
   const handleUpdateRole = async (userId: string, newRole: PlatformRole) => {
     const { data, error } = await supabase.rpc("admin_set_platform_role", {
       _target_user_id: userId,
@@ -1718,4 +1718,3 @@ export default function GerenciarAcessos() {
     </AdminLayout>
   );
 }
-

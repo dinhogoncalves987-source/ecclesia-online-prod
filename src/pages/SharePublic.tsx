@@ -67,7 +67,6 @@ export default function SharePublic() {
   const verse   = (params.get("verse") || "").slice(0, 300);
   const ref     = (params.get("ref") || "").slice(0, 50);
   const text    = (params.get("text") || "").slice(0, 600);
-  const church  = (params.get("church") || "").replace(/[^a-z0-9-]/gi, "").slice(0, 80);
   const lang    = getLang(params.get("lang"));
 
   const displayTitle = title || defaultTitle(type, lang);
@@ -79,7 +78,9 @@ export default function SharePublic() {
   const PeriodIcon = periodKey ? PERIOD_ICONS[periodKey] : undefined;
   const TypeIcon = TYPE_ICONS[type] || MessageSquare;
 
-  const signupHref = church ? `/signup?church=${church}` : "/signup";
+  // Cadastro público nunca cria vínculo com uma igreja. A associação só
+  // acontece por convite tokenizado vinculado ao e-mail autenticado.
+  const signupHref = "/signup";
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -157,20 +158,7 @@ export default function SharePublic() {
           transition={{ duration: 0.45, delay: 0.15 }}
           className="space-y-3"
         >
-          {/* Primary: join this church */}
-          {church && (
-            <Link to={signupHref}
-              className="flex items-center justify-between w-full px-5 py-4 bg-accent text-accent-foreground rounded-xl font-semibold hover:opacity-90 transition-opacity shadow-md"
-            >
-              <div className="flex items-center gap-3">
-                <UserPlus size={18} />
-                <span>{t("joinThisChurch", lang)}</span>
-              </div>
-              <ArrowRight size={18} />
-            </Link>
-          )}
-
-          {/* Secondary: join as member */}
+          {/* Cadastro público sem associação automática a uma igreja. */}
           <Link to={signupHref}
             className="flex items-center justify-between w-full px-5 py-4 bg-primary text-primary-foreground rounded-xl font-semibold hover:opacity-90 transition-opacity"
           >

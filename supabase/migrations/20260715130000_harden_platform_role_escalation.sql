@@ -57,24 +57,22 @@
 --      Substitui os updates diretos que existiam em
 --      src/pages/GerenciarAcessos.tsx e src/pages/SuperAdmin.tsx.
 --
---   E. is_platform_admin(_user_id): deixa de ler profiles.platform_role.
---      Passa a confiar apenas em fontes não editáveis pelo usuário comum:
---        - public.super_admins (tabela cujo INSERT/DELETE já exige
---          is_superadmin(auth.uid()) — ver 20260331032742_...sql — ou seja,
---          um usuário comum não consegue inserir a própria linha ali).
---        - public.user_roles com organization_id IS NULL e role
---          administrativo (a tabela já exige is_platform_admin(auth.uid())
---          para INSERT/UPDATE/DELETE — ver 20260512090000_staging_core_
---          baseline.sql — outro laço fechado, não editável por um usuário
---          comum).
+--   E. is_platform_admin(_user_id): deixa de ler profiles.platform_role e
+--      user_roles. A única raiz de autoridade passa a ser super_admins.
+--      Isso evita herdar policies legadas de user_roles que permitiam a uma
+--      conta com papel "admin" inserir outros papéis globais.
+--
+--   F. Policies legadas de super_admins/user_roles são removidas e recriadas
+--      sobre a nova raiz de autoridade. Também redefine is_superadmin() e
+--      is_platform_finance_admin(), eliminando atalhos antigos que ainda
+--      confiavam em profiles.platform_role/user_roles.
 --
 -- ATENÇÃO OPERACIONAL (não executada automaticamente por esta migration):
 --   Depois que esta migration remover profiles.platform_role da autoridade,
---   qualquer conta que hoje só tem platform_role setado (sem linha em
---   super_admins nem em user_roles global) PERDE acesso administrativo real
---   até que um super admin legítimo rode
---   `select public.admin_set_platform_role('<user_id>', '<role>')`
---   OU seja inserida em super_admins/user_roles por uma via já autorizada.
+--   qualquer conta que hoje só tem platform_role/user_roles setado (sem linha
+--   em super_admins) PERDE acesso administrativo real. A regularização da
+--   autoridade raiz deve ocorrer diretamente em super_admins, após auditoria
+--   humana, por um administrador legítimo do banco.
 --   Use o arquivo de auditoria (somente leitura)
 --   supabase/audits/20260715_audit_platform_role.sql ANTES de aplicar esta
 --   migration em qualquer ambiente, para saber quem precisa de regularização.
@@ -188,6 +186,19 @@ BEGIN
 
   v_normalized_role := NULLIF(btrim(_new_role), '');
 
+  IF v_normalized_role IS NOT NULL AND v_normalized_role NOT IN (
+    'super_admin',
+    'platform_admin',
+    'support_secretaria',
+    'support_financeiro',
+    'support_culto_louvor',
+    'support_tecnico',
+    'support_implantacao',
+    'support_readonly'
+  ) THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'invalid_platform_role');
+  END IF;
+
   UPDATE public.profiles
   SET platform_role = v_normalized_role
   WHERE user_id = _target_user_id;
@@ -204,7 +215,7 @@ REVOKE ALL ON FUNCTION public.admin_set_platform_role(uuid, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.admin_set_platform_role(uuid, text) FROM anon;
 GRANT EXECUTE ON FUNCTION public.admin_set_platform_role(uuid, text) TO authenticated;
 
--- ── E. is_platform_admin(): deixa de confiar em profiles.platform_role ─────
+-- ── E. Autoridade raiz: somente super_admins ───────────────────────────────
 CREATE OR REPLACE FUNCTION public.is_platform_admin(_user_id uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -216,17 +227,91 @@ AS $$
     SELECT 1
     FROM public.super_admins sa
     WHERE sa.user_id = _user_id
-  )
-  OR EXISTS (
-    SELECT 1
-    FROM public.user_roles ur
-    WHERE ur.user_id = _user_id
-      AND ur.organization_id IS NULL
-      AND ur.role IN ('platform_admin', 'super_admin', 'superadmin')
   );
 $$;
 
--- ── F. Trava adicional: EXECUTE de RPCs administrativas nunca para anon ────
+-- Alias legado ainda usado por policies históricas: passa a apontar para a
+-- mesma fonte de autoridade segura, sem consultar user_roles.
+CREATE OR REPLACE FUNCTION public.is_superadmin(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT public.is_platform_admin(_user_id);
+$$;
+
+-- O helper financeiro antigo confiava diretamente em platform_role e
+-- user_roles. Isso manteria um bypass financeiro mesmo após corrigir
+-- is_platform_admin; agora ele usa a mesma raiz segura.
+CREATE OR REPLACE FUNCTION public.is_platform_finance_admin(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT public.is_platform_admin(_user_id);
+$$;
+
+-- ── F. Remover policies legadas que permitiam promoção indireta ────────────
+-- Os nomes abaixo existem em diferentes gerações do schema. DROP IF EXISTS
+-- torna a migration compatível com os dois ambientes sem presumir qual
+-- baseline foi aplicada.
+DROP POLICY IF EXISTS "Superadmins can view" ON public.super_admins;
+DROP POLICY IF EXISTS "Superadmins can insert super_admins" ON public.super_admins;
+DROP POLICY IF EXISTS "Superadmins can delete super_admins" ON public.super_admins;
+DROP POLICY IF EXISTS "super admins select" ON public.super_admins;
+DROP POLICY IF EXISTS "super admins insert" ON public.super_admins;
+DROP POLICY IF EXISTS "super admins update" ON public.super_admins;
+DROP POLICY IF EXISTS "super admins delete" ON public.super_admins;
+
+CREATE POLICY "super admins select" ON public.super_admins
+FOR SELECT TO authenticated
+USING (user_id = auth.uid() OR public.is_platform_admin(auth.uid()));
+
+CREATE POLICY "super admins insert" ON public.super_admins
+FOR INSERT TO authenticated
+WITH CHECK (public.is_platform_admin(auth.uid()));
+
+CREATE POLICY "super admins update" ON public.super_admins
+FOR UPDATE TO authenticated
+USING (public.is_platform_admin(auth.uid()))
+WITH CHECK (public.is_platform_admin(auth.uid()));
+
+CREATE POLICY "super admins delete" ON public.super_admins
+FOR DELETE TO authenticated
+USING (public.is_platform_admin(auth.uid()));
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.super_admins TO authenticated;
+REVOKE ALL ON public.super_admins FROM anon;
+
+DROP POLICY IF EXISTS "Anyone authenticated can view roles" ON public.user_roles;
+DROP POLICY IF EXISTS "Admins can insert roles" ON public.user_roles;
+DROP POLICY IF EXISTS "Admins can update roles" ON public.user_roles;
+DROP POLICY IF EXISTS "Admins can delete roles" ON public.user_roles;
+DROP POLICY IF EXISTS "user roles users read own" ON public.user_roles;
+DROP POLICY IF EXISTS "user roles platform admins manage" ON public.user_roles;
+
+CREATE POLICY "user roles users read own" ON public.user_roles
+FOR SELECT TO authenticated
+USING (auth.uid() = user_id OR public.is_platform_admin(auth.uid()));
+
+CREATE POLICY "user roles platform admins manage" ON public.user_roles
+FOR ALL TO authenticated
+USING (public.is_platform_admin(auth.uid()))
+WITH CHECK (public.is_platform_admin(auth.uid()));
+
+-- ── G. Trava adicional: RPCs administrativas nunca para anon ──────────────
 REVOKE ALL ON FUNCTION public.is_platform_admin(uuid) FROM anon;
 REVOKE ALL ON FUNCTION public.is_platform_admin(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.is_platform_admin(uuid) TO authenticated;
+
+REVOKE ALL ON FUNCTION public.is_superadmin(uuid) FROM anon;
+REVOKE ALL ON FUNCTION public.is_superadmin(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_superadmin(uuid) TO authenticated;
+
+REVOKE ALL ON FUNCTION public.is_platform_finance_admin(uuid) FROM anon;
+REVOKE ALL ON FUNCTION public.is_platform_finance_admin(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_platform_finance_admin(uuid) TO authenticated;

@@ -106,13 +106,17 @@ export function useRole() {
 
     setLoading(true);
 
-    const platformRole = bootstrap.platformRole as AppRole | null | undefined;
     const legacyRows = bootstrap.userRoles as Array<{ role: AppRole; organization_id?: string | null }>;
     const organizationRows = bootstrap.memberships as Array<{ role: AppRole; organization_id: string | null }>;
     const rows: Array<{ role: AppRole; organization_id?: string | null }> = [
-      ...legacyRows,
+      // A autoridade global não vem de profiles.platform_role nem de uma
+      // linha legada em user_roles. O backend usa exclusivamente
+      // super_admins (isPlatformAdmin), então o frontend deve espelhar a
+      // mesma regra e nunca conceder a rota /admin/super-admin por uma fonte
+      // que o próprio backend não reconhece como autoridade raiz.
+      ...legacyRows.filter((row) => normalizeRole(row.role) !== "super_admin"),
       ...organizationRows,
-      ...(platformRole ? [{ role: platformRole }] : []),
+      ...(bootstrap.isSuperAdminRow ? [{ role: "super_admin" as AppRole }] : []),
     ];
 
     if (rows.length > 0) {
