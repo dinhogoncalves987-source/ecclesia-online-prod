@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { getPublicAppUrl } from "@/lib/publicUrl";
 import { normalizeOrganizationType } from "@/lib/organizationHierarchy";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import {
   AlertCircle,
   BookOpen,
@@ -155,6 +155,7 @@ function ResponsibleRoleCard({
   Icon,
   onDefine,
   onManageAccess,
+  renderProbeCards = false,
 }: {
   label: string;
   roleKey: ResponsibleRole;
@@ -162,9 +163,12 @@ function ResponsibleRoleCard({
   Icon: React.ElementType;
   onDefine: (e: React.MouseEvent) => void;
   onManageAccess: (e: React.MouseEvent) => void;
+  renderProbeCards?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-border/50 bg-background/60 px-3 py-2.5">
+    <div className={`rounded-lg border border-border/50 px-3 py-2.5 ${
+      renderProbeCards ? "bg-background" : "bg-background/60"
+    }`}>
       <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
         <Icon size={10} /> {label}
       </p>
@@ -271,6 +275,12 @@ export default function Congregacoes() {
   const { church, isMatriz, refetch: refetchChurch } = useChurch();
   const { t }                            = useLanguage();
   const navigate                         = useNavigate();
+  const location                         = useLocation();
+
+  // TEMP render probe (Android/Redmi): remove after the controlled A/B test.
+  const renderProbe = new URLSearchParams(location.search).get("renderProbe");
+  const isCardsRenderProbe = location.pathname === "/admin/congregacoes"
+    && (renderProbe === "cards" || renderProbe === "all");
 
   // ── Context state ──────────────────────────────────────────────────────────
   const [activeOrgType, setActiveOrgType]                 = useState<string | null>(null);
@@ -1498,7 +1508,9 @@ export default function Congregacoes() {
         )}
 
         {/* ── Child organizations list ── */}
-        <div className={`bg-card shadow-executive overflow-hidden ${isSetorContext && childOrganizations.length > 0 ? "rounded-b-xl" : "rounded-xl"}`}>
+        <div className={`bg-card ${isCardsRenderProbe ? "" : "shadow-executive overflow-hidden"} ${
+          isSetorContext && childOrganizations.length > 0 ? "rounded-b-xl" : "rounded-xl"
+        }`}>
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 size={24} className="animate-spin text-muted-foreground" />
@@ -1595,10 +1607,16 @@ export default function Congregacoes() {
                         if (next && isMatriz && c.organization_type === "setor")
                           void loadCongregationsForSector(c.id, true);
                       }}
-                      className="p-4 hover:bg-secondary/30 transition-colors cursor-pointer select-none"
+                      className={`p-4 transition-colors cursor-pointer select-none ${
+                        isCardsRenderProbe ? "hover:bg-secondary" : "hover:bg-secondary/30"
+                      }`}
                     >
                       <div className="flex items-start gap-4">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isExpanded ? "bg-accent/30" : "bg-accent/20"}`}>
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                          isCardsRenderProbe
+                            ? "border border-accent"
+                            : isExpanded ? "bg-accent/30" : "bg-accent/20"
+                        }`}>
                           <ChurchIcon size={20} className="text-accent" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1609,7 +1627,9 @@ export default function Congregacoes() {
                             </span>
                             {statusBadge(c.unit_status)}
                             {isMatriz && c.organization_type === "setor" && congregationCounts[c.id] !== undefined && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/15 text-accent font-semibold shrink-0">
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold shrink-0 ${
+                                isCardsRenderProbe ? "bg-accent text-accent-foreground" : "bg-accent/15 text-accent"
+                              }`}>
                                 {congregationCounts[c.id]} {localPlural.toLowerCase()}
                               </span>
                             )}
@@ -1640,7 +1660,9 @@ export default function Congregacoes() {
 
                     {/* Expanded panel */}
                     {isExpanded && (
-                      <div className="bg-muted/30 border-t border-border/40 px-4 pb-4 pt-3 space-y-4">
+                      <div className={`border-t border-border/40 px-4 pb-4 pt-3 space-y-4 ${
+                        isCardsRenderProbe ? "bg-muted" : "bg-muted/30"
+                      }`}>
 
                         {/* Responsáveis */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1663,10 +1685,13 @@ export default function Congregacoes() {
                                 e.stopPropagation();
                                 navigateAccess(roleKey, false);
                               }}
+                              renderProbeCards={isCardsRenderProbe}
                             />
                           ))}
                           {/* Contato principal */}
-                          <div className="rounded-lg border border-border/50 bg-background/60 px-3 py-2.5">
+                          <div className={`rounded-lg border border-border/50 px-3 py-2.5 ${
+                            isCardsRenderProbe ? "bg-background" : "bg-background/60"
+                          }`}>
                             <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
                               <Phone size={10} /> Contato principal
                             </p>
@@ -1832,7 +1857,9 @@ export default function Congregacoes() {
                                 {sectorCongregations[c.id].map((cong) => {
                                   const congPastor = responsiblesByOrg[cong.id]?.pastor;
                                   return (
-                                    <div key={cong.id} className="flex items-start justify-between gap-3 rounded-lg bg-background/60 px-3 py-2.5 border border-border/40">
+                                    <div key={cong.id} className={`flex items-start justify-between gap-3 rounded-lg px-3 py-2.5 border border-border/40 ${
+                                      isCardsRenderProbe ? "bg-background" : "bg-background/60"
+                                    }`}>
                                       <div className="flex-1 min-w-0">
                                         <div className="flex flex-wrap items-center gap-1.5">
                                           <p className="text-sm font-medium truncate">{cong.name}</p>

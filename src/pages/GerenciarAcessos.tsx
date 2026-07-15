@@ -467,6 +467,11 @@ export default function GerenciarAcessos() {
   const navigate                          = useNavigate();
   const location                          = useLocation();
 
+  // TEMP render probe (Android/Redmi): remove after the controlled A/B test.
+  const renderProbe = new URLSearchParams(location.search).get("renderProbe");
+  const isCardsRenderProbe = location.pathname === "/admin/gerenciar-acessos"
+    && (renderProbe === "cards" || renderProbe === "all");
+
   const navigationState = location.state as HierarchyNavigationState;
   const contextOrganizationId   = navigationState?.contextOrganizationId ?? null;
   const contextOrganizationName = navigationState?.contextOrganizationName ?? null;
@@ -1026,10 +1031,12 @@ export default function GerenciarAcessos() {
                     }
                     setSelectedRole(isSelected ? null : (role as OrgMembershipRole));
                   }}
-                  className={`group relative flex flex-col gap-2 p-3.5 rounded-xl border transition-all text-left ${
+                  className={`group relative flex flex-col gap-2 p-3.5 rounded-xl border text-left ${
+                    isCardsRenderProbe ? "" : "transition-all"
+                  } ${
                     isSelected
-                      ? "border-accent bg-accent/10 shadow-sm"
-                      : `border-border/60 bg-card hover:bg-secondary/50 ${cardAccent}`
+                      ? `border-accent shadow-sm ${isCardsRenderProbe ? "bg-card" : "bg-accent/10"}`
+                      : `border-border/60 bg-card ${isCardsRenderProbe ? "" : "hover:bg-secondary/50"} ${cardAccent}`
                   } ${future ? "opacity-60" : ""}`}
                 >
                   <div className="flex items-start justify-between">
@@ -1043,7 +1050,9 @@ export default function GerenciarAcessos() {
                         isSelected
                           ? "bg-accent text-accent-foreground"
                           : count > 0
-                            ? "bg-primary/10 text-primary"
+                            ? isCardsRenderProbe
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-primary/10 text-primary"
                             : "bg-muted text-muted-foreground"
                       }`}>
                         {count}
