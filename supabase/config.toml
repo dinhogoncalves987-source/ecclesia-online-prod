@@ -1,4 +1,17 @@
-project_id = "onywmysaukyzgkzoxtsw"
+# FASE 7 (hardening P0) — o valor anterior deste campo (`onywmysaukyzgkzoxtsw`)
+# não corresponde a nenhum projeto ativo desta conta (confirmado via
+# `supabase projects list`, ver docs/AMBIENTES_PRODUCAO_STAGING.md) — era um
+# identificador obsoleto/órfão de outra configuração. `project_id` é usado
+# pela CLI apenas como valor padrão de `--project-ref` quando ele é omitido;
+# como nenhum comando remoto deste repositório deve depender de um padrão
+# implícito (ver scripts/supabase-guard.mjs, que sempre exige `--target`
+# explícito e resolve o ref a partir de src/config/environment.ts, nunca
+# deste arquivo), o valor abaixo é um placeholder que NÃO corresponde a
+# nenhum dos dois ambientes reais (zsonukpxahaxffugavfu = produção,
+# qkiiwopkbcslquyfhdec = staging) — assim, qualquer comando `supabase`
+# disparado sem `--project-ref`/link explícito falha com "projeto não
+# encontrado" em vez de silenciosamente atingir um ambiente real errado.
+project_id = "unset-use-supabase-guard-explicit-target"
 
 [functions.bible-verses]
 verify_jwt = false

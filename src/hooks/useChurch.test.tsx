@@ -14,10 +14,6 @@ vi.mock("@/contexts/SupportContext", () => ({ useSupportContext: () => mockUseSu
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { from: (...args: unknown[]) => fromMock(...args) },
 }));
-vi.mock("@/lib/organizationMembership", () => ({
-  ensureOrganizationMembership: vi.fn().mockResolvedValue({ linked: false }),
-}));
-
 function Probe() {
   const { church, churches, loading, hasActiveMembership, bootstrapError } = useChurch();
   return (

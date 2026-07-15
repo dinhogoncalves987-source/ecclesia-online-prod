@@ -11,16 +11,15 @@ import { buildShareUrl, triggerShare } from "@/lib/share";
 import { useChurch } from "@/hooks/useChurchContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { getCachedBibleChapter, cacheBibleChapter } from "@/lib/offlineCache";
-import { fetchEdgeFunction, getPublicEdgeHeaders } from "@/lib/edgeFetch";
+import { fetchEdgeFunction, getPublicEdgeHeaders, getEdgeFunctionUrl } from "@/lib/edgeFetch";
+import { environment } from "@/config/environment";
 import { toast } from "sonner";
 import { scrollElementIntoView } from "@/lib/mobileScroll";
 
 type Verse = { num: number; text: string };
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-const CHAT_URL = `${SUPABASE_URL}/functions/v1/bible-chat`;
+const CHAT_URL = getEdgeFunctionUrl("bible-chat");
 const FETCH_TIMEOUT_MS = 40_000;
 
 function getBibleTranslation(locale: string): string {
@@ -119,7 +118,7 @@ export default function Biblia() {
     }
     return {
       ...getPublicEdgeHeaders(),
-      Authorization: `Bearer ${token ?? SUPABASE_KEY}`,
+      Authorization: `Bearer ${token ?? environment.supabasePublishableKey}`,
     };
   }, []);
 

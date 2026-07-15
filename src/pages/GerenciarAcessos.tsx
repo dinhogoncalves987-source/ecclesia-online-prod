@@ -255,8 +255,23 @@ function PlatformTeamManager() {
 
   useEffect(() => { void loadAgents(); }, [loadAgents]);
 
+  // SEGURANÇA: profiles.platform_role não é mais editável por UPDATE direto
+  // (grants por coluna revogados de `authenticated` — ver migration
+  // 20260715130000_harden_platform_role_escalation.sql). A única forma
+  // autorizada de conceder/revogar platform_role é a RPC SECURITY DEFINER
+  // admin_set_platform_role, que internamente exige que quem chama já seja
+  // is_platform_admin (fonte de autoridade: super_admins / user_roles
+  // globais — nunca a própria coluna profiles.platform_role).
   const handleUpdateRole = async (userId: string, newRole: PlatformRole) => {
-    await supabase.from("profiles").update({ platform_role: newRole } as any).eq("user_id", userId);
+    const { data, error } = await supabase.rpc("admin_set_platform_role", {
+      _target_user_id: userId,
+      _new_role: newRole,
+    });
+    const result = data as { ok?: boolean; error?: string } | null;
+    if (error || !result?.ok) {
+      toast({ title: "Não foi possível atualizar a função", description: error?.message ?? result?.error ?? "", variant: "destructive" });
+      return;
+    }
     toast({ title: `Função atualizada para ${PLATFORM_ROLE_LABELS[newRole]}` });
     void loadAgents();
   };
@@ -264,7 +279,16 @@ function PlatformTeamManager() {
   const handleDeactivate = async (userId: string, name: string | null) => {
     if (!confirm(`Remover ${name || "este agente"} da equipe da plataforma?`)) return;
     setDeactivatingId(userId);
-    await supabase.from("profiles").update({ platform_role: null } as any).eq("user_id", userId);
+    const { data, error } = await supabase.rpc("admin_set_platform_role", {
+      _target_user_id: userId,
+      _new_role: null,
+    });
+    const result = data as { ok?: boolean; error?: string } | null;
+    if (error || !result?.ok) {
+      toast({ title: "Não foi possível remover o agente", description: error?.message ?? result?.error ?? "", variant: "destructive" });
+      setDeactivatingId(null);
+      return;
+    }
     await supabase.from("platform_support_agent_departments" as any).delete().eq("agent_user_id", userId);
     toast({ title: `${name || "Agente"} removido da equipe` });
     setDeactivatingId(null);
@@ -826,15 +850,14 @@ export default function GerenciarAcessos() {
     }
     if (!user?.id) return;
 
-    console.log("[GerenciarAcessos] create invite context", {
-      contextOrganizationId,
-      contextOrganizationName,
-      contextOrganizationType,
-      churchId: church?.id,
-      effectiveOrgId: inviteOrgId,
-      role: newAccessForm.role,
-      email: newAccessForm.email,
-    });
+    if (!newAccessForm.email.trim()) {
+      toast({
+        title: "E-mail obrigatório",
+        description: "Convites de acesso administrativo exigem um e-mail para vincular a conta correta.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setSavingInvite(true);
 
@@ -860,7 +883,7 @@ export default function GerenciarAcessos() {
     const { data: inv, error: invErr } = await createAccessInvite({
       organization_id: inviteOrgId, invited_by: user.id,
       full_name: newAccessForm.name.trim(),
-      email: newAccessForm.email.trim() || undefined,
+      email: newAccessForm.email.trim(),
       phone: newAccessForm.phone.trim() || undefined,
       role: newAccessForm.role,
     });
@@ -1326,10 +1349,10 @@ export default function GerenciarAcessos() {
                   className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30" />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">Email</label>
+                <label className="text-xs text-muted-foreground block mb-1">Email <span className="text-destructive">*</span></label>
                 <div className="relative">
                   <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input type="email" value={newAccessForm.email} onChange={(e) => setNewAccessForm((f) => ({ ...f, email: e.target.value }))}
+                  <input type="email" required value={newAccessForm.email} onChange={(e) => setNewAccessForm((f) => ({ ...f, email: e.target.value }))}
                     placeholder="email@exemplo.com"
                     className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30" />
                 </div>

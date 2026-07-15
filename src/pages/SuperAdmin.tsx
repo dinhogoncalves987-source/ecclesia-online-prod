@@ -524,9 +524,22 @@ export default function SuperAdmin() {
       return;
     }
 
-    const { error: profileError } = await supabase.from("profiles")
-      .update({ platform_role: agentForm.platform_role } as any).eq("user_id", existing.user_id);
-    if (profileError) { toast.error(profileError.message); setAgentFormStatus("idle"); return; }
+    // SEGURANÇA: platform_role não é mais gravável por UPDATE direto na
+    // tabela (grants por coluna revogados de `authenticated` — ver migration
+    // 20260715130000_harden_platform_role_escalation.sql). Só a RPC
+    // admin_set_platform_role pode alterá-la, e ela mesma exige que quem
+    // chama já seja is_platform_admin por uma fonte não editável pelo
+    // usuário comum (super_admins / user_roles globais).
+    const { data: roleResult, error: profileError } = await supabase.rpc("admin_set_platform_role", {
+      _target_user_id: existing.user_id,
+      _new_role: agentForm.platform_role,
+    });
+    const roleOk = (roleResult as { ok?: boolean; error?: string } | null)?.ok;
+    if (profileError || !roleOk) {
+      toast.error(profileError?.message ?? (roleResult as { error?: string } | null)?.error ?? "Falha ao definir a função");
+      setAgentFormStatus("idle");
+      return;
+    }
 
     await supabase.from("platform_support_agents" as any).upsert({
       user_id: existing.user_id, is_active: true,
@@ -563,18 +576,24 @@ export default function SuperAdmin() {
   };
 
   const updateAgentRole = async (userId: string, newRole: string) => {
-    const { error } = await supabase.from("profiles")
-      .update({ platform_role: newRole } as any).eq("user_id", userId);
-    if (error) { toast.error(error.message); return; }
+    const { data, error } = await supabase.rpc("admin_set_platform_role", {
+      _target_user_id: userId,
+      _new_role: newRole,
+    });
+    const ok = (data as { ok?: boolean; error?: string } | null)?.ok;
+    if (error || !ok) { toast.error(error?.message ?? (data as { error?: string } | null)?.error ?? "Falha ao atualizar a função"); return; }
     await logSupportAudit(user!.id, "update_agent", null, null, "team", { target_user_id: userId, new_role: newRole });
     toast.success("Função atualizada!");
     loadAgents();
   };
 
   const deactivateAgent = async (userId: string, name: string | null) => {
-    const { error } = await supabase.from("profiles")
-      .update({ platform_role: null } as any).eq("user_id", userId);
-    if (error) { toast.error(error.message); return; }
+    const { data, error } = await supabase.rpc("admin_set_platform_role", {
+      _target_user_id: userId,
+      _new_role: null,
+    });
+    const ok = (data as { ok?: boolean; error?: string } | null)?.ok;
+    if (error || !ok) { toast.error(error?.message ?? (data as { error?: string } | null)?.error ?? "Falha ao remover o agente"); return; }
     await supabase.from("platform_support_agent_departments" as any).delete().eq("agent_user_id", userId);
     await logSupportAudit(user!.id, "deactivate_agent", null, null, "team", { target_user_id: userId });
     toast.success(`${name || "Agente"} removido da equipe da plataforma`);

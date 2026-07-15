@@ -2,27 +2,24 @@
  * Fetch público para Edge Functions do Supabase.
  * Sempre usa a publishable key — NUNCA o JWT do usuário logado.
  * (JWT de sessão + gateway Supabase causava "Failed to fetch" no browser.)
+ *
+ * FASE 4: URL/chave vêm exclusivamente de `environment` (já validado contra
+ * o ambiente atual) — nunca lidas diretamente de `import.meta.env` aqui, para
+ * que não existam pontos soltos capazes de divergir da configuração central.
  */
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+import { environment } from "@/config/environment";
 
 export function getPublicEdgeHeaders(): Record<string, string> {
-  if (!SUPABASE_KEY) {
-    throw new Error("VITE_SUPABASE_PUBLISHABLE_KEY não configurada");
-  }
+  const key = environment.supabasePublishableKey;
   return {
-    apikey: SUPABASE_KEY,
-    Authorization: `Bearer ${SUPABASE_KEY}`,
+    apikey: key,
+    Authorization: `Bearer ${key}`,
   };
 }
 
 export function getEdgeFunctionUrl(functionName: string, params?: Record<string, string>): string {
-  if (!SUPABASE_URL) {
-    throw new Error("VITE_SUPABASE_URL não configurada");
-  }
   const qs = params ? `?${new URLSearchParams(params)}` : "";
-  return `${SUPABASE_URL}/functions/v1/${functionName}${qs}`;
+  return `${environment.supabaseUrl}/functions/v1/${functionName}${qs}`;
 }
 
 export async function fetchEdgeFunction<T>(

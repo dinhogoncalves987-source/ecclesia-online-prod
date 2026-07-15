@@ -1,19 +1,11 @@
 import { AdminLayout } from "@/components/AdminLayout";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useChurch } from "@/hooks/useChurchContext";
 import { toast } from "sonner";
 import { useLanguage } from "@/hooks/useLanguage";
 import { FinanceOverview } from "@/components/financeiro/FinanceOverview";
 import { TransactionList } from "@/components/financeiro/TransactionList";
-import { FinanceExecutive } from "@/components/financeiro/FinanceExecutive";
-import { FinanceCampaigns } from "@/components/financeiro/FinanceCampaigns";
-import { FinanceAccounts } from "@/components/financeiro/FinanceAccounts";
-import { FinanceBudget } from "@/components/financeiro/FinanceBudget";
-import { FinanceAssets } from "@/components/financeiro/FinanceAssets";
-import { FinanceAccountability } from "@/components/financeiro/FinanceAccountability";
-import { FinanceAudit } from "@/components/financeiro/FinanceAudit";
-import { FinanceIntelligence } from "@/components/financeiro/FinanceIntelligence";
 import {
   BarChart3, ChevronLeft, ChevronRight, Wallet, Megaphone, ArrowLeftRight, PieChart,
   Building2, FileCheck, ShieldCheck, Sparkles,
@@ -21,6 +13,39 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import type { TreasuryTransaction } from "@/lib/finance";
 import { isModuleEnabled, type ModuleId } from "@/config/modules";
+
+// FASE 6 (separação de bundle por build) — estas 8 abas dependem de
+// financeDemo/campaignsDemo e são staging-only (ver ALL_TABS/TABS abaixo e
+// src/config/modules.ts). Import condicional + lazy: em produção,
+// `IS_STAGING_BUILD` é `false` (literal, substituído em build-time — mesmo
+// mecanismo de src/App.tsx), então nenhuma dessas chamadas `import()` entra
+// no grafo de módulos do build de produção e nenhum chunk é emitido.
+const IS_STAGING_BUILD = import.meta.env.VITE_APP_ENV === "staging";
+
+const FinanceExecutive = IS_STAGING_BUILD
+  ? lazy(() => import("@/components/financeiro/FinanceExecutive").then(m => ({ default: m.FinanceExecutive })))
+  : null;
+const FinanceCampaigns = IS_STAGING_BUILD
+  ? lazy(() => import("@/components/financeiro/FinanceCampaigns").then(m => ({ default: m.FinanceCampaigns })))
+  : null;
+const FinanceAccounts = IS_STAGING_BUILD
+  ? lazy(() => import("@/components/financeiro/FinanceAccounts").then(m => ({ default: m.FinanceAccounts })))
+  : null;
+const FinanceBudget = IS_STAGING_BUILD
+  ? lazy(() => import("@/components/financeiro/FinanceBudget").then(m => ({ default: m.FinanceBudget })))
+  : null;
+const FinanceAssets = IS_STAGING_BUILD
+  ? lazy(() => import("@/components/financeiro/FinanceAssets").then(m => ({ default: m.FinanceAssets })))
+  : null;
+const FinanceAccountability = IS_STAGING_BUILD
+  ? lazy(() => import("@/components/financeiro/FinanceAccountability").then(m => ({ default: m.FinanceAccountability })))
+  : null;
+const FinanceAudit = IS_STAGING_BUILD
+  ? lazy(() => import("@/components/financeiro/FinanceAudit").then(m => ({ default: m.FinanceAudit })))
+  : null;
+const FinanceIntelligence = IS_STAGING_BUILD
+  ? lazy(() => import("@/components/financeiro/FinanceIntelligence").then(m => ({ default: m.FinanceIntelligence })))
+  : null;
 
 const ALL_TABS = [
   { key: "executive",      icon: BarChart3,    labelKey: "Executivo",           moduleId: "finance.executive" },
@@ -160,7 +185,6 @@ export default function Financeiro() {
           )}
         </div>
 
-        {activeTab === "executive" && <FinanceExecutive onTabChange={setActiveTab} />}
         {activeTab === "treasury" && (
           <div className="space-y-6">
             {/* Operacional primeiro — tabela, filtros, ações */}
@@ -174,13 +198,18 @@ export default function Financeiro() {
             </div>
           </div>
         )}
-        {activeTab === "campaigns" && <FinanceCampaigns />}
-        {activeTab === "accounts" && <FinanceAccounts />}
-        {activeTab === "budget" && <FinanceBudget />}
-        {activeTab === "assets" && <FinanceAssets />}
-        {activeTab === "accountability" && <FinanceAccountability transactions={transactions} />}
-        {activeTab === "audit" && <FinanceAudit />}
-        {activeTab === "intelligence" && <FinanceIntelligence onTabChange={setActiveTab} />}
+        {/* Abas staging-only — ver IS_STAGING_BUILD acima. Suspense próprio
+            porque estes componentes são lazy apenas quando existem. */}
+        <Suspense fallback={null}>
+          {activeTab === "executive" && FinanceExecutive && <FinanceExecutive onTabChange={setActiveTab} />}
+          {activeTab === "campaigns" && FinanceCampaigns && <FinanceCampaigns />}
+          {activeTab === "accounts" && FinanceAccounts && <FinanceAccounts />}
+          {activeTab === "budget" && FinanceBudget && <FinanceBudget />}
+          {activeTab === "assets" && FinanceAssets && <FinanceAssets />}
+          {activeTab === "accountability" && FinanceAccountability && <FinanceAccountability transactions={transactions} />}
+          {activeTab === "audit" && FinanceAudit && <FinanceAudit />}
+          {activeTab === "intelligence" && FinanceIntelligence && <FinanceIntelligence onTabChange={setActiveTab} />}
+        </Suspense>
       </div>
     </AdminLayout>
   );

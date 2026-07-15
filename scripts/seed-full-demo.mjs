@@ -13,43 +13,27 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 import { assertSafeToSeedStagingFromProcessEnv, SeedGuardError } from "./lib/seedGuard.mjs";
+import { loadSeedEnv } from "./lib/loadSeedEnv.mjs";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.join(__dirname, "..");
+// FASE 5 — fonte única e exclusiva de ambiente para seeds: .env.seed +
+// process.env (ver scripts/lib/loadSeedEnv.mjs). Nunca lê .env/.env.local/
+// .env.staging, que são arquivos do frontend (Vite).
+const seedEnv = loadSeedEnv();
 
-// --- Env loader ---
-function loadEnvFile(filePath) {
-  if (!fs.existsSync(filePath)) return {};
-  const out = {};
-  for (const line of fs.readFileSync(filePath, "utf8").split("\n")) {
-    const m = line.match(/^([A-Z0-9_]+)\s*=\s*["']?([^"'\n]+?)["']?\s*$/);
-    if (m) out[m[1]] = m[2];
-  }
-  return out;
-}
-const dotenv = {
-  ...loadEnvFile(path.join(ROOT, ".env")),
-  ...loadEnvFile(path.join(ROOT, ".env.staging")),
-  ...loadEnvFile(path.join(ROOT, ".env.local")),
-};
-
-const SUPABASE_URL = (process.env.SUPABASE_URL || dotenv.SUPABASE_URL || dotenv.VITE_SUPABASE_URL || "").replace(/\/+$/, "");
-const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY || dotenv.SUPABASE_SERVICE_ROLE_KEY || "";
+const SUPABASE_URL = (seedEnv.SUPABASE_URL || seedEnv.VITE_SUPABASE_URL || "").replace(/\/+$/, "");
+const SERVICE_ROLE = (seedEnv.SUPABASE_SERVICE_ROLE_KEY || "").trim();
 
 if (!SUPABASE_URL || !SERVICE_ROLE) {
-  console.error("❌ SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são obrigatórios.");
-  console.error("   Passe via: $env:SUPABASE_SERVICE_ROLE_KEY='eyJ...'; npm run demo:seed-full");
+  console.error("❌ SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são obrigatórios (defina em .env.seed).");
+  console.error("   Veja .env.seed.example. Passe via: $env:SUPABASE_SERVICE_ROLE_KEY='eyJ...'; npm run demo:seed-full");
   process.exit(1);
 }
 
 // Guarda de ambiente — recusa produção e exige confirmação explícita.
 // Requer: APP_ENV=staging e SEED_STAGING="SEED_STAGING" no ambiente.
 try {
-  assertSafeToSeedStagingFromProcessEnv({ supabaseUrl: SUPABASE_URL });
+  assertSafeToSeedStagingFromProcessEnv({ supabaseUrl: SUPABASE_URL, env: seedEnv });
 } catch (err) {
   if (err instanceof SeedGuardError) {
     console.error(`\n❌ ${err.message}\n`);

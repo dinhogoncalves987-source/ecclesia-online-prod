@@ -106,7 +106,20 @@ describe("buildEnvironmentConfig — falha fechado", () => {
     ).toThrow(EnvironmentConfigError);
   });
 
-  it("rejects when the URL ref differs from the expected ref (staging build, production ref)", () => {
+  it("rejects when the URL ref differs from the expected ref (internal mismatch)", () => {
+    expect(() =>
+      buildEnvironmentConfig(
+        fixture({
+          VITE_APP_ENV: "production",
+          VITE_SUPABASE_URL: "https://zsonukpxahaxffugavfu.supabase.co",
+          VITE_EXPECTED_SUPABASE_PROJECT_REF: "qkiiwopkbcslquyfhdec",
+        }),
+      ),
+    ).toThrow(EnvironmentConfigError);
+  });
+
+  it("rejects staging using the production ref, even when internally consistent " +
+    "(expectedRef === actualRef is not enough — must match the canonical ref for the appEnv)", () => {
     expect(() =>
       buildEnvironmentConfig(
         fixture({
@@ -115,16 +128,40 @@ describe("buildEnvironmentConfig — falha fechado", () => {
           VITE_EXPECTED_SUPABASE_PROJECT_REF: "zsonukpxahaxffugavfu",
         }),
       ),
-    ).not.toThrow(); // internamente consistente — a mistura real é pega em check-environment.mjs
+    ).toThrow(EnvironmentConfigError);
+  });
 
-    // Divergência interna (URL não é a mesma que o ref esperado) deve falhar
-    // fechado independentemente do ambiente:
+  it("rejects production using the staging ref, even when internally consistent", () => {
+    expect(() =>
+      buildEnvironmentConfig(
+        fixture({
+          VITE_APP_ENV: "production",
+          VITE_SUPABASE_URL: "https://qkiiwopkbcslquyfhdec.supabase.co",
+          VITE_EXPECTED_SUPABASE_PROJECT_REF: "qkiiwopkbcslquyfhdec",
+          VITE_PUBLIC_APP_URL: "https://ecclesiabr.online",
+        }),
+      ),
+    ).toThrow(EnvironmentConfigError);
+  });
+
+  it("rejects production using a non-official public domain", () => {
     expect(() =>
       buildEnvironmentConfig(
         fixture({
           VITE_APP_ENV: "production",
           VITE_SUPABASE_URL: "https://zsonukpxahaxffugavfu.supabase.co",
-          VITE_EXPECTED_SUPABASE_PROJECT_REF: "qkiiwopkbcslquyfhdec",
+          VITE_EXPECTED_SUPABASE_PROJECT_REF: "zsonukpxahaxffugavfu",
+          VITE_PUBLIC_APP_URL: "https://ecclesia-online.vercel.app",
+        }),
+      ),
+    ).toThrow(EnvironmentConfigError);
+  });
+
+  it("rejects staging using the official production domain", () => {
+    expect(() =>
+      buildEnvironmentConfig(
+        fixture({
+          VITE_PUBLIC_APP_URL: "https://ecclesiabr.online",
         }),
       ),
     ).toThrow(EnvironmentConfigError);

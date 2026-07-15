@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "./useAuth";
 const signOutMock = vi.fn().mockResolvedValue({ error: null });
 const getSessionMock = vi.fn();
 const onAuthStateChangeMock = vi.fn();
+const updateUserMock = vi.fn().mockResolvedValue({ error: null });
 
 type AuthStateChangeCallback = (event: string, session: unknown) => void;
 let authStateChangeCallback: AuthStateChangeCallback | null = null;
@@ -15,7 +16,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       onAuthStateChange: (...args: unknown[]) => onAuthStateChangeMock(...args),
       getSession: (...args: unknown[]) => getSessionMock(...args),
       signOut: (...args: unknown[]) => signOutMock(...args),
-      updateUser: vi.fn().mockResolvedValue({ error: null }),
+      updateUser: (...args: unknown[]) => updateUserMock(...args),
     },
   },
 }));
@@ -37,6 +38,7 @@ describe("AuthProvider", () => {
     signOutMock.mockClear();
     getSessionMock.mockReset();
     onAuthStateChangeMock.mockReset();
+    updateUserMock.mockClear();
     localStorage.clear();
     authStateChangeCallback = null;
     onAuthStateChangeMock.mockImplementation((callback: AuthStateChangeCallback) => {
@@ -198,5 +200,36 @@ describe("AuthProvider", () => {
     expect(screen.getByTestId("connectionIssue").textContent).toBe("false");
     expect(screen.getByTestId("loading").textContent).toBe("false");
     expect(screen.getByTestId("user").textContent).toBe("null");
+  });
+
+  // FASE 2 (hardening P0): um SIGNED_IN via OAuth com um church_slug
+  // pendente no localStorage NUNCA deve sincronizar esse slug de volta para
+  // user_metadata via updateUser — esse era exatamente o mecanismo de
+  // autoassociação organizacional por slug (equivalente OAuth do bloco
+  // removido de handle_new_user()/Signup.tsx). Ver
+  // supabase/migrations/20260715141000_remove_open_slug_join.sql.
+  it("never calls updateUser to sync church_slug after an OAuth SIGNED_IN, even with a pending slug", async () => {
+    localStorage.setItem("ecclesia.pendingChurchSlug", "igreja-teste");
+    getSessionMock.mockResolvedValue({ data: { session: null } });
+
+    render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("loading").textContent).toBe("false"));
+
+    const oauthSession = {
+      user: { id: "oauth-user-1", app_metadata: { provider: "google" }, user_metadata: {} },
+    };
+    authStateChangeCallback?.("SIGNED_IN", oauthSession);
+
+    await waitFor(() => expect(screen.getByTestId("user").textContent).toBe("oauth-user-1"));
+
+    // Dá tempo para qualquer setTimeout(0)/microtask pendente rodar.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(updateUserMock).not.toHaveBeenCalled();
   });
 });

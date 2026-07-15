@@ -32,9 +32,19 @@
     <meta property="og:title" content="Devocional Ecclesia" />
     <meta property="og:description" content="Uma palavra diária para fortalecer a fé e aproximar sua igreja." />
     <!--
-      Interpolação nativa do Vite (%VITE_X% → valor de VITE_X em build time,
-      lido de .env.*/variáveis da Vercel). Nunca um domínio fixo: staging
-      nunca gera meta tags apontando para o domínio oficial de produção.
+      Interpolação nativa do Vite: qualquer variável VITE_ envolvida em
+      símbolos de porcentagem abaixo (ver as tags og:/twitter: seguintes) é
+      substituída pelo valor real em build time, lido de .env.*/variáveis da
+      Vercel. Nunca um domínio fixo: staging nunca gera meta tags apontando
+      para o domínio oficial de produção.
+
+      CUIDADO: o Vite escaneia o HTML inteiro (inclusive comentários) por
+      esse padrão de porcentagem — por isso este comentário NUNCA deve
+      conter um exemplo escrito literalmente com "%" ao redor de um nome que
+      não seja uma env var real; isso geraria o aviso espúrio
+      "is not defined in env variables" no build (era exatamente isso que
+      acontecia aqui antes desta correção, com um placeholder de exemplo
+      fictício).
     -->
     <meta property="og:image" content="%VITE_PUBLIC_APP_URL%/og-devocional.png" />
     <meta property="og:image:alt" content="Devocional Ecclesia — Ecclesia Online" />

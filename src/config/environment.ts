@@ -20,6 +20,24 @@
 
 export type AppEnv = "production" | "staging";
 
+/**
+ * MODELO OFICIAL E IMUTÁVEL DE AMBIENTES (não editar sem aprovação explícita
+ * — qualquer mudança aqui muda o que é considerado "produção"/"staging" em
+ * todo o app). Estes dois valores são identificadores PÚBLICOS (project refs
+ * do Supabase, não são segredos) e servem como a única fonte de verdade para
+ * qual ref cada ambiente pode usar. `VITE_EXPECTED_SUPABASE_PROJECT_REF`
+ * sozinho NUNCA é suficiente — ele é comparado contra este mapa fixo, para
+ * que uma configuração errada (ex.: produção apontando para o ref de
+ * staging, ambos "consistentes entre si") não possa se autovalidar.
+ */
+export const CANONICAL_PROJECT_REF: Record<AppEnv, string> = Object.freeze({
+  production: "zsonukpxahaxffugavfu",
+  staging: "qkiiwopkbcslquyfhdec",
+});
+
+/** Domínio oficial de produção — staging nunca pode usar este domínio. */
+export const OFFICIAL_PRODUCTION_DOMAIN = "ecclesiabr.online";
+
 export interface EnvironmentConfig {
   readonly appEnv: AppEnv;
   readonly isProduction: boolean;
@@ -127,6 +145,40 @@ export function buildEnvironmentConfig(source: RawEnvSource): EnvironmentConfig 
     throw new EnvironmentConfigError(
       "project ref de VITE_SUPABASE_URL não corresponde a VITE_EXPECTED_SUPABASE_PROJECT_REF " +
         "— produção e staging não podem ser misturados. Build/inicialização bloqueada.",
+    );
+  }
+
+  // ── Trava contra autovalidação incorreta ──────────────────────────────────
+  // Não basta expectedRef === actualRef (isso só prova consistência INTERNA
+  // do build). Cada appEnv só pode usar o ref canônico — imutável — mapeado
+  // para ele. Isso impede, por exemplo, um build com VITE_APP_ENV=production
+  // e VITE_SUPABASE_URL/VITE_EXPECTED_SUPABASE_PROJECT_REF os dois apontando
+  // (consistentemente entre si) para o project ref de STAGING.
+  const canonicalRef = CANONICAL_PROJECT_REF[appEnv];
+  if (actualRef !== canonicalRef) {
+    throw new EnvironmentConfigError(
+      `VITE_APP_ENV="${appEnv}" só pode usar o project ref canônico "${canonicalRef}" ` +
+        `(recebido "${actualRef}") — configuração de ambiente recusada.`,
+    );
+  }
+
+  // ── VITE_PUBLIC_APP_URL validado contra o ambiente ────────────────────────
+  const publicHostname = (() => {
+    try {
+      return new URL(publicAppUrl).hostname;
+    } catch {
+      return null;
+    }
+  })();
+  if (appEnv === "production" && publicHostname !== OFFICIAL_PRODUCTION_DOMAIN) {
+    throw new EnvironmentConfigError(
+      `produção exige VITE_PUBLIC_APP_URL no domínio oficial "${OFFICIAL_PRODUCTION_DOMAIN}" ` +
+        `(recebido "${publicHostname ?? publicAppUrl}").`,
+    );
+  }
+  if (appEnv === "staging" && publicHostname === OFFICIAL_PRODUCTION_DOMAIN) {
+    throw new EnvironmentConfigError(
+      `staging não pode usar o domínio oficial de produção ("${OFFICIAL_PRODUCTION_DOMAIN}").`,
     );
   }
 

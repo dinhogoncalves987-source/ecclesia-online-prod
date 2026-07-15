@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
-import { PENDING_CHURCH_SLUG_KEY } from "@/lib/organizationMembership";
 import { markBoot } from "@/lib/bootPerf";
 
 interface AuthContextType {
@@ -100,7 +99,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const userRef = useRef<User | null>(null);
   const resolvedOnceRef = useRef(false);
   const hadPersistedSessionRef = useRef(false);
-  const oauthSlugSyncedRef = useRef(false);
   const timeoutIdRef = useRef<number | null>(null);
   const attemptRef = useRef<() => void>(() => {});
 
@@ -149,32 +147,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       commit(nextSession);
 
-      // After a Google/OAuth sign-in, propagate the pending church_slug from localStorage
-      // into user_metadata so the DB trigger equivalent behaviour is preserved.
-      // Email/password signup already sets church_slug via buildSignupMetadata; this
-      // brings OAuth into parity.
-      if (event === "SIGNED_IN" && nextSession?.user && !oauthSlugSyncedRef.current) {
-        const provider = nextSession.user.app_metadata?.provider;
-        const isOAuthProvider = Boolean(provider && provider !== "email");
-        const alreadyHasSlug = Boolean(nextSession.user.user_metadata?.church_slug);
-
-        if (isOAuthProvider && !alreadyHasSlug) {
-          const pending = localStorage.getItem(PENDING_CHURCH_SLUG_KEY)?.trim();
-          if (pending) {
-            oauthSlugSyncedRef.current = true;
-            // Deferred: Supabase warns against calling auth methods synchronously
-            // inside onAuthStateChange. setTimeout(0) runs after the callback returns.
-            setTimeout(() => {
-              supabase.auth
-                .updateUser({ data: { church_slug: pending } })
-                .catch((err) => {
-                  console.warn("[Auth] Failed to sync church_slug to OAuth user metadata:", err);
-                  oauthSlugSyncedRef.current = false;
-                });
-            }, 0);
-          }
-        }
-      }
+      // SEGURANÇA (FASE 2 — hardening P0): este listener NUNCA mais escreve
+      // church_slug em user_metadata após login OAuth. Isso propagava o slug
+      // pendente do localStorage para user_metadata "para preservar o
+      // comportamento equivalente ao trigger" — ou seja, era exatamente o
+      // mecanismo de autoassociação por slug, só que para o fluxo OAuth.
+      // handle_new_user() não lê mais church_slug (ver migration
+      // 20260715141000_remove_open_slug_join.sql) e este listener não deve
+      // reabrir o mesmo vetor escrevendo o campo de volta.
     });
 
     const attemptGetSession = () => {

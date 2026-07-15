@@ -120,8 +120,13 @@ export type KnownTableName = keyof Database["public"]["Tables"];
 
 export const ORGANIZATION_ID_COLUMN = "organization_id";
 export const LEGACY_CHURCH_ID_COLUMN = "church_id";
+// FASE 4 — fail-closed: o fallback legado só é habilitado quando o valor for
+// EXATAMENTE a string "true" (produção declara "false" explicitamente;
+// qualquer valor ausente/diferente também é tratado como desabilitado).
+// Antes, a checagem era `!== "false"`, o que habilitava o fallback por
+// padrão (fail-open) sempre que a variável estivesse ausente/mal configurada.
 const ENABLE_LEGACY_CHURCH_SCOPE_FALLBACK =
-  import.meta.env.VITE_ENABLE_LEGACY_CHURCH_SCOPE_FALLBACK !== "false";
+  import.meta.env.VITE_ENABLE_LEGACY_CHURCH_SCOPE_FALLBACK === "true";
 
 const isMissingOrganizationColumn = (error: unknown) => {
   const message =

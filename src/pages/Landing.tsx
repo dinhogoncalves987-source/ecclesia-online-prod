@@ -10,6 +10,7 @@ import { AppBootScreen } from "@/components/AppBootScreen";
 import { ReconnectScreen } from "@/components/ReconnectScreen";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
+import { isRouteEnabled } from "@/config/modules";
 
 const transition = { duration: 0.5, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] };
 
@@ -48,7 +49,9 @@ export default function Landing() {
     { icon: Heart, title: t("Pedidos de Oração"), desc: t("Acompanhamento pastoral e intercessão comunitária."), path: "/admin/oracoes" },
     { icon: MessageSquare, title: t("Comunicação"), desc: t("Avisos, mensagens e comunicados centralizados."), path: "/admin/comunicacao" },
     { icon: BarChart3, title: t("Relatórios"), desc: t("Dados estratégicos para tomada de decisão."), path: "/admin/relatorios" },
-  ];
+    // FASE 6: página pública de marketing não pode anunciar módulo
+    // staging-only (ele não existe no build de produção).
+  ].filter((f) => isRouteEnabled(f.path));
 
   return (
     <div className="min-h-screen bg-background">

@@ -11,6 +11,14 @@
 
 const SUPABASE_HOST_PATTERN = /^([a-z0-9]+)\.supabase\.co$/i;
 
+/**
+ * MODELO OFICIAL E IMUTÁVEL DE AMBIENTES — mesmos valores de
+ * src/config/environment.ts e scripts/check-environment.mjs. São
+ * identificadores PÚBLICOS de project ref do Supabase, não são segredos.
+ */
+export const CANONICAL_PRODUCTION_REF = "zsonukpxahaxffugavfu";
+export const CANONICAL_STAGING_REF = "qkiiwopkbcslquyfhdec";
+
 /** Extrai o project ref de uma URL `https://<ref>.supabase.co`. */
 export function extractProjectRefFromUrl(url) {
   try {
@@ -33,10 +41,15 @@ export class SeedGuardError extends Error {
  * Valida que é seguro executar um seed/demo. Lança `SeedGuardError` (nunca
  * executa a seed) quando:
  *   - `env.APP_ENV` não é exatamente "staging";
+ *   - `env.SUPABASE_PRODUCTION_REF` ou `env.SUPABASE_STAGING_REF` estiverem
+ *     ausentes (ambos OBRIGATÓRIOS — nunca opcionais);
+ *   - `SUPABASE_PRODUCTION_REF` e `SUPABASE_STAGING_REF` forem iguais;
+ *   - qualquer um dos dois divergir do ref canônico correspondente
+ *     (`CANONICAL_PRODUCTION_REF`/`CANONICAL_STAGING_REF`) — não bastam
+ *     "distintos entre si", cada um precisa ser exatamente o ref correto;
  *   - a URL do Supabase não pôde ser resolvida para um project ref;
- *   - o ref resolvido é o ref de produção conhecido (`env.SUPABASE_PRODUCTION_REF`,
- *     quando configurado) — recusa explícita, nunca "melhor esforço";
- *   - `env.SUPABASE_STAGING_REF` está configurado e o ref resolvido diverge;
+ *   - o ref resolvido da URL não for EXATAMENTE `CANONICAL_STAGING_REF`
+ *     (equivalente a `SUPABASE_STAGING_REF`, já validado acima);
  *   - `env.SEED_STAGING` não é exatamente a string de confirmação `"SEED_STAGING"`.
  *
  * Nunca inclui a service_role key no retorno ou em mensagens de erro.
@@ -60,6 +73,28 @@ export function assertSafeToSeedStaging(input) {
     );
   }
 
+  // ── SUPABASE_PRODUCTION_REF / SUPABASE_STAGING_REF: obrigatórios, ────────
+  // distintos, e ANCORADOS nos refs canônicos imutáveis.
+  if (!productionRef) {
+    throw new SeedGuardError("SUPABASE_PRODUCTION_REF ausente (obrigatório para rodar qualquer seed).");
+  }
+  if (productionRef !== CANONICAL_PRODUCTION_REF) {
+    throw new SeedGuardError(
+      `SUPABASE_PRODUCTION_REF ("${productionRef}") difere do ref canônico de produção ("${CANONICAL_PRODUCTION_REF}"). Seed recusado.`,
+    );
+  }
+  if (!stagingRef) {
+    throw new SeedGuardError("SUPABASE_STAGING_REF ausente (obrigatório para rodar qualquer seed).");
+  }
+  if (stagingRef !== CANONICAL_STAGING_REF) {
+    throw new SeedGuardError(
+      `SUPABASE_STAGING_REF ("${stagingRef}") difere do ref canônico de staging ("${CANONICAL_STAGING_REF}"). Seed recusado.`,
+    );
+  }
+  if (productionRef === stagingRef) {
+    throw new SeedGuardError("SUPABASE_PRODUCTION_REF e SUPABASE_STAGING_REF não podem ser iguais. Seed recusado.");
+  }
+
   const projectRef = extractProjectRefFromUrl(supabaseUrl ?? "");
   if (!projectRef) {
     throw new SeedGuardError(
@@ -67,15 +102,15 @@ export function assertSafeToSeedStaging(input) {
     );
   }
 
-  if (productionRef && projectRef === productionRef) {
+  if (projectRef === CANONICAL_PRODUCTION_REF) {
     throw new SeedGuardError(
-      `SUPABASE_URL aponta para o project ref de PRODUÇÃO (${productionRef}). Seed recusado.`,
+      `SUPABASE_URL aponta para o project ref de PRODUÇÃO (${CANONICAL_PRODUCTION_REF}). Seed recusado.`,
     );
   }
 
-  if (stagingRef && projectRef !== stagingRef) {
+  if (projectRef !== CANONICAL_STAGING_REF) {
     throw new SeedGuardError(
-      `SUPABASE_URL (ref "${projectRef}") não corresponde ao ref de staging configurado (SUPABASE_STAGING_REF). Seed recusado.`,
+      `SUPABASE_URL (ref "${projectRef}") não corresponde ao ref canônico de staging ("${CANONICAL_STAGING_REF}"). Seed recusado.`,
     );
   }
 
@@ -90,17 +125,20 @@ export function assertSafeToSeedStaging(input) {
 
 /**
  * Helper de conveniência para os scripts Node: lê as variáveis relevantes de
- * `process.env` e chama `assertSafeToSeedStaging`. Lança e finaliza o
- * processo com código de saída 1 em caso de falha — nunca prossegue.
+ * uma fonte de ambiente (por padrão `process.env`, mas os scripts `seed-*`
+ * devem passar o resultado de `loadSeedEnv()` — ver scripts/lib/loadSeedEnv.mjs
+ * — para que a MESMA fonte única seja usada tanto para SUPABASE_URL/SERVICE_ROLE
+ * quanto para a guarda) e chama `assertSafeToSeedStaging`. Lança
+ * `SeedGuardError` em caso de falha — nunca prossegue.
  *
- * @param {{ supabaseUrl: string }} params
+ * @param {{ supabaseUrl: string, env?: Record<string, string | undefined> }} params
  */
-export function assertSafeToSeedStagingFromProcessEnv({ supabaseUrl }) {
+export function assertSafeToSeedStagingFromProcessEnv({ supabaseUrl, env = process.env }) {
   return assertSafeToSeedStaging({
-    appEnv: process.env.APP_ENV,
+    appEnv: env.APP_ENV,
     supabaseUrl,
-    seedStagingConfirmation: process.env.SEED_STAGING,
-    productionRef: process.env.SUPABASE_PRODUCTION_REF,
-    stagingRef: process.env.SUPABASE_STAGING_REF,
+    seedStagingConfirmation: env.SEED_STAGING,
+    productionRef: env.SUPABASE_PRODUCTION_REF,
+    stagingRef: env.SUPABASE_STAGING_REF,
   });
 }

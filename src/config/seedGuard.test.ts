@@ -70,4 +70,52 @@ describe("assertSafeToSeedStaging", () => {
       SeedGuardError,
     );
   });
+
+  it("rejects when SUPABASE_PRODUCTION_REF is missing (now mandatory)", () => {
+    expect(() =>
+      assertSafeToSeedStaging({ ...validInput, productionRef: undefined }),
+    ).toThrow(SeedGuardError);
+  });
+
+  it("rejects when SUPABASE_STAGING_REF is missing (now mandatory)", () => {
+    expect(() =>
+      assertSafeToSeedStaging({ ...validInput, stagingRef: undefined }),
+    ).toThrow(SeedGuardError);
+  });
+
+  it("rejects when SUPABASE_PRODUCTION_REF and SUPABASE_STAGING_REF are equal", () => {
+    expect(() =>
+      assertSafeToSeedStaging({
+        ...validInput,
+        productionRef: "qkiiwopkbcslquyfhdec",
+        stagingRef: "qkiiwopkbcslquyfhdec",
+      }),
+    ).toThrow(SeedGuardError);
+  });
+
+  it("rejects when SUPABASE_PRODUCTION_REF / SUPABASE_STAGING_REF are swapped", () => {
+    expect(() =>
+      assertSafeToSeedStaging({
+        ...validInput,
+        productionRef: "qkiiwopkbcslquyfhdec",
+        stagingRef: "zsonukpxahaxffugavfu",
+      }),
+    ).toThrow(SeedGuardError);
+  });
+
+  it("rejects a productionRef/stagingRef that diverge from the canonical refs, even if distinct", () => {
+    expect(() =>
+      assertSafeToSeedStaging({
+        ...validInput,
+        productionRef: "someotherprodref00",
+        stagingRef: "someotherstageref0",
+      }),
+    ).toThrow(SeedGuardError);
+  });
+
+  it("rejects the production URL even when refs are configured correctly", () => {
+    expect(() =>
+      assertSafeToSeedStaging({ ...validInput, supabaseUrl: PRODUCTION_URL }),
+    ).toThrow(SeedGuardError);
+  });
 });

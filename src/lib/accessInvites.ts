@@ -69,17 +69,30 @@ export async function createAccessInvite(input: {
   organization_id: string;
   invited_by: string;
   full_name: string;
-  email?: string;
+  /**
+   * SEGURANÇA: obrigatório. Convites de acesso administrativo sem e-mail
+   * permitiam que qualquer pessoa autenticada aceitasse o convite apenas
+   * conhecendo o token (ver migration 20260715150000_harden_access_invites).
+   * O backend também recusa a criação sem e-mail (constraint NOT VALID +
+   * validação em accept_access_invite), esta checagem é apenas para dar um
+   * erro claro antes de round-trip ao servidor.
+   */
+  email: string;
   phone?: string;
   role: string;
 }): Promise<{ data: AccessInviteRecord | null; error: string | null }> {
+  const email = input.email.trim();
+  if (!email) {
+    return { data: null, error: "E-mail é obrigatório para convites de acesso." };
+  }
+
   const { data, error } = await supabase
     .from("access_invites")
     .insert({
       organization_id: input.organization_id,
       invited_by: input.invited_by,
       full_name: input.full_name,
-      email: input.email?.trim() || null,
+      email,
       phone: input.phone?.trim() || null,
       role: input.role,
     })

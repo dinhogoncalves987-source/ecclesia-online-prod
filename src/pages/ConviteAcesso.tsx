@@ -123,10 +123,12 @@ export default function ConviteAcesso() {
     const { error } = await acceptAccessInvite(token);
     if (error) {
       const friendly: Record<string, string> = {
-        already_accepted:  "Este convite já foi utilizado.",
-        email_mismatch:    "Este convite pertence a outro e-mail. Faça login com o e-mail correto.",
-        expired_or_revoked:"Este convite expirou ou foi revogado.",
-        not_authenticated: "Você precisa estar autenticado para aceitar este convite.",
+        already_accepted:     "Este convite já foi utilizado.",
+        email_mismatch:       "Este convite pertence a outro e-mail. Faça login com o e-mail correto.",
+        expired_or_revoked:   "Este convite expirou ou foi revogado.",
+        not_authenticated:    "Você precisa estar autenticado para aceitar este convite.",
+        invite_email_missing: "Este convite não possui e-mail cadastrado. Solicite um novo link ao administrador.",
+        existing_org_access:  "Esta conta já possui acesso nesta igreja. Contate o administrador para alterar o papel.",
       };
       setErrMsg(friendly[error] ?? `Erro: ${error}`);
       setStep("error");

@@ -74,12 +74,24 @@ interface ModuleDefinition {
   note?: string;
 }
 
-/**
- * Registro central. `availability: "both"` = produção + staging.
- * `availability: "staging"` = somente staging (em teste, demo, ou
- * aguardando restauração controlada).
- */
-export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
+// FASE 6 (separação de código por build) — mesma técnica de tree-shaking
+// estático usada em src/App.tsx (`IS_STAGING_BUILD ? lazy(...) : null`):
+// `import.meta.env.VITE_APP_ENV` é inlined pelo Vite como string literal em
+// build time, então o ramo `true`/`false` abaixo é eliminado pelo
+// Rollup/esbuild antes mesmo de gerar o bundle — o array
+// `STAGING_ONLY_MODULES` (e todo texto/nota que ele carrega, incluindo os
+// próprios ids "tv-digital"/"canal-ecclesia" e as notas
+// "usa financeDemo"/"usa campaignsDemo") NUNCA chega ao bundle de produção.
+// Antes desta correção, MODULE_REGISTRY era um único array sempre presente
+// nos dois builds — os módulos reais (páginas/componentes) já eram
+// corretamente excluídos da produção via lazy-loading condicional em
+// App.tsx, mas os IDS/notas desta allowlist ainda apareciam como strings no
+// chunk de entrada, o que scripts/verify-production-bundle.mjs
+// corretamente reportava como violação de separação de ambientes.
+const IS_STAGING_BUILD = import.meta.env.VITE_APP_ENV === "staging";
+
+/** Allowlist urgente de produção — sempre presente nos dois builds. */
+const PRODUCTION_MODULES: readonly ModuleDefinition[] = [
   { id: "dashboard", availability: "both", label: "Dashboard" },
   { id: "members", availability: "both", label: "Membros" },
   { id: "congregations", availability: "both", label: "Congregações e hierarquia" },
@@ -105,7 +117,16 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
   { id: "member-invite", availability: "both", label: "Convite de membro" },
   { id: "access-invite", availability: "both", label: "Convite de acesso" },
   { id: "gatekeeper", availability: "both", label: "Modo Porteiro" },
+] as const;
 
+/**
+ * Módulos "staging"-only: ids, labels e notas descritivas que só devem
+ * existir no bundle de STAGING (ver IS_STAGING_BUILD acima). Nunca inclua
+ * aqui nada que precise ser lido em produção — mesmo texto/comentário aqui
+ * é código, e vaza para o chunk de entrada se não for eliminado por
+ * tree-shaking.
+ */
+const STAGING_ONLY_MODULES: readonly ModuleDefinition[] = IS_STAGING_BUILD ? [
   // Financeiro — abas que ainda dependem de financeDemo/campaignsDemo.
   {
     id: "finance.executive",
@@ -172,7 +193,18 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
   // para que a allowlist já os classifique corretamente quando restaurados.
   { id: "tv-digital", availability: "staging", label: "TV Digital", note: "restaurar de staging-tv-canal" },
   { id: "canal-ecclesia", availability: "staging", label: "Canal Ecclésia", note: "restaurar de staging-tv-canal" },
-] as const;
+] : [];
+
+/**
+ * Registro central. `availability: "both"` = produção + staging.
+ * `availability: "staging"` = somente staging (em teste, demo, ou
+ * aguardando restauração controlada). Em build de produção,
+ * `STAGING_ONLY_MODULES` é sempre `[]` (tree-shaken) — ver IS_STAGING_BUILD.
+ */
+export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
+  ...PRODUCTION_MODULES,
+  ...STAGING_ONLY_MODULES,
+];
 
 const REGISTRY_BY_ID: ReadonlyMap<ModuleId, ModuleDefinition> = new Map(
   MODULE_REGISTRY.map((definition) => [definition.id, definition]),

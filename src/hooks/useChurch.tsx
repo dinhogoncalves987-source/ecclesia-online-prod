@@ -1,9 +1,8 @@
-﻿import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
+﻿import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { ChurchContext, type Church } from "./useChurchContext";
 import { useAuthBootstrap, type BootstrapData } from "./useAuthBootstrap";
-import { ensureOrganizationMembership } from "@/lib/organizationMembership";
 import { isPlatformAdminRole, pickDefaultActiveChurch } from "@/lib/churchContext";
 import { useSupportContext } from "@/contexts/SupportContext";
 import { isMatrizLevel, normalizeOrganizationType } from "@/lib/organizationHierarchy";
@@ -168,7 +167,6 @@ export function ChurchProvider({ children }: { children: ReactNode }) {
   const [churches, setChurches] = useState<Church[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasActiveMembership, setHasActiveMembership] = useState(false);
-  const linkingRef = useRef(false);
 
   const fetchChurches = useCallback(async () => {
     if (!user) {
@@ -197,27 +195,19 @@ export function ChurchProvider({ children }: { children: ReactNode }) {
 
     setLoading(true);
 
-    let organizationIds = bootstrap.memberships
+    // SEGURANÇA (FASE 2): nenhuma auto-associação por church_slug acontece
+    // mais aqui. `ensureOrganizationMembership`/`join_organization_by_slug`
+    // permitiam que qualquer usuário autenticado se vinculasse como membro
+    // de QUALQUER organização apenas conhecendo (ou adivinhando) o slug
+    // público — sem convite, token ou aprovação de um administrador. Essa
+    // RPC foi removida do banco (ver migration
+    // 20260715141000_remove_open_slug_join.sql). Um usuário sem organização
+    // ativa agora só ganha uma ao aceitar um convite tokenizado real
+    // (accept_member_invite / accept_access_invite) — nunca automaticamente
+    // aqui no bootstrap.
+    const organizationIds = bootstrap.memberships
       .map((membership) => membership.organization_id)
       .filter(Boolean);
-
-    if (organizationIds.length === 0 && !linkingRef.current) {
-      linkingRef.current = true;
-      try {
-        const { linked } = await ensureOrganizationMembership(user);
-        if (linked) {
-          const refreshed = await refetchBootstrap();
-          const retryMemberships = refreshed.data?.memberships ?? [];
-          if (retryMemberships.length) {
-            organizationIds = retryMemberships
-              .map((membership) => membership.organization_id)
-              .filter(Boolean);
-          }
-        }
-      } finally {
-        linkingRef.current = false;
-      }
-    }
 
     // Vínculo ativo é a fonte de verdade para decidir OrganizationPending.
     setHasActiveMembership(organizationIds.length > 0);

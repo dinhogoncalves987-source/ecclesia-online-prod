@@ -5,6 +5,7 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { getPublicAppUrl } from "@/lib/publicUrl";
+import { environment } from "@/config/environment";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -166,8 +167,8 @@ async function fetchInviteByTokenOnce(
   token: string,
   signal: AbortSignal,
 ): Promise<{ data: MemberInvitePublic | null; error: string | null; retriable: boolean }> {
-  const baseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const apiKey  = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const baseUrl = environment.supabaseUrl;
+  const apiKey  = environment.supabasePublishableKey;
 
   let response: Response;
   try {
@@ -197,7 +198,6 @@ async function fetchInviteByTokenOnce(
   }
 
   const raw = await response.json().catch(() => null);
-  console.info("[memberInvites] REST getInviteByToken raw data", raw);
 
   if (raw === null || raw === undefined) {
     return { data: null, error: "not_found", retriable: false };

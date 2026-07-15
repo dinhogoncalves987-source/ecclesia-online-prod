@@ -12,6 +12,9 @@
     "moduleDetection": "force",
     "noEmit": true,
 
+    /* vite.config.ts imports scripts/check-environment.mjs (FASE 4 guard) */
+    "allowJs": true,
+
     /* Linting */
     "strict": true,
     "noUnusedLocals": false,

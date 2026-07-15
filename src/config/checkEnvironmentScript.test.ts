@@ -125,4 +125,42 @@ describe("runEnvironmentCheck — bloqueios obrigatórios", () => {
       runEnvironmentCheck(baseVercelStagingEnv({ VERCEL: undefined, VERCEL_ENV: undefined, VERCEL_GIT_COMMIT_REF: undefined })),
     ).not.toThrow();
   });
+
+  it("fails: SUPABASE_PRODUCTION_REF missing (now mandatory)", () => {
+    expect(() =>
+      runEnvironmentCheck(baseVercelProductionEnv({ SUPABASE_PRODUCTION_REF: undefined })),
+    ).toThrow();
+  });
+
+  it("fails: SUPABASE_STAGING_REF missing (now mandatory)", () => {
+    expect(() =>
+      runEnvironmentCheck(baseVercelStagingEnv({ SUPABASE_STAGING_REF: undefined })),
+    ).toThrow();
+  });
+
+  it("fails: SUPABASE_PRODUCTION_REF and SUPABASE_STAGING_REF are equal", () => {
+    expect(() =>
+      runEnvironmentCheck(baseVercelProductionEnv({ SUPABASE_STAGING_REF: PROD_REF })),
+    ).toThrow();
+  });
+
+  it("fails: SUPABASE_PRODUCTION_REF / SUPABASE_STAGING_REF swapped (both distinct but wrong)", () => {
+    expect(() =>
+      runEnvironmentCheck(
+        baseVercelProductionEnv({ SUPABASE_PRODUCTION_REF: STAGING_REF, SUPABASE_STAGING_REF: PROD_REF }),
+      ),
+    ).toThrow();
+  });
+
+  it("fails: production build internally consistent but pointing at the staging ref canonically", () => {
+    expect(() =>
+      runEnvironmentCheck(
+        baseVercelProductionEnv({
+          VITE_SUPABASE_URL: `https://${STAGING_REF}.supabase.co`,
+          VITE_EXPECTED_SUPABASE_PROJECT_REF: STAGING_REF,
+          SUPABASE_PRODUCTION_REF: STAGING_REF,
+        }),
+      ),
+    ).toThrow();
+  });
 });

@@ -1,4 +1,5 @@
 import type { Campaign } from "@/lib/campaignsDemo";
+import { environment } from "@/config/environment";
 import {
   campaignImageSeed,
   inferCampaignImageCategory,
@@ -69,7 +70,7 @@ export type DbCampaignMediaRow = {
   created_at: string;
 };
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const SUPABASE_URL = environment.supabaseUrl;
 
 export function mapDbCampaignMedia(row: DbCampaignMediaRow): CampaignMediaItem {
   return {

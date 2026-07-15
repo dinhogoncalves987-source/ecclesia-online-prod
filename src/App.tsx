@@ -45,20 +45,31 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 
 import SharePublic from "./pages/SharePublic";
-import ValidarCarta from "./pages/ValidarCarta";
 import ValidarMembro from "./pages/ValidarMembro";
 import ConviteMembro from "./pages/ConviteMembro";
 import ConviteAcesso from "./pages/ConviteAcesso";
 
-import DevocionalPublic from "./pages/DevocionalPublic";
-
 import NotFound from "./pages/NotFound";
+import PublicModuleUnavailable from "./pages/PublicModuleUnavailable";
 
 
 
 
-// Admin — lazy loaded (not needed until user navigates)
+// FASE 6 (separação de bundle por build) — `import.meta.env.VITE_APP_ENV` é
+// substituído por um literal de string pelo próprio Vite em tempo de build
+// (mesmo mecanismo usado por `process.env.NODE_ENV` no ecossistema React
+// para eliminar código de dev em produção). Isso torna esta comparação uma
+// expressão constante ANTES do Rollup fazer o tree-shaking do módulo — nos
+// branches abaixo (`IS_STAGING_BUILD ? lazy(() => import(...)) : null`), o
+// branch morto (incluindo a chamada `import()`) nunca é adicionado ao grafo
+// de módulos de um build de produção, então o chunk correspondente nunca é
+// emitido em `dist/`. Ver scripts/verify-production-bundle.mjs (teste de
+// artefato que falha se algum desses chunks aparecer em produção) e
+// src/config/modules.ts (mesma allowlist, aplicada em runtime ao menu/rota).
+const IS_STAGING_BUILD = import.meta.env.VITE_APP_ENV === "staging";
 
+// Admin — lazy loaded (not needed until user navigates), sempre disponíveis
+// em produção e staging (allowlist urgente de produção — ver modules.ts).
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 
 const Financeiro = lazy(() => import("./pages/Financeiro"));
@@ -67,20 +78,6 @@ const Membros = lazy(() => import("./pages/Membros"));
 
 const Agenda = lazy(() => import("./pages/Agenda"));
 
-const Biblia = lazy(() => import("./pages/Biblia"));
-
-const CultoLouvor = lazy(() => import("./pages/CultoLouvor"));
-
-const CultoBiblioteca = lazy(() => import("./pages/culto/BibliotecaMusicas"));
-
-const CultoRoteiros = lazy(() => import("./pages/culto/RoteirosCulto"));
-
-const CultoTelao = lazy(() => import("./pages/culto/TelaoProjecao"));
-
-const CultoAssistente = lazy(() => import("./pages/culto/AssistenteCulto"));
-
-const Campanhas = lazy(() => import("./pages/Campanhas"));
-
 const Oracoes = lazy(() => import("./pages/Oracoes"));
 
 const Comunicacao = lazy(() => import("./pages/Comunicacao"));
@@ -88,10 +85,6 @@ const Comunicacao = lazy(() => import("./pages/Comunicacao"));
 const Grupos = lazy(() => import("./pages/Grupos"));
 
 const Documentos = lazy(() => import("./pages/Documentos"));
-
-const CartasRecomendacao = lazy(() => import("./pages/CartasRecomendacao"));
-
-const Relatorios = lazy(() => import("./pages/Relatorios"));
 
 const Escalas = lazy(() => import("./pages/Escalas"));
 
@@ -107,10 +100,6 @@ const ConfiguracaoIgreja = lazy(() => import("./pages/ConfiguracaoIgreja"));
 
 const AssembleiaGeral = lazy(() => import("./pages/AssembleiaGeral"));
 
-const Marketplace = lazy(() => import("./pages/Marketplace"));
-
-const Comunidade = lazy(() => import("./pages/Comunidade"));
-
 const ChatSecretaria = lazy(() => import("./pages/ChatSecretaria"));
 
 const SolicitacoesAdministrativas = lazy(() => import("./pages/SolicitacoesAdministrativas"));
@@ -118,6 +107,37 @@ const SolicitacoesAdministrativas = lazy(() => import("./pages/SolicitacoesAdmin
 const CarteiraEcclesia = lazy(() => import("./pages/CarteiraEcclesia"));
 
 const ModoPorteiro = lazy(() => import("./pages/ModoPorteiro"));
+
+// Admin — staging-only (ver src/config/modules.ts, availability: "staging").
+// Nunca importados/empacotados num build de produção — apenas o gate
+// (ModuleGate) e a página de fallback (ModuleUnavailable) são bundladas.
+const Biblia = IS_STAGING_BUILD ? lazy(() => import("./pages/Biblia")) : null;
+
+const CultoLouvor = IS_STAGING_BUILD ? lazy(() => import("./pages/CultoLouvor")) : null;
+
+const CultoBiblioteca = IS_STAGING_BUILD ? lazy(() => import("./pages/culto/BibliotecaMusicas")) : null;
+
+const CultoRoteiros = IS_STAGING_BUILD ? lazy(() => import("./pages/culto/RoteirosCulto")) : null;
+
+const CultoTelao = IS_STAGING_BUILD ? lazy(() => import("./pages/culto/TelaoProjecao")) : null;
+
+const CultoAssistente = IS_STAGING_BUILD ? lazy(() => import("./pages/culto/AssistenteCulto")) : null;
+
+const Campanhas = IS_STAGING_BUILD ? lazy(() => import("./pages/Campanhas")) : null;
+
+const CartasRecomendacao = IS_STAGING_BUILD ? lazy(() => import("./pages/CartasRecomendacao")) : null;
+
+const Relatorios = IS_STAGING_BUILD ? lazy(() => import("./pages/Relatorios")) : null;
+
+const Marketplace = IS_STAGING_BUILD ? lazy(() => import("./pages/Marketplace")) : null;
+
+const Comunidade = IS_STAGING_BUILD ? lazy(() => import("./pages/Comunidade")) : null;
+
+// Público — staging-only (devotional/recommendation-letters). Mesma lógica:
+// null (e nenhum chunk) num build de produção.
+const DevocionalPublic = IS_STAGING_BUILD ? lazy(() => import("./pages/DevocionalPublic")) : null;
+
+const ValidarCarta = IS_STAGING_BUILD ? lazy(() => import("./pages/ValidarCarta")) : null;
 
 
 
@@ -166,17 +186,17 @@ const App = () => (
               <Route path="/reset-password" element={<ResetPassword />} />
 
               <Route path="/share" element={<SharePublic />} />
-              <Route path="/validar/carta/:token" element={<ValidarCarta />} />
+              <Route path="/validar/carta/:token" element={ValidarCarta ? <ValidarCarta /> : <PublicModuleUnavailable />} />
               <Route path="/validar-membro/:id" element={<ValidarMembro />} />
               <Route path="/convite-membro/:token" element={<ConviteMembro />} />
               <Route path="/convite-acesso/:token" element={<ConviteAcesso />} />
 
-              <Route path="/devocional" element={<DevocionalPublic />} />
+              <Route path="/devocional" element={DevocionalPublic ? <DevocionalPublic /> : <PublicModuleUnavailable />} />
 
 
               <Route path="/admin" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
 
-              <Route path="/admin/campanhas" element={<ProtectedRoute><ModuleGate moduleId="campaigns"><Campanhas /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/campanhas" element={<ProtectedRoute><ModuleGate moduleId="campaigns">{Campanhas && <Campanhas />}</ModuleGate></ProtectedRoute>} />
 
               <Route path="/admin/financeiro" element={<ProtectedRoute><Financeiro /></ProtectedRoute>} />
 
@@ -184,17 +204,17 @@ const App = () => (
 
               <Route path="/admin/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
 
-              <Route path="/admin/biblia" element={<ProtectedRoute><ModuleGate moduleId="bible-ai"><Biblia /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/biblia" element={<ProtectedRoute><ModuleGate moduleId="bible-ai">{Biblia && <Biblia />}</ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/culto" element={<ProtectedRoute><ModuleGate moduleId="worship"><CultoLouvor /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/culto" element={<ProtectedRoute><ModuleGate moduleId="worship">{CultoLouvor && <CultoLouvor />}</ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/culto/biblioteca" element={<ProtectedRoute><ModuleGate moduleId="worship"><CultoBiblioteca /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/culto/biblioteca" element={<ProtectedRoute><ModuleGate moduleId="worship">{CultoBiblioteca && <CultoBiblioteca />}</ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/culto/roteiros" element={<ProtectedRoute><ModuleGate moduleId="worship"><CultoRoteiros /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/culto/roteiros" element={<ProtectedRoute><ModuleGate moduleId="worship">{CultoRoteiros && <CultoRoteiros />}</ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/culto/telao" element={<ProtectedRoute><ModuleGate moduleId="worship"><CultoTelao /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/culto/telao" element={<ProtectedRoute><ModuleGate moduleId="worship">{CultoTelao && <CultoTelao />}</ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/culto/assistente" element={<ProtectedRoute><ModuleGate moduleId="worship"><CultoAssistente /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/culto/assistente" element={<ProtectedRoute><ModuleGate moduleId="worship">{CultoAssistente && <CultoAssistente />}</ModuleGate></ProtectedRoute>} />
 
               <Route path="/admin/oracoes" element={<ProtectedRoute><Oracoes /></ProtectedRoute>} />
 
@@ -204,9 +224,9 @@ const App = () => (
 
               <Route path="/admin/documentos" element={<ProtectedRoute><Documentos /></ProtectedRoute>} />
 
-              <Route path="/admin/cartas-recomendacao" element={<ProtectedRoute><ModuleGate moduleId="recommendation-letters"><CartasRecomendacao /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/cartas-recomendacao" element={<ProtectedRoute><ModuleGate moduleId="recommendation-letters">{CartasRecomendacao && <CartasRecomendacao />}</ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/relatorios" element={<ProtectedRoute><ModuleGate moduleId="reports"><Relatorios /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/relatorios" element={<ProtectedRoute><ModuleGate moduleId="reports">{Relatorios && <Relatorios />}</ModuleGate></ProtectedRoute>} />
 
               <Route path="/admin/escalas" element={<ProtectedRoute><Escalas /></ProtectedRoute>} />
 
@@ -222,9 +242,9 @@ const App = () => (
 
               <Route path="/admin/configuracao-igreja" element={<ProtectedRoute><ConfiguracaoIgreja /></ProtectedRoute>} />
 
-              <Route path="/admin/marketplace" element={<ProtectedRoute><ModuleGate moduleId="marketplace"><Marketplace /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/marketplace" element={<ProtectedRoute><ModuleGate moduleId="marketplace">{Marketplace && <Marketplace />}</ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/comunidade" element={<ProtectedRoute><ModuleGate moduleId="community"><Comunidade /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/comunidade" element={<ProtectedRoute><ModuleGate moduleId="community">{Comunidade && <Comunidade />}</ModuleGate></ProtectedRoute>} />
 
               {/* Global chat — accessible to all roles */}
               <Route path="/admin/chat" element={<ProtectedRoute><ChatSecretaria /></ProtectedRoute>} />
