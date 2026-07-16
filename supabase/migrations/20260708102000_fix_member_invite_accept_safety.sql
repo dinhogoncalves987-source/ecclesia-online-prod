@@ -1,4 +1,4 @@
-﻿-- ============================================================================
+-- ============================================================================
 -- Migration: fix_member_invite_accept_safety
 -- Version: 20260708102000 (timestamp único definido antes da primeira aplicação remota)
 -- Corrige bug critico no aceite de convite de membro:
