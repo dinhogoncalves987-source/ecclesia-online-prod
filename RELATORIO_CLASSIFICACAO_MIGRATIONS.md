@@ -199,6 +199,64 @@ cabeçalho/comentários, com inspeção direta do SQL nos casos ambíguos
 recomenda-se uma segunda leitura completa do arquivo específico que será
 promovido.
 
+## Correção 2026-07-16 — substituição da promoção em bloco por migration única
+
+O commit `c94024e` (2026-07-16) havia copiado os 33 arquivos históricos de
+staging classificados em `production_management` diretamente para
+`supabase-production/supabase/migrations/`, como cópias byte a byte dos
+arquivos de `supabase/migrations/`. Essa abordagem foi revertida nesta mesma
+revisão (sem reescrever histórico Git — os 33 arquivos foram apenas removidos
+do workdir executável de produção em um novo conjunto de alterações) por três
+razões:
+
+1. Cópias históricas inteiras misturam dezenas de preocupações diferentes por
+   arquivo (tabelas, RLS, triggers, funções), tornando qualquer revisão futura
+   de produção muito mais difícil de auditar do que uma migration única e
+   focada.
+2. O baseline de produção (`20260715170000_production_baseline_marker.sql`)
+   já registra a data a partir da qual o histórico de produção deve ser
+   estritamente forward-only; reintroduzir 33 arquivos com timestamps
+   anteriores a essa marca (mesmo funcionando via `--include-all`) contraria
+   esse princípio.
+3. A auditoria real de schema (staging × produção) identificou que a lacuna
+   estrutural relevante entre os dois bancos não estava nas tabelas em si
+   (a maioria já existia em produção, aplicada manualmente em algum momento),
+   e sim em um conjunto específico de **foreign keys de auditoria/autoria**
+   (`created_by`, `invited_by`, `assigned_to`, `user_id`, etc. referenciando
+   `auth.users(id)`) ausentes em produção.
+
+Em substituição, foi criada a migration única, forward-only (timestamp
+`20260716110000`, posterior ao baseline), comum a staging e produção, byte a
+byte idêntica nos dois workdirs (mesmo SHA256):
+
+- `supabase/migrations/20260716110000_reconcile_common_management_integrity.sql`
+- `supabase-production/supabase/migrations/20260716110000_reconcile_common_management_integrity.sql`
+
+Ela é idempotente e fail-closed: para cada constraint, confirma que a tabela e
+a coluna existem, confirma que não há registro órfão antes de criar, recusa
+seguir se uma constraint já existir com definição diferente da esperada, e
+finaliza com uma verificação de que nenhuma tabela/coluna foi removida, que
+`organizations` não foi alterada, e que a autoridade de plataforma continua
+baseada em `public.super_admins`. Não insere, atualiza nem exclui nenhuma
+linha de dado de negócio.
+
+**Divergência encontrada e não resolvida nesta migration**: a lista
+"autoritativa" de 49 constraints fornecida para esta tarefa continha 10 nomes
+sem qualquer origem rastreável em `supabase/migrations/` nem no restante do
+repositório (`members_civil_document_validated_by_fkey`,
+`organization_responsibles_assigned_by_fkey`,
+`organization_responsibles_user_id_fkey` e as 7 constraints de
+`platform_support_*`). As tabelas `platform_support_*` são de fato usadas pelo
+frontend (com `as any`, sinal de tabela sem tipos gerados), mas nenhuma
+migration rastreada as cria. A migration criada nesta correção reconcilia
+apenas as **39 constraints com origem verificada**; as 10 restantes exigem
+decisão humana antes de qualquer nova tentativa (ver comentário no topo do
+arquivo `.sql` para o detalhamento completo).
+
+Os 33 arquivos históricos originais **permanecem intactos** em
+`supabase/migrations/` e no histórico do commit `c94024e` — nada foi
+destruído, apenas removido do workdir executável de produção.
+
 ## Manifesto machine-readable
 
 A mesma classificação (incluindo destino funcional de produção/staging) está disponível

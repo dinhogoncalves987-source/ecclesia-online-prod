@@ -58,7 +58,8 @@
     "20260715141000_remove_open_slug_join.sql",
     "20260715150000_harden_access_invites.sql",
     "20260715151000_idempotent_remove_finalize_member_invite.sql",
-    "20260715160000_reconcile_production_security.sql"
+    "20260715160000_reconcile_production_security.sql",
+    "20260716110000_reconcile_common_management_integrity.sql"
   ],
   "staging_feature": [
     "20260526100000_staging_worship_tables.sql",

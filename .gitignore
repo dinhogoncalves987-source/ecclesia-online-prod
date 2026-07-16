@@ -61,3 +61,7 @@ codigo-pwa-real.txt
 # SQL fora de supabase/migrations e supabase/seeds nunca deve ser versionado
 # por engano (dumps manuais, exports pontuais, etc.).
 /*.sql
+
+# Artefatos temporários de auditoria de schema (dumps de comparação
+# staging x produção) — nunca versionar, podem conter estrutura sensível.
+schema-audit/
