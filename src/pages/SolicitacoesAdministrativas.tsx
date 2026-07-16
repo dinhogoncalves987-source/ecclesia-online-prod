@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useChurch } from "@/hooks/useChurchContext";
 import { useRole } from "@/hooks/useRole";
+import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
 import { canWriteSecretaria } from "@/lib/permissions";
 import { format } from "date-fns";
@@ -101,17 +102,18 @@ const EMPTY_FORM = {
 };
 
 export default function SolicitacoesAdministrativas() {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const { toast } = useToast();
   const { church, loading: churchLoading, isMatriz } = useChurch();
   const { canonicalRole, isAdmin, hasCapability } = useRole();
   // Nomenclatura adaptada por perfil: Matriz/Admin cria, Congregação solicita
   const isCreatorProfile = isMatriz || isAdmin;
-  const actionLabel = isCreatorProfile ? "Nova Demanda" : "Nova Solicitação";
-  const pageTitle = isCreatorProfile ? "Demandas Administrativas" : "Solicitações Administrativas";
+  const actionLabel = isCreatorProfile ? t("Nova Demanda") : t("Nova Solicitação");
+  const pageTitle = isCreatorProfile ? t("Demandas Administrativas") : t("Solicitações Administrativas");
   const pageDesc = isCreatorProfile
-    ? "Registro e acompanhamento de demandas administrativas"
-    : "Gerenciamento de pedidos recebidos pela secretaria";
+    ? t("Registro e acompanhamento de demandas administrativas")
+    : t("Gerenciamento de pedidos recebidos pela secretaria");
   const canWrite = hasCapability("requests.manage") || canWriteSecretaria(canonicalRole);
 
   const [requests, setRequests] = useState<AdmRequest[]>([]);
@@ -138,12 +140,12 @@ export default function SolicitacoesAdministrativas() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      toast({ title: "Erro ao carregar solicitações", description: error.message, variant: "destructive" });
+      toast({ title: t("Erro ao carregar solicitações"), description: error.message, variant: "destructive" });
       return;
     }
     setRequests((data ?? []) as AdmRequest[]);
     setLoading(false);
-  }, [church, toast]);
+  }, [church, toast, t]);
 
   useEffect(() => {
     if (churchLoading) return;
@@ -182,9 +184,9 @@ export default function SolicitacoesAdministrativas() {
     });
 
     if (error) {
-      toast({ title: "Erro ao criar solicitação", description: error.message, variant: "destructive" });
+      toast({ title: t("Erro ao criar solicitação"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Solicitação criada com sucesso" });
+      toast({ title: t("Solicitação criada com sucesso") });
       setShowForm(false);
       setForm(EMPTY_FORM);
       void fetchRequests();
@@ -206,9 +208,9 @@ export default function SolicitacoesAdministrativas() {
       .eq("organization_id", church!.id);
 
     if (error) {
-      toast({ title: "Erro ao atualizar status", description: error.message, variant: "destructive" });
+      toast({ title: t("Erro ao atualizar status"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: `Status alterado para: ${STATUS_LABELS[newStatus]}` });
+      toast({ title: `${t("Status alterado para:")} ${t(STATUS_LABELS[newStatus])}` });
       void fetchRequests();
       if (detailRequest?.id === req.id) {
         setDetailRequest({ ...detailRequest, status: newStatus });
@@ -228,9 +230,9 @@ export default function SolicitacoesAdministrativas() {
       .eq("organization_id", church.id);
 
     if (error) {
-      toast({ title: "Erro ao salvar observação", description: error.message, variant: "destructive" });
+      toast({ title: t("Erro ao salvar observação"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Observação salva" });
+      toast({ title: t("Observação salva") });
       void fetchRequests();
     }
     setSavingNotes(false);
@@ -273,8 +275,9 @@ export default function SolicitacoesAdministrativas() {
           )}
         </div>
 
-        {/* Cards de status */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        {/* Cards de status — 5 cards só cabem confortavelmente a partir de lg; em sm/md ficariam
+            demasiado estreitos para rótulos como "Aguardando Documento" */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {STATUS_ORDER.map((s) => {
             const Icon = STATUS_ICONS[s];
             return (
@@ -291,7 +294,7 @@ export default function SolicitacoesAdministrativas() {
               >
                 <div className="flex items-center gap-1.5 mb-1">
                   <Icon size={14} />
-                  <span className="text-xs font-medium">{STATUS_LABELS[s]}</span>
+                  <span className="text-xs font-medium">{t(STATUS_LABELS[s])}</span>
                 </div>
                 <p className="text-2xl font-bold">{statusCounts[s] ?? 0}</p>
               </button>
@@ -302,7 +305,7 @@ export default function SolicitacoesAdministrativas() {
         {/* Busca */}
         <div className="relative">
           <Input
-            placeholder="Buscar por nome, tipo ou descrição..."
+            placeholder={t("Buscar por nome, tipo ou descrição...")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-4"
@@ -328,13 +331,13 @@ export default function SolicitacoesAdministrativas() {
             <ClipboardList size={40} className="text-muted-foreground/30 mb-3" />
             <p className="text-muted-foreground text-sm">
               {requests.length === 0
-                ? "Nenhuma solicitação registrada ainda."
-                : "Nenhuma solicitação encontrada com esses filtros."}
+                ? t("Nenhuma solicitação registrada ainda.")
+                : t("Nenhuma solicitação encontrada com esses filtros.")}
             </p>
             {canWrite && requests.length === 0 && (
               <Button variant="outline" size="sm" className="mt-4" onClick={() => setShowForm(true)}>
                 <Plus size={14} className="mr-1" />
-                {isCreatorProfile ? "Registrar primeira demanda" : "Criar primeira solicitação"}
+                {isCreatorProfile ? t("Registrar primeira demanda") : t("Criar primeira solicitação")}
               </Button>
             )}
           </div>
@@ -357,7 +360,7 @@ export default function SolicitacoesAdministrativas() {
                       <div className="flex flex-wrap items-baseline gap-2">
                         <span className="font-medium text-sm truncate">{req.requester_name}</span>
                         <span className="text-xs text-muted-foreground">
-                          {REQUEST_TYPE_LABELS[req.request_type]}
+                          {t(REQUEST_TYPE_LABELS[req.request_type])}
                         </span>
                       </div>
                       {req.description && (
@@ -372,7 +375,7 @@ export default function SolicitacoesAdministrativas() {
                         variant="outline"
                         className={cn("text-[10px] px-2 py-0.5 border", STATUS_COLORS[req.status])}
                       >
-                        {STATUS_LABELS[req.status]}
+                        {t(STATUS_LABELS[req.status])}
                       </Badge>
                       {canWrite && nextStatus && (
                         <button
@@ -389,7 +392,7 @@ export default function SolicitacoesAdministrativas() {
                           ) : (
                             <ChevronDown size={10} />
                           )}
-                          {STATUS_LABELS[nextStatus]}
+                          {t(STATUS_LABELS[nextStatus])}
                         </button>
                       )}
                       {canWrite && req.status === "em_analise" && (
@@ -402,7 +405,7 @@ export default function SolicitacoesAdministrativas() {
                           disabled={changingStatus === req.id}
                           className="text-[10px] text-red-500 hover:underline"
                         >
-                          Rejeitar
+                          {t("Rejeitar")}
                         </button>
                       )}
                     </div>
@@ -422,39 +425,39 @@ export default function SolicitacoesAdministrativas() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Nome do solicitante *</label>
+              <label className="text-sm font-medium">{t("Nome do solicitante *")}</label>
               <Input
-                placeholder="Nome completo"
+                placeholder={t("Nome completo")}
                 value={form.requester_name}
                 onChange={(e) => setForm((f) => ({ ...f, requester_name: e.target.value }))}
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Tipo de solicitação</label>
+              <label className="text-sm font-medium">{t("Tipo de solicitação")}</label>
               <select
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 value={form.request_type}
                 onChange={(e) => setForm((f) => ({ ...f, request_type: e.target.value as RequestType }))}
               >
-                {(Object.keys(REQUEST_TYPE_LABELS) as RequestType[]).map((t) => (
-                  <option key={t} value={t}>{REQUEST_TYPE_LABELS[t]}</option>
+                {(Object.keys(REQUEST_TYPE_LABELS) as RequestType[]).map((rt) => (
+                  <option key={rt} value={rt}>{t(REQUEST_TYPE_LABELS[rt])}</option>
                 ))}
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Descrição</label>
+              <label className="text-sm font-medium">{t("Descrição")}</label>
               <textarea
                 className="w-full min-h-[80px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder="Descreva a solicitação..."
+                placeholder={t("Descreva a solicitação...")}
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Observação interna</label>
+              <label className="text-sm font-medium">{t("Observação interna")}</label>
               <textarea
                 className="w-full min-h-[60px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder="Anotação interna da secretaria..."
+                placeholder={t("Anotação interna da secretaria...")}
                 value={form.internal_notes}
                 onChange={(e) => setForm((f) => ({ ...f, internal_notes: e.target.value }))}
               />
@@ -462,11 +465,11 @@ export default function SolicitacoesAdministrativas() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowForm(false)} disabled={saving}>
-              Cancelar
+              {t("Cancelar")}
             </Button>
             <Button onClick={handleCreate} disabled={saving || !form.requester_name.trim()}>
               {saving ? <Loader2 size={15} className="animate-spin mr-1.5" /> : null}
-              Criar Solicitação
+              {t("Criar Solicitação")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -477,40 +480,40 @@ export default function SolicitacoesAdministrativas() {
         {detailRequest && (
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>{REQUEST_TYPE_LABELS[detailRequest.request_type]}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
+            <DialogTitle>{t(REQUEST_TYPE_LABELS[detailRequest.request_type])}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Solicitante</span>
+                <span className="text-sm text-muted-foreground">{t("Solicitante")}</span>
                 <span className="text-sm font-medium">{detailRequest.requester_name}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Status</span>
+                <span className="text-sm text-muted-foreground">{t("Status")}</span>
                 <Badge
                   variant="outline"
                   className={cn("text-xs border", STATUS_COLORS[detailRequest.status])}
                 >
-                  {STATUS_LABELS[detailRequest.status]}
+                  {t(STATUS_LABELS[detailRequest.status])}
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Criado em</span>
+                <span className="text-sm text-muted-foreground">{t("Criado em")}</span>
                 <span className="text-sm">
                   {format(new Date(detailRequest.created_at), "d MMM yyyy 'às' HH:mm", { locale: ptBR })}
                 </span>
               </div>
               {detailRequest.description && (
                 <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Descrição</p>
+                  <p className="text-sm text-muted-foreground">{t("Descrição")}</p>
                   <p className="text-sm bg-muted/50 rounded-lg px-3 py-2">{detailRequest.description}</p>
                 </div>
               )}
               {canWrite && (
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Observação interna</label>
+                  <label className="text-sm font-medium">{t("Observação interna")}</label>
                   <textarea
                     className="w-full min-h-[72px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                    placeholder="Adicionar observação interna..."
+                    placeholder={t("Adicionar observação interna...")}
                     value={notesDraft}
                     onChange={(e) => setNotesDraft(e.target.value)}
                   />
@@ -522,7 +525,7 @@ export default function SolicitacoesAdministrativas() {
                     className="w-full"
                   >
                     {savingNotes ? <Loader2 size={13} className="animate-spin mr-1" /> : null}
-                    Salvar Observação
+                    {t("Salvar Observação")}
                   </Button>
                 </div>
               )}
@@ -537,7 +540,7 @@ export default function SolicitacoesAdministrativas() {
                       disabled={changingStatus === detailRequest.id}
                       className={cn("text-xs", STATUS_COLORS[s])}
                     >
-                      {STATUS_LABELS[s]}
+                      {t(STATUS_LABELS[s])}
                     </Button>
                   ))}
                 </div>

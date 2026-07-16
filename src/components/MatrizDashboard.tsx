@@ -182,7 +182,8 @@ export function MatrizDashboard() {
       {/* Per-congregation breakdown */}
       <div className="bg-card rounded-xl shadow-executive overflow-hidden">
         <div className="p-5 border-b border-border/50 flex items-center justify-between">
-          <h3 className="font-serif text-base">{t(`Detalhamento por ${childUnitLabel}`)}</h3>
+          {/* childUnitLabel é dinâmico (nome da unidade filha) — não pode ser parte da chave de tradução */}
+          <h3 className="font-serif text-base">{t("Detalhamento por")} {childUnitLabel}</h3>
           <Link to="/admin/congregacoes" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
             {t("Gerenciar")} <ArrowRight size={12} />
           </Link>

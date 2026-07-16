@@ -425,7 +425,7 @@ export default function SuperAdmin() {
     name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") + "-" + Date.now().toString(36);
 
   const handleCreateChurch = async () => {
-    if (!churchForm.name.trim()) { toast.error("Nome é obrigatório"); return; }
+    if (!churchForm.name.trim()) { toast.error(t("Nome é obrigatório")); return; }
     const slug = generateSlug(churchForm.name);
     const { error } = await supabase.from("organizations" as any).insert({
       name: churchForm.name.trim(), slug, organization_type: churchForm.organization_type,
@@ -435,7 +435,7 @@ export default function SuperAdmin() {
       pastor_president_name: churchForm.pastor_name.trim() || null,
     } as any);
     if (error) { toast.error(error.message); return; }
-    toast.success("Igreja criada com sucesso!");
+    toast.success(t("Igreja criada com sucesso!"));
     setChurchForm({ name: "", city: "", state: "", pastor_name: "", email: "", phone: "", address: "", organization_type: "matriz", parent_id: "" });
     setShowChurchForm(false);
     loadData();
@@ -444,14 +444,14 @@ export default function SuperAdmin() {
   const handleDeleteChurch = async (id: string) => {
     const { error } = await supabase.from("organizations" as any).delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Igreja removida");
+    toast.success(t("Igreja removida"));
     loadData();
   };
 
   const handleCopyInvite = (slug: string, name: string) => {
     const url = `${window.location.origin}/signup?church=${encodeURIComponent(slug)}`;
     navigator.clipboard.writeText(url);
-    toast.success(`Link copiado para ${name}`);
+    toast.success(`${t("Link copiado para")} ${name}`);
   };
 
   // ─── Department helpers ──────────────────────────────────────────────────────
@@ -475,7 +475,7 @@ export default function SuperAdmin() {
     name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
 
   const saveDept = async () => {
-    if (!deptForm.name.trim()) { toast.error("Nome é obrigatório"); return; }
+    if (!deptForm.name.trim()) { toast.error(t("Nome é obrigatório")); return; }
     const slug = deptForm.slug.trim() || autoSlug(deptForm.name);
     const moduleKeys = deptForm.module_keys_raw.split(",").map(s => s.trim()).filter(Boolean);
     const payload = {
@@ -488,12 +488,12 @@ export default function SuperAdmin() {
       const { error } = await supabase.from("platform_support_departments" as any).update(payload as any).eq("id", editingDept.id);
       if (error) { toast.error(error.message); return; }
       await logSupportAudit(user!.id, "update_department", null, null, "departments", { dept_id: editingDept.id, name: deptForm.name });
-      toast.success("Departamento atualizado!");
+      toast.success(t("Departamento atualizado!"));
     } else {
       const { error } = await supabase.from("platform_support_departments" as any).insert(payload as any);
       if (error) { toast.error(error.message); return; }
       await logSupportAudit(user!.id, "create_department", null, null, "departments", { slug, name: deptForm.name });
-      toast.success("Departamento criado!");
+      toast.success(t("Departamento criado!"));
     }
 
     setShowDeptForm(false);
@@ -512,14 +512,14 @@ export default function SuperAdmin() {
   // ─── Agent helpers ───────────────────────────────────────────────────────────
 
   const saveAgent = async () => {
-    if (!agentForm.email.trim()) { toast.error("E-mail é obrigatório"); return; }
+    if (!agentForm.email.trim()) { toast.error(t("E-mail é obrigatório")); return; }
     setAgentFormStatus("saving");
 
     const { data: existing } = await supabase
       .from("profiles").select("user_id, full_name, platform_role").eq("email", agentForm.email.trim()).maybeSingle();
 
     if (!existing) {
-      toast.error("Usuário não encontrado. O agente deve criar uma conta primeiro ou receber um convite de acesso.");
+      toast.error(t("Usuário não encontrado. O agente deve criar uma conta primeiro ou receber um convite de acesso."));
       setAgentFormStatus("idle");
       return;
     }
@@ -536,7 +536,7 @@ export default function SuperAdmin() {
     });
     const roleOk = (roleResult as { ok?: boolean; error?: string } | null)?.ok;
     if (profileError || !roleOk) {
-      toast.error(profileError?.message ?? (roleResult as { error?: string } | null)?.error ?? "Falha ao definir a função");
+      toast.error(profileError?.message ?? (roleResult as { error?: string } | null)?.error ?? t("Falha ao definir a função"));
       setAgentFormStatus("idle");
       return;
     }
@@ -564,7 +564,7 @@ export default function SuperAdmin() {
       target_user_id: existing.user_id, role: agentForm.platform_role,
     });
 
-    toast.success(`Agente ${existing.full_name || agentForm.email} configurado com sucesso!`);
+    toast.success(`${t("Agente")} ${existing.full_name || agentForm.email} ${t("configurado com sucesso!")}`);
     setAgentFormStatus("done");
     setShowAgentForm(false);
     setAgentForm({
@@ -581,9 +581,9 @@ export default function SuperAdmin() {
       _new_role: newRole,
     });
     const ok = (data as { ok?: boolean; error?: string } | null)?.ok;
-    if (error || !ok) { toast.error(error?.message ?? (data as { error?: string } | null)?.error ?? "Falha ao atualizar a função"); return; }
+    if (error || !ok) { toast.error(error?.message ?? (data as { error?: string } | null)?.error ?? t("Falha ao atualizar a função")); return; }
     await logSupportAudit(user!.id, "update_agent", null, null, "team", { target_user_id: userId, new_role: newRole });
-    toast.success("Função atualizada!");
+    toast.success(t("Função atualizada!"));
     loadAgents();
   };
 
@@ -593,10 +593,10 @@ export default function SuperAdmin() {
       _new_role: null,
     });
     const ok = (data as { ok?: boolean; error?: string } | null)?.ok;
-    if (error || !ok) { toast.error(error?.message ?? (data as { error?: string } | null)?.error ?? "Falha ao remover o agente"); return; }
+    if (error || !ok) { toast.error(error?.message ?? (data as { error?: string } | null)?.error ?? t("Falha ao remover o agente")); return; }
     await supabase.from("platform_support_agent_departments" as any).delete().eq("agent_user_id", userId);
     await logSupportAudit(user!.id, "deactivate_agent", null, null, "team", { target_user_id: userId });
-    toast.success(`${name || "Agente"} removido da equipe da plataforma`);
+    toast.success(`${name || t("Agente")} ${t("removido da equipe da plataforma")}`);
     loadAgents();
   };
 
@@ -611,7 +611,7 @@ export default function SuperAdmin() {
       ticket_id: ticketId, actor_user_id: user!.id, event_type: "status_change",
       payload: { from: "open", to: "in_progress" },
     } as any);
-    toast.success("Chamado aceito!");
+    toast.success(t("Chamado aceito!"));
     loadTickets();
   };
 
@@ -625,12 +625,12 @@ export default function SuperAdmin() {
       payload: { from: "in_progress", to: "resolved" },
     } as any);
     await logSupportAudit(user!.id, "resolve_ticket", null, null, "chamados", { ticket_id: ticketId });
-    toast.success("Chamado resolvido!");
+    toast.success(t("Chamado resolvido!"));
     loadTickets();
   };
 
   const submitTransfer = async () => {
-    if (!transferModal || !transferForm.department_id) { toast.error("Selecione o departamento destino"); return; }
+    if (!transferModal || !transferForm.department_id) { toast.error(t("Selecione o departamento destino")); return; }
     const updates: any = {
       department_id: transferForm.department_id,
       status: "open",
@@ -647,19 +647,19 @@ export default function SuperAdmin() {
     await logSupportAudit(user!.id, "transfer_ticket", null, null, "chamados", {
       ticket_id: transferModal.ticketId, to_dept: transferForm.department_id,
     });
-    toast.success("Chamado transferido!");
+    toast.success(t("Chamado transferido!"));
     setTransferModal(null);
     setTransferForm({ department_id: "", agent_id: "", note: "" });
     loadTickets();
   };
 
   const attendOrg = async (ticket: SupportTicket) => {
-    if (!ticket.organization_id) { toast.error("Chamado sem organização vinculada"); return; }
+    if (!ticket.organization_id) { toast.error(t("Chamado sem organização vinculada")); return; }
     const { data: org } = await supabase.from("organizations" as any)
       .select("id, name, organization_type, city, state").eq("id", ticket.organization_id).maybeSingle();
-    if (!org) { toast.error("Organização não encontrada"); return; }
+    if (!org) { toast.error(t("Organização não encontrada")); return; }
     setSupportOrg(org as any);
-    toast.success(`Atendendo: ${(org as any).name}`);
+    toast.success(`${t("Atendendo:")} ${(org as any).name}`);
   };
 
   // ─── Notice helpers ──────────────────────────────────────────────────────────
@@ -670,7 +670,7 @@ export default function SuperAdmin() {
     const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "-");
     const filePath = `platform-announcements/${Date.now()}-${safeFileName}`;
     const { error } = await supabase.storage.from("platform-media").upload(filePath, file, { contentType: file.type, upsert: false });
-    if (error) { setNoticeImageUploading(false); toast.error("Erro ao enviar imagem"); return; }
+    if (error) { setNoticeImageUploading(false); toast.error(t("Erro ao enviar imagem")); return; }
     const { data } = supabase.storage.from("platform-media").getPublicUrl(filePath);
     setNoticeImageUrl(data.publicUrl); setNoticeImagePreview(data.publicUrl);
     setNoticeImageUploading(false);
@@ -684,13 +684,13 @@ export default function SuperAdmin() {
     event.preventDefault();
     const file = event.dataTransfer.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) { toast.error("Selecione uma imagem"); return; }
+    if (!file.type.startsWith("image/")) { toast.error(t("Selecione uma imagem")); return; }
     await uploadNoticeImage(file);
   };
 
   const handleGenerateBannerAi = async () => {
     if (!noticeTitle.trim() || !noticeShortDescription.trim() || !noticeFullContent.trim()) {
-      toast.error("Preencha título, resumo e conteúdo antes de gerar o banner"); return;
+      toast.error(t("Preencha título, resumo e conteúdo antes de gerar o banner")); return;
     }
     setNoticeBannerGenerating(true);
     const generationId = crypto.randomUUID();
@@ -698,13 +698,13 @@ export default function SuperAdmin() {
       body: { title: noticeTitle.trim(), short_description: noticeShortDescription.trim(), full_content: noticeFullContent.trim(), generation_id: generationId, announcement_id: editingNoticeId },
     });
     setNoticeBannerGenerating(false);
-    if (error) { toast.error(error.message || "Erro ao gerar banner"); return; }
+    if (error) { toast.error(error.message || t("Erro ao gerar banner")); return; }
     const result = data as { imageUrl?: string | null; error?: string } | null;
     if (result?.error) { toast.error(result.error); return; }
-    if (!result?.imageUrl) { toast.error("A IA não retornou uma imagem"); return; }
+    if (!result?.imageUrl) { toast.error(t("A IA não retornou uma imagem")); return; }
     setNoticeImageUrl(result.imageUrl);
     setNoticeImagePreview(`${result.imageUrl}${result.imageUrl.includes("?") ? "&" : "?"}preview=${generationId}`);
-    toast.success("Banner gerado com sucesso");
+    toast.success(t("Banner gerado com sucesso"));
   };
 
   const createNotice = async () => {
@@ -718,7 +718,7 @@ export default function SuperAdmin() {
           starts_at: noticeStartsAt || null, ends_at: noticeEndsAt || null, updated_at: new Date().toISOString(),
         } as any).eq("id", editingNoticeId).select();
       if (error) { toast.error(error.message); return; }
-      toast.success("Aviso atualizado");
+      toast.success(t("Aviso atualizado"));
     } else {
       const { error } = await supabase.from("platform_announcements" as any).insert({
         title: noticeTitle.trim(), short_description: noticeShortDescription.trim(),
@@ -728,7 +728,7 @@ export default function SuperAdmin() {
         starts_at: noticeStartsAt || null, ends_at: noticeEndsAt || null,
       } as any);
       if (error) { toast.error(error.message); return; }
-      toast.success("Aviso publicado");
+      toast.success(t("Aviso publicado"));
     }
     setNoticeTitle(""); setNoticeShortDescription(""); setNoticeFullContent(""); setNoticeImageUrl(""); setNoticeImagePreview("");
     setNoticeButtonLabel(""); setNoticeButtonLink(""); setNoticeStartsAt(""); setNoticeEndsAt("");
@@ -741,12 +741,12 @@ export default function SuperAdmin() {
       .eq("id", id).select("id, is_active").single();
     if (error) { toast.error(error.message); return; }
     setNotices(items => items.map(item => item.id === id ? { ...item, is_active: Boolean((data as any)?.is_active) } : item));
-    toast.success(!active ? "Aviso ativado" : "Aviso desativado");
+    toast.success(!active ? t("Aviso ativado") : t("Aviso desativado"));
   };
 
   const deleteNotice = async (id: string) => {
     await supabase.from("platform_announcements" as any).delete().eq("id", id);
-    toast.success("Aviso removido"); loadData();
+    toast.success(t("Aviso removido")); loadData();
   };
 
   const handleEditAnnouncement = (n: PlatformNotice) => {

@@ -14,6 +14,7 @@ import {
   buildWhatsappLink,
   type InviteRecord,
 } from "@/lib/memberInvites";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -45,6 +46,7 @@ export function MemberInviteModal({
   sectorId, congregationId, invitedBy,
   phone, email,
 }: Props) {
+  const { t, lang } = useLanguage();
   const [invite, setInvite]     = useState<InviteRecord | null>(null);
   const [loading, setLoading]   = useState(false);
   const [copied, setCopied]     = useState(false);
@@ -63,14 +65,14 @@ export function MemberInviteModal({
         role: "member",
       });
       if (error || !data) {
-        toast.error("Erro ao gerar convite", { description: error ?? "Tente novamente" });
+        toast.error(t("Erro ao gerar convite"), { description: error ?? t("Tente novamente") });
         return;
       }
       setInvite(data);
     } finally {
       setLoading(false);
     }
-  }, [memberId, organizationId, sectorId, congregationId, invitedBy]);
+  }, [memberId, organizationId, sectorId, congregationId, invitedBy, t]);
 
   useEffect(() => {
     // The invite binds the Auth account to the member's registered e-mail —
@@ -85,10 +87,10 @@ export function MemberInviteModal({
     try {
       await navigator.clipboard.writeText(inviteUrl);
       setCopied(true);
-      toast.success("Link copiado!");
+      toast.success(t("Link copiado!"));
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      toast.error("Não foi possível copiar. Copie manualmente.", { description: inviteUrl });
+      toast.error(t("Não foi possível copiar. Copie manualmente."), { description: inviteUrl });
     }
   };
 
@@ -108,8 +110,9 @@ export function MemberInviteModal({
     onClose();
   };
 
+  const dateLocale = lang === "en" ? "en-US" : lang === "es" ? "es-ES" : "pt-BR";
   const expiresLabel = invite
-    ? new Date(invite.expires_at).toLocaleDateString("pt-BR", {
+    ? new Date(invite.expires_at).toLocaleDateString(dateLocale, {
         day:   "2-digit",
         month: "long",
         year:  "numeric",
@@ -125,10 +128,10 @@ export function MemberInviteModal({
           <div>
             <div className="flex items-center gap-2 mb-0.5">
               <CheckCircle2 size={18} className="text-emerald-500" />
-              <h2 className="font-serif text-base font-semibold">Membro cadastrado com sucesso</h2>
+              <h2 className="font-serif text-base font-semibold">{t("Membro cadastrado com sucesso")}</h2>
             </div>
             <p className="text-xs text-muted-foreground">
-              Envie o link de ativação para que o membro crie o acesso ao aplicativo.
+              {t("Envie o link de ativação para que o membro crie o acesso ao aplicativo.")}
             </p>
           </div>
           <button
@@ -147,7 +150,7 @@ export function MemberInviteModal({
             <div className="flex flex-col items-center text-center gap-2 py-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-4">
               <AlertTriangle size={22} className="text-amber-600 dark:text-amber-400" />
               <p className="text-sm text-amber-800 dark:text-amber-300">
-                Cadastre um e-mail para este membro antes de enviar o convite digital.
+                {t("Cadastre um e-mail para este membro antes de enviar o convite digital.")}
               </p>
             </div>
           )}
@@ -156,7 +159,7 @@ export function MemberInviteModal({
           {hasEmail && loading && (
             <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground">
               <Loader2 size={18} className="animate-spin" />
-              <span className="text-sm">Gerando convite...</span>
+              <span className="text-sm">{t("Gerando convite...")}</span>
             </div>
           )}
 
@@ -165,19 +168,19 @@ export function MemberInviteModal({
             <>
               {/* Link preview */}
               <div className="bg-muted/40 rounded-lg px-3 py-2.5">
-                <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide font-medium">Link de convite</p>
+                <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide font-medium">{t("Link de convite")}</p>
                 <p className="text-xs text-foreground break-all leading-relaxed">{inviteUrl}</p>
               </div>
 
               {/* Expiry */}
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Clock size={13} />
-                <span>Válido até {expiresLabel}</span>
+                <span>{t("Válido até")} {expiresLabel}</span>
                 <button
                   onClick={handleRegenerate}
                   className="ml-auto flex items-center gap-1 text-xs text-primary hover:underline"
                 >
-                  <RefreshCw size={11} /> Regenerar
+                  <RefreshCw size={11} /> {t("Regenerar")}
                 </button>
               </div>
 
@@ -189,11 +192,11 @@ export function MemberInviteModal({
                     className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#25D366] text-white rounded-lg text-sm font-medium hover:bg-[#1ebe5b] transition-colors"
                   >
                     <MessageCircle size={16} />
-                    Enviar pelo WhatsApp
+                    {t("Enviar pelo WhatsApp")}
                   </button>
                 ) : (
                   <p className="text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 text-center">
-                    Este membro não possui telefone cadastrado. Copie o link e envie manualmente.
+                    {t("Este membro não possui telefone cadastrado. Copie o link e envie manualmente.")}
                   </p>
                 )}
 
@@ -202,8 +205,8 @@ export function MemberInviteModal({
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-secondary text-foreground rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
                 >
                   {copied
-                    ? <><CheckCircle2 size={15} className="text-emerald-500" /> Link copiado!</>
-                    : <><Copy size={15} /> Copiar link</>
+                    ? <><CheckCircle2 size={15} className="text-emerald-500" /> {t("Link copiado!")}</>
+                    : <><Copy size={15} /> {t("Copiar link")}</>
                   }
                 </button>
               </div>
@@ -217,7 +220,7 @@ export function MemberInviteModal({
             onClick={handleDoLater}
             className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors py-1.5"
           >
-            Fazer depois
+            {t("Fazer depois")}
           </button>
         </div>
 

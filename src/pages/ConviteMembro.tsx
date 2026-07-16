@@ -39,6 +39,7 @@ import {
   type MemberInvitePublic,
 } from "@/lib/memberInvites";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -92,6 +93,7 @@ function hasMemberEmail(invite: MemberInvitePublic | null): boolean {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ConviteMembro() {
+  const { t } = useLanguage();
   const { token = "" } = useParams<{ token: string }>();
   const location = useLocation();
   const { user, loading: authLoading } = useAuth();
@@ -119,7 +121,7 @@ export default function ConviteMembro() {
     const init = async () => {
       if (!token || !token.trim()) {
         console.error("[ConviteMembro] token is empty or missing");
-        setErrMsg(INVITE_LOAD_ERRORS.invalid_token);
+        setErrMsg(t(INVITE_LOAD_ERRORS.invalid_token));
         setStep("error");
         return;
       }
@@ -133,7 +135,7 @@ export default function ConviteMembro() {
       } catch (e) {
         console.error("[ConviteMembro] getInviteByToken failed", e);
         if (!cancelled) {
-          setErrMsg(INVITE_LOAD_ERRORS.network_error);
+          setErrMsg(t(INVITE_LOAD_ERRORS.network_error));
           setStep("error");
         }
         return;
@@ -143,7 +145,7 @@ export default function ConviteMembro() {
 
       if (error || !data) {
         console.error("[ConviteMembro] invite load error", error);
-        setErrMsg(INVITE_LOAD_ERRORS[error ?? ""] ?? error ?? "Convite inválido.");
+        setErrMsg(t(INVITE_LOAD_ERRORS[error ?? ""] ?? error ?? "Convite inválido."));
         setStep("error");
         return;
       }
@@ -155,7 +157,7 @@ export default function ConviteMembro() {
     init().catch((e) => {
       console.error("[ConviteMembro] init() unhandled exception", e);
       if (!cancelled) {
-        setErrMsg("Erro inesperado ao carregar o convite. Tente novamente.");
+        setErrMsg(t("Erro inesperado ao carregar o convite. Tente novamente."));
         setStep("error");
       }
     });
@@ -167,7 +169,7 @@ export default function ConviteMembro() {
         setStep((current) => {
           if (current === "loading") {
             console.error("[ConviteMembro] loading timeout — stuck in loading state");
-            setErrMsg(INVITE_LOAD_ERRORS.timeout);
+            setErrMsg(t(INVITE_LOAD_ERRORS.timeout));
             return "error";
           }
           return current;
@@ -179,6 +181,7 @@ export default function ConviteMembro() {
       cancelled = true;
       clearTimeout(loadingTimeout);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const fixedEmail     = invite?.member_email?.trim() ?? "";
@@ -194,7 +197,7 @@ export default function ConviteMembro() {
 
       if (!result.success) {
         console.error("[ConviteMembro] acceptMemberInvite failed", result.error);
-        setLinkError(ACCEPT_ERRORS[result.error ?? ""] ?? result.message ?? "Não foi possível concluir a vinculação agora.");
+        setLinkError(t(ACCEPT_ERRORS[result.error ?? ""] ?? result.message ?? "Não foi possível concluir a vinculação agora."));
         setLinkErrorCode(result.error ?? "");
         setFormMode("link_error");
         setStep("form");
@@ -208,11 +211,12 @@ export default function ConviteMembro() {
       setTimeout(() => { window.location.href = "/admin"; }, 1200);
     } catch (e) {
       console.error("[ConviteMembro] acceptMemberInvite unexpected exception", e);
-      setLinkError("Erro inesperado ao concluir a vinculação. Tente novamente.");
+      setLinkError(t("Erro inesperado ao concluir a vinculação. Tente novamente."));
       setLinkErrorCode("unexpected_error");
       setFormMode("link_error");
       setStep("form");
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   // ── React to the real auth session: this is what finalizes the invite both
@@ -239,7 +243,7 @@ export default function ConviteMembro() {
     if (submitting) return;
 
     if (!fixedEmail) {
-      setFormError("Este membro ainda não possui e-mail cadastrado.");
+      setFormError(t("Este membro ainda não possui e-mail cadastrado."));
       return;
     }
     setSubmitting(true);
@@ -250,7 +254,7 @@ export default function ConviteMembro() {
 
       if (error) {
         console.error("[ConviteMembro] magic-link error", error);
-        setFormError(error.message || "Não foi possível enviar o link seguro agora. Tente novamente.");
+        setFormError(error.message || t("Não foi possível enviar o link seguro agora. Tente novamente."));
         setSubmitting(false);
         return;
       }
@@ -261,7 +265,7 @@ export default function ConviteMembro() {
       setSubmitting(false);
     } catch (err) {
       console.error("[ConviteMembro] handleSignUp unexpected exception", err);
-      setFormError("Erro inesperado ao criar sua conta. Tente novamente.");
+      setFormError(t("Erro inesperado ao criar sua conta. Tente novamente."));
       setSubmitting(false);
     }
   };
@@ -298,7 +302,7 @@ export default function ConviteMembro() {
     <div className="flex items-center justify-between px-6 py-4 border-b border-border/30">
       <Link to="/" className="flex items-center gap-2">
         <Church size={20} className="text-primary" />
-        <span className="font-serif text-base font-semibold text-foreground">Ecclesia Online</span>
+        <span className="font-serif text-base font-semibold text-foreground">{t("Ecclesia Online")}</span>
       </Link>
       <ThemeToggle />
     </div>
@@ -316,7 +320,7 @@ export default function ConviteMembro() {
 
   // ── Loading ───────────────────────────────────────────────────────────────────
   if (step === "loading") {
-    return <MiniStatus text="Verificando convite..." />;
+    return <MiniStatus text={t("Verificando convite...")} />;
   }
 
   // ── Error ─────────────────────────────────────────────────────────────────────
@@ -327,10 +331,10 @@ export default function ConviteMembro() {
         <div className="flex-1 flex items-center justify-center px-4">
           <div className="max-w-sm w-full text-center space-y-4">
             <XCircle size={48} className="text-destructive mx-auto" />
-            <h1 className="font-serif text-xl font-semibold">Convite inválido</h1>
+            <h1 className="font-serif text-xl font-semibold">{t("Convite inválido")}</h1>
             <p className="text-sm text-muted-foreground">{errMsg}</p>
             <Link to="/login" className="inline-block text-sm text-primary hover:underline mt-2">
-              Ir para o login
+              {t("Ir para o login")}
             </Link>
           </div>
         </div>
@@ -340,7 +344,7 @@ export default function ConviteMembro() {
 
   // ── Linking (finalizing with the authenticated session) ──────────────────────
   if (step === "linking") {
-    return <MiniStatus text="Vinculando seu acesso..." />;
+    return <MiniStatus text={t("Vinculando seu acesso...")} />;
   }
 
   // ── Done ──────────────────────────────────────────────────────────────────────
@@ -351,12 +355,12 @@ export default function ConviteMembro() {
         <div className="flex-1 flex items-center justify-center px-4">
           <div className="max-w-sm w-full text-center space-y-4">
             <CheckCircle2 size={52} className="text-emerald-500 mx-auto" />
-            <h1 className="font-serif text-xl font-semibold">Acesso ativado!</h1>
+            <h1 className="font-serif text-xl font-semibold">{t("Acesso ativado!")}</h1>
             <p className="text-sm text-muted-foreground">
-              Bem-vindo(a), <strong>{invite?.member_name}</strong>.<br />
-              Você está vinculado(a) à <strong>{invite?.church_name}</strong>.
+              {t("Bem-vindo(a),")} <strong>{invite?.member_name}</strong>.<br />
+              {t("Você está vinculado(a) à")} <strong>{invite?.church_name}</strong>.
             </p>
-            <p className="text-xs text-muted-foreground">Entrando no painel...</p>
+            <p className="text-xs text-muted-foreground">{t("Entrando no painel...")}</p>
           </div>
         </div>
       </div>
@@ -379,7 +383,7 @@ export default function ConviteMembro() {
       )}
       <div>
         <p className="font-serif text-lg font-semibold leading-tight">{invite?.member_name}</p>
-        <p className="text-sm text-muted-foreground">{invite?.member_role || "Membro"}</p>
+        <p className="text-sm text-muted-foreground">{invite?.member_role || t("Membro")}</p>
       </div>
     </div>
   );
@@ -414,8 +418,7 @@ export default function ConviteMembro() {
       <div className="space-y-2 text-center bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3">
         <AlertTriangle size={22} className="text-amber-600 dark:text-amber-400 mx-auto" />
         <p className="text-sm text-amber-800 dark:text-amber-300">
-          Este membro ainda não possui e-mail cadastrado. Procure a secretaria para
-          atualizar o cadastro antes de ativar o acesso.
+          {t("Este membro ainda não possui e-mail cadastrado. Procure a secretaria para atualizar o cadastro antes de ativar o acesso.")}
         </p>
       </div>
     );
@@ -423,7 +426,7 @@ export default function ConviteMembro() {
     body = (
       <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground">
         <Loader2 size={18} className="animate-spin" />
-        <span className="text-sm">Verificando sua sessão...</span>
+        <span className="text-sm">{t("Verificando sua sessão...")}</span>
       </div>
     );
   } else if (formMode === "session_mismatch") {
@@ -432,8 +435,8 @@ export default function ConviteMembro() {
         <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 space-y-2">
           <AlertTriangle size={22} className="text-amber-600 dark:text-amber-400 mx-auto" />
           <p className="text-sm text-amber-800 dark:text-amber-300">
-            Você está conectado(a) com uma conta diferente da conta deste membro
-            (<strong>{fixedEmail}</strong>). Saia desta conta para continuar.
+            {t("Você está conectado(a) com uma conta diferente da conta deste membro")}
+            {" "}(<strong>{fixedEmail}</strong>). {t("Saia desta conta para continuar.")}
           </p>
         </div>
         <button
@@ -441,7 +444,7 @@ export default function ConviteMembro() {
           onClick={handleSignOutAndRetry}
           className="w-full py-2.5 bg-secondary text-foreground rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors flex items-center justify-center gap-2"
         >
-          <LogOut size={15} /> Sair desta conta
+          <LogOut size={15} /> {t("Sair desta conta")}
         </button>
       </div>
     );
@@ -459,7 +462,7 @@ export default function ConviteMembro() {
             onClick={handleSignOutAndRetry}
             className="w-full py-2.5 bg-secondary text-foreground rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors flex items-center justify-center gap-2"
           >
-            <LogOut size={15} /> Sair e tentar com outra conta
+            <LogOut size={15} /> {t("Sair e tentar com outra conta")}
           </button>
         ) : user ? (
           <button
@@ -467,7 +470,7 @@ export default function ConviteMembro() {
             onClick={handleRetryLink}
             className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
           >
-            Tentar novamente
+            {t("Tentar novamente")}
           </button>
         ) : (
           <Link
@@ -475,7 +478,7 @@ export default function ConviteMembro() {
             state={loginStateFrom}
             className="inline-block text-sm text-primary hover:underline"
           >
-            Ir para o login
+            {t("Ir para o login")}
           </Link>
         )}
       </div>
@@ -486,11 +489,10 @@ export default function ConviteMembro() {
         <div className="bg-muted/40 border border-border/50 rounded-xl px-4 py-3 space-y-2">
           <MailCheck size={26} className="text-primary mx-auto" />
           <p className="text-sm text-foreground">
-            Enviamos um link seguro para <strong>{fixedEmail}</strong>.
+            {t("Enviamos um link seguro para")} <strong>{fixedEmail}</strong>.
           </p>
           <p className="text-xs text-muted-foreground">
-            Abra o e-mail e clique no link para provar que esta caixa postal é sua.
-            Você voltará automaticamente para concluir o acesso.
+            {t("Abra o e-mail e clique no link para provar que esta caixa postal é sua. Você voltará automaticamente para concluir o acesso.")}
           </p>
         </div>
         <button
@@ -499,9 +501,9 @@ export default function ConviteMembro() {
           disabled={resendState === "sending"}
           className="text-sm text-primary hover:underline disabled:opacity-60"
         >
-          {resendState === "sending" && "Reenviando..."}
-          {resendState === "sent" && "E-mail reenviado!"}
-          {resendState === "idle" && "Reenviar link seguro"}
+          {resendState === "sending" && t("Reenviando...")}
+          {resendState === "sent" && t("E-mail reenviado!")}
+          {resendState === "idle" && t("Reenviar link seguro")}
         </button>
       </div>
     );
@@ -511,7 +513,7 @@ export default function ConviteMembro() {
       <form onSubmit={handleSignUp} className="space-y-3">
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Mail size={12} /> E-mail cadastrado
+            <Mail size={12} /> {t("E-mail cadastrado")}
           </label>
           <input
             type="email"
@@ -532,13 +534,13 @@ export default function ConviteMembro() {
           className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
         >
           {submitting && <Loader2 size={14} className="animate-spin" />}
-          Enviar link seguro para meu e-mail
+          {t("Enviar link seguro para meu e-mail")}
         </button>
 
         <p className="text-center text-xs text-muted-foreground">
-          Prefere entrar com sua senha atual?{" "}
+          {t("Prefere entrar com sua senha atual?")}{" "}
           <Link to="/login" state={loginStateFrom} className="text-primary hover:underline">
-            Fazer login
+            {t("Fazer login")}
           </Link>
         </p>
       </form>
@@ -563,7 +565,7 @@ export default function ConviteMembro() {
           </div>
 
           <p className="text-center text-xs text-muted-foreground">
-            Ecclesia Online — Plataforma de Gestão Pastoral
+            {t("Ecclesia Online — Plataforma de Gestão Pastoral")}
           </p>
         </div>
       </div>
