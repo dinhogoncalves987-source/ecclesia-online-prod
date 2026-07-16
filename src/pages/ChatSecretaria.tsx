@@ -344,7 +344,7 @@ export default function ChatSecretaria() {
 
   return (
     <AdminLayout>
-      <div className="flex flex-col h-[calc(100vh-4rem)]">
+      <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
         <InternalChat
           key={refetchKey}
           mode="inbox"

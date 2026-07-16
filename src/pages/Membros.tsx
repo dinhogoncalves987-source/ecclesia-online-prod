@@ -2,10 +2,11 @@ import { AdminLayout } from "@/components/AdminLayout";
 import {
   Search, Plus, X, Trash2, Loader2, Upload, Pencil, CreditCard, Camera, ChevronRight,
   User, FileText, Phone, MapPin, Church, Briefcase, Users, BookOpen, Send, Building2,
+  Shield,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { MemberWalletCard } from "@/components/MemberWalletCard";
 import { MemberInviteModal } from "@/components/MemberInviteModal";
@@ -31,7 +32,6 @@ import {
   CIVIL_DOCUMENT_STATUS_OPTIONS,
   getCivilDocLabel,
 } from "@/lib/secretariaConstants";
-import { getMemberInvites, buildInviteUrl, buildWhatsappLink } from "@/lib/memberInvites";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -235,9 +235,10 @@ export default function Membros() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const { church, loading: churchLoading } = useChurch();
-  const { canonicalRole } = useRole();
-  const canWrite = canWriteSecretaria(canonicalRole);
+  const { canonicalRole, hasCapability, canAccess } = useRole();
+  const canWrite = hasCapability("members.write") || canWriteSecretaria(canonicalRole);
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Context filter: when navigated from Hierarquia/Congregacoes
   type ContextFilter = { orgId: string; orgName: string; orgType: string } | null;
@@ -259,6 +260,26 @@ export default function Membros() {
       });
     }
   }, [location.state]);
+
+  // When contextFilter is a subsede, load the congregation IDs under it
+  useEffect(() => {
+    if (!contextFilter || contextFilter.orgType !== "subsede") {
+      setSubsedeCongregationIds([]);
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from("organizations")
+      .select("id")
+      .eq("parent_id", contextFilter.orgId)
+      .eq("active", true)
+      .eq("organization_type", "congregacao")
+      .then(({ data }) => {
+        if (cancelled) return;
+        setSubsedeCongregationIds((data ?? []).map((o: { id: string }) => o.id));
+      });
+    return () => { cancelled = true; };
+  }, [contextFilter]);
 
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
@@ -287,12 +308,16 @@ export default function Membros() {
   // Sub-organizations (sectors + congregations)
   const [subOrgs, setSubOrgs] = useState<SubOrg[]>([]);
 
+  // Congregation IDs under a subsede (for subsede member context)
+  const [subsedeCongregationIds, setSubsedeCongregationIds] = useState<string[]>([]);
+
   // Invite modal (shown after creating a new member)
   const [inviteModal, setInviteModal] = useState<{
     open: boolean;
     memberId: string;
     memberName: string;
     phone: string | null;
+    email: string | null;
   } | null>(null);
 
   const setField = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
@@ -358,14 +383,26 @@ export default function Membros() {
 
   // ── Filtering ───────────────────────────────────────────────────────────────
 
-  const filtered = members.filter(m => {
-    // Context filter: show only members linked to the selected sub-organization
-    if (contextFilter) {
-      const inContext =
-        m.congregation_id === contextFilter.orgId ||
-        m.sector_id       === contextFilter.orgId;
-      if (!inContext) return false;
-    }
+  // Membros da unidade em foco: toda a matriz (sem contextFilter) OU somente a
+  // congregação/setor selecionado (com contextFilter). Contadores do cabeçalho
+  // e o "Nenhum membro encontrado" devem ser calculados sobre este escopo —
+  // nunca sobre o total da matriz quando uma congregação está selecionada.
+  // Subsedes: lista membros de todas as congregações filhas da subsede.
+  const scopedMembers = contextFilter
+    ? contextFilter.orgType === "subsede"
+      ? subsedeCongregationIds.length > 0
+        ? members.filter(m =>
+            m.congregation_id !== null &&
+            subsedeCongregationIds.includes(m.congregation_id),
+          )
+        : [] // subsede sem congregações = lista vazia
+      : members.filter(m =>
+          m.congregation_id === contextFilter.orgId ||
+          m.sector_id       === contextFilter.orgId,
+        )
+    : members;
+
+  const filtered = scopedMembers.filter(m => {
     if (filterStatus !== "all" && m.status !== filterStatus) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -488,10 +525,21 @@ export default function Membros() {
 
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   };
+  // Ao cadastrar dentro de uma congregação/setor selecionado (contextFilter),
+  // o novo membro precisa nascer já vinculado a essa unidade — senão ele cai
+  // fora do escopo filtrado e "desaparece" da lista até o usuário reabrir a
+  // tela sem filtro. organization_id continua sendo a matriz (church.id),
+  // gravado separadamente em handleSave; aqui só decidimos sector_id/congregation_id.
+  const SECTOR_TYPES = ["setor", "district"];
   const openNew = () => {
     setIsNewMember(true);
     setEditingId(null);
-    setForm({ ...EMPTY_FORM });
+    const isSectorContext = !!contextFilter && SECTOR_TYPES.includes(contextFilter.orgType);
+    setForm({
+      ...EMPTY_FORM,
+      sector_id:       isSectorContext ? contextFilter!.orgId : null,
+      congregation_id: contextFilter && !isSectorContext ? contextFilter.orgId : null,
+    });
     setPhotoPreview(null);
     setPhotoFile(null);
     setCivilDocumentFile(null);
@@ -757,16 +805,15 @@ export default function Membros() {
         }
         closeModal();
 
-        // Open invite modal if member has a phone/whatsapp
+        // Open invite modal after creating a new member
         const invitePhone = form.whatsapp?.trim() || form.phone?.trim() || null;
-        if (invitePhone) {
-          setInviteModal({
-            open:       true,
-            memberId:   newId,
-            memberName: form.full_name.trim(),
-            phone:      invitePhone,
-          });
-        }
+        setInviteModal({
+          open:       true,
+          memberId:   newId,
+          memberName: form.full_name.trim(),
+          phone:      invitePhone,
+          email:      form.email?.trim() || null,
+        });
 
       } else {
         // ── EDIT existing member ─────────────────────────────────────────────
@@ -873,10 +920,10 @@ export default function Membros() {
 
   // ── Stats ────────────────────────────────────────────────────────────────────
 
-  const activeCount     = members.filter(m => m.status === "Ativo").length;
-  const visitanteCount  = members.filter(m => m.status === "Visitante").length;
-  const falecidoCount   = members.filter(m => m.status === "Falecido").length;
-  const transferidoCount = members.filter(m => m.status === "Transferido").length;
+  const activeCount     = scopedMembers.filter(m => m.status === "Ativo").length;
+  const visitanteCount  = scopedMembers.filter(m => m.status === "Visitante").length;
+  const falecidoCount   = scopedMembers.filter(m => m.status === "Falecido").length;
+  const transferidoCount = scopedMembers.filter(m => m.status === "Transferido").length;
 
   const canDeleteMember = (m: Member) =>
     canWrite && !MEMBER_STATUSES_NO_DELETE.includes(m.status as MemberStatus);
@@ -922,7 +969,7 @@ export default function Membros() {
           <div>
             <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">{t("Membros")}</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {members.length} {t("cadastrados")} · {activeCount} {t("ativos")} · {visitanteCount} {t("visitantes")}
+              {scopedMembers.length} {t("cadastrados")} · {activeCount} {t("ativos")} · {visitanteCount} {t("visitantes")}
               {falecidoCount > 0 && ` · ${falecidoCount} ${t("falecidos")}`}
               {transferidoCount > 0 && ` · ${transferidoCount} ${t("transferidos")}`}
             </p>
@@ -1600,6 +1647,35 @@ export default function Membros() {
                 <div className="flex items-center gap-2">
                   {!isNewMember && (
                     <>
+                      {canAccess("/admin/gerenciar-acessos") && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const member = members.find((item) => item.id === editingId);
+                            if (!member) return;
+                            const targetOrganizationId = member.congregation_id
+                              ?? member.sector_id
+                              ?? contextFilter?.orgId
+                              ?? church?.id;
+                            if (!targetOrganizationId) return;
+                            closeModal();
+                            navigate("/admin/gerenciar-acessos", {
+                              state: {
+                                openNewAccess: true,
+                                presetMemberId: member.id,
+                                presetMemberName: member.full_name,
+                                contextOrganizationId: targetOrganizationId,
+                                contextOrganizationName: contextFilter?.orgName ?? church?.name ?? "Unidade do membro",
+                                contextOrganizationType: contextFilter?.orgType ?? "",
+                                source: "member_profile",
+                              },
+                            });
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
+                        >
+                          <Shield size={14} /> Gerenciar acessos
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => { const m = members.find(x => x.id === editingId); if (m) { closeModal(); setWalletMember(m); } }}
@@ -1607,40 +1683,22 @@ export default function Membros() {
                       >
                         <CreditCard size={14} /> Carteira
                       </button>
-                      {(form.whatsapp || form.phone) && (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            if (!editingId) return;
-                            const { data: invites } = await getMemberInvites(editingId);
-                            const pending = invites.find(i => i.status === "pending");
-                            const token = pending?.token;
-                            if (!token) {
-                              setInviteModal({
-                                open:       true,
-                                memberId:   editingId,
-                                memberName: form.full_name,
-                                phone:      form.whatsapp?.trim() || form.phone?.trim() || null,
-                              });
-                              return;
-                            }
-                            const url = buildInviteUrl(token);
-                            const ph  = form.whatsapp?.trim() || form.phone?.trim() || "";
-                            if (ph) {
-                              window.open(
-                                buildWhatsappLink(ph, form.full_name, church?.name ?? "Igreja", url),
-                                "_blank", "noopener,noreferrer",
-                              );
-                            } else {
-                              await navigator.clipboard.writeText(url);
-                              toast.success("Link copiado!");
-                            }
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
-                        >
-                          <Send size={13} /> Convite
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!editingId) return;
+                          setInviteModal({
+                            open:       true,
+                            memberId:   editingId,
+                            memberName: form.full_name,
+                            phone:      form.whatsapp?.trim() || form.phone?.trim() || null,
+                            email:      form.email?.trim() || null,
+                          });
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
+                      >
+                        <Send size={13} /> Convite
+                      </button>
                     </>
                   )}
                   <button type="button" onClick={closeModal}
@@ -1715,11 +1773,10 @@ export default function Membros() {
           congregationId={form.congregation_id}
           invitedBy={user?.id}
           phone={inviteModal.phone}
+          email={inviteModal.email}
         />
       )}
     </AdminLayout>
   );
 }
-
-
 

@@ -8,14 +8,14 @@
  * O usuário pode então compartilhar o arquivo via WhatsApp, Email ou Download.
  */
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { ChevronLeft, ChevronRight, Shield } from "lucide-react";
+import { ChevronLeft, ChevronRight, Shield, QrCode, RefreshCw, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DocumentActions } from "@/components/DocumentActions";
-import { getPublicAppUrl } from "@/lib/publicUrl";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 export type WalletMember = {
   id: string;
@@ -83,11 +83,11 @@ const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
 // ── Frente ────────────────────────────────────────────────────────────────────
 
 function CardFront({
-  id, member, churchName, churchCity, churchState, churchLogoUrl, code, issueDate, validUntil, qrValue,
+  id, member, churchName, churchCity, churchState, churchLogoUrl, code, issueDate, validUntil, qrValue, pdfQrPlaceholder,
 }: {
   id: string; member: WalletMember; churchName: string;
   churchCity?: string; churchState?: string; churchLogoUrl?: string | null;
-  code: string; issueDate: string; validUntil: string; qrValue: string;
+  code: string; issueDate: string; validUntil: string; qrValue: string; pdfQrPlaceholder?: string;
 }) {
   const statusInfo = STATUS_BADGE[member.status] ?? STATUS_BADGE.Ativo;
   const roleLabel  = ROLE_LABEL[member.member_role ?? ""] ?? member.member_role ?? "Membro";
@@ -158,7 +158,17 @@ function CardFront({
             </div>
           </div>
           <div className="bg-white rounded-lg p-1 flex-shrink-0 shadow">
-            <QRCodeSVG value={qrValue} size={40} level="M" />
+            {pdfQrPlaceholder ? (
+              <div className="w-[40px] h-[40px] flex items-center justify-center p-0.5">
+                <span className="text-[5px] text-slate-500 text-center leading-tight">{pdfQrPlaceholder}</span>
+              </div>
+            ) : qrValue ? (
+              <QRCodeSVG value={qrValue} size={40} level="M" />
+            ) : (
+              <div className="w-[40px] h-[40px] flex items-center justify-center">
+                <QrCode size={16} className="text-slate-300" />
+              </div>
+            )}
           </div>
         </div>
 
@@ -250,14 +260,65 @@ export function MemberWalletCard({ member, churchName, churchCity, churchState, 
   const [showBack, setShowBack] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
+  // ── Dynamic QR state ────────────────────────────────────────────────────────
+  const [qrState, setQrState] = useState<"idle" | "loading" | "ready" | "expired" | "error">("idle");
+  const [qrToken, setQrToken] = useState<string | null>(null);
+  const [qrExpiresAt, setQrExpiresAt] = useState<string | null>(null);
+  const [qrError, setQrError] = useState<string | null>(null);
+  const [qrTimeLeft, setQrTimeLeft] = useState(0);
+
+  // ── Countdown timer ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (qrState !== "ready" || !qrExpiresAt) return;
+    const tick = () => {
+      const remaining = Math.max(0, Math.floor((new Date(qrExpiresAt).getTime() - Date.now()) / 1000));
+      setQrTimeLeft(remaining);
+      if (remaining <= 0) setQrState("expired");
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [qrState, qrExpiresAt]);
+
+  const formatTimeLeft = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  // ── QR generation ───────────────────────────────────────────────────────────
+  const handleGenerateQr = async () => {
+    setQrState("loading");
+    setQrError(null);
+    try {
+      const { data, error } = await supabase.rpc("generate_member_validation_token", {
+        p_member_id: member.id,
+      });
+      if (error) throw error;
+      if (!(data as { token?: string; expires_at?: string })?.token) throw new Error("token_missing");
+      const payload = data as { token: string; expires_at: string };
+      setQrToken(payload.token);
+      setQrExpiresAt(payload.expires_at);
+      setQrTimeLeft(300);
+      setQrState("ready");
+    } catch {
+      setQrError("Não foi possível gerar o QR seguro agora.");
+      setQrState("error");
+    }
+  };
+
   // Refs para os cards off-screen usados exclusivamente pelo gerador de PDF
   const pdfContainerRef = useRef<HTMLDivElement>(null);
 
   const issueDate  = format(new Date(), "dd/MM/yyyy", { locale: ptBR });
   const validUntil = format(new Date(new Date().setFullYear(new Date().getFullYear() + 1)), "dd/MM/yyyy", { locale: ptBR });
   const code           = memberCode(member.id);
-  const validationUrl  = `${getPublicAppUrl()}/validar-membro/${member.id}`;
-  const qrValue        = validationUrl;
+
+  const qrValue = qrState === "ready" && qrToken
+    ? `${window.location.origin}/admin/porteiro?token=${encodeURIComponent(qrToken)}`
+    : "";
+
+  const pdfQrPlaceholder = "QR Code seguro disponível apenas na carteira digital.";
   const roleLabel      = ROLE_LABEL[member.member_role ?? ""] ?? member.member_role ?? "Membro";
 
   const shareText = [
@@ -272,9 +333,6 @@ export function MemberWalletCard({ member, churchName, churchCity, churchState, 
     `Situação: ${member.status || "Ativa"}`,
     ``,
     `Documento emitido pela igreja via Ecclesia Online.`,
-    ``,
-    `🔗 Validação:`,
-    validationUrl,
   ].filter(Boolean).join("\n");
 
   // ── Geração de PDF real (html2canvas + jsPDF) ─────────────────────────────
@@ -341,6 +399,67 @@ export function MemberWalletCard({ member, churchName, churchCity, churchState, 
           : <CardFront id="wallet-card-front" {...cardProps} />}
       </div>
 
+      {/* Dynamic QR controls */}
+      <div className="flex flex-col items-center gap-2 w-full max-w-xs">
+        {qrState === "idle" && (
+          <button
+            type="button"
+            onClick={handleGenerateQr}
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white transition-colors font-medium"
+          >
+            <QrCode size={14} /> Gerar QR seguro
+          </button>
+        )}
+
+        {qrState === "loading" && (
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Loader2 size={14} className="animate-spin" /> Gerando QR...
+          </span>
+        )}
+
+        {qrState === "ready" && (
+          <div className="flex flex-col items-center gap-1.5">
+            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+              QR Code gerado com sucesso
+            </span>
+            <span className="text-[11px] text-muted-foreground">
+              Este QR Code expira em 5 minutos.
+            </span>
+            <span className={`text-xs font-mono font-semibold ${qrTimeLeft <= 60 ? "text-red-500" : "text-foreground"}`}>
+              {formatTimeLeft(qrTimeLeft)}
+            </span>
+          </div>
+        )}
+
+        {qrState === "expired" && (
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-xs text-red-500 font-medium">
+              QR Code expirado. Gere um novo código.
+            </span>
+            <button
+              type="button"
+              onClick={handleGenerateQr}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-amber-500 hover:bg-amber-600 text-white transition-colors font-medium"
+            >
+              <RefreshCw size={14} /> Gerar novo QR
+            </button>
+          </div>
+        )}
+
+        {qrState === "error" && (
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-xs text-red-500">{qrError}</span>
+            <button
+              type="button"
+              onClick={handleGenerateQr}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-border hover:bg-secondary transition-colors font-medium"
+            >
+              <RefreshCw size={14} /> Tentar novamente
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Cards off-screen sempre renderizados — usados pelo PDF */}
       <div
         ref={pdfContainerRef}
@@ -348,7 +467,7 @@ export function MemberWalletCard({ member, churchName, churchCity, churchState, 
         style={{ position: "fixed", left: "-9999px", top: "-9999px", width: 360, pointerEvents: "none" }}
       >
         <div style={{ marginBottom: 16 }}>
-          <CardFront id="wallet-pdf-front" {...cardProps} />
+          <CardFront id="wallet-pdf-front" {...cardProps} qrValue="" pdfQrPlaceholder={pdfQrPlaceholder} />
         </div>
         <CardBack id="wallet-pdf-back" {...{ member, churchName }} />
       </div>
@@ -382,7 +501,7 @@ export function MemberWalletCard({ member, churchName, churchCity, churchState, 
         printElementId={showBack ? "wallet-card-back" : "wallet-card-front"}
         shareTitle={`Carteira de Membro — ${member.full_name}`}
         shareText={shareText}
-        shareUrl={validationUrl}
+        shareUrl={window.location.origin}
         whatsappText={`Carteira de Membro — ${member.full_name} | ${churchName}`}
         emailSubject={`Carteira de Membro — ${member.full_name} — ${churchName}`}
         emailBody={shareText}

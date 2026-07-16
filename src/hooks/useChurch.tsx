@@ -1,10 +1,12 @@
-﻿import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
+﻿import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { ChurchContext, type Church } from "./useChurchContext";
-import { ensureOrganizationMembership } from "@/lib/organizationMembership";
+import { useAuthBootstrap, type BootstrapData } from "./useAuthBootstrap";
 import { isPlatformAdminRole, pickDefaultActiveChurch } from "@/lib/churchContext";
 import { useSupportContext } from "@/contexts/SupportContext";
+import { isMatrizLevel, normalizeOrganizationType } from "@/lib/organizationHierarchy";
+import { markBoot } from "@/lib/bootPerf";
 
 const ACTIVE_CHURCH_STORAGE_KEY = "ecclesia.activeChurchId";
 
@@ -57,7 +59,9 @@ const mapOrganizationToChurch = (org: OrganizationRow): Church => ({
   logo_url: org.logo_url,
   primary_color: null,
   parent_church_id: org.parent_id,
-  is_matriz: org.organization_type === "matriz" || org.organization_type === "sede",
+  // Normalizado (não comparação de string crua) para reconhecer também
+  // aliases legados (ex.: "church") e evitar falso-negativo de matriz/sede.
+  is_matriz: isMatrizLevel(normalizeOrganizationType(org.organization_type)),
   organization_type: org.organization_type ?? null,
   address: null,
   city: org.city,
@@ -107,23 +111,20 @@ const ORGANIZATION_SELECT = [
   // ConfiguracaoIgreja.tsx para evitar quebra antes de migration ser aplicada.
 ].join(",");
 
-async function resolvePlatformAdmin(userId: string): Promise<boolean> {
-  const [profileResult, globalRolesResult, superAdminRow] = await Promise.all([
-    supabase.from("profiles").select("platform_role").eq("user_id", userId).maybeSingle(),
-    supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .is("organization_id", null),
-    supabase.from("super_admins").select("user_id").eq("user_id", userId).maybeSingle(),
-  ]);
+/**
+ * Whether this user is a platform admin (super_admin/platform_admin/support_*),
+ * derived entirely from data useAuthBootstrap already fetched — no
+ * additional profiles/user_roles/super_admins queries needed here anymore.
+ */
+function isBootstrapPlatformAdmin(bootstrap: BootstrapData): boolean {
+  if (isPlatformAdminRole(bootstrap.platformRole)) return true;
 
-  if (isPlatformAdminRole(profileResult.data?.platform_role)) return true;
+  const hasGlobalAdminRole = bootstrap.userRoles.some(
+    (row) => !row.organization_id && isPlatformAdminRole(row.role),
+  );
+  if (hasGlobalAdminRole) return true;
 
-  const globalRoles = (globalRolesResult.data || []) as Array<{ role: string }>;
-  if (globalRoles.some((row) => isPlatformAdminRole(row.role))) return true;
-
-  return Boolean(superAdminRow.data?.user_id);
+  return bootstrap.isSuperAdminRow;
 }
 
 async function fetchActiveOrganizations(
@@ -155,12 +156,17 @@ async function fetchActiveOrganizations(
 export function ChurchProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { isPlatformUser, activeSupportOrg } = useSupportContext();
+  // memberships (organization_users) already come from the shared bootstrap
+  // fetch — no independent query here for the common case. Only the
+  // downstream `organizations` lookup (by the resulting ids) is inherently
+  // a second round-trip, since we can't know which orgs to fetch before
+  // knowing the membership ids.
+  const { data: bootstrap, loading: bootstrapLoading, isError: bootstrapIsError, refetch: refetchBootstrap } = useAuthBootstrap(user?.id);
   const [church, setChurch] = useState<Church | null>(null);
   const [profileChurchId, setProfileChurchId] = useState<string | null>(null);
   const [churches, setChurches] = useState<Church[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasActiveMembership, setHasActiveMembership] = useState(false);
-  const linkingRef = useRef(false);
 
   const fetchChurches = useCallback(async () => {
     if (!user) {
@@ -172,49 +178,36 @@ export function ChurchProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    setLoading(true);
-
-    const { data: memberships, error: membershipsError } = await supabase
-      .from("organization_users")
-      .select("organization_id, role, is_active")
-      .eq("user_id", user.id)
-      .eq("is_active", true);
-
-    if (membershipsError) {
-      console.error("Erro ao buscar organizações do usuário:", membershipsError);
-      setChurch(null);
-      setProfileChurchId(null);
-      setChurches([]);
-      setHasActiveMembership(false);
+    if (bootstrapIsError) {
+      // A REAL failure upstream (network/server/RLS) — never fall back to
+      // "no membership" / trigger OrganizationPending from this, and never
+      // wipe out whatever church data we already had in memory. Just settle
+      // `loading` so ProtectedRoute can show a recoverable error state
+      // (driven by `bootstrapError`) instead of spinning forever.
       setLoading(false);
       return;
     }
 
-    let organizationIds = (memberships || [])
+    if (bootstrapLoading || !bootstrap) {
+      setLoading(true);
+      return;
+    }
+
+    setLoading(true);
+
+    // SEGURANÇA (FASE 2): nenhuma auto-associação por church_slug acontece
+    // mais aqui. `ensureOrganizationMembership`/`join_organization_by_slug`
+    // permitiam que qualquer usuário autenticado se vinculasse como membro
+    // de QUALQUER organização apenas conhecendo (ou adivinhando) o slug
+    // público — sem convite, token ou aprovação de um administrador. Essa
+    // RPC foi removida do banco (ver migration
+    // 20260715141000_remove_open_slug_join.sql). Um usuário sem organização
+    // ativa agora só ganha uma ao aceitar um convite tokenizado real
+    // (accept_member_invite / accept_access_invite) — nunca automaticamente
+    // aqui no bootstrap.
+    const organizationIds = bootstrap.memberships
       .map((membership) => membership.organization_id)
       .filter(Boolean);
-
-    if (organizationIds.length === 0 && !linkingRef.current) {
-      linkingRef.current = true;
-      try {
-        const { linked } = await ensureOrganizationMembership(user);
-        if (linked) {
-          const { data: retryMemberships, error: retryError } = await supabase
-            .from("organization_users")
-            .select("organization_id, role, is_active")
-            .eq("user_id", user.id)
-            .eq("is_active", true);
-
-          if (!retryError && retryMemberships?.length) {
-            organizationIds = retryMemberships
-              .map((membership) => membership.organization_id)
-              .filter(Boolean);
-          }
-        }
-      } finally {
-        linkingRef.current = false;
-      }
-    }
 
     // Vínculo ativo é a fonte de verdade para decidir OrganizationPending.
     setHasActiveMembership(organizationIds.length > 0);
@@ -222,7 +215,7 @@ export function ChurchProvider({ children }: { children: ReactNode }) {
     let organizationsQueryIds: string[] | null = organizationIds;
 
     if (organizationIds.length === 0) {
-      const platformAdmin = await resolvePlatformAdmin(user.id);
+      const platformAdmin = isBootstrapPlatformAdmin(bootstrap);
       if (platformAdmin) {
         organizationsQueryIds = null;
       } else {
@@ -276,7 +269,8 @@ export function ChurchProvider({ children }: { children: ReactNode }) {
     setChurches(visibleChurches);
     setChurch(activeChurch);
     setLoading(false);
-  }, [user, isPlatformUser]);
+    markBoot("church resolved");
+  }, [user, isPlatformUser, bootstrap, bootstrapLoading, bootstrapIsError, refetchBootstrap]);
 
   useEffect(() => {
     fetchChurches();
@@ -311,6 +305,10 @@ export function ChurchProvider({ children }: { children: ReactNode }) {
   const isMatriz = church?.is_matriz ?? false;
   const congregations = churches.filter((c) => c.parent_church_id === church?.id);
 
+  const retryBootstrap = useCallback(() => {
+    void refetchBootstrap();
+  }, [refetchBootstrap]);
+
   return (
     <ChurchContext.Provider
       value={{
@@ -323,6 +321,8 @@ export function ChurchProvider({ children }: { children: ReactNode }) {
         isMatriz,
         congregations,
         hasActiveMembership,
+        bootstrapError: bootstrapIsError,
+        retryBootstrap,
         switchChurch,
         clearActiveChurch,
         refetch: fetchChurches,

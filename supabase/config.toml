@@ -1,4 +1,9 @@
-project_id = "onywmysaukyzgkzoxtsw"
+# Identificador exclusivamente LOCAL usado pelo Supabase CLI para os
+# containers de desenvolvimento. Ele NÃO seleciona projeto remoto e não é
+# um `project-ref`. O vínculo remoto fica em `supabase/.temp/project-ref`
+# depois de `supabase link`; scripts/supabase-guard.mjs valida esse arquivo
+# contra o `--target` antes de executar qualquer comando com `--linked`.
+project_id = "ecclesia-online-local"
 
 [functions.bible-verses]
 verify_jwt = false

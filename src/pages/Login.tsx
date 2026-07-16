@@ -1,9 +1,13 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import type { Location } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AppBootScreen } from "@/components/AppBootScreen";
+import { ReconnectScreen } from "@/components/ReconnectScreen";
 import { Loader2, Eye, EyeOff, BookOpen, Users, Wallet } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useMobileFocusScroll } from "@/hooks/useMobileFocusScroll";
 import { persistPendingChurchSlug, resolveInviteChurchSlug, signupPathWithChurch } from "@/lib/organizationMembership";
@@ -11,8 +15,19 @@ import flagBR from "@/assets/flag-br.png";
 import flagUS from "@/assets/flag-us.png";
 import flagES from "@/assets/flag-es.png";
 
+/** Where to send the user once we know they're authenticated. */
+function resolveDestination(location: Location): string {
+  const from = (location.state as { from?: Location } | null)?.from;
+  if (from) {
+    return `${from.pathname}${from.search ?? ""}${from.hash ?? ""}`;
+  }
+  return "/admin?entry=1";
+}
+
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user, loading: authLoading, connectionIssue, retryConnection } = useAuth();
   const { t, lang, setLang } = useLanguage();
   const [searchParams] = useSearchParams();
   const churchSlug = searchParams.get("church");
@@ -20,6 +35,17 @@ export default function Login() {
   useEffect(() => {
     persistPendingChurchSlug(churchSlug);
   }, [churchSlug]);
+
+  // A session already exists (persisted from a previous visit) — never make
+  // an already-authenticated user fill in the form again. This is the fix
+  // for the PWA "always asks to log in again" complaint: without this,
+  // landing on /login with a valid session showed the form regardless.
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate(resolveDestination(location), { replace: true });
+    }
+  }, [authLoading, user, navigate, location]);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -35,11 +61,25 @@ export default function Login() {
 
     if (error) {
       toast({ title: t("Erro ao entrar"), description: error.message, variant: "destructive" });
+      setLoading(false);
     } else {
-      navigate("/admin?entry=1");
+      navigate(resolveDestination(location), { replace: true });
     }
-    setLoading(false);
   };
+
+  // A persisted token exists but couldn't be confirmed (offline/timeout) —
+  // never show the login form here, this is not a logout. Offer a manual
+  // retry instead. See PROBLEMA CRÍTICO 1.
+  if (connectionIssue) {
+    return <ReconnectScreen onRetry={retryConnection} />;
+  }
+
+  // While we're still recovering the session, or once we know the user is
+  // authenticated (redirect effect above is about to fire), never flash the
+  // login form.
+  if (authLoading || user) {
+    return <AppBootScreen />;
+  }
 
   const FEATURES = [
     { icon: BookOpen, label: lang === "en" ? "AI Bible Assistant" : lang === "es" ? "Asistente Bíblico IA" : "Assistente Bíblico IA" },

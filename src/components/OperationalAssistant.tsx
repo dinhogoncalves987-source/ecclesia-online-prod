@@ -23,8 +23,9 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
+import { environment } from "@/config/environment";
+import { getEdgeFunctionUrl } from "@/lib/edgeFetch";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const MAX_INPUT = 1500;
 
 export type AssistantModule = "member" | "document" | "communication" | "financial";
@@ -122,13 +123,13 @@ export function OperationalAssistant({
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const token = session?.access_token ?? environment.supabasePublishableKey;
 
-      const resp = await fetch(`${SUPABASE_URL}/functions/v1/operational-assistant`, {
+      const resp = await fetch(getEdgeFunctionUrl("operational-assistant"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          "apikey": environment.supabasePublishableKey,
           "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify({

@@ -5,6 +5,7 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { getPublicAppUrl } from "@/lib/publicUrl";
+import { environment } from "@/config/environment";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -20,6 +21,8 @@ export interface MemberInvitePublic {
   member_name:     string;
   member_role:     string;
   member_photo:    string;
+  /** E-mail cadastrado do membro — chave fixa de vínculo. Pode vir vazio se o cadastro não tem e-mail. */
+  member_email?:   string | null;
   church_name:     string;
   church_city:     string;
   church_state:    string;
@@ -70,12 +73,14 @@ export function buildWhatsappLink(
 ): string {
   const number = formatWhatsappNumber(phone);
   const text = [
-    `Olá, ${memberName}.`,
+    `Olá, ${memberName}!`,
     ``,
-    `A ${churchName} convidou você para acessar o Ecclesia Online como membro.`,
+    `Seu acesso ao Ecclesia Online foi criado.`,
     ``,
-    `Clique no link abaixo para ativar seu acesso:`,
+    `Clique no link abaixo para ativar sua conta e criar sua senha:`,
     inviteUrl,
+    ``,
+    `Deus abençoe.`,
   ].join("\n");
   return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
 }
@@ -128,37 +133,196 @@ export async function revokeMemberInvites(memberId: string): Promise<void> {
 }
 
 // ── Fetch invite by token (public — no auth needed) ───────────────────────────
+//
+// Uses a direct REST fetch to the PostgREST RPC endpoint instead of the
+// supabase-js client. This mirrors the exact request that was manually
+// confirmed to work (PowerShell POST /rest/v1/rpc/get_member_invite_by_token),
+// bypassing any supabase-js client-side session/header quirks on the public
+// invite page (where the user may have no session at all).
+
+/** Normalize the raw RPC payload into a single object, or null if impossible. */
+function normalizeRpcPayload(raw: unknown): Record<string, unknown> | null {
+  let value: unknown = raw;
+
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+
+  if (Array.isArray(value)) {
+    value = value[0];
+  }
+
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+async function fetchInviteByTokenOnce(
+  token: string,
+  signal: AbortSignal,
+): Promise<{ data: MemberInvitePublic | null; error: string | null; retriable: boolean }> {
+  const baseUrl = environment.supabaseUrl;
+  const apiKey  = environment.supabasePublishableKey;
+
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/rest/v1/rpc/get_member_invite_by_token`, {
+      method: "POST",
+      headers: {
+        "apikey": apiKey,
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ _token: token }),
+      signal,
+    });
+  } catch {
+    console.error("[memberInvites] REST getInviteByToken network failure");
+    return { data: null, error: "network_error", retriable: true };
+  }
+
+  if (!response.ok) {
+    console.error("[memberInvites] REST getInviteByToken HTTP error", response.status);
+
+    // 4xx = client/permission/validation error — not retriable.
+    // 5xx = server error — retriable.
+    const retriable = response.status >= 500;
+    return { data: null, error: "http_error", retriable };
+  }
+
+  const raw = await response.json().catch(() => null);
+
+  if (raw === null || raw === undefined) {
+    return { data: null, error: "not_found", retriable: false };
+  }
+
+  const result = normalizeRpcPayload(raw) as ({ ok: boolean; error?: string } & MemberInvitePublic) | null;
+
+  if (!result) {
+    console.error("[memberInvites] REST getInviteByToken unexpected response shape");
+    return { data: null, error: "invalid_shape", retriable: false };
+  }
+
+  if (result.ok !== true) {
+    return { data: null, error: result.error ?? "invalid_invite", retriable: false };
+  }
+
+  return { data: result as MemberInvitePublic, error: null, retriable: false };
+}
 
 export async function getInviteByToken(
   token: string,
 ): Promise<{ data: MemberInvitePublic | null; error: string | null }> {
-  const { data, error } = await supabase.rpc(
-    "get_member_invite_by_token" as never,
-    { _token: token },
-  );
+  if (!token || !token.trim()) {
+    return { data: null, error: "invalid_token" };
+  }
 
-  if (error) return { data: null, error: error.message };
+  const TIMEOUT_MS = 20000;
+  const MAX_ATTEMPTS = 2; // 1 initial try + 1 retry
 
-  const result = data as { ok: boolean; error?: string } & MemberInvitePublic;
-  if (!result.ok) return { data: null, error: result.error ?? "Convite inválido" };
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-  return { data: result as MemberInvitePublic, error: null };
+    try {
+      const result = await fetchInviteByTokenOnce(token, controller.signal);
+      clearTimeout(timer);
+
+      if (result.error && result.retriable && attempt < MAX_ATTEMPTS) {
+        continue; // retry once for timeout/network/5xx
+      }
+
+      return { data: result.data, error: result.error };
+    } catch (e) {
+      clearTimeout(timer);
+      const isAbort = e instanceof Error && e.name === "AbortError";
+      console.error("[memberInvites] getInviteByToken unexpected exception", e);
+
+      if (isAbort && attempt < MAX_ATTEMPTS) {
+        continue; // retry once on timeout
+      }
+
+      return { data: null, error: isAbort ? "timeout" : "network_error" };
+    }
+  }
+
+  // Unreachable, but keeps TypeScript happy.
+  return { data: null, error: "network_error" };
+}
+
+// ── E-mail helpers ─────────────────────────────────────────────────────────────
+
+/** Normalize an e-mail for comparison: trim + lowercase. Never throws. */
+export function normalizeEmail(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase();
+}
+
+/** True when both e-mails are non-empty and equal after normalization. */
+export function emailsMatch(a: string | null | undefined, b: string | null | undefined): boolean {
+  const na = normalizeEmail(a);
+  const nb = normalizeEmail(b);
+  return na.length > 0 && na === nb;
 }
 
 // ── Accept invite (authenticated) ─────────────────────────────────────────────
 
+export type AcceptMemberInviteResult = {
+  success: boolean;
+  error?: string;
+  message?: string;
+  member_id?: string;
+  organization_id?: string;
+};
+
 export async function acceptMemberInvite(
   token: string,
-): Promise<{ ok: boolean; organizationId?: string; memberId?: string; error?: string }> {
-  const { data, error } = await supabase.rpc(
-    "accept_member_invite" as never,
-    { _token: token },
-  );
+  userId: string,
+): Promise<AcceptMemberInviteResult> {
+  const { data, error } = await supabase.rpc("accept_member_invite", {
+    p_token: token,
+    p_user_id: userId,
+  });
 
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    return {
+      success: false,
+      error: "rpc_error",
+      message: error.message,
+    };
+  }
 
-  const result = data as { ok: boolean; error?: string; organization_id?: string; member_id?: string };
-  if (!result.ok) return { ok: false, error: result.error };
+  const result = data as AcceptMemberInviteResult | null;
+  if (!result) {
+    return {
+      success: false,
+      error: "empty_response",
+      message: "Não foi possível aceitar o convite agora.",
+    };
+  }
 
-  return { ok: true, organizationId: result.organization_id, memberId: result.member_id };
+  return result;
+}
+
+// ── Create account for a new member (official Supabase sign-up) ──────────────
+//
+// SECURITY: passwordless e-mail proof for both new and existing accounts.
+// Unlike password signUp(), this flow never depends on the project's
+// "Confirm e-mail" toggle to prove mailbox ownership: Supabase only creates
+// an authenticated session after the recipient opens the magic link/OTP sent
+// to the fixed member e-mail. The invite RPC is called only after that session
+// returns to this exact URL and its authenticated e-mail matches the member.
+export async function sendMemberInviteMagicLink(email: string, token: string) {
+  return supabase.auth.signInWithOtp({
+    email,
+    options: {
+      emailRedirectTo: buildInviteUrl(token),
+      shouldCreateUser: true,
+    },
+  });
 }

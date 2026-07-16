@@ -5,7 +5,7 @@ import {
   Heart, MessageSquare, UsersRound, Archive, BarChart3, Menu, X,
   Bell, ChevronLeft, ChevronDown, Settings, LogOut, Maximize, Minimize, Globe,
   Shield, User, Building2, Music2, Gavel, Briefcase, ShoppingBag, MessageCircle, Megaphone, ScrollText,
-  MessagesSquare, ClipboardList, CreditCard, LayoutGrid
+  MessagesSquare, ClipboardList, CreditCard, LayoutGrid, ScanLine
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { SupportModeBanner } from "@/components/platform/SupportModeBanner";
 import { RequireSupportOrganization } from "@/components/platform/RequireSupportOrganization";
 import { useSupportContext } from "@/contexts/SupportContext";
+import { isRouteEnabled } from "@/config/modules";
 import flagBR from "@/assets/flag-br.png";
 import flagUS from "@/assets/flag-us.png";
 import flagES from "@/assets/flag-es.png";
@@ -40,6 +41,10 @@ const SECRETARIA_PATHS = [
 ];
 // Global chat route — lives outside Secretaria, never auto-expands it
 const GLOBAL_CHAT_PATH = "/admin/chat";
+
+const PORTARIA_PATHS = ["/admin/porteiro"];
+
+const CONFIG_PATHS = ["/admin/perfil", "/admin/configuracao-igreja"];
 
 const navSections: NavSection[] = [
   {
@@ -78,6 +83,15 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    id: "portaria",
+    labelKey: "Portaria",
+    collapsible: true,
+    separator: true,
+    items: [
+      { icon: ScanLine, label: "Modo Porteiro", path: "/admin/porteiro" },
+    ],
+  },
+  {
     id: "financeiro",
     separator: true,
     items: [
@@ -91,7 +105,6 @@ const navSections: NavSection[] = [
     separator: true,
     items: [
       { icon: Building2, label: "Congregações", path: "/admin/congregacoes" },
-      { icon: Settings, label: "Configuração da Igreja", path: "/admin/configuracao-igreja" },
       { icon: Shield, label: "Gerenciar Acessos", path: "/admin/gerenciar-acessos" },
       { icon: LayoutGrid, label: "Cockpit", path: "/admin/super-admin" },
     ],
@@ -135,6 +148,13 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const { church } = useChurch();
   const { isPlatformUser, isSupportModeActive } = useSupportContext();
 
+  // TEMP render probe (Android/Redmi): remove after the controlled A/B test.
+  const renderProbe = new URLSearchParams(location.search).get("renderProbe");
+  const isRenderProbeRoute = location.pathname === "/admin/congregacoes"
+    || location.pathname === "/admin/gerenciar-acessos";
+  const isLayoutRenderProbe = isRenderProbeRoute
+    && (renderProbe === "layout" || renderProbe === "all");
+
   // Routes that are platform-level and do NOT require a support org selected
   const UNGUARDED_PLATFORM_PATHS = [
     "/admin",               // Dashboard (shows platform metrics)
@@ -171,6 +191,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       return church?.intermediate_level_label_plural ?? t("Unidades");
     }
     if (orgType === "setor") return church?.local_unit_label_plural ?? t("Unidades locais");
+    if (orgType === "subsede") return church?.local_unit_label_plural ?? t("Congregações");
     return church?.local_unit_label_plural ?? t("Unidades locais");
   };
 
@@ -188,12 +209,24 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [secretariaExpanded, setSecretariaExpanded] = useState(() =>
     SECRETARIA_PATHS.includes(location.pathname)
   );
+  const [portariaExpanded, setPortariaExpanded] = useState(() =>
+    PORTARIA_PATHS.includes(location.pathname)
+  );
+  const [configExpanded, setConfigExpanded] = useState(() =>
+    CONFIG_PATHS.includes(location.pathname)
+  );
 
   // Auto-expand Secretaria section when navigating to a secretaria path.
   // Never expand for the global chat route — it lives outside Secretaria.
   useEffect(() => {
     if (location.pathname !== GLOBAL_CHAT_PATH && SECRETARIA_PATHS.includes(location.pathname)) {
       setSecretariaExpanded(true);
+    }
+    if (PORTARIA_PATHS.includes(location.pathname)) {
+      setPortariaExpanded(true);
+    }
+    if (CONFIG_PATHS.includes(location.pathname)) {
+      setConfigExpanded(true);
     }
   }, [location.pathname]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -249,12 +282,16 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const renderNavSections = (collapsed: boolean, onLinkClick?: () => void) => (
     <nav className="flex-1 px-3 py-2 overflow-y-auto">
       {resolvedSections.map(section => {
-        const visibleItems = section.items.filter(item => canAccess(item.path));
+        const visibleItems = section.items.filter(item => canAccess(item.path) && isRouteEnabled(item.path));
         if (visibleItems.length === 0) return null;
 
         const isSecretaria = section.id === "secretaria";
+        const isPortaria = section.id === "portaria";
+        const isCollapsible = isSecretaria || isPortaria;
         const sectionHasActive = visibleItems.some(i => isActive(i.path));
-        const expanded = isSecretaria ? (sidebarCollapsed || secretariaExpanded) : true;
+        const expanded = isCollapsible
+          ? (sidebarCollapsed || (isSecretaria ? secretariaExpanded : portariaExpanded))
+          : true;
 
         return (
           <div key={section.id}>
@@ -262,9 +299,9 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
             {/* Section header (label or collapsible trigger) */}
             {section.labelKey && !collapsed && (
-              isSecretaria ? (
+              isCollapsible ? (
                 <button
-                  onClick={() => setSecretariaExpanded(v => !v)}
+                  onClick={() => isSecretaria ? setSecretariaExpanded(v => !v) : setPortariaExpanded(v => !v)}
                   className="w-full flex items-center justify-between px-3 py-1.5 mb-0.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:bg-secondary/50 transition-colors"
                 >
                   <span className="flex items-center gap-2">
@@ -273,7 +310,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                   </span>
                   <ChevronDown
                     size={13}
-                    className={`transition-transform duration-200 ${secretariaExpanded ? "rotate-0" : "-rotate-90"}`}
+                    className={`transition-transform duration-200 ${isSecretaria ? (secretariaExpanded ? "rotate-0" : "-rotate-90") : (portariaExpanded ? "rotate-0" : "-rotate-90")}`}
                   />
                 </button>
               ) : (
@@ -288,13 +325,13 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               {expanded && (
                 <motion.div
                   key="sec-items"
-                  initial={isSecretaria ? { height: 0, opacity: 0 } : false}
+                  initial={isCollapsible ? { height: 0, opacity: 0 } : false}
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   transition={{ duration: 0.2, ease: "easeInOut" }}
                   style={{ overflow: "hidden" }}
                 >
-                  <div className={`space-y-0.5 ${isSecretaria && !collapsed ? "pl-1" : ""}`}>
+                  <div className={`space-y-0.5 ${isCollapsible && !collapsed ? "pl-1" : ""}`}>
                     {visibleItems.map(item => (
                       <Link
                         key={item.path}
@@ -321,8 +358,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               )}
             </AnimatePresence>
 
-            {/* Collapsed: show secretaria icon trigger */}
-            {isSecretaria && collapsed && sectionHasActive && (
+            {/* Collapsed: show collapsible section icon trigger */}
+            {isCollapsible && collapsed && sectionHasActive && (
               <div className="w-2 h-2 rounded-full bg-accent mx-auto my-1" />
             )}
           </div>
@@ -341,7 +378,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const initials = displayName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className={`min-h-screen bg-background flex ${isLayoutRenderProbe ? "flex-col lg:flex-row" : ""}`}>
       {/* Desktop Sidebar */}
       <aside
         className={`hidden lg:flex flex-col bg-card shadow-executive transition-all duration-300 ${
@@ -359,10 +396,54 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
         {renderNavSections(sidebarCollapsed)}
 
-        <div className="p-3 border-t border-border/50">
+        <div className="p-3 border-t border-border/50 space-y-1">
+          {/* Configurações — collapsible section at the bottom */}
+          {!sidebarCollapsed ? (
+            <div>
+              <button
+                onClick={() => setConfigExpanded(v => !v)}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-secondary/50 hover:text-foreground transition-colors"
+              >
+                <span className="flex items-center gap-3">
+                  <Settings size={18} strokeWidth={1.5} />
+                  {t("Configurações")}
+                </span>
+                <ChevronDown
+                  size={14}
+                  className={`transition-transform duration-200 ${configExpanded ? "rotate-0" : "-rotate-90"}`}
+                />
+              </button>
+              {configExpanded && (
+                <div className="mt-0.5 space-y-0.5 pl-1">
+                  <Link
+                    to="/admin/perfil"
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors w-full"
+                  >
+                    <User size={18} strokeWidth={1.5} /> {t("Meu Perfil")}
+                  </Link>
+                  {canAccess("/admin/configuracao-igreja") && (
+                    <Link
+                      to="/admin/configuracao-igreja"
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors w-full"
+                    >
+                      <Settings size={18} strokeWidth={1.5} /> {t("Configuração da Igreja")}
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={() => { setSidebarCollapsed(false); setConfigExpanded(true); }}
+              className="flex justify-center py-2 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors w-full"
+              title={t("Configurações")}
+            >
+              <Settings size={20} strokeWidth={1.5} />
+            </button>
+          )}
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors w-full"
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors w-full ${!sidebarCollapsed ? "" : "justify-center"}`}
           >
             <ChevronLeft
               size={20}
@@ -377,7 +458,9 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="h-16 bg-card/95 lg:bg-card/80 lg:backdrop-blur-md shadow-[var(--shadow-sm)] flex items-center justify-between px-4 lg:px-8 sticky top-0 z-30">
+        <header className={`h-16 bg-card/95 lg:bg-card/80 lg:backdrop-blur-md shadow-[var(--shadow-sm)] flex items-center justify-between px-4 lg:px-8 z-30 ${
+          isLayoutRenderProbe ? "lg:sticky lg:top-0" : "sticky top-0"
+        }`}>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(true)}
@@ -476,7 +559,11 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">
+        <main className={`flex-1 ${
+          isLayoutRenderProbe
+            ? "overflow-visible pb-0 lg:overflow-y-auto lg:overflow-x-hidden"
+            : "overflow-y-auto overflow-x-hidden pb-20 lg:pb-0"
+        }`}>
           {/* Support mode banner — visible for all platform users */}
           <SupportModeBanner />
           <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
@@ -521,13 +608,39 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               {renderNavSections(false, () => setMobileMenuOpen(false))}
 
               <div className="p-3 border-t border-border/50 space-y-0.5">
-                <Link
-                  to="/admin/perfil"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary w-full"
+                {/* Configurações — collapsible in mobile too */}
+                <button
+                  onClick={() => setConfigExpanded(v => !v)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary font-medium"
                 >
-                  <Settings size={20} strokeWidth={1.5} /> {t("Configurações")}
-                </Link>
+                  <span className="flex items-center gap-3">
+                    <Settings size={20} strokeWidth={1.5} /> {t("Configurações")}
+                  </span>
+                  <ChevronDown
+                    size={14}
+                    className={`transition-transform duration-200 ${configExpanded ? "rotate-0" : "-rotate-90"}`}
+                  />
+                </button>
+                {configExpanded && (
+                  <div className="space-y-0.5 pl-2">
+                    <Link
+                      to="/admin/perfil"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary w-full"
+                    >
+                      <User size={20} strokeWidth={1.5} /> {t("Meu Perfil")}
+                    </Link>
+                    {canAccess("/admin/configuracao-igreja") && (
+                      <Link
+                        to="/admin/configuracao-igreja"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary w-full"
+                      >
+                        <Settings size={20} strokeWidth={1.5} /> {t("Configuração da Igreja")}
+                      </Link>
+                    )}
+                  </div>
+                )}
                 <button
                   onClick={() => { setMobileMenuOpen(false); setShowLogoutConfirm(true); }}
                   className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-secondary w-full"
@@ -541,8 +654,10 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       </AnimatePresence>
 
       {/* Mobile bottom nav */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-card shadow-[0_-1px_0_0_hsl(var(--border)/0.5)] flex justify-around items-center z-30">
-        {mobileNavItems.filter(item => canAccess(item.path)).map((item) => (
+      <nav className={`lg:hidden h-16 bg-card shadow-[0_-1px_0_0_hsl(var(--border)/0.5)] flex justify-around items-center z-30 ${
+        isLayoutRenderProbe ? "" : "fixed bottom-0 left-0 right-0"
+      }`}>
+        {mobileNavItems.filter(item => canAccess(item.path) && isRouteEnabled(item.path)).map((item) => (
           <Link
             key={item.path}
             to={item.path}

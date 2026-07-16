@@ -2,7 +2,7 @@ import { AdminLayout } from "@/components/AdminLayout";
 import { DocumentActions } from "@/components/DocumentActions";
 import { Clock, MapPin, Plus, ChevronLeft, ChevronRight, X, Trash2, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useMobileFocusScroll } from "@/hooks/useMobileFocusScroll";
 import { scrollElementIntoView } from "@/lib/mobileScroll";
 import { supabase } from "@/integrations/supabase/client";
@@ -133,9 +133,9 @@ export default function Agenda() {
   const { user } = useAuth();
   const { t, lang } = useLanguage();
   const { church, loading: churchLoading } = useChurch();
-  const { canonicalRole } = useRole();
-  const canWrite = canWriteSecretaria(canonicalRole);
-  const canDelete = canDeleteEvent(canonicalRole);
+  const { canonicalRole, hasCapability } = useRole();
+  const canWrite = hasCapability("agenda.write") || canWriteSecretaria(canonicalRole);
+  const canDelete = hasCapability("agenda.write") || canDeleteEvent(canonicalRole);
 
   const [agendaTab, setAgendaTab] = useState<"church" | "personal">("church");
   const [events, setEvents] = useState<Event[]>([]);
@@ -150,10 +150,11 @@ export default function Agenda() {
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [editForm, setEditForm] = useState<EventFormState>(emptyEventForm());
   const formRef = useMobileFocusScroll<HTMLDivElement>();
+  const activeLoadRef = useRef(false);
 
   useEffect(() => {
     if (showForm) scrollElementIntoView(formRef.current, { block: "start", delay: 400 });
-  }, [showForm]);
+  }, [showForm, formRef]);
 
   const todayDay = now.getDate();
   const todayMonth = now.getMonth();
@@ -200,14 +201,20 @@ export default function Agenda() {
       setLoading(false);
       return;
     }
+    let cancelled = false;
     const load = async () => {
       setLoading(true);
+      // Abort any previous in-flight load to prevent race conditions
+      activeLoadRef.current = true;
       await reloadEvents();
+      if (cancelled) return;
       setLoading(false);
     };
     load();
-  // reloadEvents já inclui agendaTab em seus deps; não duplicar aqui
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      cancelled = true;
+      activeLoadRef.current = false;
+    };
   }, [user, church, churchLoading, reloadEvents]);
 
   const getDay = (e: Event) => new Date(e.starts_at).getDate();

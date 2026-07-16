@@ -23,8 +23,45 @@ dist-ssr
 *.sln
 *.sw?
 
-# Local/staging secrets and Supabase temp
-.env.staging
-supabase/.temp/
+# ── Separação de ambientes (produção/staging) ──────────────────────────────
+# Nenhum arquivo .env real deve ser versionado — apenas os *.example
+# deliberados (sem valores reais) permanecem no histórico.
+.env
+.env.*
+!.env.example
+!.env.staging.example
+!.env.production.example
+!.env.seed.example
 
-.vercel
+.vercel/
+supabase/.temp/
+supabase-production/supabase/.temp/
+
+# Dumps, restores, backups e diagnósticos locais — nunca versionar dados
+# reais nem artefatos de depuração ad-hoc.
+*.dump
+*.dump.sql
+*-dump.sql
+*.restore.sql
+*-restore.sql
+*.backup
+*.backup-*
+*-backup.sql
+DIAGNOSTICO_*.txt
+DIAGNOSTICO_*.md
+DIFF_*.txt
+AUDITORIA_*.txt
+BUILD_SUBSEDE*.txt
+EDGE_*.txt
+REVISAO_*.txt
+TRECHOS_*.txt
+diagnostico-*.txt
+codigo-pwa-real.txt
+
+# SQL fora de supabase/migrations e supabase/seeds nunca deve ser versionado
+# por engano (dumps manuais, exports pontuais, etc.).
+/*.sql
+
+# Artefatos temporários de auditoria de schema (dumps de comparação
+# staging x produção) — nunca versionar, podem conter estrutura sensível.
+schema-audit/

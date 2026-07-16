@@ -13,48 +13,41 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+import { assertSafeToSeedStagingFromProcessEnv, SeedGuardError } from "./lib/seedGuard.mjs";
+import { loadSeedEnv } from "./lib/loadSeedEnv.mjs";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.join(__dirname, "..");
-
-function loadEnvFile(filePath) {
-  if (!fs.existsSync(filePath)) return {};
-  const out = {};
-  for (const line of fs.readFileSync(filePath, "utf8").split("\n")) {
-    const m = line.match(/^([A-Z0-9_]+)="([^"]*)"/);
-    if (m) out[m[1]] = m[2];
-  }
-  return out;
-}
-
-const dotenv = {
-  ...loadEnvFile(path.join(ROOT, ".env")),
-  ...loadEnvFile(path.join(ROOT, ".env.local")),
-};
+// FASE 5 — fonte única e exclusiva de ambiente para seeds: .env.seed +
+// process.env (ver scripts/lib/loadSeedEnv.mjs). Nunca lê .env/.env.local/
+// .env.staging, que são arquivos do frontend (Vite).
+const seedEnv = loadSeedEnv();
 
 const supabaseUrl = (
-  process.env.SUPABASE_URL ||
-  dotenv.SUPABASE_URL ||
-  dotenv.VITE_SUPABASE_URL ||
+  seedEnv.SUPABASE_URL ||
+  seedEnv.VITE_SUPABASE_URL ||
   ""
 ).replace(/\/+$/, "");
 
-const serviceKey = (
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  dotenv.SUPABASE_SERVICE_ROLE_KEY ||
-  ""
-).trim();
+const serviceKey = (seedEnv.SUPABASE_SERVICE_ROLE_KEY || "").trim();
 
 if (!supabaseUrl || !serviceKey) {
   console.error(
-    "\n❌ Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY.\n" +
+    "\n❌ Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY em .env.seed.\n" +
       "   Staging: https://qkiiwopkbcslquyfhdec.supabase.co\n" +
-      "   Exemplo: $env:SUPABASE_SERVICE_ROLE_KEY=\"...\"; npm run campaigns:seed-staging\n",
+      "   Veja .env.seed.example. Exemplo: $env:SUPABASE_SERVICE_ROLE_KEY=\"...\"; npm run campaigns:seed-staging\n",
   );
   process.exit(1);
+}
+
+// Guarda de ambiente — recusa produção e exige confirmação explícita.
+// Requer: APP_ENV=staging e SEED_STAGING="SEED_STAGING" no ambiente.
+try {
+  assertSafeToSeedStagingFromProcessEnv({ supabaseUrl, env: seedEnv });
+} catch (err) {
+  if (err instanceof SeedGuardError) {
+    console.error(`\n❌ ${err.message}\n`);
+    process.exit(1);
+  }
+  throw err;
 }
 
 const sb = createClient(supabaseUrl, serviceKey, {

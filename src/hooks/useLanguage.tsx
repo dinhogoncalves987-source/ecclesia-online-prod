@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useState, ReactNode } from "react";
 
 type Lang = "pt" | "en" | "es";
 
@@ -1802,9 +1802,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("app-lang", l);
   };
 
-  const t = (key: string): string => {
+  const t = useCallback((key: string): string => {
     return translations[key]?.[lang] || key;
-  };
+  }, [lang]);
 
   return (
     <LanguageContext.Provider value={{ lang, setLang: changeLang, t }}>

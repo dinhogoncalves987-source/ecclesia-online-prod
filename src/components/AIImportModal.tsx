@@ -2,6 +2,8 @@ import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, X, Upload, Loader2, CheckCircle2, AlertCircle, FileText, Image } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
+import { environment } from "@/config/environment";
+import { getEdgeFunctionUrl } from "@/lib/edgeFetch";
 
 type AIImportModalProps = {
   open: boolean;
@@ -11,9 +13,6 @@ type AIImportModalProps = {
   title?: string;
   moduleName: string;
 };
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 export function AIImportModal({ open, onClose, onImport, fields, title, moduleName }: AIImportModalProps) {
   const { t } = useLanguage();
@@ -57,11 +56,11 @@ export function AIImportModal({ open, onClose, onImport, fields, title, moduleNa
       const isImage = file.type.startsWith("image/");
       const fileType = isImage ? "imagem (base64)" : file.name.split(".").pop() || "texto";
 
-      const resp = await fetch(`${SUPABASE_URL}/functions/v1/ai-import`, {
+      const resp = await fetch(getEdgeFunctionUrl("ai-import"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_KEY}`,
+          Authorization: `Bearer ${environment.supabasePublishableKey}`,
         },
         body: JSON.stringify({
           fileContent: isImage ? `[Imagem em base64: ${content.slice(0, 5000)}...]` : content.slice(0, 15000),

@@ -4,9 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- PWA -->
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- PWA: manifesto injetado automaticamente pelo vite-plugin-pwa (ver vite.config.ts) -->
     <meta name="theme-color" content="#0B0B0F" />
+
+    <!--
+      robots: valor seguro por padrão (noindex/nofollow). Em produção, é
+      atualizado em runtime para "index, follow" por EnvironmentBanner (ver
+      src/config/environment.ts) — nunca o contrário, para que uma falha na
+      detecção de ambiente jamais resulte em staging sendo indexado.
+    -->
+    <meta name="robots" content="noindex, nofollow" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Ecclesia" />
@@ -24,18 +31,33 @@
     <meta property="og:site_name" content="Ecclesia Online" />
     <meta property="og:title" content="Devocional Ecclesia" />
     <meta property="og:description" content="Uma palavra diária para fortalecer a fé e aproximar sua igreja." />
-    <meta property="og:image" content="https://ecclesiabr.online/og-devocional.png" />
+    <!--
+      Interpolação nativa do Vite: qualquer variável VITE_ envolvida em
+      símbolos de porcentagem abaixo (ver as tags og:/twitter: seguintes) é
+      substituída pelo valor real em build time, lido de .env.*/variáveis da
+      Vercel. Nunca um domínio fixo: staging nunca gera meta tags apontando
+      para o domínio oficial de produção.
+
+      CUIDADO: o Vite escaneia o HTML inteiro (inclusive comentários) por
+      esse padrão de porcentagem — por isso este comentário NUNCA deve
+      conter um exemplo escrito literalmente com "%" ao redor de um nome que
+      não seja uma env var real; isso geraria o aviso espúrio
+      "is not defined in env variables" no build (era exatamente isso que
+      acontecia aqui antes desta correção, com um placeholder de exemplo
+      fictício).
+    -->
+    <meta property="og:image" content="%VITE_PUBLIC_APP_URL%/og-devocional.png" />
     <meta property="og:image:alt" content="Devocional Ecclesia — Ecclesia Online" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:url" content="https://ecclesiabr.online/devocional" />
+    <meta property="og:url" content="%VITE_PUBLIC_APP_URL%/devocional" />
 
     <!-- Twitter / X card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Devocional Ecclesia" />
     <meta name="twitter:description" content="Uma palavra diária para fortalecer a fé e aproximar sua igreja." />
-    <meta name="twitter:image" content="https://ecclesiabr.online/og-devocional.png" />
-    <meta name="twitter:url" content="https://ecclesiabr.online/devocional" />
+    <meta name="twitter:image" content="%VITE_PUBLIC_APP_URL%/og-devocional.png" />
+    <meta name="twitter:url" content="%VITE_PUBLIC_APP_URL%/devocional" />
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -43,7 +65,26 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!--
+        Shell estático de abertura: pintado pelo navegador imediatamente,
+        antes mesmo do JS/CSS do bundle carregar — por isso usa estilos
+        inline (não pode depender do Tailwind/variáveis CSS, que só chegam
+        depois). Evita qualquer tela branca entre o carregamento do HTML e o
+        primeiro render do React. O AppBootScreen (React) usa a mesma
+        aparência, então a transição entre os dois é imperceptível.
+      -->
+      <div
+        style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#0B0B0F;font-family:Inter,system-ui,sans-serif;"
+      >
+        <div style="width:64px;height:64px;border-radius:16px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;">
+          <span style="font-family:'Playfair Display',serif;font-size:28px;color:#E3A63E;">Ω</span>
+        </div>
+        <p style="font-size:13px;font-weight:500;letter-spacing:0.02em;color:rgba(255,255,255,0.7);margin:0;">
+          Abrindo Ecclesia
+        </p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

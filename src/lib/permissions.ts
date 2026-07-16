@@ -6,6 +6,7 @@ export type AdminRole =
   | "leader"
   | "tesoureiro"
   | "contador"
+  | "porteiro"
   | "member";
 
 export type LegacyAppRole =
@@ -29,6 +30,7 @@ export const CANONICAL_ROLES: AdminRole[] = [
   "tesoureiro",
   "contador",
   "leader",
+  "porteiro",
   "member",
 ];
 
@@ -55,6 +57,9 @@ export const normalizeRole = (role: LegacyAppRole | string | null | undefined): 
       return "leader";
     case "member":
     case "membro":
+      return "member";
+    case "porteiro":
+      return "porteiro";
     default:
       return "member";
   }

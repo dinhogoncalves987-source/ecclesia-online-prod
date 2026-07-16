@@ -1,11 +1,10 @@
 ﻿import { AdminLayout } from "@/components/AdminLayout";
 import { ExecutiveCard } from "@/components/ExecutiveCard";
 import { MatrizDashboard } from "@/components/MatrizDashboard";
-import { DailyDevotional } from "@/components/DailyDevotional";
-import { DashboardCampaignSections } from "@/components/campanhas/DashboardCampaignSections";
+import { isModuleEnabled, isRouteEnabled } from "@/config/modules";
 import { motion } from "framer-motion";
 import { Wallet, Users, TrendingUp, Calendar, Clock, Bell, Plus, ChevronRight, Loader2, Shield, Building2, Globe, BookOpen, Heart, Music2, MessageSquare, FileText } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,6 +13,18 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useRole } from "@/hooks/useRole";
 import { useSupportContext } from "@/contexts/SupportContext";
 import { runScopedOrganizationQuery } from "@/lib/organizationScope";
+import { environment } from "@/config/environment";
+
+// FASE 6 (separação de bundle por build): "devotional" é staging-only (ver
+// src/config/modules.ts). `import.meta.env.VITE_APP_ENV` é substituído por
+// uma string literal em build-time pelo Vite, tornando esta comparação uma
+// expressão constante ANTES do tree-shaking do Rollup — o branch morto
+// (incluindo o `import()`) nunca entra no grafo de módulos de um build de
+// produção. Mesmo padrão de src/App.tsx e src/pages/Financeiro.tsx.
+const IS_STAGING_BUILD = import.meta.env.VITE_APP_ENV === "staging";
+const DailyDevotional = IS_STAGING_BUILD
+  ? lazy(() => import("@/components/DailyDevotional").then((m) => ({ default: m.DailyDevotional })))
+  : null;
 
 interface PlatformCampaign {
   id: string;
@@ -46,7 +57,7 @@ const isPlatformCampaign = (value: unknown): value is PlatformCampaign => {
 
 const loadPlatformAnnouncements = async (nowIso: string): Promise<PlatformCampaignSelect[]> => {
   const { data: sessionData } = await supabase.auth.getSession();
-  const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/platform_announcements`);
+  const url = new URL(`${environment.supabaseUrl}/rest/v1/platform_announcements`);
 
   url.searchParams.set("select", "id,title,short_description,image_url,button_label,button_link,is_active,starts_at,ends_at,created_at");
   url.searchParams.set("is_active", "eq.true");
@@ -55,8 +66,8 @@ const loadPlatformAnnouncements = async (nowIso: string): Promise<PlatformCampai
 
   const response = await fetch(url.toString(), {
     headers: {
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-      Authorization: `Bearer ${sessionData.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      apikey: environment.supabasePublishableKey,
+      Authorization: `Bearer ${sessionData.session?.access_token || environment.supabasePublishableKey}`,
     },
   });
 
@@ -361,7 +372,11 @@ export default function Dashboard() {
             { label: t("Pedidos de Oração"), desc: t("Ore pela igreja"), path: "/admin/oracoes", icon: Heart },
             { label: t("Comunicação"), desc: t("Comunicados da igreja"), path: "/admin/comunicacao", icon: MessageSquare },
             { label: t("Escalas"), desc: t("Escalas de serviço"), path: "/admin/escalas", icon: FileText },
-          ].map((item, i) => (
+          ]
+            // FASE 6: nunca oferecer link de dashboard para módulo staging-only
+            // em produção (bíblia/culto ficam fora do bundle e da allowlist).
+            .filter((item) => isRouteEnabled(item.path))
+            .map((item, i) => (
             <Link key={item.path} to={item.path}>
               <motion.div
                 initial={{ opacity: 0 }}
@@ -526,7 +541,7 @@ export default function Dashboard() {
 
   return (
     <AdminLayout>
-      <div className="space-y-8">
+      <div className="isolate space-y-8 w-full max-w-full overflow-x-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">
@@ -550,10 +565,15 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Daily Devotional - always visible */}
-        <DailyDevotional />
-        {!loading && church && <DashboardCampaignSections />}
-        {false && !loading && canViewPlatformCampaigns && renderCampaignBanner()}
+        {/* Devocional — em teste, restrito a staging (ver src/config/modules.ts) */}
+        {isModuleEnabled("devotional") && DailyDevotional && (
+          <Suspense fallback={null}>
+            <DailyDevotional />
+          </Suspense>
+        )}
+        {/* Campanhas (FASE 6): widget de dashboard staging-only removido daqui —
+            nunca importado estaticamente para não entrar no bundle de produção.
+            Módulo continua disponível em /admin/campanhas no build de staging. */}
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -582,7 +602,10 @@ export default function Dashboard() {
                 { icon: BookOpen, title: lang === "en" ? "AI Bible Assistant" : lang === "es" ? "Asistente Bíblico IA" : "Assistente Bíblico IA", desc: lang === "en" ? "Chat with a pastoral AI guide" : lang === "es" ? "Conversa con un guía pastoral IA" : "Converse com um guia pastoral IA", href: "/admin/biblia" },
                 { icon: Music2,   title: lang === "en" ? "Worship" : lang === "es" ? "Culto y Alabanza" : "Culto & Louvor", desc: lang === "en" ? "Hymns, worship orders & AI" : lang === "es" ? "Himnos, roteiros y IA" : "Hinos, roteiros e IA", href: "/admin/culto" },
                 { icon: Heart,    title: lang === "en" ? "Prayer Requests" : lang === "es" ? "Pedidos de Oración" : "Pedidos de Oração", desc: lang === "en" ? "Pray with your community" : lang === "es" ? "Ora con tu comunidad" : "Ore com sua comunidade", href: "/admin/oracoes" },
-              ].map(item => (
+              ]
+                // FASE 6: onboarding de produção não pode linkar módulo staging-only.
+                .filter(item => isRouteEnabled(item.href))
+                .map(item => (
                 <Link key={item.href} to={item.href}
                   className="p-4 rounded-xl bg-secondary/40 hover:bg-secondary/70 transition-colors flex flex-col gap-2">
                   <item.icon size={18} className="text-accent" strokeWidth={1.5} />

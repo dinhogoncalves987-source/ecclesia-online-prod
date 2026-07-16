@@ -104,7 +104,7 @@ export default function SolicitacoesAdministrativas() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { church, loading: churchLoading, isMatriz } = useChurch();
-  const { canonicalRole, isAdmin } = useRole();
+  const { canonicalRole, isAdmin, hasCapability } = useRole();
   // Nomenclatura adaptada por perfil: Matriz/Admin cria, Congregação solicita
   const isCreatorProfile = isMatriz || isAdmin;
   const actionLabel = isCreatorProfile ? "Nova Demanda" : "Nova Solicitação";
@@ -112,7 +112,7 @@ export default function SolicitacoesAdministrativas() {
   const pageDesc = isCreatorProfile
     ? "Registro e acompanhamento de demandas administrativas"
     : "Gerenciamento de pedidos recebidos pela secretaria";
-  const canWrite = canWriteSecretaria(canonicalRole);
+  const canWrite = hasCapability("requests.manage") || canWriteSecretaria(canonicalRole);
 
   const [requests, setRequests] = useState<AdmRequest[]>([]);
   const [loading, setLoading] = useState(true);

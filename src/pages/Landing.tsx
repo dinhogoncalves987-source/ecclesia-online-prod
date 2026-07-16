@@ -1,16 +1,44 @@
-import { Link } from "react-router-dom";
+import { useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard, Wallet, Users, Calendar, BookOpen, Heart,
   MessageSquare, BarChart3, Shield, ChevronRight, ArrowRight
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AppBootScreen } from "@/components/AppBootScreen";
+import { ReconnectScreen } from "@/components/ReconnectScreen";
+import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
+import { isRouteEnabled } from "@/config/modules";
 
 const transition = { duration: 0.5, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] };
 
 export default function Landing() {
   const { t } = useLanguage();
+  const { user, loading: authLoading, connectionIssue, retryConnection } = useAuth();
+  const navigate = useNavigate();
+
+  // Someone who already has a valid session should get straight into the
+  // app instead of seeing the public marketing page — this is reachable
+  // when the PWA's start_url resolves to "/" on an older cached shell, or
+  // when a browser tab is opened directly at the root.
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate("/admin", { replace: true });
+    }
+  }, [authLoading, user, navigate]);
+
+  // A persisted token exists but couldn't be confirmed — never show the
+  // public marketing page as if the user were logged out. See PROBLEMA
+  // CRÍTICO 1.
+  if (connectionIssue) {
+    return <ReconnectScreen onRetry={retryConnection} />;
+  }
+
+  if (authLoading || user) {
+    return <AppBootScreen />;
+  }
 
   const features = [
     { icon: LayoutDashboard, title: t("Dashboard Executivo"), desc: t("Visão gerencial completa com métricas em tempo real."), path: "/admin" },
@@ -21,7 +49,9 @@ export default function Landing() {
     { icon: Heart, title: t("Pedidos de Oração"), desc: t("Acompanhamento pastoral e intercessão comunitária."), path: "/admin/oracoes" },
     { icon: MessageSquare, title: t("Comunicação"), desc: t("Avisos, mensagens e comunicados centralizados."), path: "/admin/comunicacao" },
     { icon: BarChart3, title: t("Relatórios"), desc: t("Dados estratégicos para tomada de decisão."), path: "/admin/relatorios" },
-  ];
+    // FASE 6: página pública de marketing não pode anunciar módulo
+    // staging-only (ele não existe no build de produção).
+  ].filter((f) => isRouteEnabled(f.path));
 
   return (
     <div className="min-h-screen bg-background">

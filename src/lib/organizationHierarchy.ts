@@ -32,6 +32,7 @@ export type OrgType =
   | "matriz"                   // Matriz Municipal / Campo / Ministério
   | "sede"                     // Sede / Igreja Central
   | "setor"                    // Setor / Distrito / Região / Área / Campo
+  | "subsede"                  // Subsede — unidade intermediária entre distrito e congregação
   | "congregacao";             // Congregação / Campus / Igreja local / Filial
 
 /** Modelos de hierarquia por cliente/organização. */
@@ -51,6 +52,7 @@ export const CANONICAL_ORG_TYPES: OrgType[] = [
   "matriz",
   "sede",
   "setor",
+  "subsede",
   "congregacao",
 ];
 
@@ -67,6 +69,8 @@ const LEGACY_MAP: Record<string, OrgType> = {
   church:                   "matriz",
   setor:                    "setor",
   district:                 "setor",
+  subsede:                  "subsede",
+  sub_sede:                 "subsede",
   congregacao:              "congregacao",
   congregation:             "congregacao",
   campus:                   "congregacao",
@@ -133,6 +137,12 @@ export function isIntermediateLevel(type: string | null | undefined): boolean {
   return t === "setor";
 }
 
+/** true para subsede (unidade entre distrito e congregação). */
+export function isSubsedeLevel(type: string | null | undefined): boolean {
+  const t = normalizeOrganizationType(type);
+  return t === "subsede";
+}
+
 /** true para congregacao (e equivalentes locais). */
 export function isLocalUnitLevel(type: string | null | undefined): boolean {
   const t = normalizeOrganizationType(type);
@@ -150,7 +160,6 @@ export function canHaveStructuralChildren(
   const t = normalizeOrganizationType(type);
   return t !== null && t !== "congregacao";
 }
-
 /**
  * true se a organização opera no modelo single_church.
  * Igreja simples não cria filhos estruturais, apenas usa módulos operacionais.
@@ -180,6 +189,8 @@ export function getExpectedChildTypes(
     case "sede":
       return ["setor", "congregacao"];
     case "setor":
+      return ["subsede", "congregacao"];
+    case "subsede":
       return ["congregacao"];
     default:
       return [];
@@ -221,6 +232,12 @@ export function getInsertChildType(
       return useIntermediateLevel ? "setor" : "congregacao";
 
     case "setor":
+      // Dois filhos válidos: subsede e congregacao.
+      // A interface deve oferecer duas ações separadas (Nova Subsede / Nova
+      // Congregação), não escolher um tipo automaticamente.
+      return null;
+
+    case "subsede":
       return "congregacao";
 
     case "congregacao":
@@ -252,7 +269,8 @@ const DEFAULT_LABELS: Record<OrgType, { singular: string; plural: string }> = {
   convencao:                { singular: "Convenção",                 plural: "Convenções" },
   matriz:                   { singular: "Matriz Municipal",          plural: "Matrizes Municipais" },
   sede:                     { singular: "Sede",                      plural: "Sedes" },
-  setor:                    { singular: "Setor",                     plural: "Setores" },
+  setor:                    { singular: "Distrito",                  plural: "Distritos" },
+  subsede:                  { singular: "Subsede",                   plural: "Subsedes" },
   congregacao:              { singular: "Congregação",               plural: "Congregações" },
 };
 
@@ -321,6 +339,12 @@ export function getChildrenLabel(
       : (church.local_unit_label ?? "Congregação");
   }
 
+  if (t === "subsede") {
+    return plural
+      ? (church.local_unit_label_plural ?? "Congregações")
+      : (church.local_unit_label ?? "Congregação");
+  }
+
   return plural ? "Unidades" : "Unidade";
 }
 
@@ -362,6 +386,14 @@ export function getCreateButtonLabel(
   }
 
   if (t === "setor") {
+    // Dois filhos possíveis: subsede e congregacao.
+    // O botão padrão usa o customChildType para decidir qual label mostrar.
+    if (customChildType === "subsede") return "Nova Subsede";
+    if (customChildType === "congregacao") return "Nova Congregação";
+    return `Nova ${church.local_unit_label ?? "unidade"}`;
+  }
+
+  if (t === "subsede") {
     return `Nova ${church.local_unit_label ?? "Congregação"}`;
   }
 
@@ -389,7 +421,8 @@ export function getStructurePageTitle(church: Church | null): string {
     return church.intermediate_level_label_plural ?? "Setores";
   }
 
-  if (t === "setor") return church.local_unit_label_plural ?? "Congregações";
+  if (t === "setor") return church.local_unit_label_plural ?? "Distritos";
+  if (t === "subsede") return church.local_unit_label_plural ?? "Congregações";
   if (t === "congregacao") return church.name;
 
   return "Estrutura";
@@ -423,7 +456,11 @@ export function getStructurePageSubtitle(church: Church | null): string {
   }
   if (t === "setor") {
     const label = (church.local_unit_label_plural ?? "congregações").toLowerCase();
-    return `Cadastre ${label} vinculadas a este ${(church.intermediate_level_label ?? "setor").toLowerCase()}.`;
+    return `Cadastre subsedes e ${label} vinculadas a este ${(church.intermediate_level_label ?? "distrito").toLowerCase()}.`;
+  }
+  if (t === "subsede") {
+    const label = (church.local_unit_label_plural ?? "congregações").toLowerCase();
+    return `Cadastre ${label} vinculadas a esta subsede.`;
   }
   if (t === "congregacao") {
     return "Dados operacionais desta unidade local. Responsáveis, membros, financeiro e agenda estão nos módulos específicos.";
@@ -459,6 +496,7 @@ export function getNavChildrenLabel(church: Church | null): string {
     return church.intermediate_level_label_plural ?? "Unidades";
   }
   if (t === "setor") return church.local_unit_label_plural ?? "Unidades locais";
+  if (t === "subsede") return church.local_unit_label_plural ?? "Congregações";
   return church.local_unit_label_plural ?? "Unidades locais";
 }
 
@@ -482,7 +520,9 @@ export function getTypeBadgeLabel(
     case "sede":
       return church?.municipal_level_label ?? "Sede";
     case "setor":
-      return church?.intermediate_level_label ?? "Setor";
+      return church?.intermediate_level_label ?? "Distrito";
+    case "subsede":
+      return "Subsede";
     case "congregacao":
       return church?.local_unit_label ?? "Congregação";
     default:

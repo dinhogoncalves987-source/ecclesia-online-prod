@@ -19,47 +19,25 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+import { assertSafeToSeedStagingFromProcessEnv, SeedGuardError } from "./lib/seedGuard.mjs";
+import { loadSeedEnv } from "./lib/loadSeedEnv.mjs";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.join(__dirname, "..");
-
-// --- Carrega .env (mesmo padrão de seed-staging-campaigns.mjs) ---
-function loadEnvFile(filePath) {
-  if (!fs.existsSync(filePath)) return {};
-  const out = {};
-  for (const line of fs.readFileSync(filePath, "utf8").split("\n")) {
-    // aceita: KEY=value  |  KEY="value"  |  KEY='value'
-    const m = line.match(/^([A-Z0-9_]+)\s*=\s*["']?([^"'\n]+?)["']?\s*$/);
-    if (m) out[m[1]] = m[2];
-  }
-  return out;
-}
-
-const dotenv = {
-  ...loadEnvFile(path.join(ROOT, ".env")),
-  ...loadEnvFile(path.join(ROOT, ".env.staging")),
-  ...loadEnvFile(path.join(ROOT, ".env.local")), // .env.local sobrescreve
-};
+// FASE 5 — fonte única e exclusiva de ambiente para seeds: .env.seed +
+// process.env (ver scripts/lib/loadSeedEnv.mjs). Nunca lê .env/.env.local/
+// .env.staging, que são arquivos do frontend (Vite).
+const seedEnv = loadSeedEnv();
 
 // --- URL: aceita SUPABASE_URL ou VITE_SUPABASE_URL ---
 const SUPABASE_URL = (
-  process.env.SUPABASE_URL ||
-  dotenv.SUPABASE_URL ||
-  dotenv.VITE_SUPABASE_URL ||
+  seedEnv.SUPABASE_URL ||
+  seedEnv.VITE_SUPABASE_URL ||
   ""
 ).replace(/\/+$/, "");
 
 // --- Key: deve ser a Service Role Key (bypassa RLS) ---
 // Obtenha em: Supabase Dashboard → Settings → API → service_role secret
-// Passe via: $env:SUPABASE_SERVICE_ROLE_KEY="eyJ..."; npm run demo:seed-matriz
-const SERVICE_ROLE = (
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  dotenv.SUPABASE_SERVICE_ROLE_KEY ||
-  ""
-).trim();
+// Configure em .env.seed (ver .env.seed.example) ou exporte no shell.
+const SERVICE_ROLE = (seedEnv.SUPABASE_SERVICE_ROLE_KEY || "").trim();
 
 if (!SUPABASE_URL || !SERVICE_ROLE) {
   console.error("");
@@ -71,8 +49,8 @@ if (!SUPABASE_URL || !SERVICE_ROLE) {
 
   if (!SUPABASE_URL) {
     console.error("");
-    console.error("   A URL não foi encontrada em .env / .env.local / .env.staging.");
-    console.error("   Verifique se VITE_SUPABASE_URL está definida em algum desses arquivos.");
+    console.error("   A URL não foi encontrada em .env.seed nem em process.env.");
+    console.error("   Verifique se SUPABASE_URL está definida (veja .env.seed.example).");
   }
 
   if (!SERVICE_ROLE) {
@@ -90,7 +68,7 @@ if (!SUPABASE_URL || !SERVICE_ROLE) {
     console.error("   Como executar (PowerShell):");
     console.error(`   $env:SUPABASE_SERVICE_ROLE_KEY="eyJ..."; npm run demo:seed-matriz`);
     console.error("");
-    console.error("   Ou adicione ao .env.local (nunca commitar):");
+    console.error("   Ou adicione ao .env.seed (nunca commitar):");
     console.error("   SUPABASE_SERVICE_ROLE_KEY=eyJ...");
     console.error("   (veja .env.seed.example para o formato correto)");
   }
@@ -98,6 +76,18 @@ if (!SUPABASE_URL || !SERVICE_ROLE) {
   console.error("═".repeat(54));
   console.error("");
   process.exit(1);
+}
+
+// Guarda de ambiente — recusa produção e exige confirmação explícita.
+// Requer: APP_ENV=staging e SEED_STAGING="SEED_STAGING" no ambiente.
+try {
+  assertSafeToSeedStagingFromProcessEnv({ supabaseUrl: SUPABASE_URL, env: seedEnv });
+} catch (err) {
+  if (err instanceof SeedGuardError) {
+    console.error(`\n❌ ${err.message}\n`);
+    process.exit(1);
+  }
+  throw err;
 }
 
 const sb = createClient(SUPABASE_URL, SERVICE_ROLE, {

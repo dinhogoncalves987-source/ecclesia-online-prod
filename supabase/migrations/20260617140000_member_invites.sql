@@ -191,4 +191,4 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.accept_member_invite(text) TO authenticated;
 
-RAISE NOTICE 'member_invites: tabela e funções criadas ✓';
+DO $$ BEGIN RAISE NOTICE 'member_invites: tabela e funções criadas ✓'; END $$;

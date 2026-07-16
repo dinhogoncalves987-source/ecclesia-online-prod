@@ -96,8 +96,8 @@ export function CampaignAutoCover({
             </defs>
             <rect width="100%" height="100%" fill={`url(#grid-${category.replace(/\s/g, "-")})`} />
           </svg>
-          <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
-          <div className="absolute -bottom-8 -left-8 h-40 w-40 rounded-full bg-black/10 blur-3xl" />
+          <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/5" />
+          <div className="absolute -bottom-8 -left-8 h-40 w-40 rounded-full bg-black/5" />
         </>
       )}
 

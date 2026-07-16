@@ -32,6 +32,11 @@ CREATE INDEX IF NOT EXISTS idx_org_users_user_org_active
   WHERE is_active = true;
 
 -- ── 3. New scoped SELECT policy ──────────────────────────────────────────────
+-- IF EXISTS: torna esta migration reaplicável com segurança caso a política
+-- já tenha sido criada manualmente (fora do controle de migrations) antes
+-- deste arquivo ser efetivamente registrado como aplicado.
+DROP POLICY IF EXISTS "profiles select scoped" ON public.profiles;
+
 CREATE POLICY "profiles select scoped" ON public.profiles
 FOR SELECT TO authenticated
 USING (

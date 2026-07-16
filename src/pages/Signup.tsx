@@ -52,9 +52,9 @@ export default function Signup() {
     if (error) {
       toast({ title: t("Erro ao criar conta"), description: error.message, variant: "destructive" });
     } else {
-      if (inviteSlug && data.session) {
-        await supabase.auth.updateUser({ data: { church_slug: inviteSlug, full_name: metadata.full_name } });
-      }
+      // SEGURANÇA (FASE 2): nunca sincroniza church_slug para
+      // user_metadata/raw_user_meta_data — ingresso em organização só ocorre
+      // por convite tokenizado (ver src/lib/organizationMembership.ts).
       if (data.session) {
         toast({ title: t("Conta criada!"), description: t("Entrando no Ecclesia...") });
         navigate("/admin?entry=1");

@@ -45,6 +45,7 @@ CREATE TRIGGER update_administrative_requests_updated_at
 ALTER TABLE public.administrative_requests ENABLE ROW LEVEL SECURITY;
 
 -- Membros da organização podem ler
+DROP POLICY IF EXISTS "admin_requests_org_read" ON public.administrative_requests;
 CREATE POLICY "admin_requests_org_read"
   ON public.administrative_requests FOR SELECT
   USING (
@@ -55,6 +56,7 @@ CREATE POLICY "admin_requests_org_read"
   );
 
 -- Membros da organização podem inserir/atualizar
+DROP POLICY IF EXISTS "admin_requests_org_write" ON public.administrative_requests;
 CREATE POLICY "admin_requests_org_write"
   ON public.administrative_requests FOR INSERT
   WITH CHECK (
@@ -64,6 +66,7 @@ CREATE POLICY "admin_requests_org_write"
     )
   );
 
+DROP POLICY IF EXISTS "admin_requests_org_update" ON public.administrative_requests;
 CREATE POLICY "admin_requests_org_update"
   ON public.administrative_requests FOR UPDATE
   USING (
@@ -73,6 +76,7 @@ CREATE POLICY "admin_requests_org_update"
     )
   );
 
+DROP POLICY IF EXISTS "admin_requests_org_delete" ON public.administrative_requests;
 CREATE POLICY "admin_requests_org_delete"
   ON public.administrative_requests FOR DELETE
   USING (

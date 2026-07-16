@@ -29,9 +29,9 @@ import {
 export default function RoteirosCulto() {
   const { t } = useLanguage();
   const { church, loading: churchLoading } = useChurch();
-  const { canonicalRole } = useRole();
+  const { canonicalRole, hasCapability } = useRole();
   const organizationId = church?.id;
-  const canWrite = canWriteWorship(canonicalRole);
+  const canWrite = hasCapability("worship.write") || canWriteWorship(canonicalRole);
   const canPersist = Boolean(organizationId) && !churchLoading;
 
   const [setlists, setSetlists] = useState<WorshipSetlist[]>([]);
