@@ -143,7 +143,7 @@ export default function ConfiguracaoIgreja() {
 
     if (error) {
       console.error("[ConfiguracaoIgreja] Erro ao salvar:", error);
-      toast.error(`Erro ao salvar: ${error.message}`);
+      toast.error(`${t("Erro ao salvar:")} ${error.message}`);
       return;
     }
 
@@ -160,7 +160,7 @@ export default function ConfiguracaoIgreja() {
 
     const maxMb = 2;
     if (file.size > maxMb * 1024 * 1024) {
-      toast.error(`Logo deve ter no máximo ${maxMb}MB`);
+      toast.error(`${t("Logo deve ter no máximo")} ${maxMb}MB`);
       return;
     }
 
@@ -174,7 +174,7 @@ export default function ConfiguracaoIgreja() {
 
     if (uploadError) {
       console.error("[ConfiguracaoIgreja] Erro no upload:", uploadError);
-      toast.error(`Erro ao subir logo: ${uploadError.message}`);
+      toast.error(`${t("Erro ao subir logo:")} ${uploadError.message}`);
       setUploadingLogo(false);
       return;
     }
@@ -191,14 +191,14 @@ export default function ConfiguracaoIgreja() {
       .eq("id", church.id);
 
     if (updateError) {
-      toast.error(`Erro ao salvar URL do logo: ${updateError.message}`);
+      toast.error(`${t("Erro ao salvar URL do logo:")} ${updateError.message}`);
       setUploadingLogo(false);
       return;
     }
 
     setLogoUrl(publicUrl);
     setUploadingLogo(false);
-    toast.success("Logo atualizado com sucesso");
+    toast.success(t("Logo atualizado com sucesso"));
     refetch();
   };
 
@@ -239,12 +239,13 @@ export default function ConfiguracaoIgreja() {
 
   return (
     <AdminLayout>
-      <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+      {/* max-w-3xl mx-auto sem px próprio: evita somar com o padding horizontal já aplicado pelo AdminLayout (duplicava o recuo no mobile) */}
+      <div className="max-w-3xl mx-auto py-8 space-y-6">
 
-        {/* Cabeçalho */}
-        <div className="flex items-center justify-between">
+        {/* Cabeçalho — coluna no mobile para não espremer o botão "Salvar" ao lado de um título+subtítulo longos */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
+            <div className="p-2 rounded-lg bg-primary/10 flex-shrink-0">
               <Building2 size={20} className="text-primary" />
             </div>
             <div>
@@ -257,7 +258,7 @@ export default function ConfiguracaoIgreja() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-60 self-start sm:self-auto"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             {t("Salvar")}

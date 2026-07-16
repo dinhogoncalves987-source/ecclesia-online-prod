@@ -323,7 +323,8 @@ export default function Oracoes() {
                 className="w-full sm:max-w-lg bg-card rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[92vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="sticky top-0 z-10 bg-card/95 backdrop-blur border-b border-border/50 px-5 py-4 flex items-start justify-between gap-3">
+                {/* bg-card sólido (sem backdrop-blur): evita a combinação sticky+blur associada ao rasgo gráfico em Android */}
+                <div className="sticky top-0 z-10 bg-card border-b border-border/50 px-5 py-4 flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-muted-foreground mb-1">{t("Detalhes do pedido")}</p>
                     <h2 className="text-lg font-serif font-bold text-foreground">{detailPrayer.title}</h2>

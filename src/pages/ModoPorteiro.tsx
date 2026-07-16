@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { AdminLayout } from "@/components/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/hooks/useLanguage";
 import {
   ScanLine, Camera, CameraOff, Loader2, CheckCircle2, XCircle,
   User, Building2, Hash, BadgeCheck, Search,
@@ -58,22 +59,22 @@ const STATUS_LABEL: Record<string, string> = {
   Afastado: "Afastado",
 };
 
-function getErrorMessage(reason: string): string {
+function getErrorMessage(reason: string, t: (key: string) => string): string {
   switch (reason) {
     case "invalid_token":
-      return "QR Code inválido ou token não encontrado.";
+      return t("QR Code inválido ou token não encontrado.");
     case "token_expired":
-      return "Este QR Code expirou. Peça ao membro que gere um novo código.";
+      return t("Este QR Code expirou. Peça ao membro que gere um novo código.");
     case "token_already_used":
-      return "Este QR Code já foi utilizado. Cada código é válido apenas uma vez.";
+      return t("Este QR Code já foi utilizado. Cada código é válido apenas uma vez.");
     case "permission_denied":
-      return "Você não tem permissão para validar membros. Apenas porteiros e líderes autorizados.";
+      return t("Você não tem permissão para validar membros. Apenas porteiros e líderes autorizados.");
     case "not_authenticated":
-      return "Você precisa estar autenticado para validar membros.";
+      return t("Você precisa estar autenticado para validar membros.");
     case "member_not_found":
-      return "Membro não encontrado no sistema.";
+      return t("Membro não encontrado no sistema.");
     default:
-      return "Erro ao validar o QR Code. Tente novamente.";
+      return t("Erro ao validar o QR Code. Tente novamente.");
   }
 }
 
@@ -103,6 +104,8 @@ function extractTokenFromValue(value: string): string | null {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ModoPorteiro() {
+  const { t } = useLanguage();
+
   // Scanner refs
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerDivId = "porteiro-qr-reader";
@@ -133,16 +136,17 @@ export default function ModoPorteiro() {
         setAppState("success");
       } else {
         const reason = (payload?.reason as string) || "unknown";
-        setError({ reason, message: getErrorMessage(reason) });
+        setError({ reason, message: getErrorMessage(reason, t) });
         setAppState("error");
       }
     } catch {
       setError({
         reason: "unknown",
-        message: "Erro de conexão ao validar. Verifique sua internet e tente novamente.",
+        message: t("Erro de conexão ao validar. Verifique sua internet e tente novamente."),
       });
       setAppState("error");
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -179,7 +183,7 @@ export default function ModoPorteiro() {
 
       const cameras = await Html5Qrcode.getCameras();
       if (!cameras || cameras.length === 0) {
-        setCameraError("Nenhuma câmera encontrada neste dispositivo.");
+        setCameraError(t("Nenhuma câmera encontrada neste dispositivo."));
         setAppState("idle");
         return;
       }
@@ -208,7 +212,7 @@ export default function ModoPorteiro() {
           if (!token) {
             setError({
               reason: "invalid_qr",
-              message: "QR Code inválido. Este não é um QR de carteira de membro.",
+              message: t("QR Code inválido. Este não é um QR de carteira de membro."),
             });
             setAppState("error");
             return;
@@ -221,7 +225,7 @@ export default function ModoPorteiro() {
       );
     } catch (err: unknown) {
       const msg =
-        err instanceof Error ? err.message : "Erro desconhecido ao iniciar câmera.";
+        err instanceof Error ? err.message : t("Erro desconhecido ao iniciar câmera.");
       setCameraError(msg);
       setAppState("idle");
     }
@@ -245,7 +249,7 @@ export default function ModoPorteiro() {
     if (!token) {
       setError({
         reason: "invalid_input",
-        message: "Link ou token inválido. Cole a URL completa do QR Code ou o token gerado.",
+        message: t("Link ou token inválido. Cole a URL completa do QR Code ou o token gerado."),
       });
       setAppState("error");
       return;
@@ -282,22 +286,22 @@ export default function ModoPorteiro() {
           <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-3">
             <ScanLine size={28} className="text-emerald-600 dark:text-emerald-400" />
           </div>
-          <h1 className="text-xl font-bold tracking-tight">Modo Porteiro</h1>
+          <h1 className="text-xl font-bold tracking-tight">{t("Modo Porteiro")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Validação segura de membros por QR Code temporário.
+            {t("Validação segura de membros por QR Code temporário.")}
           </p>
         </div>
 
         {/* Instructions */}
         <p className="text-xs text-muted-foreground text-center">
-          Aponte a câmera para o QR Code da carteira digital ou cole o link/token manualmente.
+          {t("Aponte a câmera para o QR Code da carteira digital ou cole o link/token manualmente.")}
         </p>
 
         {/* ── Loading state ──────────────────────────────────────────────── */}
         {appState === "loading" && (
           <div className="flex flex-col items-center gap-3 py-10">
             <Loader2 size={36} className="animate-spin text-emerald-600" />
-            <p className="text-sm font-medium text-muted-foreground">Validando...</p>
+            <p className="text-sm font-medium text-muted-foreground">{t("Validando...")}</p>
           </div>
         )}
 
@@ -307,7 +311,7 @@ export default function ModoPorteiro() {
             <div className="flex items-center gap-2">
               <BadgeCheck size={20} className="text-emerald-600 dark:text-emerald-400" />
               <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
-                Membro validado
+                {t("Membro validado")}
               </span>
             </div>
 
@@ -329,7 +333,7 @@ export default function ModoPorteiro() {
                   {result.member_role}
                 </p>
                 <span className="inline-block mt-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-200 dark:bg-emerald-800/60 text-emerald-800 dark:text-emerald-200">
-                  {STATUS_LABEL[result.status] || result.status}
+                  {t(STATUS_LABEL[result.status] || result.status)}
                 </span>
               </div>
             </div>
@@ -354,7 +358,7 @@ export default function ModoPorteiro() {
               onClick={handleReset}
               className="w-full inline-flex items-center justify-center gap-2 text-sm px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium transition-colors"
             >
-              <Search size={16} /> Escanear próximo QR
+              <Search size={16} /> {t("Escanear próximo QR")}
             </button>
           </div>
         )}
@@ -365,7 +369,7 @@ export default function ModoPorteiro() {
             <div className="flex items-center gap-2">
               <XCircle size={20} className="text-red-600 dark:text-red-400" />
               <span className="text-sm font-bold text-red-700 dark:text-red-300">
-                Falha na validação
+                {t("Falha na validação")}
               </span>
             </div>
             <p className="text-sm text-red-600 dark:text-red-400">{error.message}</p>
@@ -374,7 +378,7 @@ export default function ModoPorteiro() {
               onClick={handleReset}
               className="w-full inline-flex items-center justify-center gap-2 text-sm px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium transition-colors"
             >
-              <Search size={16} /> Tentar novamente
+              <Search size={16} /> {t("Tentar novamente")}
             </button>
           </div>
         )}
@@ -408,7 +412,7 @@ export default function ModoPorteiro() {
                   onClick={startScanner}
                   className="inline-flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium transition-colors"
                 >
-                  <Camera size={16} /> Iniciar câmera
+                  <Camera size={16} /> {t("Iniciar câmera")}
                 </button>
               )}
               {appState === "scanning" && (
@@ -417,26 +421,26 @@ export default function ModoPorteiro() {
                   onClick={stopScanner}
                   className="inline-flex items-center gap-2 text-sm px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium transition-colors"
                 >
-                  <CameraOff size={16} /> Parar câmera
+                  <CameraOff size={16} /> {t("Parar câmera")}
                 </button>
               )}
             </div>
 
             {appState === "scanning" && (
               <p className="text-xs text-muted-foreground text-center">
-                Aponte a câmera para o QR Code da carteira digital.
+                {t("Aponte a câmera para o QR Code da carteira digital.")}
               </p>
             )}
             {appState === "idle" && (
               <p className="text-xs text-muted-foreground text-center">
-                Aguardando leitura
+                {t("Aguardando leitura")}
               </p>
             )}
 
             {/* Manual input */}
             <div className="border-t border-border pt-4 space-y-3">
               <p className="text-xs font-medium text-muted-foreground text-center">
-                Ou cole o link/token manualmente
+                {t("Ou cole o link/token manualmente")}
               </p>
               <div className="flex gap-2">
                 <input
@@ -446,7 +450,7 @@ export default function ModoPorteiro() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleManualValidate();
                   }}
-                  placeholder="Colar link ou token do QR Code"
+                  placeholder={t("Colar link ou token do QR Code")}
                   className="flex-1 px-3 py-2 rounded-lg border border-border bg-card text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
                 />
                 <button
@@ -455,7 +459,7 @@ export default function ModoPorteiro() {
                   disabled={!manualInput.trim()}
                   className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-40 transition-opacity"
                 >
-                  <Search size={16} /> Validar
+                  <Search size={16} /> {t("Validar")}
                 </button>
               </div>
             </div>

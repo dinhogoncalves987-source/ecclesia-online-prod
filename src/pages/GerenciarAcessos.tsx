@@ -19,6 +19,7 @@ import { AdminLayout } from "@/components/AdminLayout";
 import { SupportOrganizationSelector } from "@/components/platform/SupportOrganizationSelector";
 import { useAuth } from "@/hooks/useAuth";
 import { useChurch } from "@/hooks/useChurchContext";
+import { useLanguage } from "@/hooks/useLanguage";
 import { useRole } from "@/hooks/useRole";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -129,11 +130,12 @@ function describeRpcError(message: string): string {
 }
 
 function ResponsibilityBadge({ responsibility }: { responsibility: AccessResponsibility }) {
+  const { t } = useLanguage();
   const definition = ACCESS_RESPONSIBILITY_BY_KEY.get(responsibility);
   if (!definition) return null;
   return (
     <span className="inline-flex items-center rounded-full border border-border/60 bg-secondary/60 px-2 py-1 text-[11px] font-medium text-foreground">
-      {definition.label}
+      {t(definition.label)}
     </span>
   );
 }
@@ -147,6 +149,7 @@ function ResponsibilityPicker({
   onChange: (next: Set<AccessResponsibility>) => void;
   allowGovernance: boolean;
 }) {
+  const { t } = useLanguage();
   const toggle = (responsibility: AccessResponsibility) => {
     const next = new Set(selected);
     if (next.has(responsibility)) next.delete(responsibility);
@@ -161,7 +164,7 @@ function ResponsibilityPicker({
         return (
           <section key={category}>
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {RESPONSIBILITY_CATEGORY_LABELS[category]}
+              {t(RESPONSIBILITY_CATEGORY_LABELS[category])}
             </h3>
             <div className="grid gap-2 sm:grid-cols-2">
               {definitions.map((definition) => {
@@ -184,8 +187,8 @@ function ResponsibilityPicker({
                         {checked && <Check size={13} />}
                       </span>
                       <span>
-                        <span className="block text-sm font-semibold text-foreground">{definition.label}</span>
-                        <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">{definition.description}</span>
+                        <span className="block text-sm font-semibold text-foreground">{t(definition.label)}</span>
+                        <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">{t(definition.description)}</span>
                       </span>
                     </div>
                   </button>
@@ -197,7 +200,7 @@ function ResponsibilityPicker({
       })}
       {!allowGovernance && (
         <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-[11px] text-amber-800 dark:text-amber-300">
-          Funções de governo desta unidade são definidas pela unidade superior. Aqui você pode distribuir todos os trabalhos operacionais.
+          {t("Funções de governo desta unidade são definidas pela unidade superior. Aqui você pode distribuir todos os trabalhos operacionais.")}
         </p>
       )}
     </div>
@@ -205,6 +208,7 @@ function ResponsibilityPicker({
 }
 
 export default function GerenciarAcessos() {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const { church, loading: churchLoading } = useChurch();
   const { canAccess, isSuperAdmin, loading: roleLoading } = useRole();
@@ -212,7 +216,7 @@ export default function GerenciarAcessos() {
   const navigationState = location.state as HierarchyNavigationState;
 
   const effectiveOrgId = navigationState?.contextOrganizationId ?? church?.id ?? null;
-  const effectiveOrgName = navigationState?.contextOrganizationName ?? church?.name ?? "Organização";
+  const effectiveOrgName = navigationState?.contextOrganizationName ?? church?.name ?? t("Organização");
   const effectiveOrgType = navigationState?.contextOrganizationType ?? church?.organization_type ?? null;
   const allowGovernance = isSuperAdmin || Boolean(church?.id && effectiveOrgId && church.id !== effectiveOrgId);
 
@@ -255,7 +259,7 @@ export default function GerenciarAcessos() {
 
     if (usersResult.error || invitesResult.error) {
       const message = usersResult.error?.message ?? invitesResult.error?.message ?? "Falha ao carregar acessos.";
-      setLoadError(describeRpcError(message));
+      setLoadError(t(describeRpcError(message)));
       setUsers([]);
       setInvites([]);
       setLoading(false);
@@ -282,7 +286,7 @@ export default function GerenciarAcessos() {
       } as PendingAccessInvite;
     }));
     setLoading(false);
-  }, [effectiveOrgId]);
+  }, [effectiveOrgId, t]);
 
   useEffect(() => {
     if (roleLoading || churchLoading) return;
@@ -342,7 +346,7 @@ export default function GerenciarAcessos() {
     });
     if (sequence !== memberSearchSequence.current) return;
     if (error) {
-      toast({ title: "Não foi possível buscar", description: describeRpcError(error.message), variant: "destructive" });
+      toast({ title: t("Não foi possível buscar"), description: t(describeRpcError(error.message)), variant: "destructive" });
       setMemberResults([]);
     } else {
       const payload = data as JsonResult;
@@ -359,7 +363,7 @@ export default function GerenciarAcessos() {
       _responsibility_types: [...responsibilities],
     });
     if (error) {
-      toast({ title: "Não foi possível salvar", description: describeRpcError(error.message), variant: "destructive" });
+      toast({ title: t("Não foi possível salvar"), description: t(describeRpcError(error.message)), variant: "destructive" });
       return false;
     }
     return true;
@@ -379,7 +383,7 @@ export default function GerenciarAcessos() {
       );
       const ok = await saveExistingUser(selectedMember.user_id, cumulativeResponsibilities);
       if (ok) {
-        toast({ title: "Responsabilidades concedidas", description: "O perfil de membro foi preservado." });
+        toast({ title: t("Responsabilidades concedidas"), description: t("O perfil de membro foi preservado.") });
         resetMemberModal();
         await loadAccess();
       }
@@ -393,7 +397,7 @@ export default function GerenciarAcessos() {
       _responsibility_types: [...selectedResponsibilities],
     });
     if (error) {
-      toast({ title: "Não foi possível criar o convite", description: describeRpcError(error.message), variant: "destructive" });
+      toast({ title: t("Não foi possível criar o convite"), description: t(describeRpcError(error.message)), variant: "destructive" });
       setSaving(false);
       return;
     }
@@ -401,7 +405,7 @@ export default function GerenciarAcessos() {
     const payload = data as JsonResult;
     const token = typeof payload?.token === "string" ? payload.token : "";
     if (token) await navigator.clipboard.writeText(buildInviteUrl(token)).catch(() => undefined);
-    toast({ title: "Convite seguro criado", description: "O link foi copiado. O membro usará o e-mail já cadastrado." });
+    toast({ title: t("Convite seguro criado"), description: t("O link foi copiado. O membro usará o e-mail já cadastrado.") });
     resetMemberModal();
     setSaving(false);
   };
@@ -417,14 +421,14 @@ export default function GerenciarAcessos() {
       _responsibility_types: [...selectedResponsibilities],
     });
     if (error) {
-      toast({ title: "Não foi possível criar o convite", description: describeRpcError(error.message), variant: "destructive" });
+      toast({ title: t("Não foi possível criar o convite"), description: t(describeRpcError(error.message)), variant: "destructive" });
       setSaving(false);
       return;
     }
     const payload = data as JsonResult;
     const token = typeof payload?.token === "string" ? payload.token : "";
     if (token) await navigator.clipboard.writeText(buildAccessInviteUrl(token)).catch(() => undefined);
-    toast({ title: "Convite criado", description: "O link foi copiado e está preso ao e-mail informado." });
+    toast({ title: t("Convite criado"), description: t("O link foi copiado e está preso ao e-mail informado.") });
     resetExternalModal();
     await loadAccess();
     setSaving(false);
@@ -435,7 +439,7 @@ export default function GerenciarAcessos() {
     setSaving(true);
     const ok = await saveExistingUser(editUser.user_id, selectedResponsibilities);
     if (ok) {
-      toast({ title: "Acessos atualizados", description: "As demais funções do membro continuam intactas." });
+      toast({ title: t("Acessos atualizados"), description: t("As demais funções do membro continuam intactas.") });
       setEditUser(null);
       setSelectedResponsibilities(new Set());
       await loadAccess();
@@ -444,11 +448,11 @@ export default function GerenciarAcessos() {
   };
 
   const revokeAllResponsibilities = async (accessUser: ManagedAccessUser) => {
-    if (!confirm(`Remover os trabalhos delegados a ${accessUser.full_name}? O cadastro de membro será preservado.`)) return;
+    if (!confirm(`${t("Remover os trabalhos delegados a")} ${accessUser.full_name}? ${t("O cadastro de membro será preservado.")}`)) return;
     setSaving(true);
     const ok = await saveExistingUser(accessUser.user_id, new Set());
     if (ok) {
-      toast({ title: "Responsabilidades removidas", description: "A pessoa continua como membro da igreja." });
+      toast({ title: t("Responsabilidades removidas"), description: t("A pessoa continua como membro da igreja.") });
       setEditUser(null);
       await loadAccess();
     }
@@ -458,16 +462,16 @@ export default function GerenciarAcessos() {
   const revokeInvite = async (invite: PendingAccessInvite) => {
     const { error } = await supabase.rpc("admin_revoke_access_invite", { _invite_id: invite.id });
     if (error) {
-      toast({ title: "Não foi possível revogar", description: describeRpcError(error.message), variant: "destructive" });
+      toast({ title: t("Não foi possível revogar"), description: t(describeRpcError(error.message)), variant: "destructive" });
       return;
     }
-    toast({ title: "Convite revogado" });
+    toast({ title: t("Convite revogado") });
     await loadAccess();
   };
 
   const copyInvite = async (invite: PendingAccessInvite) => {
     await navigator.clipboard.writeText(buildAccessInviteUrl(invite.token)).catch(() => undefined);
-    toast({ title: "Link copiado" });
+    toast({ title: t("Link copiado") });
   };
 
   if (!roleLoading && !canAccess("/admin/gerenciar-acessos")) return <Navigate to="/admin" replace />;
@@ -477,10 +481,10 @@ export default function GerenciarAcessos() {
       <AdminLayout>
         <div className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center text-center">
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Building2 size={30} /></div>
-          <h1 className="text-2xl font-serif font-bold">Selecione uma organização</h1>
-          <p className="mt-2 text-sm text-muted-foreground">O Super Admin precisa escolher a igreja que será administrada antes de abrir o Gerenciador de Acessos.</p>
+          <h1 className="text-2xl font-serif font-bold">{t("Selecione uma organização")}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{t("O Super Admin precisa escolher a igreja que será administrada antes de abrir o Gerenciador de Acessos.")}</p>
           <button type="button" onClick={() => setOrganizationSelectorOpen(true)} className="mt-5 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground">
-            Escolher organização
+            {t("Escolher organização")}
           </button>
         </div>
         <SupportOrganizationSelector open={organizationSelectorOpen} onClose={() => setOrganizationSelectorOpen(false)} />
@@ -495,9 +499,9 @@ export default function GerenciarAcessos() {
           <div>
             <div className="flex items-center gap-2">
               <Shield size={26} className="text-primary" />
-              <h1 className="text-2xl font-serif font-bold sm:text-3xl">Gerenciador de Acessos</h1>
+              <h1 className="text-2xl font-serif font-bold sm:text-3xl">{t("Gerenciador de Acessos")}</h1>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">Delegação hierárquica de trabalhos — sem alterar o perfil-base do membro.</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t("Delegação hierárquica de trabalhos — sem alterar o perfil-base do membro.")}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
               <span className="rounded-full bg-primary/10 px-2.5 py-1 font-semibold text-primary">{effectiveOrgName}</span>
               {effectiveOrgType && <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">{effectiveOrgType}</span>}
@@ -506,41 +510,41 @@ export default function GerenciarAcessos() {
           <div className="flex flex-wrap gap-2">
             {isSuperAdmin && (
               <button type="button" onClick={() => setOrganizationSelectorOpen(true)} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium">
-                <Building2 size={15} /> Trocar organização
+                <Building2 size={15} /> {t("Trocar organização")}
               </button>
             )}
             <button type="button" onClick={() => { setSelectedResponsibilities(new Set()); setMemberModalOpen(true); }} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground">
-              <UserCheck size={15} /> Autorizar membro
+              <UserCheck size={15} /> {t("Autorizar membro")}
             </button>
             <button type="button" onClick={() => { setSelectedResponsibilities(new Set()); setExternalModalOpen(true); }} className="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-sm font-semibold text-primary">
-              <UserPlus size={15} /> Convidar externo
+              <UserPlus size={15} /> {t("Convidar externo")}
             </button>
           </div>
         </header>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-border/60 bg-card p-4"><p className="text-xs text-muted-foreground">Pessoas com trabalhos</p><p className="mt-1 text-2xl font-bold">{users.filter((item) => item.responsibility_types.length > 0).length}</p></div>
-          <div className="rounded-xl border border-border/60 bg-card p-4"><p className="text-xs text-muted-foreground">Responsabilidades ativas</p><p className="mt-1 text-2xl font-bold">{users.reduce((total, item) => total + item.responsibility_types.length, 0)}</p></div>
-          <div className="rounded-xl border border-border/60 bg-card p-4"><p className="text-xs text-muted-foreground">Convites pendentes</p><p className="mt-1 text-2xl font-bold">{pendingInvites.length}</p></div>
+          <div className="rounded-xl border border-border/60 bg-card p-4"><p className="text-xs text-muted-foreground">{t("Pessoas com trabalhos")}</p><p className="mt-1 text-2xl font-bold">{users.filter((item) => item.responsibility_types.length > 0).length}</p></div>
+          <div className="rounded-xl border border-border/60 bg-card p-4"><p className="text-xs text-muted-foreground">{t("Responsabilidades ativas")}</p><p className="mt-1 text-2xl font-bold">{users.reduce((total, item) => total + item.responsibility_types.length, 0)}</p></div>
+          <div className="rounded-xl border border-border/60 bg-card p-4"><p className="text-xs text-muted-foreground">{t("Convites pendentes")}</p><p className="mt-1 text-2xl font-bold">{pendingInvites.length}</p></div>
         </div>
 
         {loadError && (
           <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-            <p className="font-semibold">Não foi possível confirmar os acessos</p>
+            <p className="font-semibold">{t("Não foi possível confirmar os acessos")}</p>
             <p className="mt-1">{loadError}</p>
-            <button type="button" onClick={() => void loadAccess()} className="mt-3 rounded-lg border border-destructive/30 px-3 py-1.5 text-xs font-semibold">Tentar novamente</button>
+            <button type="button" onClick={() => void loadAccess()} className="mt-3 rounded-lg border border-destructive/30 px-3 py-1.5 text-xs font-semibold">{t("Tentar novamente")}</button>
           </div>
         )}
 
         <section className="overflow-hidden rounded-xl border border-border/60 bg-card">
           <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
-            <h2 className="flex items-center gap-2 text-sm font-semibold"><Users size={16} /> Equipe autorizada</h2>
-            <span className="text-xs text-muted-foreground">{users.length} pessoa{users.length === 1 ? "" : "s"}</span>
+            <h2 className="flex items-center gap-2 text-sm font-semibold"><Users size={16} /> {t("Equipe autorizada")}</h2>
+            <span className="text-xs text-muted-foreground">{users.length} {users.length === 1 ? t("pessoa") : t("pessoas")}</span>
           </div>
           {loading ? (
             <div className="flex justify-center py-12"><Loader2 className="animate-spin text-muted-foreground" /></div>
           ) : users.length === 0 ? (
-            <div className="py-12 text-center text-sm text-muted-foreground">Nenhuma pessoa autorizada nesta unidade.</div>
+            <div className="py-12 text-center text-sm text-muted-foreground">{t("Nenhuma pessoa autorizada nesta unidade.")}</div>
           ) : (
             <div className="divide-y divide-border/40">
               {users.map((accessUser) => (
@@ -558,12 +562,12 @@ export default function GerenciarAcessos() {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">{accessUser.full_name}</span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      Função eclesiástica: {accessUser.ecclesiastical_role || "Membro"}
+                      {t("Função eclesiástica:")} {t(accessUser.ecclesiastical_role || "Membro")}
                     </span>
                     <span className="mt-1.5 flex flex-wrap gap-1">
                       {accessUser.responsibility_types.length > 0
                         ? accessUser.responsibility_types.map((responsibility) => <ResponsibilityBadge key={responsibility} responsibility={responsibility} />)
-                        : <span className="text-[11px] text-muted-foreground">Somente acesso-base de membro</span>}
+                        : <span className="text-[11px] text-muted-foreground">{t("Somente acesso-base de membro")}</span>}
                     </span>
                   </span>
                   <ChevronRight size={17} className="flex-shrink-0 text-muted-foreground" />
@@ -575,7 +579,7 @@ export default function GerenciarAcessos() {
 
         {pendingInvites.length > 0 && (
           <section className="overflow-hidden rounded-xl border border-border/60 bg-card">
-            <div className="border-b border-border/50 px-4 py-3"><h2 className="flex items-center gap-2 text-sm font-semibold"><Mail size={16} /> Convites externos pendentes</h2></div>
+            <div className="border-b border-border/50 px-4 py-3"><h2 className="flex items-center gap-2 text-sm font-semibold"><Mail size={16} /> {t("Convites externos pendentes")}</h2></div>
             <div className="divide-y divide-border/40">
               {pendingInvites.map((invite) => (
                 <div key={invite.id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center">
@@ -585,8 +589,8 @@ export default function GerenciarAcessos() {
                     <div className="mt-1 flex flex-wrap gap-1">{invite.responsibility_types.map((responsibility) => <ResponsibilityBadge key={responsibility} responsibility={responsibility} />)}</div>
                   </div>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => void copyInvite(invite)} className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs"><ClipboardCopy size={13} /> Copiar</button>
-                    <button type="button" onClick={() => void revokeInvite(invite)} className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 px-2.5 py-1.5 text-xs text-destructive"><X size={13} /> Revogar</button>
+                    <button type="button" onClick={() => void copyInvite(invite)} className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs"><ClipboardCopy size={13} /> {t("Copiar")}</button>
+                    <button type="button" onClick={() => void revokeInvite(invite)} className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 px-2.5 py-1.5 text-xs text-destructive"><X size={13} /> {t("Revogar")}</button>
                   </div>
                 </div>
               ))}
@@ -601,23 +605,23 @@ export default function GerenciarAcessos() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
             <div className="flex items-center justify-between border-b border-border/50 px-5 py-4">
-              <div><h2 className="font-semibold">Autorizar membro existente</h2><p className="text-xs text-muted-foreground">{effectiveOrgName}</p></div>
+              <div><h2 className="font-semibold">{t("Autorizar membro existente")}</h2><p className="text-xs text-muted-foreground">{effectiveOrgName}</p></div>
               <button type="button" onClick={resetMemberModal}><X size={18} /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-5">
               {!selectedMember ? (
                 <div className="space-y-4">
-                  <div className="relative"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input value={memberQuery} onChange={(event) => void searchMembers(event.target.value)} placeholder="Buscar membro por nome" autoFocus className="w-full rounded-lg border border-border bg-background py-2.5 pl-9 pr-3 text-sm" /></div>
+                  <div className="relative"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input value={memberQuery} onChange={(event) => void searchMembers(event.target.value)} placeholder={t("Buscar membro por nome")} autoFocus className="w-full rounded-lg border border-border bg-background py-2.5 pl-9 pr-3 text-sm" /></div>
                   {memberSearching ? <div className="flex justify-center py-10"><Loader2 className="animate-spin" /></div> : (
                     <div className="space-y-2">
                       {memberResults.map((member) => (
                         <button key={member.id} type="button" onClick={() => setSelectedMember(member)} className="flex w-full items-center gap-3 rounded-xl border border-border/60 p-3 text-left hover:border-primary/40">
                           {member.photo_url ? <img src={member.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" /> : <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{initials(member.full_name)}</span>}
-                          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{member.full_name}</span><span className="block text-xs text-muted-foreground">{member.ecclesiastical_role || "Membro"}</span></span>
-                          <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${member.user_id ? "bg-emerald-500/10 text-emerald-700" : "bg-amber-500/10 text-amber-700"}`}>{member.user_id ? "Com login" : "Receberá convite"}</span>
+                          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{member.full_name}</span><span className="block text-xs text-muted-foreground">{t(member.ecclesiastical_role || "Membro")}</span></span>
+                          <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${member.user_id ? "bg-emerald-500/10 text-emerald-700" : "bg-amber-500/10 text-amber-700"}`}>{member.user_id ? t("Com login") : t("Receberá convite")}</span>
                         </button>
                       ))}
-                      {memberQuery.trim().length >= 2 && memberResults.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">Nenhum membro encontrado dentro desta estrutura.</p>}
+                      {memberQuery.trim().length >= 2 && memberResults.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">{t("Nenhum membro encontrado dentro desta estrutura.")}</p>}
                     </div>
                   )}
                 </div>
@@ -625,16 +629,16 @@ export default function GerenciarAcessos() {
                 <div className="space-y-5">
                   <div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
                     <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{initials(selectedMember.full_name)}</span>
-                    <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{selectedMember.full_name}</span><span className="text-xs text-muted-foreground">Continua sendo {selectedMember.ecclesiastical_role || "Membro"}</span></span>
-                    <button type="button" onClick={() => setSelectedMember(null)} className="text-xs text-primary">Trocar</button>
+                    <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{selectedMember.full_name}</span><span className="text-xs text-muted-foreground">{t("Continua sendo")} {t(selectedMember.ecclesiastical_role || "Membro")}</span></span>
+                    <button type="button" onClick={() => setSelectedMember(null)} className="text-xs text-primary">{t("Trocar")}</button>
                   </div>
                   <ResponsibilityPicker selected={selectedResponsibilities} onChange={setSelectedResponsibilities} allowGovernance={allowGovernance} />
                 </div>
               )}
             </div>
             <div className="flex gap-2 border-t border-border/50 p-4">
-              <button type="button" onClick={resetMemberModal} className="flex-1 rounded-lg bg-secondary px-4 py-2.5 text-sm font-semibold">Cancelar</button>
-              <button type="button" disabled={!selectedMember || selectedResponsibilities.size === 0 || saving} onClick={() => void authorizeSelectedMember()} className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">{saving ? "Salvando..." : selectedMember?.user_id ? "Conceder acessos" : "Criar convite seguro"}</button>
+              <button type="button" onClick={resetMemberModal} className="flex-1 rounded-lg bg-secondary px-4 py-2.5 text-sm font-semibold">{t("Cancelar")}</button>
+              <button type="button" disabled={!selectedMember || selectedResponsibilities.size === 0 || saving} onClick={() => void authorizeSelectedMember()} className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">{saving ? t("Salvando...") : selectedMember?.user_id ? t("Conceder acessos") : t("Criar convite seguro")}</button>
             </div>
           </div>
         </div>
@@ -643,16 +647,16 @@ export default function GerenciarAcessos() {
       {externalModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border/50 px-5 py-4"><div><h2 className="font-semibold">Convidar pessoa externa</h2><p className="text-xs text-muted-foreground">Não cria cadastro de membro automaticamente.</p></div><button type="button" onClick={resetExternalModal}><X size={18} /></button></div>
+            <div className="flex items-center justify-between border-b border-border/50 px-5 py-4"><div><h2 className="font-semibold">{t("Convidar pessoa externa")}</h2><p className="text-xs text-muted-foreground">{t("Não cria cadastro de membro automaticamente.")}</p></div><button type="button" onClick={resetExternalModal}><X size={18} /></button></div>
             <div className="flex-1 space-y-5 overflow-y-auto p-5">
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="text-xs text-muted-foreground sm:col-span-2">Nome completo<input value={externalForm.fullName} onChange={(event) => setExternalForm((current) => ({ ...current, fullName: event.target.value }))} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground" /></label>
-                <label className="text-xs text-muted-foreground">E-mail obrigatório<input type="email" value={externalForm.email} onChange={(event) => setExternalForm((current) => ({ ...current, email: event.target.value }))} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground" /></label>
-                <label className="text-xs text-muted-foreground">Telefone / WhatsApp<input value={externalForm.phone} onChange={(event) => setExternalForm((current) => ({ ...current, phone: event.target.value }))} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground" /></label>
+                <label className="text-xs text-muted-foreground sm:col-span-2">{t("Nome completo")}<input value={externalForm.fullName} onChange={(event) => setExternalForm((current) => ({ ...current, fullName: event.target.value }))} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground" /></label>
+                <label className="text-xs text-muted-foreground">{t("E-mail obrigatório")}<input type="email" value={externalForm.email} onChange={(event) => setExternalForm((current) => ({ ...current, email: event.target.value }))} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground" /></label>
+                <label className="text-xs text-muted-foreground">{t("Telefone / WhatsApp")}<input value={externalForm.phone} onChange={(event) => setExternalForm((current) => ({ ...current, phone: event.target.value }))} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground" /></label>
               </div>
               <ResponsibilityPicker selected={selectedResponsibilities} onChange={setSelectedResponsibilities} allowGovernance={allowGovernance} />
             </div>
-            <div className="flex gap-2 border-t border-border/50 p-4"><button type="button" onClick={resetExternalModal} className="flex-1 rounded-lg bg-secondary px-4 py-2.5 text-sm font-semibold">Cancelar</button><button type="button" disabled={saving || !externalForm.fullName.trim() || !externalForm.email.trim() || selectedResponsibilities.size === 0} onClick={() => void createExternalInvite()} className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">{saving ? "Criando..." : "Criar convite"}</button></div>
+            <div className="flex gap-2 border-t border-border/50 p-4"><button type="button" onClick={resetExternalModal} className="flex-1 rounded-lg bg-secondary px-4 py-2.5 text-sm font-semibold">{t("Cancelar")}</button><button type="button" disabled={saving || !externalForm.fullName.trim() || !externalForm.email.trim() || selectedResponsibilities.size === 0} onClick={() => void createExternalInvite()} className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">{saving ? t("Criando...") : t("Criar convite")}</button></div>
           </div>
         </div>
       )}
@@ -660,11 +664,11 @@ export default function GerenciarAcessos() {
       {editUser && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/40">
           <div className="flex h-full w-full max-w-xl flex-col bg-card shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border/50 px-5 py-4"><div><h2 className="font-semibold">Acessos de {editUser.full_name}</h2><p className="text-xs text-muted-foreground">Função eclesiástica preservada: {editUser.ecclesiastical_role || "Membro"}</p></div><button type="button" onClick={() => setEditUser(null)}><X size={18} /></button></div>
+            <div className="flex items-center justify-between border-b border-border/50 px-5 py-4"><div><h2 className="font-semibold">{t("Acessos de")} {editUser.full_name}</h2><p className="text-xs text-muted-foreground">{t("Função eclesiástica preservada:")} {t(editUser.ecclesiastical_role || "Membro")}</p></div><button type="button" onClick={() => setEditUser(null)}><X size={18} /></button></div>
             <div className="flex-1 overflow-y-auto p-5"><ResponsibilityPicker selected={selectedResponsibilities} onChange={setSelectedResponsibilities} allowGovernance={allowGovernance} /></div>
             <div className="space-y-2 border-t border-border/50 p-4">
-              {editUser.user_id !== user?.id && <button type="button" disabled={saving} onClick={() => void revokeAllResponsibilities(editUser)} className="flex w-full items-center justify-center gap-2 rounded-lg border border-destructive/30 px-4 py-2.5 text-sm font-semibold text-destructive"><UserX size={15} /> Remover trabalhos delegados</button>}
-              <div className="flex gap-2"><button type="button" onClick={() => setEditUser(null)} className="flex-1 rounded-lg bg-secondary px-4 py-2.5 text-sm font-semibold">Cancelar</button><button type="button" disabled={saving} onClick={() => void saveEditedUser()} className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground">{saving ? "Salvando..." : "Salvar responsabilidades"}</button></div>
+              {editUser.user_id !== user?.id && <button type="button" disabled={saving} onClick={() => void revokeAllResponsibilities(editUser)} className="flex w-full items-center justify-center gap-2 rounded-lg border border-destructive/30 px-4 py-2.5 text-sm font-semibold text-destructive"><UserX size={15} /> {t("Remover trabalhos delegados")}</button>}
+              <div className="flex gap-2"><button type="button" onClick={() => setEditUser(null)} className="flex-1 rounded-lg bg-secondary px-4 py-2.5 text-sm font-semibold">{t("Cancelar")}</button><button type="button" disabled={saving} onClick={() => void saveEditedUser()} className="flex-1 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground">{saving ? t("Salvando...") : t("Salvar responsabilidades")}</button></div>
             </div>
           </div>
         </div>

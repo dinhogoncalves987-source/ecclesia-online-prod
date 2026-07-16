@@ -37,7 +37,8 @@ export function CampaignActions({ campaignTitle, campaignId }: Props) {
   };
 
   return (
-    <div className="flex flex-wrap gap-2 pt-2 border-t border-border/50 sticky bottom-0 z-20 bg-card/95 backdrop-blur-md py-3 -mx-5 px-5 sm:static sm:z-auto sm:bg-transparent sm:py-0 sm:mx-0 sm:px-0 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:shadow-none">
+    /* bg-card sólido (sem backdrop-blur): evita a combinação sticky+blur associada ao rasgo gráfico em Android */
+    <div className="flex flex-wrap gap-2 pt-2 border-t border-border/50 sticky bottom-0 z-20 bg-card py-3 -mx-5 px-5 sm:static sm:z-auto sm:bg-transparent sm:py-0 sm:mx-0 sm:px-0 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:shadow-none">
       <button
         type="button"
         onClick={handleFollow}

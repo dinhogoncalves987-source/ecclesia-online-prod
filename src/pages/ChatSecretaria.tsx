@@ -13,6 +13,7 @@ import { InternalChat } from "@/components/messages/InternalChat";
 import { useAuth } from "@/hooks/useAuth";
 import { useChurch } from "@/hooks/useChurchContext";
 import { useRole } from "@/hooks/useRole";
+import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
 import {
   createSecretariatThread,
@@ -69,6 +70,7 @@ const ROLE_LABEL: Record<string, string> = {
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export default function ChatSecretaria() {
+  const { t } = useLanguage();
   const { user } = useAuth();
   const { toast } = useToast();
   const { church, loading: churchLoading } = useChurch();
@@ -80,10 +82,10 @@ export default function ChatSecretaria() {
   // On the global route /admin/chat the title is "Conversas".
   // On the legacy /admin/chat-secretaria it stays as "Chat da Secretaria".
   const isGlobalChat = pathname === "/admin/chat";
-  const pageTitle    = isGlobalChat ? "Conversas" : "Chat da Secretaria";
+  const pageTitle    = isGlobalChat ? t("Conversas") : t("Chat da Secretaria");
   const pageSubtitle = isGlobalChat
-    ? "Comunicação interna da organização"
-    : "Comunicação interna administrativa";
+    ? t("Comunicação interna da organização")
+    : t("Comunicação interna administrativa");
 
   // estado geral
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -103,14 +105,14 @@ export default function ChatSecretaria() {
     // Clear nav state so back-navigation doesn't re-trigger
     navigate(pathname, { replace: true, state: {} });
 
-    void findOrCreateDirectThread(church.id, user.id, state.userId, state.userName || "Usuário")
+    void findOrCreateDirectThread(church.id, user.id, state.userId, state.userName || t("Usuário"))
       .then((result) => {
         if (result.ok && result.thread) {
           setForcedThread(result.thread);
           setRefetchKey((k) => k + 1);
-          toast({ title: `Conversa com ${state.userName || "usuário"} aberta` });
+          toast({ title: `${t("Conversa com")} ${state.userName || t("usuário")} ${t("aberta")}` });
         } else {
-          toast({ title: "Erro ao abrir conversa", description: result.error, variant: "destructive" });
+          toast({ title: t("Erro ao abrir conversa"), description: result.error, variant: "destructive" });
         }
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -177,7 +179,7 @@ export default function ChatSecretaria() {
 
     const result = await createSecretariatThread(church.id, user.id, newSubject.trim());
     if (!result.ok || !result.thread) {
-      toast({ title: "Erro ao criar conversa", description: result.error, variant: "destructive" });
+      toast({ title: t("Erro ao criar conversa"), description: result.error, variant: "destructive" });
       setCreating(false);
       return;
     }
@@ -192,22 +194,22 @@ export default function ChatSecretaria() {
     closeDialog();
     setCreating(false);
     setRefetchKey((k) => k + 1);
-    toast({ title: "Conversa criada com sucesso" });
+    toast({ title: t("Conversa criada com sucesso") });
   };
 
   const handleSupportThread = async () => {
     if (!church?.id || !user?.id) return;
     setCreating(true);
 
-    const result = await createSecretariatThread(church.id, user.id, "Suporte Ecclesia");
+    const result = await createSecretariatThread(church.id, user.id, t("Suporte Ecclesia"));
     if (!result.ok || !result.thread) {
-      toast({ title: "Erro ao criar conversa de suporte", description: result.error, variant: "destructive" });
+      toast({ title: t("Erro ao criar conversa de suporte"), description: result.error, variant: "destructive" });
       setCreating(false);
       return;
     }
 
     await sendInternalMessage(church.id, result.thread.id, user.id, {
-      body: "Olá! Preciso de ajuda com a plataforma Ecclesia.",
+      body: t("Olá! Preciso de ajuda com a plataforma Ecclesia."),
       senderRole: isAdmin ? "admin" : "secretary",
     });
 
@@ -215,7 +217,7 @@ export default function ChatSecretaria() {
     setCreating(false);
     setForcedThread(result.thread);
     setRefetchKey((k) => k + 1);
-    toast({ title: "Conversa de suporte iniciada" });
+    toast({ title: t("Conversa de suporte iniciada") });
   };
 
   const handleDirectMessage = async () => {
@@ -230,7 +232,7 @@ export default function ChatSecretaria() {
     );
 
     if (!result.ok || !result.thread) {
-      toast({ title: "Erro ao abrir conversa", description: result.error, variant: "destructive" });
+      toast({ title: t("Erro ao abrir conversa"), description: result.error, variant: "destructive" });
       setCreating(false);
       return;
     }
@@ -241,9 +243,9 @@ export default function ChatSecretaria() {
     setRefetchKey((k) => k + 1);
 
     if (result.isNew) {
-      toast({ title: `Conversa iniciada com ${selectedMember.full_name}` });
+      toast({ title: `${t("Conversa iniciada com")} ${selectedMember.full_name}` });
     } else {
-      toast({ title: `Conversa com ${selectedMember.full_name} aberta` });
+      toast({ title: `${t("Conversa com")} ${selectedMember.full_name} ${t("aberta")}` });
     }
   };
 
@@ -255,14 +257,14 @@ export default function ChatSecretaria() {
     const result = await createSecretariatThread(church.id, user.id, subject);
 
     if (!result.ok || !result.thread) {
-      toast({ title: "Erro ao criar reunião", description: result.error, variant: "destructive" });
+      toast({ title: t("Erro ao criar reunião"), description: result.error, variant: "destructive" });
       setCreating(false);
       return;
     }
 
     // Mensagem de convite para a reunião
     await sendInternalMessage(church.id, result.thread.id, user.id, {
-      body: `📹 Reunião "${subject}" criada. Use os botões de ligação/vídeo para entrar na sala.`,
+      body: `📹 ${t("Reunião")} "${subject}" ${t("criada. Use os botões de ligação/vídeo para entrar na sala.")}`,
       senderRole: isAdmin ? "admin" : "secretary",
     });
 
@@ -271,7 +273,7 @@ export default function ChatSecretaria() {
     setMeetingThread(result.thread);
     setMeetingCallOpen(true);
     setRefetchKey((k) => k + 1);
-    toast({ title: `Reunião "${subject}" iniciada` });
+    toast({ title: `${t("Reunião")} "${subject}" ${t("iniciada")}` });
   };
 
   // ── Carregando ─────────────────────────────────────────────────────────────
@@ -294,9 +296,9 @@ export default function ChatSecretaria() {
         <div className="flex flex-col items-center justify-center h-full py-20 gap-4 text-center px-6">
           <MessageSquarePlus size={40} className="text-muted-foreground/40" />
           <div>
-            <p className="text-base font-semibold">Chat não disponível</p>
+            <p className="text-base font-semibold">{t("Chat não disponível")}</p>
             <p className="text-sm text-muted-foreground mt-1 max-w-xs">
-              Sua conta ainda não está vinculada a uma igreja. Use um convite recebido ou solicite vínculo à secretaria.
+              {t("Sua conta ainda não está vinculada a uma igreja. Use um convite recebido ou solicite vínculo à secretaria.")}
             </p>
           </div>
         </div>
@@ -322,8 +324,8 @@ export default function ChatSecretaria() {
           }}
         >
           <Video size={15} className="mr-1.5" />
-          <span className="hidden sm:inline">Nova Reunião</span>
-          <span className="sm:hidden">Reunião</span>
+          <span className="hidden sm:inline">{t("Nova Reunião")}</span>
+          <span className="sm:hidden">{t("Reunião")}</span>
         </Button>
         <Button
           size="sm"
@@ -333,8 +335,8 @@ export default function ChatSecretaria() {
           }}
         >
           <MessageSquarePlus size={16} className="mr-1.5" />
-          <span className="hidden sm:inline">Nova Conversa</span>
-          <span className="sm:hidden">Novo</span>
+          <span className="hidden sm:inline">{t("Nova Conversa")}</span>
+          <span className="sm:hidden">{t("Novo")}</span>
         </Button>
       </div>
     </div>
@@ -344,7 +346,16 @@ export default function ChatSecretaria() {
 
   return (
     <AdminLayout>
-      <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
+      {/*
+        Altura calculada a partir do viewport dinâmico (dvh, mais estável em
+        navegadores mobile que escondem/mostram a barra de endereço),
+        descontando cabeçalho (4rem), o padding vertical do <main> em cada
+        breakpoint (p-4/p-6/p-8) e, no mobile/tablet, a navegação inferior
+        fixa (pb-20 = 5rem). O cálculo antigo só descontava o cabeçalho e
+        ficava maior que o espaço real disponível, empurrando o rodapé do
+        chat para debaixo da navegação inferior fixa.
+      */}
+      <div className="flex flex-col h-[calc(100dvh-11rem)] sm:h-[calc(100dvh-12rem)] lg:h-[calc(100dvh-8rem)] overflow-hidden">
         <InternalChat
           key={refetchKey}
           mode="inbox"
@@ -374,9 +385,9 @@ export default function ChatSecretaria() {
           displayName={
             (user?.user_metadata as Record<string, string> | undefined)?.full_name ||
             user?.email?.split("@")[0] ||
-            "Participante"
+            t("Participante")
           }
-          callTitle={`Reunião: ${meetingThread.subject}`}
+          callTitle={`${t("Reunião:")} ${meetingThread.subject}`}
         />
       )}
 
@@ -386,10 +397,10 @@ export default function ChatSecretaria() {
           <DialogHeader>
             <DialogTitle>
               {dialogMode === "direct"
-                ? "Nova Mensagem Direta"
+                ? t("Nova Mensagem Direta")
                 : dialogMode === "meeting"
-                  ? "Nova Reunião"
-                  : "Nova Conversa"}
+                  ? t("Nova Reunião")
+                  : t("Nova Conversa")}
             </DialogTitle>
           </DialogHeader>
 
@@ -407,7 +418,7 @@ export default function ChatSecretaria() {
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                {m === "topic" ? "Tópico" : m === "direct" ? "Mensagem Direta" : "Reunião"}
+                {m === "topic" ? t("Tópico") : m === "direct" ? t("Mensagem Direta") : t("Reunião")}
               </button>
             ))}
           </div>
@@ -416,9 +427,9 @@ export default function ChatSecretaria() {
           {dialogMode === "topic" && (
             <div className="space-y-4 py-1">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Assunto</label>
+                <label className="text-sm font-medium">{t("Assunto")}</label>
                 <Input
-                  placeholder="Ex: Secretaria Geral"
+                  placeholder={t("Ex: Secretaria Geral")}
                   value={newSubject}
                   onChange={(e) => setNewSubject(e.target.value)}
                 />
@@ -435,16 +446,16 @@ export default function ChatSecretaria() {
                           : "border-border hover:border-primary/50 text-muted-foreground",
                       )}
                     >
-                      {cat}
+                      {t(cat)}
                     </button>
                   ))}
                 </div>
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Primeira mensagem (opcional)</label>
+                <label className="text-sm font-medium">{t("Primeira mensagem (opcional)")}</label>
                 <textarea
                   className="w-full min-h-[70px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                  placeholder="Digite uma mensagem inicial..."
+                  placeholder={t("Digite uma mensagem inicial...")}
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                 />
@@ -453,9 +464,9 @@ export default function ChatSecretaria() {
               <div className="border border-dashed border-border rounded-lg p-3 flex items-center gap-3">
                 <HeadphonesIcon size={18} className="text-muted-foreground flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium">Falar com Suporte Ecclesia</p>
+                  <p className="text-xs font-medium">{t("Falar com Suporte Ecclesia")}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    Abrir conversa direta com a equipe da plataforma
+                    {t("Abrir conversa direta com a equipe da plataforma")}
                   </p>
                 </div>
                 <Button
@@ -466,7 +477,7 @@ export default function ChatSecretaria() {
                   disabled={creating}
                   onClick={handleSupportThread}
                 >
-                  Abrir
+                  {t("Abrir")}
                 </Button>
               </div>
             </div>
@@ -476,13 +487,13 @@ export default function ChatSecretaria() {
           {dialogMode === "direct" && (
             <div className="space-y-3 py-1">
               <p className="text-xs text-muted-foreground">
-                Busque um membro da organização para iniciar uma conversa privada.
+                {t("Busque um membro da organização para iniciar uma conversa privada.")}
               </p>
               <div className="relative">
                 <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   className="pl-8"
-                  placeholder="Nome do membro..."
+                  placeholder={t("Nome do membro...")}
                   value={memberSearch}
                   onChange={(e) => {
                     setMemberSearch(e.target.value);
@@ -512,7 +523,7 @@ export default function ChatSecretaria() {
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{m.full_name}</p>
                         <p className="text-[11px] text-muted-foreground">
-                          {ROLE_LABEL[m.member_role ?? ""] ?? m.member_role ?? "Membro"}
+                          {t(ROLE_LABEL[m.member_role ?? ""] ?? m.member_role ?? "Membro")}
                         </p>
                       </div>
                     </button>
@@ -522,7 +533,7 @@ export default function ChatSecretaria() {
 
               {!memberSearching && memberSearch.trim() && memberResults.length === 0 && (
                 <p className="text-xs text-center text-muted-foreground py-3">
-                  Nenhum membro encontrado com esse nome.
+                  {t("Nenhum membro encontrado com esse nome.")}
                 </p>
               )}
 
@@ -534,7 +545,7 @@ export default function ChatSecretaria() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{selectedMember.full_name}</p>
                     <p className="text-[11px] text-muted-foreground">
-                      {ROLE_LABEL[selectedMember.member_role ?? ""] ?? selectedMember.member_role ?? "Membro"}
+                      {t(ROLE_LABEL[selectedMember.member_role ?? ""] ?? selectedMember.member_role ?? "Membro")}
                     </p>
                   </div>
                   <button
@@ -542,7 +553,7 @@ export default function ChatSecretaria() {
                     className="text-xs text-muted-foreground hover:text-foreground"
                     onClick={() => { setSelectedMember(null); setMemberSearch(""); }}
                   >
-                    Trocar
+                    {t("Trocar")}
                   </button>
                 </div>
               )}
@@ -553,9 +564,9 @@ export default function ChatSecretaria() {
           {dialogMode === "meeting" && (
             <div className="space-y-4 py-1">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Nome da reunião</label>
+                <label className="text-sm font-medium">{t("Nome da reunião")}</label>
                 <Input
-                  placeholder="Ex: Reunião da Diretoria"
+                  placeholder={t("Ex: Reunião da Diretoria")}
                   value={meetingName}
                   onChange={(e) => setMeetingName(e.target.value)}
                 />
@@ -563,8 +574,7 @@ export default function ChatSecretaria() {
               <div className="flex items-start gap-2.5 p-3 bg-muted/40 rounded-md text-xs text-muted-foreground">
                 <Users size={14} className="flex-shrink-0 mt-0.5" />
                 <p>
-                  Uma sala de videoconferência será criada automaticamente. Os participantes entram
-                  pela conversa usando os botões de chamada.
+                  {t("Uma sala de videoconferência será criada automaticamente. Os participantes entram pela conversa usando os botões de chamada.")}
                 </p>
               </div>
             </div>
@@ -572,27 +582,27 @@ export default function ChatSecretaria() {
 
           <DialogFooter>
             <Button variant="outline" onClick={closeDialog} disabled={creating}>
-              Cancelar
+              {t("Cancelar")}
             </Button>
 
             {dialogMode === "topic" && (
               <Button onClick={handleCreateTopic} disabled={creating || !newSubject.trim()}>
                 {creating ? <Loader2 size={15} className="animate-spin mr-1.5" /> : null}
-                Criar Conversa
+                {t("Criar Conversa")}
               </Button>
             )}
 
             {dialogMode === "direct" && (
               <Button onClick={handleDirectMessage} disabled={creating || !selectedMember}>
                 {creating ? <Loader2 size={15} className="animate-spin mr-1.5" /> : null}
-                Abrir Conversa
+                {t("Abrir Conversa")}
               </Button>
             )}
 
             {dialogMode === "meeting" && (
               <Button onClick={handleCreateMeeting} disabled={creating || !meetingName.trim()}>
                 {creating ? <Loader2 size={15} className="animate-spin mr-1.5" /> : null}
-                Criar e Entrar
+                {t("Criar e Entrar")}
               </Button>
             )}
           </DialogFooter>
