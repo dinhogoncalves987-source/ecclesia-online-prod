@@ -114,13 +114,12 @@ export default function AssembleiaGeral() {
   const [uploading, setUploading] = useState(false);
 
   const formModalRef = useRef<HTMLDivElement>(null);
-  const formScrollRef = useRef<HTMLDivElement>(null);
 
   const scrollFormIntoView = useCallback(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
     setTimeout(() => {
       formModalRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      if (formScrollRef.current) formScrollRef.current.scrollTop = 0;
+      if (formModalRef.current) formModalRef.current.scrollTop = 0;
     }, 0);
   }, []);
 
@@ -689,7 +688,8 @@ export default function AssembleiaGeral() {
                 className="w-full sm:max-w-2xl bg-card rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[92vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="sticky top-0 z-10 bg-card/95 backdrop-blur border-b border-border/50 px-5 py-4 flex items-start justify-between gap-3">
+                {/* bg-card sólido (sem backdrop-blur): evita a combinação sticky+blur associada ao rasgo gráfico em Android */}
+                <div className="sticky top-0 z-10 bg-card border-b border-border/50 px-5 py-4 flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h2 className="text-lg font-serif font-bold text-foreground">{detailAssembly.title}</h2>
@@ -824,7 +824,14 @@ export default function AssembleiaGeral() {
               className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-[55]"
               onClick={closeForm}
             />
-            <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-4 overflow-y-auto">
+            {/*
+              Um único contêiner de rolagem por modal: o motion.div abaixo já
+              tem max-h + overflow-y-auto. Havia antes 3 camadas de overflow
+              aninhadas (este wrapper fixed, o motion.div e um <div> interno),
+              o que gerava barras de rolagem duplicadas e piorava o risco de
+              artefatos de composição em Android.
+            */}
+            <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-4">
               <motion.div
                 ref={formModalRef}
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -833,7 +840,6 @@ export default function AssembleiaGeral() {
                 className="w-full max-w-md bg-card rounded-2xl p-6 shadow-xl max-h-[85vh] overflow-y-auto my-auto"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div ref={formScrollRef} className="max-h-[calc(85vh-3rem)] overflow-y-auto">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-serif font-bold">
                     {editingId ? t("Editar Assembleia") : t("Nova Assembleia")}
@@ -912,7 +918,6 @@ export default function AssembleiaGeral() {
                   >
                     {editingId ? t("Salvar alterações") : t("Criar Assembleia")}
                   </button>
-                </div>
                 </div>
               </motion.div>
             </div>

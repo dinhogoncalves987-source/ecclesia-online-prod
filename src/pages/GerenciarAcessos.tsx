@@ -219,6 +219,7 @@ interface PlatformAgent {
 }
 
 function PlatformTeamManager() {
+  const { t } = useLanguage();
   const [agents, setAgents] = useState<PlatformAgent[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectorOpen, setSelectorOpen] = useState(false);
@@ -269,15 +270,15 @@ function PlatformTeamManager() {
     });
     const result = data as { ok?: boolean; error?: string } | null;
     if (error || !result?.ok) {
-      toast({ title: "Não foi possível atualizar a função", description: error?.message ?? result?.error ?? "", variant: "destructive" });
+      toast({ title: t("Não foi possível atualizar a função"), description: error?.message ?? result?.error ?? "", variant: "destructive" });
       return;
     }
-    toast({ title: `Função atualizada para ${PLATFORM_ROLE_LABELS[newRole]}` });
+    toast({ title: `${t("Função atualizada para")} ${PLATFORM_ROLE_LABELS[newRole]}` });
     void loadAgents();
   };
 
   const handleDeactivate = async (userId: string, name: string | null) => {
-    if (!confirm(`Remover ${name || "este agente"} da equipe da plataforma?`)) return;
+    if (!confirm(`${t("Remover")} ${name || t("este agente")} ${t("da equipe da plataforma?")}`)) return;
     setDeactivatingId(userId);
     const { data, error } = await supabase.rpc("admin_set_platform_role", {
       _target_user_id: userId,
@@ -285,12 +286,12 @@ function PlatformTeamManager() {
     });
     const result = data as { ok?: boolean; error?: string } | null;
     if (error || !result?.ok) {
-      toast({ title: "Não foi possível remover o agente", description: error?.message ?? result?.error ?? "", variant: "destructive" });
+      toast({ title: t("Não foi possível remover o agente"), description: error?.message ?? result?.error ?? "", variant: "destructive" });
       setDeactivatingId(null);
       return;
     }
     await supabase.from("platform_support_agent_departments" as any).delete().eq("agent_user_id", userId);
-    toast({ title: `${name || "Agente"} removido da equipe` });
+    toast({ title: `${name || t("Agente")} ${t("removido da equipe")}` });
     setDeactivatingId(null);
     void loadAgents();
   };
@@ -720,15 +721,15 @@ export default function GerenciarAcessos() {
   const handleConfirmAuthorize = async () => {
     if (!selectedMember || !selectedMember.user_id || !effectiveOrgId) return;
     if (!appAccessRole) {
-      toast({ title: "Acesso não selecionado", description: "Selecione o acesso no aplicativo.", variant: "destructive" });
+      toast({ title: t("Acesso não selecionado"), description: t("Selecione o acesso no aplicativo."), variant: "destructive" });
       return;
     }
     if (!churchRole) {
-      toast({ title: "Cargo não selecionado", description: "Selecione a função/cargo na igreja.", variant: "destructive" });
+      toast({ title: t("Cargo não selecionado"), description: t("Selecione a função/cargo na igreja."), variant: "destructive" });
       return;
     }
     if (churchRole === "Personalizado" && !customChurchRole.trim()) {
-      toast({ title: "Função personalizada vazia", description: "Digite a função/cargo personalizada.", variant: "destructive" });
+      toast({ title: t("Função personalizada vazia"), description: t("Digite a função/cargo personalizada."), variant: "destructive" });
       return;
     }
 
@@ -746,7 +747,7 @@ export default function GerenciarAcessos() {
       }, { onConflict: "user_id,organization_id" });
 
     if (orgErr) {
-      toast({ title: "Erro ao autorizar", description: orgErr.message, variant: "destructive" });
+      toast({ title: t("Erro ao autorizar"), description: orgErr.message, variant: "destructive" });
       setAuthorizingId(null);
       return;
     }
@@ -758,11 +759,11 @@ export default function GerenciarAcessos() {
       .eq("id", selectedMember.id);
 
     if (memErr) {
-      toast({ title: "Acesso criado, mas erro ao salvar cargo", description: memErr.message, variant: "destructive" });
+      toast({ title: t("Acesso criado, mas erro ao salvar cargo"), description: memErr.message, variant: "destructive" });
     }
 
     const roleLabel = ROLE_LABELS[appAccessRole] || appAccessRole;
-    toast({ title: `${roleLabel} autorizado com sucesso.` });
+    toast({ title: `${roleLabel} ${t("autorizado com sucesso.")}` });
     await loadUsers();
     setAuthorizeModal(false);
     setMemberSearch("");
@@ -784,7 +785,7 @@ export default function GerenciarAcessos() {
     if (error) {
       toast({ title: t("Erro ao atualizar"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: `Função atualizada para ${ROLE_LABELS[newRole]}` });
+      toast({ title: `${t("Função atualizada para")} ${ROLE_LABELS[newRole]}` });
       setUsers((prev) => prev.map((u) => u.user_id === userId ? { ...u, role: newRole } : u));
       if (detailUser?.user_id === userId) setDetailUser((d) => d ? { ...d, role: newRole } : d);
     }
@@ -812,31 +813,31 @@ export default function GerenciarAcessos() {
   };
 
   const handleRevokeInvite = async (inviteId: string) => {
-    if (!confirm("Revogar este convite? O link deixará de funcionar.")) return;
+    if (!confirm(t("Revogar este convite? O link deixará de funcionar."))) return;
     setRevokingId(inviteId);
     const ok = await revokeAccessInvite(inviteId);
     if (ok) {
-      toast({ title: "Convite revogado." });
+      toast({ title: t("Convite revogado.") });
       setInvites((prev) => prev.map((i) => i.id === inviteId ? { ...i, status: "revoked" } : i));
     } else {
-      toast({ title: "Erro ao revogar convite.", variant: "destructive" });
+      toast({ title: t("Erro ao revogar convite."), variant: "destructive" });
     }
     setRevokingId(null);
   };
 
   const handleCopyInviteLink = (token: string) => {
     navigator.clipboard.writeText(buildAccessInviteUrl(token)).catch(() => {});
-    toast({ title: "Link copiado!" });
+    toast({ title: t("Link copiado!") });
   };
 
   const handleWhatsAppInvite = (inv: AccessInviteRecord) => {
     if (!effectiveOrgName) return;
-    if (!inv.phone) { handleCopyInviteLink(inv.token); toast({ title: "Sem WhatsApp. Link copiado!" }); return; }
+    if (!inv.phone) { handleCopyInviteLink(inv.token); toast({ title: t("Sem WhatsApp. Link copiado!") }); return; }
     window.open(buildAccessWhatsAppLink({ phone: inv.phone, name: inv.full_name, roleLabel: ROLE_LABELS[normalizeRole(inv.role)], orgName: effectiveOrgName, token: inv.token }), "_blank", "noopener,noreferrer");
   };
 
   const handleCreateInvite = async () => {
-    if (!newAccessForm.name.trim()) { toast({ title: "Nome é obrigatório.", variant: "destructive" }); return; }
+    if (!newAccessForm.name.trim()) { toast({ title: t("Nome é obrigatório."), variant: "destructive" }); return; }
 
     const inviteOrgId =
       hierarchyContextOrgIdRef.current
@@ -847,8 +848,8 @@ export default function GerenciarAcessos() {
 
     if (!inviteOrgId) {
       toast({
-        title: "Organização não definida",
-        description: "Não foi possível identificar em qual unidade o acesso será criado.",
+        title: t("Organização não definida"),
+        description: t("Não foi possível identificar em qual unidade o acesso será criado."),
         variant: "destructive",
       });
       return;
@@ -857,8 +858,8 @@ export default function GerenciarAcessos() {
 
     if (!newAccessForm.email.trim()) {
       toast({
-        title: "E-mail obrigatório",
-        description: "Convites de acesso administrativo exigem um e-mail para vincular a conta correta.",
+        title: t("E-mail obrigatório"),
+        description: t("Convites de acesso administrativo exigem um e-mail para vincular a conta correta."),
         variant: "destructive",
       });
       return;
@@ -875,7 +876,7 @@ export default function GerenciarAcessos() {
           role: newAccessForm.role, is_active: true,
         }, { onConflict: "user_id,organization_id" });
         if (!error) {
-          toast({ title: "Usuário vinculado!", description: `${existingProfile.full_name || newAccessForm.email} adicionado como ${ROLE_LABELS[newAccessForm.role]}.` });
+          toast({ title: t("Usuário vinculado!"), description: `${existingProfile.full_name || newAccessForm.email} ${t("adicionado como")} ${ROLE_LABELS[newAccessForm.role]}.` });
           await loadUsers();
           setNewAccessForm({ name: "", email: "", phone: "", role: "member" });
           setNewAccessModal(false);
@@ -896,13 +897,13 @@ export default function GerenciarAcessos() {
     if (invErr || !inv) {
       const isTableMissing = invErr?.includes("relation") || invErr?.includes("does not exist") || invErr?.includes("42P01");
       toast({
-        title: isTableMissing ? "Migração pendente" : "Erro ao criar convite",
-        description: isTableMissing ? "Aplique 20260618120000_access_invites.sql no Supabase." : invErr ?? "",
+        title: isTableMissing ? t("Migração pendente") : t("Erro ao criar convite"),
+        description: isTableMissing ? t("Aplique 20260618120000_access_invites.sql no Supabase.") : invErr ?? "",
         variant: "destructive",
       });
     } else {
       navigator.clipboard.writeText(buildAccessInviteUrl(inv.token)).catch(() => {});
-      toast({ title: "Convite criado!", description: "Link copiado para a área de transferência." });
+      toast({ title: t("Convite criado!"), description: t("Link copiado para a área de transferência.") });
       await loadInvites();
     }
 
@@ -1026,7 +1027,7 @@ export default function GerenciarAcessos() {
                   type="button"
                   onClick={() => {
                     if (future) {
-                      toast({ title: "Em breve", description: "A função Porteiro será habilitada futuramente com leitor de QR Code." });
+                      toast({ title: t("Em breve"), description: t("A função Porteiro será habilitada futuramente com leitor de QR Code.") });
                       return;
                     }
                     setSelectedRole(isSelected ? null : (role as OrgMembershipRole));

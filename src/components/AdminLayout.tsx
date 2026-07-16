@@ -148,13 +148,6 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const { church } = useChurch();
   const { isPlatformUser, isSupportModeActive } = useSupportContext();
 
-  // TEMP render probe (Android/Redmi): remove after the controlled A/B test.
-  const renderProbe = new URLSearchParams(location.search).get("renderProbe");
-  const isRenderProbeRoute = location.pathname === "/admin/congregacoes"
-    || location.pathname === "/admin/gerenciar-acessos";
-  const isLayoutRenderProbe = isRenderProbeRoute
-    && (renderProbe === "layout" || renderProbe === "all");
-
   // Routes that are platform-level and do NOT require a support org selected
   const UNGUARDED_PLATFORM_PATHS = [
     "/admin",               // Dashboard (shows platform metrics)
@@ -378,7 +371,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const initials = displayName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <div className={`min-h-screen bg-background flex ${isLayoutRenderProbe ? "flex-col lg:flex-row" : ""}`}>
+    <div className="min-h-screen bg-background flex">
       {/* Desktop Sidebar */}
       <aside
         className={`hidden lg:flex flex-col bg-card shadow-executive transition-all duration-300 ${
@@ -458,9 +451,18 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className={`h-16 bg-card/95 lg:bg-card/80 lg:backdrop-blur-md shadow-[var(--shadow-sm)] flex items-center justify-between px-4 lg:px-8 z-30 ${
-          isLayoutRenderProbe ? "lg:sticky lg:top-0" : "sticky top-0"
-        }`}>
+        {/*
+          Header não é "sticky" no mobile de propósito: no diagnóstico do
+          rasgo gráfico em Android/Redmi, a combinação de `position: sticky`
+          com o `overflow-y-auto`/`overflow-x-hidden` do <main> abaixo era o
+          padrão mais associado ao artefato de composição. Como o header já
+          fica fora da área de rolagem interna do <main> no mobile (o <main>
+          não cria mais seu próprio scroller ali — ver comentário abaixo),
+          "sticky" não tinha efeito posicional nenhum no mobile, só criava um
+          contexto de composição extra sem necessidade. Em desktop (`lg:`), o
+          <main> volta a rolar internamente e o header permanece sticky.
+        */}
+        <header className="h-16 bg-card/95 lg:bg-card/80 lg:backdrop-blur-md shadow-[var(--shadow-sm)] flex items-center justify-between px-4 lg:px-8 z-30 lg:sticky lg:top-0">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(true)}
@@ -558,12 +560,16 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Page content */}
-        <main className={`flex-1 ${
-          isLayoutRenderProbe
-            ? "overflow-visible pb-0 lg:overflow-y-auto lg:overflow-x-hidden"
-            : "overflow-y-auto overflow-x-hidden pb-20 lg:pb-0"
-        }`}>
+        {/*
+          No mobile, o <main> NÃO cria seu próprio contêiner de rolagem
+          (overflow-visible): a página inteira rola pelo documento/body, o
+          que evita a combinação sticky+overflow-y-auto+overflow-x-hidden
+          identificada como causa provável do rasgo gráfico em Android/Redmi.
+          `pb-20` reserva espaço para a navegação inferior fixa. Em desktop
+          (`lg:`), o <main> volta a rolar internamente (mais previsível numa
+          janela grande, sem o mesmo risco em hardware desktop).
+        */}
+        <main className="flex-1 overflow-visible pb-20 lg:pb-0 lg:overflow-y-auto lg:overflow-x-hidden">
           {/* Support mode banner — visible for all platform users */}
           <SupportModeBanner />
           <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
@@ -654,9 +660,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       </AnimatePresence>
 
       {/* Mobile bottom nav */}
-      <nav className={`lg:hidden h-16 bg-card shadow-[0_-1px_0_0_hsl(var(--border)/0.5)] flex justify-around items-center z-30 ${
-        isLayoutRenderProbe ? "" : "fixed bottom-0 left-0 right-0"
-      }`}>
+      <nav className="lg:hidden h-16 bg-card shadow-[0_-1px_0_0_hsl(var(--border)/0.5)] flex justify-around items-center z-30 fixed bottom-0 left-0 right-0">
         {mobileNavItems.filter(item => canAccess(item.path) && isRouteEnabled(item.path)).map((item) => (
           <Link
             key={item.path}

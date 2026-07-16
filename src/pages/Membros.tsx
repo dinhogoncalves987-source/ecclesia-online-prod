@@ -420,7 +420,7 @@ export default function Membros() {
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { toast.error("Foto muito grande (máx. 5MB)"); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error(t("Foto muito grande (máx. 5MB)")); return; }
     setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
   };
@@ -437,13 +437,13 @@ export default function Membros() {
         .from("avatars")
         .upload(path, photoFile, { upsert: true, contentType: photoFile.type });
       if (error) {
-        toast.warning(`Foto não salva: ${error.message}`);
+        toast.warning(`${t("Foto não salva:")} ${error.message}`);
         return null;
       }
       const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
       return urlData?.publicUrl ?? null;
     } catch (e) {
-      toast.warning("Erro inesperado no upload da foto.");
+      toast.warning(t("Erro inesperado no upload da foto."));
       return null;
     } finally {
       setUploadingPhoto(false);
@@ -458,12 +458,12 @@ export default function Membros() {
 
     const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
     if (!allowedTypes.includes(file.type)) {
-      toast.error("Documento invalido. Use PDF, JPG, PNG ou WEBP.");
+      toast.error(t("Documento invalido. Use PDF, JPG, PNG ou WEBP."));
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      toast.error("Documento muito grande (max. 10MB).");
+      toast.error(t("Documento muito grande (max. 10MB)."));
       return;
     }
 
@@ -484,13 +484,13 @@ export default function Membros() {
         .upload(path, civilDocumentFile, { upsert: true, contentType: civilDocumentFile.type });
 
       if (error) {
-        toast.error("Erro ao enviar documento civil", { description: error.message });
+        toast.error(t("Erro ao enviar documento civil"), { description: error.message });
         return null;
       }
 
       return path;
     } catch {
-      toast.error("Erro inesperado no upload do documento civil.");
+      toast.error(t("Erro inesperado no upload do documento civil."));
       return null;
     } finally {
       setUploadingCivilDocument(false);
@@ -517,7 +517,7 @@ export default function Membros() {
       .createSignedUrl(form.civil_document_url, 60 * 10);
 
     if (error || !data?.signedUrl) {
-      toast.error("Nao foi possivel abrir o documento.", { description: error?.message });
+      toast.error(t("Nao foi possivel abrir o documento."), { description: error?.message });
       return;
     }
 
@@ -705,18 +705,18 @@ export default function Membros() {
 
     if (fromTabId === "pessoal") {
       if (!form.full_name.trim()) {
-        toast.error("Informe o nome completo antes de continuar.");
+        toast.error(t("Informe o nome completo antes de continuar."));
         return false;
       }
       if (!form.cpf?.trim()) {
-        toast.error("Informe o CPF antes de continuar.");
+        toast.error(t("Informe o CPF antes de continuar."));
         return false;
       }
     }
 
     if (fromTabId === "contato") {
       if (!form.phone?.trim()) {
-        toast.error("Informe o telefone antes de continuar.");
+        toast.error(t("Informe o telefone antes de continuar."));
         return false;
       }
     }
@@ -728,22 +728,22 @@ export default function Membros() {
 
   const handleSave = async (openWallet = false) => {
     if (!form.full_name.trim()) {
-      toast.error("Informe o nome completo antes de salvar.");
+      toast.error(t("Informe o nome completo antes de salvar."));
       setActiveTab("pessoal");
       return;
     }
     if (!form.cpf?.trim()) {
-      toast.error("Informe o CPF antes de salvar.");
+      toast.error(t("Informe o CPF antes de salvar."));
       setActiveTab("pessoal");
       return;
     }
     if (!form.phone?.trim()) {
-      toast.error("Informe o telefone antes de salvar.");
+      toast.error(t("Informe o telefone antes de salvar."));
       setActiveTab("contato");
       return;
     }
     if (!form.member_role) {
-      toast.error("Função eclesiástica é obrigatória.");
+      toast.error(t("Função eclesiástica é obrigatória."));
       setActiveTab("funcao");
       return;
     }
@@ -762,7 +762,7 @@ export default function Membros() {
         if (error && isMissingColumnError(error)) {
           console.warn("[Membros] extended fields need migration:", error.message);
           toast.warning(
-            "Dados básicos salvos. Para salvar foto, endereço, CPF e outros campos, aplique as migrations no Supabase Dashboard → SQL Editor:\n• 20260617120000_members_extended_fields.sql\n• 20260617130000_members_status_constraint_fix.sql",
+            t("Dados básicos salvos. Para salvar foto, endereço, CPF e outros campos, aplique as migrations no Supabase Dashboard → SQL Editor:\n• 20260617120000_members_extended_fields.sql\n• 20260617130000_members_status_constraint_fix.sql"),
             { duration: 8000 }
           );
           return false;
@@ -784,7 +784,7 @@ export default function Membros() {
 
         if (insErr || !inserted) {
           console.error("[Membros] insert error:", insErr);
-          toast.error("Erro ao criar membro", { description: insErr?.message ?? "Falha ao inserir" });
+          toast.error(t("Erro ao criar membro"), { description: insErr?.message ?? t("Falha ao inserir") });
           return;
         }
 
@@ -794,7 +794,7 @@ export default function Membros() {
         const photoUrl  = await uploadPhotoIfNeeded(newId);
         const civilDocumentUrl = await uploadCivilDocumentIfNeeded(newId);
         const allSaved  = await tryExtended(newId, photoUrl, civilDocumentUrl);
-        if (allSaved) toast.success("Membro cadastrado com sucesso!");
+        if (allSaved) toast.success(t("Membro cadastrado com sucesso!"));
 
         await reloadMembers();
         if (openWallet) {
@@ -816,7 +816,7 @@ export default function Membros() {
       } else {
         // ── EDIT existing member ─────────────────────────────────────────────
         if (!editingId) {
-          toast.error("ID do membro não encontrado. Feche e tente novamente.");
+          toast.error(t("ID do membro não encontrado. Feche e tente novamente."));
           return;
         }
 
@@ -834,11 +834,11 @@ export default function Membros() {
 
         if (coreErr) {
           if (isNoRowsError(coreErr)) {
-            toast.error("Permissão negada.", {
-              description: "Nenhuma linha atualizada. Verifique se você tem acesso para editar este membro (RLS).",
+            toast.error(t("Permissão negada."), {
+              description: t("Nenhuma linha atualizada. Verifique se você tem acesso para editar este membro (RLS)."),
             });
           } else {
-            toast.error("Erro ao salvar", { description: coreErr.message });
+            toast.error(t("Erro ao salvar"), { description: coreErr.message });
           }
           return;
         }
@@ -847,7 +847,7 @@ export default function Membros() {
         const photoUrl = await uploadPhotoIfNeeded(editingId);
         const civilDocumentUrl = await uploadCivilDocumentIfNeeded(editingId);
         const allSaved = await tryExtended(editingId, photoUrl, civilDocumentUrl);
-        if (allSaved) toast.success("Membro atualizado com sucesso!");
+        if (allSaved) toast.success(t("Membro atualizado com sucesso!"));
 
         await reloadMembers();
         closeModal();
@@ -861,11 +861,11 @@ export default function Membros() {
 
   const removeMember = async (m: Member) => {
     if (!church) return;
-    if (!confirm(`Remover ${m.full_name}? Esta ação não pode ser desfeita.`)) return;
+    if (!confirm(`${t("Remover")} ${m.full_name}? ${t("Esta ação não pode ser desfeita.")}`)) return;
     const { error } = await supabase.from("members").delete()
       .eq("id", m.id).eq("organization_id", church.id);
-    if (error) { toast.error("Erro ao remover", { description: error.message }); return; }
-    toast.success("Membro removido");
+    if (error) { toast.error(t("Erro ao remover"), { description: error.message }); return; }
+    toast.success(t("Membro removido"));
     await reloadMembers();
   };
 
@@ -873,8 +873,8 @@ export default function Membros() {
     if (!church) return;
     const { error } = await supabase.from("members").update({ status: newStatus })
       .eq("id", id).eq("organization_id", church.id);
-    if (error) { toast.error("Erro ao atualizar", { description: error.message }); return; }
-    toast.success("Status atualizado");
+    if (error) { toast.error(t("Erro ao atualizar"), { description: error.message }); return; }
+    toast.success(t("Status atualizado"));
     await reloadMembers();
   };
 
@@ -1062,7 +1062,9 @@ export default function Membros() {
           <>
             {/* Desktop table */}
             <div className="hidden sm:block bg-card rounded-xl shadow-executive overflow-hidden">
-              <table className="w-full text-sm">
+              {/* overflow-x-auto isolado do overflow-hidden externo: mantém os cantos arredondados e ainda permite rolagem horizontal se a tabela não couber (evita conteúdo cortado silenciosamente) */}
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[640px]">
                 <thead>
                   <tr className="border-b border-border/50 text-left text-xs text-muted-foreground">
                     <th className="px-4 py-3 font-medium">{t("Membro")}</th>
@@ -1173,6 +1175,7 @@ export default function Membros() {
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
 
             {/* Mobile cards */}

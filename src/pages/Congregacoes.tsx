@@ -573,9 +573,9 @@ export default function Congregacoes() {
       await loadFraternas();
       setShowFraterna(false);
       setFraterna({ name: "", description: "", affiliation_type: "fraterna" });
-      toast({ title: "Fraterna criada." });
+      toast({ title: t("Fraterna criada.") });
     } catch {
-      toast({ title: "Erro ao criar fraterna", variant: "destructive" });
+      toast({ title: t("Erro ao criar fraterna"), variant: "destructive" });
     }
     setSavingFraterna(false);
   };
@@ -784,20 +784,20 @@ export default function Congregacoes() {
     } else {
       const orgType = insertOrganizationType(insertChildType ?? undefined);
       if (!orgType) {
-        toast({ title: "Tipo de unidade inválido", description: "Selecione se deseja criar uma subsede ou congregação.", variant: "destructive" });
+        toast({ title: t("Tipo de unidade inválido"), description: t("Selecione se deseja criar uma subsede ou congregação."), variant: "destructive" });
         return;
       }
       const { error } = await supabase.from("organizations").insert({
         ...payload, slug: generateSlug(form.name) + "-" + Date.now().toString(36),
         parent_id: church!.id, organization_type: orgType, active: true,
       });
-      if (error) toast({ title: `Erro ao criar ${childSingular.toLowerCase()}`, description: error.message, variant: "destructive" });
+      if (error) toast({ title: `${t("Erro ao criar")} ${childSingular.toLowerCase()}`, description: error.message, variant: "destructive" });
       else {
       const unitLabel = orgType === "state_convention" ? nationalSingular
         : orgType === "setor" ? intermediateSingular
-        : orgType === "subsede" ? "Subsede"
+        : orgType === "subsede" ? t("Subsede")
         : orgType === "matriz" ? municipalSingular : localSingular;
-        toast({ title: `${unitLabel} criado(a).` });
+        toast({ title: `${unitLabel} ${t("criado(a).")}` });
       }
     }
     setForm(EMPTY_ORG_FORM); setShowForm(false); setEditingId(null); setInsertChildType(null);
@@ -842,9 +842,9 @@ export default function Congregacoes() {
       email: congForm.email || null, website_url: congForm.website_url || null,
       unit_status: congForm.unit_status, active: true,
     });
-    if (error) toast({ title: `Erro ao criar ${localSingular.toLowerCase()}`, description: error.message, variant: "destructive" });
+    if (error) toast({ title: `${t("Erro ao criar")} ${localSingular.toLowerCase()}`, description: error.message, variant: "destructive" });
     else {
-      toast({ title: `${localSingular} criada.`, description: `${parentConnText}: ${congModal.sectorName}.` });
+      toast({ title: `${localSingular} ${t("criada.")}`, description: `${parentConnText}: ${congModal.sectorName}.` });
       await loadCongregationsForSector(congModal.sectorId, true);
       setCongModal(null); setCongForm(EMPTY_ORG_FORM);
     }
@@ -896,9 +896,9 @@ export default function Congregacoes() {
     }).eq("id", church.id);
 
     if (error) {
-      toast({ title: "Erro ao salvar configuração", description: error.message, variant: "destructive" });
+      toast({ title: t("Erro ao salvar configuração"), description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Configuração salva!", description: "Menu, títulos e formulários foram atualizados." });
+      toast({ title: t("Configuração salva!"), description: t("Menu, títulos e formulários foram atualizados.") });
       setShowNomenclatureForm(false);
       await refetchChurch();
       void loadChildOrganizations();

@@ -219,29 +219,31 @@ export function FinanceReports({ transactions }: { transactions: TreasuryTransac
                 </div>
               ))}
             </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border/50 text-xs text-muted-foreground">
-                  <th className="text-left py-2 font-medium">{t("Data")}</th>
-                  <th className="text-left py-2 font-medium">{t("Descrição")}</th>
-                  <th className="text-left py-2 font-medium">{t("Categoria")}</th>
-                  <th className="text-right py-2 font-medium">{t("Valor")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {monthTxs.map(tx => (
-                  <tr key={tx.id} className="border-b border-border/20">
-                    <td className="py-1.5 text-xs">{tx.date}</td>
-                    <td className="py-1.5 text-xs">{tx.description}</td>
-                    <td className="py-1.5 text-xs">{tx.category}</td>
-                    <td className={`py-1.5 text-right text-xs tabular-nums ${isExpense(tx.type) ? "text-destructive" : "text-success"}`}>
-                      {isExpense(tx.type) ? "-" : "+"}{formatCurrency(Number(tx.amount))}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[480px]">
+                <thead>
+                  <tr className="border-b border-border/50 text-xs text-muted-foreground">
+                    <th className="text-left py-2 font-medium">{t("Data")}</th>
+                    <th className="text-left py-2 font-medium">{t("Descrição")}</th>
+                    <th className="text-left py-2 font-medium">{t("Categoria")}</th>
+                    <th className="text-right py-2 font-medium">{t("Valor")}</th>
                   </tr>
-                ))}
-                {monthTxs.length === 0 && <tr><td colSpan={4} className="text-center py-8 text-sm text-muted-foreground">{t("Nenhuma movimentação encontrada.")}</td></tr>}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {monthTxs.map(tx => (
+                    <tr key={tx.id} className="border-b border-border/20">
+                      <td className="py-1.5 text-xs">{tx.date}</td>
+                      <td className="py-1.5 text-xs">{tx.description}</td>
+                      <td className="py-1.5 text-xs">{tx.category}</td>
+                      <td className={`py-1.5 text-right text-xs tabular-nums ${isExpense(tx.type) ? "text-destructive" : "text-success"}`}>
+                        {isExpense(tx.type) ? "-" : "+"}{formatCurrency(Number(tx.amount))}
+                      </td>
+                    </tr>
+                  ))}
+                  {monthTxs.length === 0 && <tr><td colSpan={4} className="text-center py-8 text-sm text-muted-foreground">{t("Nenhuma movimentação encontrada.")}</td></tr>}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

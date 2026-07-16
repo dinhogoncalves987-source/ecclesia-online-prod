@@ -30,6 +30,7 @@ import {
   buildAccessInviteUrl,
 } from "@/lib/accessInvites";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useLanguage } from "@/hooks/useLanguage";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -57,6 +58,7 @@ function isEmailMismatch(inviteEmail: string | null | undefined, currentEmail: s
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ConviteAcesso() {
+  const { t } = useLanguage();
   const { token = "" } = useParams<{ token: string }>();
   const navigate         = useNavigate();
 
@@ -91,14 +93,14 @@ export default function ConviteAcesso() {
           revoked:          "Este convite foi revogado.",
           expired:          "Este convite expirou. Solicite um novo ao administrador.",
         };
-        setErrMsg(friendly[error ?? ""] ?? error ?? "Convite inválido.");
+        setErrMsg(t(friendly[error ?? ""] ?? error ?? "Convite inválido."));
         setStep("error");
         return;
       }
       setInvite(data);
 
       if (!data.email || !data.email.trim()) {
-        setErrMsg("Este convite não possui e-mail cadastrado. Solicite um novo link ao administrador.");
+        setErrMsg(t("Este convite não possui e-mail cadastrado. Solicite um novo link ao administrador."));
         setStep("error");
         return;
       }
@@ -137,7 +139,7 @@ export default function ConviteAcesso() {
         existing_org_access:  "Esta conta já possui acesso nesta igreja. Contate o administrador para alterar o papel.",
         invalid_invite_role:  "A função deste convite é inválida. Solicite um novo link ao administrador.",
       };
-      setErrMsg(friendly[error] ?? `Erro: ${error}`);
+      setErrMsg(friendly[error] ? t(friendly[error]) : `${t("Erro:")} ${error}`);
       setStep("error");
       return;
     }
@@ -166,7 +168,7 @@ export default function ConviteAcesso() {
       } else {
         const fixedInviteEmail = invite?.email?.trim() ?? "";
         if (!fixedInviteEmail || isEmailMismatch(fixedInviteEmail, email)) {
-          setAuthError("Use exatamente o e-mail vinculado a este convite.");
+          setAuthError(t("Use exatamente o e-mail vinculado a este convite."));
           return;
         }
 
@@ -203,7 +205,7 @@ export default function ConviteAcesso() {
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
-  const roleLabel = invite ? (ROLE_LABELS[invite.role] ?? invite.role) : "";
+  const roleLabel = invite ? t(ROLE_LABELS[invite.role] ?? invite.role) : "";
   const inviteUrl = token ? buildAccessInviteUrl(token) : "";
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -220,8 +222,8 @@ export default function ConviteAcesso() {
           <div className="w-14 h-14 rounded-full bg-accent/20 flex items-center justify-center mx-auto mb-3">
             <Shield size={28} className="text-accent" />
           </div>
-          <p className="text-xs font-bold tracking-widest text-slate-400 uppercase">Ecclesia Online</p>
-          <p className="text-lg font-semibold text-white mt-1">Convite de Acesso</p>
+          <p className="text-xs font-bold tracking-widest text-slate-400 uppercase">{t("Ecclesia Online")}</p>
+          <p className="text-lg font-semibold text-white mt-1">{t("Convite de Acesso")}</p>
         </div>
 
         <div className="p-6">
@@ -230,7 +232,7 @@ export default function ConviteAcesso() {
           {step === "loading" && (
             <div className="flex flex-col items-center gap-3 py-8">
               <Loader2 size={32} className="animate-spin text-accent" />
-              <p className="text-sm text-muted-foreground">Verificando convite...</p>
+              <p className="text-sm text-muted-foreground">{t("Verificando convite...")}</p>
             </div>
           )}
 
@@ -238,7 +240,7 @@ export default function ConviteAcesso() {
           {step === "error" && (
             <div className="flex flex-col items-center gap-3 py-8 text-center">
               <XCircle size={40} className="text-destructive" />
-              <p className="font-semibold text-destructive">Convite inválido</p>
+              <p className="font-semibold text-destructive">{t("Convite inválido")}</p>
               <p className="text-sm text-muted-foreground">{errMsg}</p>
             </div>
           )}
@@ -250,24 +252,24 @@ export default function ConviteAcesso() {
                 <div className="w-14 h-14 rounded-full bg-amber-500/20 flex items-center justify-center">
                   <AlertTriangle size={28} className="text-amber-500" />
                 </div>
-                <p className="font-semibold">Conta diferente detectada</p>
+                <p className="font-semibold">{t("Conta diferente detectada")}</p>
               </div>
 
               <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4 space-y-2 text-sm">
                 <p className="text-muted-foreground">
-                  Este convite foi enviado para:
+                  {t("Este convite foi enviado para:")}
                 </p>
                 <p className="font-semibold text-amber-700 dark:text-amber-400 break-all">
-                  {invite.email || "— (sem e-mail cadastrado)"}
+                  {invite.email || t("— (sem e-mail cadastrado)")}
                 </p>
                 <p className="text-muted-foreground mt-2">
-                  Você está logado como:
+                  {t("Você está logado como:")}
                 </p>
                 <p className="font-semibold break-all">{currentUserEmail ?? "—"}</p>
               </div>
 
               <p className="text-sm text-muted-foreground text-center">
-                Para aceitar este convite, saia desta conta e entre com o e-mail correto.
+                {t("Para aceitar este convite, saia desta conta e entre com o e-mail correto.")}
               </p>
 
               <div className="flex flex-col gap-2">
@@ -277,19 +279,19 @@ export default function ConviteAcesso() {
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/90 transition-colors"
                 >
                   <LogOut size={15} />
-                  Sair e continuar
+                  {t("Sair e continuar")}
                 </button>
                 <button
                   type="button"
                   onClick={() => navigate(-1)}
                   className="w-full px-4 py-2.5 bg-secondary rounded-xl text-sm hover:bg-secondary/80 transition-colors"
                 >
-                  Cancelar
+                  {t("Cancelar")}
                 </button>
               </div>
 
               <p className="text-[11px] text-muted-foreground text-center">
-                Ao sair, você não perderá dados. Apenas a sessão será encerrada.
+                {t("Ao sair, você não perderá dados. Apenas a sessão será encerrada.")}
               </p>
             </div>
           )}
@@ -310,7 +312,7 @@ export default function ConviteAcesso() {
                 <div className="border-t border-border/40 pt-3 space-y-1.5">
                   <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                     <Shield size={11} className="text-accent" />
-                    Função: <span className="font-medium text-foreground">{roleLabel}</span>
+                    {t("Função:")} <span className="font-medium text-foreground">{roleLabel}</span>
                   </p>
                   <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                     <MapPin size={11} />
@@ -322,7 +324,7 @@ export default function ConviteAcesso() {
                   {currentUserEmail && (
                     <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                       <CheckCircle2 size={11} />
-                      Conta verificada: {currentUserEmail}
+                      {t("Conta verificada:")} {currentUserEmail}
                     </p>
                   )}
                 </div>
@@ -334,11 +336,11 @@ export default function ConviteAcesso() {
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/90 transition-colors"
               >
                 <CheckCircle2 size={16} />
-                Ativar meu acesso
+                {t("Ativar meu acesso")}
               </button>
 
               <p className="text-[11px] text-muted-foreground text-center">
-                Ao ativar, sua conta será vinculada como {roleLabel} em {invite.church_name}.
+                {t("Ao ativar, sua conta será vinculada como")} {roleLabel} {t("em")} {invite.church_name}.
               </p>
             </div>
           )}
@@ -347,7 +349,7 @@ export default function ConviteAcesso() {
           {step === "accepting" && (
             <div className="flex flex-col items-center gap-3 py-8">
               <Loader2 size={32} className="animate-spin text-accent" />
-              <p className="text-sm text-muted-foreground">Ativando acesso...</p>
+              <p className="text-sm text-muted-foreground">{t("Ativando acesso...")}</p>
             </div>
           )}
 
@@ -355,8 +357,8 @@ export default function ConviteAcesso() {
           {step === "done" && (
             <div className="flex flex-col items-center gap-3 py-8 text-center">
               <CheckCircle2 size={40} className="text-emerald-500" />
-              <p className="font-semibold">Acesso ativado!</p>
-              <p className="text-sm text-muted-foreground">Redirecionando para o painel...</p>
+              <p className="font-semibold">{t("Acesso ativado!")}</p>
+              <p className="text-sm text-muted-foreground">{t("Redirecionando para o painel...")}</p>
             </div>
           )}
 
@@ -364,10 +366,10 @@ export default function ConviteAcesso() {
           {step === "check_email" && invite && (
             <div className="flex flex-col items-center gap-3 py-8 text-center">
               <CheckCircle2 size={40} className="text-emerald-500" />
-              <p className="font-semibold">Verifique seu e-mail</p>
+              <p className="font-semibold">{t("Verifique seu e-mail")}</p>
               <p className="text-sm text-muted-foreground">
-                Enviamos um link seguro para <strong>{invite.email}</strong>.
-                Abra o link para provar que o e-mail é seu e voltar a este convite.
+                {t("Enviamos um link seguro para")} <strong>{invite.email}</strong>.
+                {" "}{t("Abra o link para provar que o e-mail é seu e voltar a este convite.")}
               </p>
             </div>
           )}
@@ -388,15 +390,15 @@ export default function ConviteAcesso() {
               {invite.email && (
                 <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 px-3 py-2">
                   <p className="text-xs text-blue-700 dark:text-blue-400">
-                    Entre com o e-mail <strong>{invite.email}</strong> para aceitar este convite.
+                    {t("Entre com o e-mail")} <strong>{invite.email}</strong> {t("para aceitar este convite.")}
                   </p>
                 </div>
               )}
 
               <p className="text-sm text-muted-foreground">
                 {authMode === "login"
-                  ? "Entre com sua conta para ativar o acesso."
-                  : "Receba um link seguro no e-mail do convite para criar ou acessar sua conta."}
+                  ? t("Entre com sua conta para ativar o acesso.")
+                  : t("Receba um link seguro no e-mail do convite para criar ou acessar sua conta.")}
               </p>
 
               <form onSubmit={(e) => void handleAuth(e)} className="space-y-3">
@@ -415,7 +417,7 @@ export default function ConviteAcesso() {
                       type={showPass ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Senha"
+                      placeholder={t("Senha")}
                       required
                       className="w-full px-3 py-2 pr-9 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
                     />
@@ -443,7 +445,7 @@ export default function ConviteAcesso() {
                   ) : (
                     <UserPlus size={14} />
                   )}
-                  {authMode === "login" ? "Entrar e ativar acesso" : "Enviar link seguro"}
+                  {authMode === "login" ? t("Entrar e ativar acesso") : t("Enviar link seguro")}
                 </button>
               </form>
 
@@ -457,14 +459,14 @@ export default function ConviteAcesso() {
                 })}
                 className="w-full text-xs text-muted-foreground hover:text-foreground text-center"
               >
-                {authMode === "login" ? "Não tem conta? Criar agora" : "Já tem conta? Entrar"}
+                {authMode === "login" ? t("Não tem conta? Criar agora") : t("Já tem conta? Entrar")}
               </button>
             </div>
           )}
         </div>
 
         <div className="border-t border-border/30 px-6 py-3 flex items-center justify-between">
-          <p className="text-[10px] text-muted-foreground">Ecclesia Online · Acesso seguro</p>
+          <p className="text-[10px] text-muted-foreground">{t("Ecclesia Online · Acesso seguro")}</p>
           {inviteUrl && (
             <p className="text-[10px] text-muted-foreground truncate max-w-[180px]">{inviteUrl}</p>
           )}
