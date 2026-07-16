@@ -22,9 +22,9 @@ const EMPTY_FORM = { title: "", lyrics: "", key: "", category: "", notes: "" };
 export default function BibliotecaMusicas() {
   const { t } = useLanguage();
   const { church, loading: churchLoading } = useChurch();
-  const { canonicalRole } = useRole();
+  const { canonicalRole, hasCapability } = useRole();
   const organizationId = church?.id;
-  const canWrite = canWriteWorship(canonicalRole);
+  const canWrite = hasCapability("worship.write") || canWriteWorship(canonicalRole);
   const orgReady = Boolean(organizationId);
   const canPersist = orgReady && !churchLoading;
 

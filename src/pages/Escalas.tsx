@@ -140,9 +140,9 @@ export default function Escalas() {
   const { toast } = useToast();
   const { t, lang } = useLanguage();
   const { church, loading: churchLoading } = useChurch();
-  const { canonicalRole } = useRole();
-  const canWrite = canWriteSecretaria(canonicalRole);
-  const canDelete = canDeleteSchedule(canonicalRole);
+  const { canonicalRole, hasCapability } = useRole();
+  const canWrite = hasCapability("schedules.write") || canWriteSecretaria(canonicalRole);
+  const canDelete = hasCapability("schedules.write") || canDeleteSchedule(canonicalRole);
 
   const [schedules, setSchedules] = useState<ScheduleWithSummary[]>([]);
   const [loading, setLoading] = useState(true);

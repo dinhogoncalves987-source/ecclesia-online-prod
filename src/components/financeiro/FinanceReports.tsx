@@ -26,8 +26,9 @@ export function FinanceReports({ transactions }: { transactions: TreasuryTransac
   const formatCurrency = makeCurrencyFormatter(lang);
   const { user } = useAuth();
   const { church } = useChurch();
-  const { hasRole } = useRole();
-  const canWriteFinance = hasRole(["super_admin", "church_admin", "tesoureiro"]);
+  const { hasRole, hasCapability } = useRole();
+  const canWriteFinance = hasCapability("finance.approve")
+    || hasRole(["super_admin", "church_admin", "tesoureiro"]);
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
   const [reportType, setReportType] = useState<"prestacao" | "dre" | "balancete" | "fluxo">("prestacao");

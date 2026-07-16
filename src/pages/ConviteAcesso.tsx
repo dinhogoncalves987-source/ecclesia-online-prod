@@ -30,20 +30,14 @@ import {
   buildAccessInviteUrl,
 } from "@/lib/accessInvites";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import {
+  ACCESS_RESPONSIBILITY_BY_KEY,
+  responsibilitiesFromInvite,
+} from "@/lib/accessControl";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Step = "loading" | "error" | "wrong_account" | "preview" | "auth" | "check_email" | "accepting" | "done";
-
-const ROLE_LABELS: Record<string, string> = {
-  church_admin: "Administrador",
-  tesoureiro:   "Tesoureiro",
-  contador:     "Contador",
-  pastor:       "Pastor",
-  secretary:    "Secretário(a)",
-  leader:       "Líder",
-  member:       "Membro",
-};
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
@@ -203,7 +197,11 @@ export default function ConviteAcesso() {
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
-  const roleLabel = invite ? (ROLE_LABELS[invite.role] ?? invite.role) : "";
+  const roleLabel = invite
+    ? responsibilitiesFromInvite(invite.responsibility_types, invite.role)
+        .map((responsibility) => ACCESS_RESPONSIBILITY_BY_KEY.get(responsibility)?.label ?? responsibility)
+        .join(", ") || "Acesso de trabalho"
+    : "";
   const inviteUrl = token ? buildAccessInviteUrl(token) : "";
 
   // ── Render ────────────────────────────────────────────────────────────────

@@ -32,4 +32,10 @@ describe("createAccessInvite — fail closed", () => {
     expect(result.error).toMatch(/função inválida/i);
     expect(fromMock).not.toHaveBeenCalled();
   });
+
+  it("não transforma convite comum de membro em permissão administrativa", async () => {
+    const result = await createAccessInvite(BASE);
+    expect(result.error).toMatch(/função inválida/i);
+    expect(fromMock).not.toHaveBeenCalled();
+  });
 });

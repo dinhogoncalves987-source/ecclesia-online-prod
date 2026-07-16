@@ -34,7 +34,23 @@ type GroupMessage = {
   authorLabel: string;
 };
 
-const groupTypes = ["Estudo Bíblico", "Jovens", "Casais", "Mulheres", "Homens", "Missões", "Geral"];
+const groupTypes = [
+  "Escola Bíblica Dominical",
+  "Infantil",
+  "Adolescentes",
+  "Jovens",
+  "Círculo de Oração / Mulheres",
+  "Homens",
+  "Casais",
+  "Missões",
+  "Louvor",
+  "Mídia e Comunicação",
+  "Intercessão",
+  "Recepção e Portaria",
+  "Ação Social",
+  "Estudo Bíblico",
+  "Geral",
+];
 
 const participantRoleOrder = (role: string) => {
   if (role === "leader") return 0;
@@ -62,9 +78,10 @@ export default function Grupos() {
   const { toast } = useToast();
   const { t, lang } = useLanguage();
   const { church, loading: churchLoading } = useChurch();
-  const { canonicalRole } = useRole();
-  const canWrite = canWriteSecretaria(canonicalRole);
+  const { canonicalRole, hasCapability } = useRole();
+  const canWrite = hasCapability("groups.manage") || canWriteSecretaria(canonicalRole);
   const [groups, setGroups] = useState<SmallGroup[]>([]);
+  const [managedGroupIds, setManagedGroupIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -250,18 +267,25 @@ export default function Grupos() {
     setForm(emptyForm());
   };
 
-  const fetch_ = async () => {
+  const fetch_ = useCallback(async () => {
     if (!church) return;
-    const { data } = await supabase.from("groups").select("*").eq("organization_id", church.id).order("created_at", { ascending: false });
+    const [{ data }, { data: managedIds }] = await Promise.all([
+      supabase.from("groups").select("*").eq("organization_id", church.id).order("created_at", { ascending: false }),
+      supabase.rpc("get_my_managed_group_ids", { _organization_id: church.id }),
+    ]);
     setGroups((data as SmallGroup[]) || []);
+    setManagedGroupIds(new Set(managedIds ?? []));
     setLoading(false);
-  };
+  }, [church]);
+
+  const canManageGroup = (groupId: string) => canWrite || managedGroupIds.has(groupId);
+  const canSaveForm = editingId ? canManageGroup(editingId) : canWrite;
 
   useEffect(() => {
     if (churchLoading) return;
     if (!church) { setLoading(false); return; }
-    fetch_();
-  }, [church, churchLoading]);
+    void fetch_();
+  }, [church, churchLoading, fetch_]);
 
   const handleSave = async () => {
     if (!form.name.trim() || !church) return;
@@ -345,14 +369,14 @@ export default function Grupos() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-serif font-bold text-foreground">{t("Pequenos Grupos")}</h1>
-            <p className="text-sm text-muted-foreground mt-1">{t("Gerencie os grupos de comunhão e estudo")}</p>
+            <h1 className="text-2xl font-serif font-bold text-foreground">{t("Grupos e Departamentos")}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{t("Organize grupos, departamentos, líderes e equipes de trabalho")}</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <DocumentActions
               actions={["print", "share"]}
-              shareTitle={t("Pequenos Grupos")}
-              shareText={t("Pequenos Grupos — Ecclesia")}
+              shareTitle={t("Grupos e Departamentos")}
+              shareText={t("Grupos e Departamentos — Ecclesia")}
               size="sm"
             />
             {canWrite && (
@@ -398,7 +422,7 @@ export default function Grupos() {
                   {g.meeting_day && <div className="flex items-center gap-1.5"><Clock size={12} /> {g.meeting_day}{g.meeting_time && ` às ${g.meeting_time}`}</div>}
                   {g.location && <div className="flex items-center gap-1.5"><MapPin size={12} /> {g.location}</div>}
                 </div>
-                {canWrite && (
+                {canManageGroup(g.id) && (
                   <div className="mt-3 pt-2 border-t border-border/30 flex justify-end gap-2" onClick={e => e.stopPropagation()}>
                     <button onClick={() => openEditForm(g)} className="text-xs text-muted-foreground hover:bg-secondary px-2 py-1 rounded transition-colors">
                       {t("Editar")}
@@ -553,7 +577,7 @@ export default function Grupos() {
                     )}
                   </section>
 
-                  {canWrite && (
+                  {canManageGroup(detailGroup.id) && (
                     <div className="flex flex-wrap justify-end gap-2 pt-2 border-t border-border/30">
                       <button type="button" onClick={() => { closeGroupDetail(); openEditForm(detailGroup); }} className="text-xs text-muted-foreground hover:bg-secondary px-3 py-1.5 rounded transition-colors">
                         {t("Editar")}
@@ -574,7 +598,7 @@ export default function Grupos() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {showForm && canWrite && (
+        {showForm && canSaveForm && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-40" onClick={closeForm} />
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

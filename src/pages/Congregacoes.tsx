@@ -129,17 +129,10 @@ type ResponsibleMap = {
   };
 };
 
-function membershipToSlotRole(role: string): ResponsibleRole | null {
-  if (role === "pastor" || role === "church_admin") return "pastor";
-  if (role === "secretary") return "secretary";
-  if (role === "tesoureiro") return "tesoureiro";
-  return null;
-}
-
-function inviteToSlotRole(role: string): ResponsibleRole | null {
-  if (role === "pastor") return "pastor";
-  if (role === "secretary") return "secretary";
-  if (role === "tesoureiro") return "tesoureiro";
+function responsibilityToSlotRole(responsibility: string): ResponsibleRole | null {
+  if (responsibility === "responsible_pastor" || responsibility === "church_admin") return "pastor";
+  if (responsibility === "secretary") return "secretary";
+  if (responsibility === "treasurer") return "tesoureiro";
   return null;
 }
 
@@ -271,7 +264,7 @@ function newUnitArticle(label: string): "Novo" | "Nova" {
 
 export default function Congregacoes() {
   const { user }                                     = useAuth();
-  const { isAdmin, loading: roleLoading }            = useRole();
+  const { isAdmin, hasCapability, loading: roleLoading } = useRole();
   const { church, isMatriz, refetch: refetchChurch } = useChurch();
   const { t }                            = useLanguage();
   const navigate                         = useNavigate();
@@ -350,7 +343,8 @@ export default function Congregacoes() {
     && church?.uses_local_units === false)
     || church?.hierarchy_model === "single_church";
 
-  const canManageChildUnits = isAdmin
+  const canManageOrganizations = hasCapability("organization.manage");
+  const canManageChildUnits = canManageOrganizations
     && (isMatriz || isSetorContext || isSubsedeContext || isConvencaoContext || isNationalContext || isInternationalContext)
     && (isMatriz || activeOrgTypeResolved)
     && !isSingleChurchMode
@@ -487,53 +481,33 @@ export default function Congregacoes() {
     const map: ResponsibleMap = {};
     for (const id of orgIds) map[id] = {};
 
-    // 1) Vínculos ativos em organization_users
-    const { data: memberships } = await supabase
-      .from("organization_users")
-      .select("organization_id, user_id, role")
-      .in("organization_id", orgIds)
-      .in("role", ["pastor", "church_admin", "secretary", "tesoureiro"])
-      .eq("is_active", true);
+    // Uma única RPC hierárquica resolve perfis e convites sem depender de
+    // policies permissivas ou de leituras diretas em unidades subordinadas.
+    const { data, error } = await supabase.rpc("admin_list_hierarchy_responsibles", {
+      _organization_ids: orgIds,
+    });
+    if (error) return;
 
-    if (memberships?.length) {
-      const userIds = [...new Set(memberships.map((m) => m.user_id))];
-      const { data: profiles } = await supabase
-        .from("profiles").select("user_id, full_name, email").in("user_id", userIds);
-      const pMap = new Map((profiles ?? []).map((p) => [p.user_id, p]));
+    const payload = data as { responsibles?: Array<{
+      organization_id: string;
+      responsibility_type: string;
+      status: ResponsibleStatus;
+      user_id: string | null;
+      invite_id: string | null;
+      full_name: string | null;
+      email: string | null;
+    }> } | null;
 
-      for (const m of memberships) {
-        const slot = membershipToSlotRole(m.role);
-        if (!slot || !map[m.organization_id]) continue;
-        const p = pMap.get(m.user_id);
-        map[m.organization_id][slot] = {
-          name: p?.full_name ?? null,
-          email: p?.email ?? null,
-          role: slot,
-          status: "active",
-          userId: m.user_id,
-        };
-      }
-    }
-
-    // 2) Convites pendentes em access_invites (somente se slot vazio)
-    const { data: invites } = await supabase
-      .from("access_invites")
-      .select("id, organization_id, full_name, email, role, status, created_at")
-      .in("organization_id", orgIds)
-      .in("role", ["pastor", "secretary", "tesoureiro"])
-      .eq("status", "pending")
-      .order("created_at", { ascending: false });
-
-    for (const inv of invites ?? []) {
-      const slot = inviteToSlotRole(inv.role);
-      if (!slot || !map[inv.organization_id]) continue;
-      if (map[inv.organization_id][slot]) continue;
-      map[inv.organization_id][slot] = {
-        name: inv.full_name,
-        email: inv.email,
+    for (const responsible of payload?.responsibles ?? []) {
+      const slot = responsibilityToSlotRole(responsible.responsibility_type);
+      if (!slot || !map[responsible.organization_id] || map[responsible.organization_id][slot]) continue;
+      map[responsible.organization_id][slot] = {
+        name: responsible.full_name,
+        email: responsible.email,
         role: slot,
-        status: "pending",
-        inviteId: inv.id,
+        status: responsible.status,
+        userId: responsible.user_id ?? undefined,
+        inviteId: responsible.invite_id ?? undefined,
       };
     }
 
@@ -616,7 +590,6 @@ export default function Congregacoes() {
       setCongregationCounts((prev) => ({ ...prev, [sectorId]: congs.length }));
       if (congs.length > 0) void loadResponsiblesForOrgs(congs.map((c) => c.id));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sectorCongregations, loadResponsiblesForOrgs]);
 
   // ── activeOrgType ──────────────────────────────────────────────────────────
@@ -938,7 +911,7 @@ export default function Congregacoes() {
   // ── Guard ──────────────────────────────────────────────────────────────────
   if (!roleLoading && !isAdmin) return <Navigate to="/admin" replace />;
 
-  const showStructureConfig = (isMatriz || isConvencaoContext || isNationalContext) && isAdmin;
+  const showStructureConfig = (isMatriz || isConvencaoContext || isNationalContext) && canManageOrganizations;
 
   // ══════════════════════════════════════════════════════════════════════════
   // JSX
@@ -1933,7 +1906,7 @@ export default function Congregacoes() {
                   Agrupamentos laterais (fraternas, eventos, grupos regionais). Não são parent de Matriz.
                 </p>
               </div>
-              {isAdmin && (
+              {canManageOrganizations && (
                 <button
                   onClick={() => setShowFraterna(!showFraterna)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:border-accent/50 hover:bg-accent/5 hover:text-accent transition-all">
