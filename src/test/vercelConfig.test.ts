@@ -33,6 +33,9 @@ interface VercelRoute {
 
 interface VercelConfig {
   $schema?: string;
+  framework?: string;
+  buildCommand?: string;
+  outputDirectory?: string;
   headers?: VercelHeaderRule[];
   routes?: VercelRoute[];
 }
@@ -47,6 +50,13 @@ describe("vercel.json configuration", () => {
 
   it("declares the official Vercel JSON schema", () => {
     expect(config.$schema).toBe("https://openapi.vercel.sh/vercel.json");
+  });
+
+  it("uses the fail-closed production build instead of the rejected generic build", () => {
+    expect(config.framework).toBe("vite");
+    expect(config.buildCommand).toBe("npm run build:production");
+    expect(config.buildCommand).not.toBe("npm run build");
+    expect(config.outputDirectory).toBe("dist");
   });
 
   it("has no invalid bare-wildcard header source patterns (e.g. the old /workbox-*.js)", () => {
