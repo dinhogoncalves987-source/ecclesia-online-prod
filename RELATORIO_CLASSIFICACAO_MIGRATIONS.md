@@ -240,18 +240,37 @@ finaliza com uma verificação de que nenhuma tabela/coluna foi removida, que
 baseada em `public.super_admins`. Não insere, atualiza nem exclui nenhuma
 linha de dado de negócio.
 
-**Divergência encontrada e não resolvida nesta migration**: a lista
-"autoritativa" de 49 constraints fornecida para esta tarefa continha 10 nomes
-sem qualquer origem rastreável em `supabase/migrations/` nem no restante do
-repositório (`members_civil_document_validated_by_fkey`,
+**Atualização 2026-07-16 (revisão do commit `8eaf7f9`)**: das 49 constraints,
+39 têm origem rastreável em `supabase/migrations/` (a definição foi copiada
+literalmente da migration que criou a coluna). As outras 10
+(`members_civil_document_validated_by_fkey`,
 `organization_responsibles_assigned_by_fkey`,
 `organization_responsibles_user_id_fkey` e as 7 constraints de
-`platform_support_*`). As tabelas `platform_support_*` são de fato usadas pelo
-frontend (com `as any`, sinal de tabela sem tipos gerados), mas nenhuma
-migration rastreada as cria. A migration criada nesta correção reconcilia
-apenas as **39 constraints com origem verificada**; as 10 restantes exigem
-decisão humana antes de qualquer nova tentativa (ver comentário no topo do
-arquivo `.sql` para o detalhamento completo).
+`platform_support_*`) **não possuem migration histórica rastreada no
+repositório** — as tabelas `platform_support_*` são de fato usadas pelo
+frontend (com `as any`, sinal de tabela sem tipos gerados), mas nenhum arquivo
+`.sql` do repositório as cria.
+
+As 10 constraints sem migration histórica rastreada foram recuperadas do
+inventário estrutural exportado diretamente do banco de teste/staging
+`qkiiwopkbcslquyfhdec` e incorporadas à migration comum com suas definições
+exatas (via `pg_get_constraintdef` no catálogo PostgreSQL real desse banco).
+Nenhuma definição foi inferida ou inventada. Elas **não** vieram das
+migrations do repositório — sua fonte é exclusivamente o catálogo do banco de
+teste/staging. A migration reconcilia hoje as **49 constraints** (as 39 com
+origem em `supabase/migrations/` mais as 10 recuperadas do banco de
+teste/staging), com preflight que confere, contra o catálogo do banco de
+destino, se cada definição bate exatamente com o esperado antes de alterar
+qualquer coisa.
+
+Reforçando a separação de ambientes: o banco de teste/staging é
+`qkiiwopkbcslquyfhdec` (dados fictícios/controlados) e o banco de produção é
+`zsonukpxahaxffugavfu` (dados reais). A migration comum (mesmo arquivo, byte
+a byte idêntico, mesmo SHA256 nos dois workdirs) será executada separadamente
+em cada ambiente: primeiro no banco de teste/staging, com validação completa,
+e só depois — manualmente, após essa validação — no banco de produção, com
+nova validação completa. Nenhum dado é transferido entre os dois bancos por
+esta migration.
 
 Os 33 arquivos históricos originais **permanecem intactos** em
 `supabase/migrations/` e no histórico do commit `c94024e` — nada foi

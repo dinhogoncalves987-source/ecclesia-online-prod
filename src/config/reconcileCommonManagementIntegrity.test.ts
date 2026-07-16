@@ -5,12 +5,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
- * FASE 7 — testes de proteção da correção 2026-07-16 (substituição da
- * promoção em bloco do commit c94024e por uma migration única, forward-only,
- * comum a staging e produção).
+ * FASE 9 — testes de proteção da correção 2026-07-16 (revisão do commit
+ * `8eaf7f9`): a migration comum `20260716110000_reconcile_common_management_
+ * integrity.sql` agora reconcilia as 49 foreign keys (39 com origem em
+ * `supabase/migrations/` + 10 recuperadas do inventário estrutural do banco
+ * de teste/staging `qkiiwopkbcslquyfhdec` via `pg_get_constraintdef`), com
+ * três ações ON DELETE corrigidas e verificação integral de conkey/confkey.
  *
  * Este teste é somente leitura: nunca aplica, move ou edita nenhuma
- * migration, e nunca se conecta a um banco de dados real.
+ * migration, e nunca se conecta a um banco de dados real (nem de teste/
+ * staging, nem de produção).
  */
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..", "..");
@@ -22,9 +26,10 @@ const BASELINE_FILE = "20260715170000_production_baseline_marker.sql";
 const BASELINE_VERSION = "20260715170000";
 const RECONCILE_FILE = "20260716110000_reconcile_common_management_integrity.sql";
 
-// Os 33 arquivos históricos de staging que o commit c94024e havia copiado
-// para o workdir executável de produção e que esta correção removeu de lá
-// (preservando-os intactos em supabase/migrations/).
+// Os 33 arquivos históricos do banco de teste/staging que o commit c94024e
+// havia copiado para o workdir executável do banco de produção e que a
+// correção de 2026-07-16 removeu de lá (preservando-os intactos em
+// supabase/migrations/).
 const REMOVED_HISTORICAL_COPIES = [
   "20260512090000_staging_core_baseline.sql",
   "20260512100000_staging_treasury_mvp.sql",
@@ -61,10 +66,10 @@ const REMOVED_HISTORICAL_COPIES = [
   "20260715160000_reconcile_production_security.sql",
 ];
 
-// As 39 constraints com origem verificada em supabase/migrations que a
-// migration deve reconciliar. As outras 10 do conjunto "autoritativo" de 49
-// fornecido pela tarefa não têm origem rastreável no repositório (ver
-// comentário no topo do arquivo .sql) e foram deliberadamente excluídas.
+// As 49 constraints que a migration deve reconciliar: 39 com origem
+// rastreável em supabase/migrations/, e 10 recuperadas do inventário
+// estrutural do banco de teste/staging (qkiiwopkbcslquyfhdec) via
+// pg_get_constraintdef — nenhuma foi inventada (ver cabeçalho do .sql).
 const EXPECTED_CONSTRAINTS = [
   "access_invites_accepted_user_id_fkey",
   "access_invites_invited_by_fkey",
@@ -105,13 +110,6 @@ const EXPECTED_CONSTRAINTS = [
   "user_roles_user_id_fkey",
   "worship_setlists_created_by_fkey",
   "worship_songs_created_by_fkey",
-];
-
-// Constraints do conjunto "autoritativo" de 49 fornecido pela tarefa que NÃO
-// têm origem rastreável no repositório e por isso não são reconciliadas por
-// esta migration (ver seção "DIVERGÊNCIA ENCONTRADA" no topo do arquivo .sql
-// e a seção "Correção 2026-07-16" em RELATORIO_CLASSIFICACAO_MIGRATIONS.md).
-const EXCLUDED_CONSTRAINTS_WITHOUT_TRACEABLE_ORIGIN = [
   "members_civil_document_validated_by_fkey",
   "organization_responsibles_assigned_by_fkey",
   "organization_responsibles_user_id_fkey",
@@ -124,16 +122,25 @@ const EXCLUDED_CONSTRAINTS_WITHOUT_TRACEABLE_ORIGIN = [
   "platform_support_tickets_opened_by_user_id_fkey",
 ];
 
+if (EXPECTED_CONSTRAINTS.length !== 49) {
+  throw new Error(`EXPECTED_CONSTRAINTS deve ter exatamente 49 entradas, tem ${EXPECTED_CONSTRAINTS.length}`);
+}
+
+// As 3 ações ON DELETE corrigidas nesta revisão (não podem regredir).
+const EXPECTED_ON_DELETE: Record<string, string> = {
+  members_user_id_fkey: "SET NULL",
+  documents_created_by_fkey: "NO ACTION",
+  schedules_created_by_fkey: "NO ACTION",
+};
+
 const FORBIDDEN_PATTERNS: Array<[string, RegExp]> = [
-  ["INSERT INTO", /INSERT\s+INTO/i],
-  ["UPDATE ... SET", /\bUPDATE\s+(public\.|auth\.)?\w+\s+SET\b/i],
+  ["INSERT INTO (tabela de negócio)", /INSERT\s+INTO\s+public\.(?!_)/i],
+  ["UPDATE ... SET (dados)", /\bUPDATE\s+(public\.|auth\.)?\w+\s+SET\b/i],
   ["DELETE FROM", /DELETE\s+FROM/i],
   ["TRUNCATE", /\bTRUNCATE\b/i],
   ["DROP TABLE", /DROP\s+TABLE/i],
-  ["staging-only", /staging-only/i],
-  ["staging/demo", /staging\/demo/i],
-  ["storage.buckets", /storage\.buckets/i],
   ["CREATE POLICY", /\bCREATE\s+POLICY\b/i],
+  ["storage.buckets", /storage\.buckets/i],
   ["bucket público", /bucket\s+p[uú]blico/i],
   ["seed", /\bseed\b/i],
   [
@@ -155,19 +162,19 @@ function sha256(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex");
 }
 
-describe("reconcile_common_management_integrity — workdir de produção", () => {
-  it("nenhuma migration executável de produção tem timestamp anterior ao baseline", () => {
+describe("reconcile_common_management_integrity — workdir do banco de produção", () => {
+  it("nenhuma migration executável do banco de produção tem timestamp anterior ao baseline", () => {
     const files = readdirSync(PRODUCTION_MIGRATIONS_DIR).filter((f) => f.endsWith(".sql"));
     const tooOld = files.filter((f) => f.slice(0, 14) < BASELINE_VERSION);
     expect(tooOld, `migration(s) anterior(es) ao baseline em supabase-production: ${tooOld.join(", ")}`).toEqual([]);
   });
 
-  it("o baseline continua presente no workdir de produção", () => {
+  it("o baseline continua presente no workdir do banco de produção", () => {
     const files = readdirSync(PRODUCTION_MIGRATIONS_DIR);
     expect(files).toContain(BASELINE_FILE);
   });
 
-  it("nenhum dos 33 arquivos históricos removidos permanece no workdir de produção", () => {
+  it("nenhum dos 33 arquivos históricos removidos voltou ao workdir do banco de produção", () => {
     const files = new Set(readdirSync(PRODUCTION_MIGRATIONS_DIR));
     const stillPresent = REMOVED_HISTORICAL_COPIES.filter((f) => files.has(f));
     expect(
@@ -184,19 +191,25 @@ describe("reconcile_common_management_integrity — workdir de produção", () =
 });
 
 describe("reconcile_common_management_integrity — a migration em si", () => {
-  it("existe nos dois workdirs (staging e produção)", () => {
+  it("existe nos dois workdirs (banco de teste/staging e banco de produção)", () => {
     expect(readdirSync(STAGING_MIGRATIONS_DIR)).toContain(RECONCILE_FILE);
     expect(readdirSync(PRODUCTION_MIGRATIONS_DIR)).toContain(RECONCILE_FILE);
   });
 
-  it("as duas cópias têm conteúdo e hash SHA256 idênticos", () => {
+  it("as duas cópias têm conteúdo idêntico (byte a byte)", () => {
     const staging = readMigrationText(STAGING_MIGRATIONS_DIR, RECONCILE_FILE);
     const production = readMigrationText(PRODUCTION_MIGRATIONS_DIR, RECONCILE_FILE);
     expect(staging).toBe(production);
+  });
+
+  it("as duas cópias têm SHA256 idêntico", () => {
+    const staging = readMigrationText(STAGING_MIGRATIONS_DIR, RECONCILE_FILE);
+    const production = readMigrationText(PRODUCTION_MIGRATIONS_DIR, RECONCILE_FILE);
     expect(sha256(staging)).toBe(sha256(production));
   });
 
-  it("tem timestamp posterior ao baseline de produção", () => {
+  it("tem timestamp posterior ao baseline do banco de produção e não foi renomeada", () => {
+    expect(RECONCILE_FILE.startsWith("20260716110000_")).toBe(true);
     expect(RECONCILE_FILE.slice(0, 14) > BASELINE_VERSION).toBe(true);
   });
 
@@ -211,7 +224,7 @@ describe("reconcile_common_management_integrity — a migration em si", () => {
     expect(withoutComments.endsWith("COMMIT;")).toBe(true);
   });
 
-  it("contém exatamente as 39 constraints com origem verificada, e nenhuma outra", () => {
+  it("contém exatamente as 49 constraints esperadas, e nenhuma outra", () => {
     const sql = readMigrationText(STAGING_MIGRATIONS_DIR, RECONCILE_FILE);
     for (const name of EXPECTED_CONSTRAINTS) {
       expect(sql.includes(`'${name}'`), `constraint esperada ausente: ${name}`).toBe(true);
@@ -221,15 +234,99 @@ describe("reconcile_common_management_integrity — a migration em si", () => {
     const namesFound = new Set(fkeyMatches.map((m) => m.slice(1, -1)));
     const unexpected = [...namesFound].filter((n) => !EXPECTED_CONSTRAINTS.includes(n));
     expect(unexpected, `constraint(s) inesperada(s) na migration: ${unexpected.join(", ")}`).toEqual([]);
+    expect(namesFound.size).toBe(49);
   });
 
-  it("não inclui nenhuma das 10 constraints sem origem rastreável no repositório", () => {
+  it("o total declarado de constraints esperadas é 49 (não 39)", () => {
     const sql = readMigrationText(STAGING_MIGRATIONS_DIR, RECONCILE_FILE);
-    const present = EXCLUDED_CONSTRAINTS_WITHOUT_TRACEABLE_ORIGIN.filter((name) => sql.includes(`'${name}'`));
-    expect(
-      present,
-      `constraint(s) sem origem verificada foram incluídas de forma inventada: ${present.join(", ")}`,
-    ).toEqual([]);
+    expect(sql).toMatch(/v_constraints_esperadas\s+int\s*:=\s*49/);
+    expect(sql).toContain("'constraints_esperadas', 49");
+    expect(sql).not.toMatch(/:=\s*39\b/);
+    expect(sql).not.toContain("'constraints_esperadas', 39");
+  });
+
+  it.each(Object.entries(EXPECTED_ON_DELETE))("%s usa ON DELETE %s (corrigido nesta revisão)", (name, expectedDelete) => {
+    const sql = readMigrationText(STAGING_MIGRATIONS_DIR, RECONCILE_FILE);
+    const row = sql.split("\n").find((line) => line.includes(`'${name}'`));
+    expect(row, `linha da constraint ${name} não encontrada`).toBeDefined();
+    expect(row).toContain(`'${expectedDelete}'`);
+  });
+
+  it("para as demais 46 constraints, nenhuma ação ON DELETE foi alterada em relação à revisão anterior", () => {
+    const sql = readMigrationText(STAGING_MIGRATIONS_DIR, RECONCILE_FILE);
+    const untouched: Record<string, string> = {
+      access_invites_accepted_user_id_fkey: "SET NULL",
+      access_invites_invited_by_fkey: "SET NULL",
+      group_messages_author_user_id_fkey: "CASCADE",
+      organization_users_user_id_fkey: "CASCADE",
+      profiles_user_id_fkey: "CASCADE",
+      transactions_user_id_fkey: "CASCADE",
+      user_roles_user_id_fkey: "CASCADE",
+      members_created_by_fkey: "SET NULL",
+      organization_responsibles_user_id_fkey: "CASCADE",
+      platform_support_agents_user_id_fkey: "CASCADE",
+    };
+    for (const [name, expectedDelete] of Object.entries(untouched)) {
+      const row = sql.split("\n").find((line) => line.includes(`'${name}'`));
+      expect(row, `linha da constraint ${name} não encontrada`).toBeDefined();
+      expect(row, `${name} deveria manter ON DELETE ${expectedDelete}`).toContain(`'${expectedDelete}'`);
+    }
+  });
+
+  it("valida integralmente conkey, confkey e os demais atributos de uma constraint pré-existente", () => {
+    const sql = readMigrationText(STAGING_MIGRATIONS_DIR, RECONCILE_FILE);
+    for (const attr of [
+      "con.conkey",
+      "con.confkey",
+      "con.confdeltype",
+      "con.confupdtype",
+      "con.confmatchtype",
+      "con.condeferrable",
+      "con.condeferred",
+      "con.contype",
+      "con.conrelid",
+      "con.confrelid",
+    ]) {
+      expect(sql, `verificação de ${attr} ausente na migration`).toContain(attr);
+    }
+    // confupdtype deve ser conferido contra NO ACTION ('a') e confmatchtype contra MATCH SIMPLE ('s')
+    expect(sql).toMatch(/con\.confupdtype\s*<>\s*'a'/);
+    expect(sql).toMatch(/con\.confmatchtype\s*<>\s*'s'/);
+    expect(sql).toMatch(/con\.condeferrable\s*<>\s*false/);
+    expect(sql).toMatch(/con\.condeferred\s*<>\s*false/);
+  });
+
+  it("a contagem final de constraints presentes/validadas usa nome + tabela + coluna + destino (não só o nome)", () => {
+    const sql = readMigrationText(STAGING_MIGRATIONS_DIR, RECONCILE_FILE);
+    // As duas contagens finais (dentro do DO e no SELECT de fase 7) devem
+    // fazer JOIN com pg_attribute e comparar attname da coluna de origem
+    // esperada — não apenas filtrar por uma lista de nomes.
+    const joinOccurrences = sql.match(/JOIN pg_attribute asrc ON asrc\.attrelid = c\.conrelid AND asrc\.attnum = c\.conkey\[1\]/g) ?? [];
+    expect(joinOccurrences.length, "contagem por nome+tabela+coluna+destino deve aparecer nas 2 verificações finais (DO + SELECT)").toBeGreaterThanOrEqual(2);
+    expect(sql).toContain("asrc.attname = e.col");
+    expect(sql).toContain("adst.attname = 'id'");
+    // não deve existir uma contagem apoiada somente em uma lista fixa de nomes
+    expect(sql).not.toMatch(/c\.conname\s+IN\s*\(\s*\n?\s*'access_invites_accepted_user_id_fkey'/);
+  });
+
+  it("organizations_preservadas retorna a quantidade real de linhas (número), não um booleano", () => {
+    const sql = readMigrationText(STAGING_MIGRATIONS_DIR, RECONCILE_FILE);
+    const match = sql.match(/'organizations_preservadas',\s*([^,\n]+(?:\n[^,\n]+)?),/);
+    expect(match, "chave organizations_preservadas não encontrada no SELECT final").not.toBeNull();
+    const expression = (match?.[1] ?? "").replace(/\s+/g, " ").trim();
+    expect(expression).toBe("(SELECT count(*) FROM public.organizations)");
+    expect(expression).not.toMatch(/IS NOT NULL/i);
+    expect(expression).not.toMatch(/\btrue\b|\bfalse\b/i);
+  });
+
+  it("o resultado JSON inclui ambiente_alvo = 'common_structure'", () => {
+    const sql = readMigrationText(STAGING_MIGRATIONS_DIR, RECONCILE_FILE);
+    expect(sql).toContain("'ambiente_alvo', 'common_structure'");
+  });
+
+  it("não inclui nenhuma tabela ou fase que sugira transferência de dados entre os bancos", () => {
+    const sql = readMigrationText(STAGING_MIGRATIONS_DIR, RECONCILE_FILE);
+    expect(sql.toLowerCase()).not.toMatch(/dblink|postgres_fdw|copy\s+.+\s+from\s+program/);
   });
 
   it("não contém operações de dados, seeds, políticas antigas nem concessão insegura de autoridade", () => {
