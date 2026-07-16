@@ -26,11 +26,14 @@ function makeQueryNode(result: { data: unknown; error: { message: string } | nul
 type TableResults = Record<string, { data: unknown; error: { message: string } | null }>;
 
 let tableResults: TableResults = {};
+let rpcResult: { data: unknown; error: { message: string } | null } = { data: [], error: null };
 const fromMock = vi.fn((table: string) => makeQueryNode(tableResults[table] ?? { data: null, error: null }));
+const rpcMock = vi.fn(() => Promise.resolve(rpcResult));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (table: string) => fromMock(table),
+    rpc: () => rpcMock(),
   },
 }));
 
@@ -46,6 +49,8 @@ function renderBootstrap(userId: string | null) {
 describe("useAuthBootstrap", () => {
   beforeEach(() => {
     fromMock.mockClear();
+    rpcMock.mockClear();
+    rpcResult = { data: [], error: null };
     tableResults = {
       profiles: { data: { platform_role: null }, error: null },
       user_roles: { data: [], error: null },
@@ -108,7 +113,8 @@ describe("useAuthBootstrap", () => {
     await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 5000 });
 
     // fromMock is called 4 times per attempt (profiles, user_roles,
-    // organization_users, super_admins); more than one attempt's worth of
+    // organization_users, super_admins); the capabilities RPC is the fifth
+    // parallel source. More than one attempt's worth of
     // calls proves retry actually engaged, which the previous
     // "always resolves successfully" implementation could never do.
     expect(fromMock.mock.calls.length).toBeGreaterThan(4);
@@ -129,6 +135,7 @@ describe("useAuthBootstrap", () => {
     expect(result.current.isError).toBe(false);
     expect(result.current.data?.platformRole).toBe("church_admin");
     expect(result.current.data?.memberships).toHaveLength(1);
+    expect(result.current.data?.accessCapabilities).toEqual([]);
   });
 
   it("does not query when userId is not yet known", () => {
@@ -137,5 +144,23 @@ describe("useAuthBootstrap", () => {
     expect(result.current.loading).toBe(false);
     expect(result.current.data).toBeNull();
     expect(fromMock).not.toHaveBeenCalled();
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("loads cumulative responsibilities and permissions from the capability RPC", async () => {
+    rpcResult = {
+      data: [{
+        organization_id: "org-1",
+        source_organization_id: "org-1",
+        responsibility_type: "gatekeeper",
+        permission_key: "gatekeeper.use",
+      }],
+      error: null,
+    };
+
+    const { result } = renderBootstrap("user-1");
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.data?.accessCapabilities).toEqual(rpcResult.data);
   });
 });

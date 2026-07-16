@@ -133,9 +133,9 @@ export default function Agenda() {
   const { user } = useAuth();
   const { t, lang } = useLanguage();
   const { church, loading: churchLoading } = useChurch();
-  const { canonicalRole } = useRole();
-  const canWrite = canWriteSecretaria(canonicalRole);
-  const canDelete = canDeleteEvent(canonicalRole);
+  const { canonicalRole, hasCapability } = useRole();
+  const canWrite = hasCapability("agenda.write") || canWriteSecretaria(canonicalRole);
+  const canDelete = hasCapability("agenda.write") || canDeleteEvent(canonicalRole);
 
   const [agendaTab, setAgendaTab] = useState<"church" | "personal">("church");
   const [events, setEvents] = useState<Event[]>([]);
@@ -154,7 +154,7 @@ export default function Agenda() {
 
   useEffect(() => {
     if (showForm) scrollElementIntoView(formRef.current, { block: "start", delay: 400 });
-  }, [showForm]);
+  }, [showForm, formRef]);
 
   const todayDay = now.getDate();
   const todayMonth = now.getMonth();
@@ -215,7 +215,6 @@ export default function Agenda() {
       cancelled = true;
       activeLoadRef.current = false;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, church, churchLoading, reloadEvents]);
 
   const getDay = (e: Event) => new Date(e.starts_at).getDate();

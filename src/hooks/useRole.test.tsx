@@ -162,4 +162,69 @@ describe("useRole", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.canonicalRole).toBeNull();
   });
+
+  it("adds module access from a cumulative responsibility without changing the member identity", async () => {
+    mockUseAuth.mockReturnValue({ user: { id: "u1" } });
+    mockUseChurch.mockReturnValue({ activeChurchId: "org-1", loading: false });
+    mockUseAuthBootstrap.mockReturnValue({
+      data: {
+        platformRole: null,
+        isSuperAdminRow: false,
+        userRoles: [],
+        memberships: [{ organization_id: "org-1", role: "member", is_active: true }],
+        accessCapabilities: [
+          {
+            organization_id: "org-1",
+            source_organization_id: "org-1",
+            responsibility_type: "gatekeeper",
+            permission_key: "gatekeeper.use",
+          },
+        ],
+      },
+      loading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    const { result } = renderHook(() => useRole());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.canonicalRole).toBe("member");
+    expect(result.current.hasCapability("gatekeeper.use")).toBe(true);
+    expect(result.current.canAccess("/admin/porteiro")).toBe(true);
+  });
+
+  it("permite ao gestor de acessos navegar na hierarquia sem conceder gestão estrutural", async () => {
+    mockUseAuth.mockReturnValue({ user: { id: "u1" } });
+    mockUseChurch.mockReturnValue({ activeChurchId: "org-1", loading: false });
+    mockUseAuthBootstrap.mockReturnValue({
+      data: {
+        platformRole: null,
+        isSuperAdminRow: false,
+        userRoles: [],
+        memberships: [{ organization_id: "org-1", role: "member", is_active: true }],
+        accessCapabilities: [
+          {
+            organization_id: "org-1",
+            source_organization_id: "org-1",
+            responsibility_type: "access_manager",
+            permission_key: "access.manage",
+          },
+        ],
+      },
+      loading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    const { result } = renderHook(() => useRole());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.canonicalRole).toBe("member");
+    expect(result.current.canAccess("/admin/gerenciar-acessos")).toBe(true);
+    expect(result.current.canAccess("/admin/congregacoes")).toBe(true);
+    expect(result.current.hasCapability("organization.manage")).toBe(false);
+  });
 });

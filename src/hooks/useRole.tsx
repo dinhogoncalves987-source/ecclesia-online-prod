@@ -11,6 +11,13 @@ import {
   type AdminRole,
   type LegacyAppRole,
 } from "@/lib/permissions";
+import {
+  ACCESS_PERMISSION_KEYS,
+  ROUTE_ACCESS_PERMISSIONS,
+  isAccessResponsibility,
+  type AccessPermission,
+  type AccessResponsibility,
+} from "@/lib/accessControl";
 
 export type AppRole = LegacyAppRole;
 
@@ -78,6 +85,8 @@ export function useRole() {
   const [role, setRole] = useState<AppRole | null>(null);
   const [canonicalRole, setCanonicalRole] = useState<AdminRole | null>(null);
   const [extraRoles, setExtraRoles] = useState<Set<AdminRole>>(new Set());
+  const [responsibilities, setResponsibilities] = useState<Set<AccessResponsibility>>(new Set());
+  const [capabilities, setCapabilities] = useState<Set<AccessPermission>>(new Set());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -85,6 +94,8 @@ export function useRole() {
       setRole(null);
       setCanonicalRole(null);
       setExtraRoles(new Set());
+      setResponsibilities(new Set());
+      setCapabilities(new Set());
       setLoading(false);
       return;
     }
@@ -105,6 +116,23 @@ export function useRole() {
     }
 
     setLoading(true);
+
+    const capabilityRows = bootstrap.accessCapabilities ?? [];
+    const scopedCapabilities = capabilityRows.filter((row) =>
+      !activeChurchId || row.organization_id === activeChurchId,
+    );
+    setResponsibilities(new Set(
+      scopedCapabilities
+        .map((row) => row.responsibility_type)
+        .filter(isAccessResponsibility),
+    ));
+    setCapabilities(new Set(
+      scopedCapabilities
+        .map((row) => row.permission_key)
+        .filter((permission): permission is AccessPermission =>
+          (ACCESS_PERMISSION_KEYS as readonly string[]).includes(permission),
+        ),
+    ));
 
     const legacyRows = bootstrap.userRoles as Array<{ role: AppRole; organization_id?: string | null }>;
     const organizationRows = bootstrap.memberships as Array<{ role: AppRole; organization_id: string | null }>;
@@ -180,12 +208,21 @@ export function useRole() {
 
   const canAccess = (path: string): boolean => {
     if (!canonicalRole) return false;
+    const requiredCapability = ROUTE_ACCESS_PERMISSIONS[path];
+    if (
+      requiredCapability
+      && (canonicalRole === "super_admin" || capabilities.has(requiredCapability))
+    ) {
+      return true;
+    }
     // Modo Porteiro e uma capacidade extra (porteiro), nunca a identidade
     // base do usuario — por isso a checagem usa extraRoles, nao
     // canonicalRole/role. Nao e liberado por hierarquia administrativa da
     // igreja; apenas o superadmin da plataforma tem passe livre.
     if (path === "/admin/porteiro") {
-      return extraRoles.has("porteiro") || canonicalRole === "super_admin";
+      return capabilities.has("gatekeeper.use")
+        || extraRoles.has("porteiro")
+        || canonicalRole === "super_admin";
     }
 
     const allowed = MODULE_ACCESS[path];
@@ -198,18 +235,23 @@ export function useRole() {
     return hasPermission(canonicalRole, canonicalAllowed);
   };
 
-  const isAdmin = ["church_admin", "super_admin", "pastor", "secretary"].includes(canonicalRole || "");
+  const isAdmin = capabilities.has("access.manage")
+    || ["church_admin", "super_admin", "pastor", "secretary"].includes(canonicalRole || "");
   const isSuperAdmin = canonicalRole === "super_admin";
   const isLeader = canonicalRole === "leader";
   const isMember = canonicalRole === "member";
   const hasRole = (allowedRoles: AdminRole[]) => hasPermission(canonicalRole, allowedRoles);
   // Extra capability granted on top of the base identity (see EXTRA_CAPABILITY_ROLES).
   const hasExtraRole = (extraRole: AdminRole) => extraRoles.has(extraRole);
-  const isPorteiro = extraRoles.has("porteiro");
+  const isPorteiro = capabilities.has("gatekeeper.use") || extraRoles.has("porteiro");
+  const hasCapability = (permission: AccessPermission) =>
+    canonicalRole === "super_admin" || capabilities.has(permission);
+  const hasResponsibility = (responsibility: AccessResponsibility) =>
+    responsibilities.has(responsibility);
 
   return {
     role, canonicalRole, loading, canAccess, hasRole, isAdmin, isSuperAdmin, isLeader, isMember,
-    hasExtraRole, isPorteiro,
+    hasExtraRole, isPorteiro, hasCapability, hasResponsibility, capabilities, responsibilities,
     /** True when the shared bootstrap query really failed (not just loading/absent). */
     bootstrapError: bootstrapIsError,
     /** Retries the shared bootstrap query. */

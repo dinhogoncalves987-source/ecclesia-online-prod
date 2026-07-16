@@ -2,10 +2,11 @@ import { AdminLayout } from "@/components/AdminLayout";
 import {
   Search, Plus, X, Trash2, Loader2, Upload, Pencil, CreditCard, Camera, ChevronRight,
   User, FileText, Phone, MapPin, Church, Briefcase, Users, BookOpen, Send, Building2,
+  Shield,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { MemberWalletCard } from "@/components/MemberWalletCard";
 import { MemberInviteModal } from "@/components/MemberInviteModal";
@@ -234,9 +235,10 @@ export default function Membros() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const { church, loading: churchLoading } = useChurch();
-  const { canonicalRole } = useRole();
-  const canWrite = canWriteSecretaria(canonicalRole);
+  const { canonicalRole, hasCapability, canAccess } = useRole();
+  const canWrite = hasCapability("members.write") || canWriteSecretaria(canonicalRole);
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Context filter: when navigated from Hierarquia/Congregacoes
   type ContextFilter = { orgId: string; orgName: string; orgType: string } | null;
@@ -1645,6 +1647,35 @@ export default function Membros() {
                 <div className="flex items-center gap-2">
                   {!isNewMember && (
                     <>
+                      {canAccess("/admin/gerenciar-acessos") && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const member = members.find((item) => item.id === editingId);
+                            if (!member) return;
+                            const targetOrganizationId = member.congregation_id
+                              ?? member.sector_id
+                              ?? contextFilter?.orgId
+                              ?? church?.id;
+                            if (!targetOrganizationId) return;
+                            closeModal();
+                            navigate("/admin/gerenciar-acessos", {
+                              state: {
+                                openNewAccess: true,
+                                presetMemberId: member.id,
+                                presetMemberName: member.full_name,
+                                contextOrganizationId: targetOrganizationId,
+                                contextOrganizationName: contextFilter?.orgName ?? church?.name ?? "Unidade do membro",
+                                contextOrganizationType: contextFilter?.orgType ?? "",
+                                source: "member_profile",
+                              },
+                            });
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
+                        >
+                          <Shield size={14} /> Gerenciar acessos
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => { const m = members.find(x => x.id === editingId); if (m) { closeModal(); setWalletMember(m); } }}
@@ -1748,6 +1779,4 @@ export default function Membros() {
     </AdminLayout>
   );
 }
-
-
 

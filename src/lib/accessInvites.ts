@@ -4,11 +4,25 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { getPublicAppUrl } from "@/lib/publicUrl";
+import {
+  responsibilitiesFromInvite,
+  type AccessResponsibility,
+} from "@/lib/accessControl";
 
 const ASSIGNABLE_ACCESS_ROLES = new Set([
   "church_admin", "pastor", "secretary", "tesoureiro",
-  "contador", "leader", "porteiro", "member",
+  "contador", "leader", "porteiro",
 ]);
+
+const LEGACY_ROLE_RESPONSIBILITY: Record<string, AccessResponsibility> = {
+  church_admin: "church_admin",
+  pastor: "responsible_pastor",
+  secretary: "secretary",
+  tesoureiro: "treasurer",
+  contador: "accountant",
+  leader: "group_manager",
+  porteiro: "gatekeeper",
+};
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -20,6 +34,7 @@ export interface AccessInvitePublic {
   email: string;
   phone: string;
   role: string;
+  responsibility_types: AccessResponsibility[];
   expires_at: string;
   church_name: string;
   church_city: string;
@@ -34,6 +49,7 @@ export interface AccessInviteRecord {
   email: string | null;
   phone: string | null;
   role: string;
+  responsibility_types: AccessResponsibility[];
   status: "pending" | "accepted" | "expired" | "revoked";
   expires_at: string;
   accepted_at: string | null;
@@ -85,6 +101,7 @@ export async function createAccessInvite(input: {
   email: string;
   phone?: string;
   role: string;
+  responsibility_types?: AccessResponsibility[];
 }): Promise<{ data: AccessInviteRecord | null; error: string | null }> {
   const email = input.email.trim();
   if (!email) {
@@ -94,36 +111,28 @@ export async function createAccessInvite(input: {
     return { data: null, error: "Função inválida para convite de acesso." };
   }
 
-  const { data, error } = await supabase
-    .from("access_invites")
-    .insert({
-      organization_id: input.organization_id,
-      invited_by: input.invited_by,
-      full_name: input.full_name,
-      email,
-      phone: input.phone?.trim() || null,
-      role: input.role,
-    })
-    .select("*")
-    .single();
+  const responsibilityTypes = input.responsibility_types ?? [LEGACY_ROLE_RESPONSIBILITY[input.role]];
+  const { data, error } = await supabase.rpc("admin_create_external_access_invite", {
+    _target_organization_id: input.organization_id,
+    _full_name: input.full_name,
+    _email: email,
+    _phone: input.phone?.trim() || "",
+    _responsibility_types: responsibilityTypes,
+  });
   if (error) return { data: null, error: error.message };
-  return { data: data as AccessInviteRecord, error: null };
+  return { data: data as unknown as AccessInviteRecord, error: null };
 }
 
 export async function getAccessInvites(organizationId: string): Promise<AccessInviteRecord[]> {
-  const { data } = await supabase
-    .from("access_invites")
-    .select("*")
-    .eq("organization_id", organizationId)
-    .order("created_at", { ascending: false });
-  return (data || []) as AccessInviteRecord[];
+  const { data } = await supabase.rpc("admin_list_access_invites", {
+    _target_organization_id: organizationId,
+  });
+  const payload = data as { invites?: AccessInviteRecord[] } | null;
+  return payload?.invites ?? [];
 }
 
 export async function revokeAccessInvite(id: string): Promise<boolean> {
-  const { error } = await supabase
-    .from("access_invites")
-    .update({ status: "revoked" })
-    .eq("id", id);
+  const { error } = await supabase.rpc("admin_revoke_access_invite", { _invite_id: id });
   return !error;
 }
 
@@ -135,7 +144,13 @@ export async function getAccessInviteByToken(token: string): Promise<{
   if (error) return { data: null, error: error.message };
   const result = data as { ok: boolean; error?: string } & AccessInvitePublic;
   if (!result.ok) return { data: null, error: result.error ?? "Convite inválido" };
-  return { data: result as AccessInvitePublic, error: null };
+  return {
+    data: {
+      ...result,
+      responsibility_types: responsibilitiesFromInvite(result.responsibility_types, result.role),
+    },
+    error: null,
+  };
 }
 
 export async function acceptAccessInvite(token: string): Promise<{

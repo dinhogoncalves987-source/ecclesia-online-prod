@@ -2,7 +2,7 @@ import { AdminLayout } from "@/components/AdminLayout";
 import { DocumentActions } from "@/components/DocumentActions";
 import { Plus, X, FileText, FolderOpen, Upload, Eye } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useChurch } from "@/hooks/useChurchContext";
@@ -28,8 +28,8 @@ export default function Documentos() {
   const { toast } = useToast();
   const { t, lang } = useLanguage();
   const { church, loading: churchLoading } = useChurch();
-  const { canonicalRole } = useRole();
-  const canWrite = canWriteSecretaria(canonicalRole);
+  const { canonicalRole, hasCapability } = useRole();
+  const canWrite = hasCapability("documents.write") || canWriteSecretaria(canonicalRole);
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -92,18 +92,18 @@ export default function Documentos() {
 
   const dateLoc = lang === "en" ? enUS : lang === "es" ? es : ptBR;
 
-  const fetch_ = async () => {
+  const fetch_ = useCallback(async () => {
     if (!church) return;
     const { data } = await supabase.from("documents").select("*").eq("organization_id", church.id).order("created_at", { ascending: false });
     setDocs((data as Document[]) || []);
     setLoading(false);
-  };
+  }, [church]);
 
   useEffect(() => {
     if (churchLoading) return;
     if (!church) { setLoading(false); return; }
-    fetch_();
-  }, [church, churchLoading]);
+    void fetch_();
+  }, [church, churchLoading, fetch_]);
 
   const handleAdd = async () => {
     if (!title.trim() || !user || !church) return;

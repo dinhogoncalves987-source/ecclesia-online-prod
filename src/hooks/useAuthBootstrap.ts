@@ -47,11 +47,19 @@ export interface BootstrapMembershipRow {
   is_active: boolean;
 }
 
+export interface BootstrapAccessCapabilityRow {
+  organization_id: string;
+  source_organization_id: string;
+  responsibility_type: string;
+  permission_key: string;
+}
+
 export interface BootstrapData {
   platformRole: string | null;
   isSuperAdminRow: boolean;
   userRoles: BootstrapUserRoleRow[];
   memberships: BootstrapMembershipRow[];
+  accessCapabilities: BootstrapAccessCapabilityRow[];
 }
 
 /** Thrown when one or more of the bootstrap queries fail for real (not a legitimate empty result). */
@@ -64,7 +72,7 @@ export class BootstrapFetchError extends Error {
 
 async function fetchBootstrapData(userId: string): Promise<BootstrapData> {
   return measureBoot("bootstrap (profile+roles+memberships+super_admins)", async () => {
-    const [profileResult, userRolesResult, membershipsResult, superAdminResult] = await Promise.all([
+    const [profileResult, userRolesResult, membershipsResult, superAdminResult, capabilitiesResult] = await Promise.all([
       supabase.from("profiles").select("platform_role").eq("user_id", userId).maybeSingle(),
       supabase.from("user_roles").select("role, organization_id").eq("user_id", userId),
       supabase
@@ -73,6 +81,7 @@ async function fetchBootstrapData(userId: string): Promise<BootstrapData> {
         .eq("user_id", userId)
         .eq("is_active", true),
       supabase.from("super_admins").select("user_id").eq("user_id", userId).maybeSingle(),
+      supabase.rpc("get_my_access_capabilities"),
     ]);
 
     const failures: Array<{ table: string; message: string }> = [];
@@ -80,6 +89,7 @@ async function fetchBootstrapData(userId: string): Promise<BootstrapData> {
     if (userRolesResult.error) failures.push({ table: "user_roles", message: userRolesResult.error.message });
     if (membershipsResult.error) failures.push({ table: "organization_users", message: membershipsResult.error.message });
     if (superAdminResult.error) failures.push({ table: "super_admins", message: superAdminResult.error.message });
+    if (capabilitiesResult.error) failures.push({ table: "get_my_access_capabilities", message: capabilitiesResult.error.message });
 
     if (failures.length > 0) {
       // Log locally only (never sent anywhere) — table names and error
@@ -98,6 +108,7 @@ async function fetchBootstrapData(userId: string): Promise<BootstrapData> {
       isSuperAdminRow: Boolean(superAdminResult.data?.user_id),
       userRoles: (userRolesResult.data || []) as BootstrapUserRoleRow[],
       memberships: (membershipsResult.data || []) as BootstrapMembershipRow[],
+      accessCapabilities: (capabilitiesResult.data || []) as BootstrapAccessCapabilityRow[],
     };
   });
 }

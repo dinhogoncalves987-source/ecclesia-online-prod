@@ -14,6 +14,107 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_user_id: string | null
+          created_at: string
+          email: string | null
+          expires_at: string
+          full_name: string
+          id: string
+          invited_by: string | null
+          organization_id: string
+          phone: string | null
+          responsibility_types: string[]
+          role: string
+          status: string
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_user_id?: string | null
+          created_at?: string
+          email?: string | null
+          expires_at?: string
+          full_name?: string
+          id?: string
+          invited_by?: string | null
+          organization_id: string
+          phone?: string | null
+          responsibility_types?: string[]
+          role?: string
+          status?: string
+          token?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_user_id?: string | null
+          created_at?: string
+          email?: string | null
+          expires_at?: string
+          full_name?: string
+          id?: string
+          invited_by?: string | null
+          organization_id?: string
+          phone?: string | null
+          responsibility_types?: string[]
+          role?: string
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_invites_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      access_responsibility_definitions: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          inherits_to_descendants: boolean
+          is_active: boolean
+          is_governance: boolean
+          label: string
+          permission_keys: string[]
+          responsibility_type: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description: string
+          inherits_to_descendants?: boolean
+          is_active?: boolean
+          is_governance?: boolean
+          label: string
+          permission_keys?: string[]
+          responsibility_type: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          inherits_to_descendants?: boolean
+          is_active?: boolean
+          is_governance?: boolean
+          label?: string
+          permission_keys?: string[]
+          responsibility_type?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       // ??? Staging-generated tables ?????????????????????????????????????????
       documents: {
         Row: {
@@ -379,6 +480,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "organization_users_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_responsibles: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          notes: string | null
+          organization_id: string
+          responsibility_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          organization_id: string
+          responsibility_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          organization_id?: string
+          responsibility_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_responsibles_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -1990,6 +2138,77 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_create_external_access_invite: {
+        Args: {
+          _email: string
+          _full_name: string
+          _phone: string
+          _responsibility_types: string[]
+          _target_organization_id: string
+        }
+        Returns: Json
+      }
+      admin_create_member_access_invite: {
+        Args: {
+          _member_id: string
+          _responsibility_types: string[]
+          _target_organization_id: string
+        }
+        Returns: Json
+      }
+      admin_list_access_invites: {
+        Args: { _target_organization_id: string }
+        Returns: Json
+      }
+      admin_list_hierarchy_responsibles: {
+        Args: { _organization_ids: string[] }
+        Returns: Json
+      }
+      admin_list_organization_access: {
+        Args: { _target_organization_id: string }
+        Returns: Json
+      }
+      admin_revoke_access_invite: {
+        Args: { _invite_id: string }
+        Returns: Json
+      }
+      admin_search_members_for_access: {
+        Args: { _query: string; _target_organization_id: string }
+        Returns: Json
+      }
+      admin_set_organization_responsibilities: {
+        Args: {
+          _responsibility_types: string[]
+          _target_organization_id: string
+          _target_user_id: string
+        }
+        Returns: Json
+      }
+      can_manage_access_for_organization: {
+        Args: { _target_organization_id: string; _user_id: string }
+        Returns: boolean
+      }
+      get_my_access_capabilities: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          organization_id: string
+          permission_key: string
+          responsibility_type: string
+          source_organization_id: string
+        }[]
+      }
+      get_my_managed_group_ids: {
+        Args: { _organization_id: string }
+        Returns: string[]
+      }
+      has_org_access_permission: {
+        Args: {
+          _organization_id: string
+          _permission_key: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
       has_org_finance_role: {
         Args: { _organization_id: string; _roles: string[]; _user_id: string }
         Returns: boolean

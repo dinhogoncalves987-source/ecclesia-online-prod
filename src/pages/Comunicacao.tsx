@@ -65,8 +65,8 @@ export default function Comunicacao() {
   const { toast } = useToast();
   const { t, lang } = useLanguage();
   const { church, loading: churchLoading } = useChurch();
-  const { canonicalRole } = useRole();
-  const canWrite = canWriteCommunication(canonicalRole);
+  const { canonicalRole, hasCapability } = useRole();
+  const canWrite = hasCapability("communications.write") || canWriteCommunication(canonicalRole);
   const canDelete = canDeleteCommunication(canonicalRole);
 
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
