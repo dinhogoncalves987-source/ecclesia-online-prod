@@ -179,6 +179,29 @@ describe("AuthProvider", () => {
     expect(signOutMock).not.toHaveBeenCalled();
   });
 
+  // CORREÇÃO 2026-07-17: "Invalid Refresh Token" é um erro definitivo, não
+  // uma instabilidade de rede — retry nunca vai resolver isso. Diferente do
+  // CENÁRIO OBRIGATÓRIO 1 (erro de rede genérico), aqui a sessão local devia
+  // ser limpa e o app deve resolver como deslogado, nunca travar em
+  // connectionIssue para sempre.
+  it("with a persisted token, an 'Invalid Refresh Token' error resolves as logged out instead of a permanent reconnect loop", async () => {
+    localStorage.setItem("sb-testproject-auth-token", JSON.stringify({ access_token: "abc" }));
+    getSessionMock.mockRejectedValue(new Error("Invalid Refresh Token: Refresh Token Not Found"));
+
+    render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("loading").textContent).toBe("false"));
+
+    expect(screen.getByTestId("user").textContent).toBe("null");
+    expect(screen.getByTestId("connectionIssue").textContent).toBe("false");
+    expect(signOutMock).not.toHaveBeenCalled();
+    expect(localStorage.getItem("sb-testproject-auth-token")).toBeNull();
+  });
+
   it("never treats a corrupted/garbage value under a sb-*-auth-token key as a real persisted session", async () => {
     vi.useFakeTimers();
     // Garbage that isn't valid JSON, and a value that IS valid JSON but

@@ -58,7 +58,9 @@ const FORBIDDEN_TERMS_SOURCE = [
   "FinanceAccountability",
   "FinanceAudit",
   "FinanceIntelligence",
-  "pages/Biblia",
+  // "pages/Biblia" removido em 2026-07-17: Bíblia/IA foi promovida para
+  // availability: "both" (não depende de tabela/migration staging-only) —
+  // agora DEVE aparecer no bundle de produção. Ver src/config/modules.ts.
   "pages/CultoLouvor",
   "pages/Campanhas",
   "pages/CartasRecomendacao",

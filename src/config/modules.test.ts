@@ -37,9 +37,8 @@ describe("isModuleEnabled", () => {
     expect(isModuleEnabled("canal-ecclesia", "staging")).toBe(true);
   });
 
-  it("disables in-testing modules (Bíblia/IA, Devocional, Culto, Campanhas, Marketplace, Comunidade, Relatórios) in production", () => {
+  it("disables in-testing modules (Devocional, Culto, Campanhas, Marketplace, Comunidade, Relatórios) in production", () => {
     for (const id of [
-      "bible-ai",
       "devotional",
       "worship",
       "campaigns",
@@ -53,6 +52,15 @@ describe("isModuleEnabled", () => {
     }
   });
 
+  // CORREÇÃO 2026-07-17: Bíblia/IA não depende de nenhuma tabela/migration
+  // ainda não promovida (é um chat de IA sem escrita no banco) — nunca
+  // deveria ter sido staging-only. Promovida para "both" após regressão que
+  // removeu o módulo do menu de produção.
+  it("enables Bíblia/IA ('bible-ai') in both production and staging", () => {
+    expect(isModuleEnabled("bible-ai", "production")).toBe(true);
+    expect(isModuleEnabled("bible-ai", "staging")).toBe(true);
+  });
+
   it("denies unknown module ids by default", () => {
     // @ts-expect-error — id intencionalmente inválido para testar o default-deny
     expect(isModuleEnabled("not-a-real-module", "staging")).toBe(false);
@@ -62,7 +70,6 @@ describe("isModuleEnabled", () => {
 describe("isRouteEnabled", () => {
   it("disables staging-only routes in production", () => {
     expect(isRouteEnabled("/admin/campanhas", "production")).toBe(false);
-    expect(isRouteEnabled("/admin/biblia", "production")).toBe(false);
     expect(isRouteEnabled("/admin/culto", "production")).toBe(false);
     expect(isRouteEnabled("/admin/culto/telao", "production")).toBe(false);
     expect(isRouteEnabled("/admin/cartas-recomendacao", "production")).toBe(false);
@@ -73,6 +80,11 @@ describe("isRouteEnabled", () => {
 
   it("enables staging-only routes in staging", () => {
     expect(isRouteEnabled("/admin/campanhas", "staging")).toBe(true);
+  });
+
+  // CORREÇÃO 2026-07-17: /admin/biblia deve funcionar em produção também.
+  it("keeps /admin/biblia enabled in both production and staging", () => {
+    expect(isRouteEnabled("/admin/biblia", "production")).toBe(true);
     expect(isRouteEnabled("/admin/biblia", "staging")).toBe(true);
   });
 

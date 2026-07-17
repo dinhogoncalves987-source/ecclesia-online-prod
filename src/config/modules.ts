@@ -117,6 +117,12 @@ const PRODUCTION_MODULES: readonly ModuleDefinition[] = [
   { id: "member-invite", availability: "both", label: "Convite de membro" },
   { id: "access-invite", availability: "both", label: "Convite de acesso" },
   { id: "gatekeeper", availability: "both", label: "Modo Porteiro" },
+
+  // A Bíblia não depende de nenhuma tabela/migration ainda não promovida —
+  // é um chat de IA (edge function bible-chat) sem escrita no banco. Nunca
+  // deveria ter sido classificada como staging-only; corrigido em 2026-07-17
+  // após regressão que removeu o módulo do menu de produção.
+  { id: "bible-ai", availability: "both", label: "Bíblia / IA" },
 ] as const;
 
 /**
@@ -178,8 +184,8 @@ const STAGING_ONLY_MODULES: readonly ModuleDefinition[] = IS_STAGING_BUILD ? [
   },
 
   // Não constam na allowlist urgente de produção — permanecem em teste.
+  // ("bible-ai" foi promovida para PRODUCTION_MODULES — ver acima.)
   { id: "recommendation-letters", availability: "staging", label: "Cartas de Recomendação" },
-  { id: "bible-ai", availability: "staging", label: "Bíblia / IA" },
   { id: "devotional", availability: "staging", label: "Devocional" },
   { id: "worship", availability: "staging", label: "Culto & Louvor" },
   { id: "campaigns", availability: "staging", label: "Campanhas" },
