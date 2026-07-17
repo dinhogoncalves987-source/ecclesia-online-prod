@@ -1,4 +1,4 @@
-import { Wallet, Target, TrendingUp, Users } from "lucide-react";
+import { Wallet, Target, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/hooks/useLanguage";
 import { formatCampaignCurrency, getCampaignStats, type Campaign } from "@/lib/campaignsDemo";
@@ -28,16 +28,10 @@ export function CampaignOverview({ campaigns }: Props) {
       icon: TrendingUp,
       color: "text-accent bg-accent/10",
     },
-    {
-      title: t("Participações"),
-      value: stats.participations.toLocaleString(lang === "en" ? "en-US" : lang === "es" ? "es-MX" : "pt-BR"),
-      icon: Users,
-      color: "text-amber-600 bg-amber-500/10",
-    },
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       {cards.map((card, i) => (
         <motion.div
           key={card.title}

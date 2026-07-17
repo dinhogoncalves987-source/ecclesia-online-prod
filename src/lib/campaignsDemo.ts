@@ -287,7 +287,6 @@ export function getCampaignStats(campaigns: Campaign[]) {
     totalRaised,
     activeCount: active.length,
     totalGoal,
-    participations: 847,
   };
 }
 

@@ -37,28 +37,23 @@ describe("isModuleEnabled", () => {
     expect(isModuleEnabled("canal-ecclesia", "staging")).toBe(true);
   });
 
-  it("disables in-testing modules (Devocional, Culto, Campanhas, Marketplace, Comunidade, Relatórios) in production", () => {
-    for (const id of [
-      "devotional",
-      "worship",
-      "campaigns",
-      "marketplace",
-      "community",
-      "reports",
-      "recommendation-letters",
-    ] as const) {
+  it("disables in-testing modules (Devocional, Marketplace, Comunidade) in production — telas de maquete, sem backend real", () => {
+    for (const id of ["devotional", "marketplace", "community"] as const) {
       expect(isModuleEnabled(id, "production")).toBe(false);
       expect(isModuleEnabled(id, "staging")).toBe(true);
     }
   });
 
-  // CORREÇÃO 2026-07-17: Bíblia/IA não depende de nenhuma tabela/migration
-  // ainda não promovida (é um chat de IA sem escrita no banco) — nunca
-  // deveria ter sido staging-only. Promovida para "both" após regressão que
-  // removeu o módulo do menu de produção.
-  it("enables Bíblia/IA ('bible-ai') in both production and staging", () => {
-    expect(isModuleEnabled("bible-ai", "production")).toBe(true);
-    expect(isModuleEnabled("bible-ai", "staging")).toBe(true);
+  // CORREÇÃO 2026-07-17: Bíblia/IA, Culto & Louvor, Campanhas, Cartas de
+  // Recomendação e Relatórios não dependem de dado fictício exibido ao
+  // usuário (todos têm backend real no Supabase) — nunca deveriam ter sido
+  // staging-only. Promovidos para "both" após regressão que os removeu do
+  // menu de produção.
+  it("enables Bíblia/IA, Culto & Louvor, Campanhas, Cartas de Recomendação e Relatórios em produção e staging", () => {
+    for (const id of ["bible-ai", "worship", "campaigns", "recommendation-letters", "reports"] as const) {
+      expect(isModuleEnabled(id, "production")).toBe(true);
+      expect(isModuleEnabled(id, "staging")).toBe(true);
+    }
   });
 
   it("denies unknown module ids by default", () => {
@@ -68,24 +63,32 @@ describe("isModuleEnabled", () => {
 });
 
 describe("isRouteEnabled", () => {
-  it("disables staging-only routes in production", () => {
-    expect(isRouteEnabled("/admin/campanhas", "production")).toBe(false);
-    expect(isRouteEnabled("/admin/culto", "production")).toBe(false);
-    expect(isRouteEnabled("/admin/culto/telao", "production")).toBe(false);
-    expect(isRouteEnabled("/admin/cartas-recomendacao", "production")).toBe(false);
-    expect(isRouteEnabled("/admin/relatorios", "production")).toBe(false);
+  it("disables staging-only routes (maquetes sem backend real) in production", () => {
     expect(isRouteEnabled("/admin/marketplace", "production")).toBe(false);
     expect(isRouteEnabled("/admin/comunidade", "production")).toBe(false);
   });
 
   it("enables staging-only routes in staging", () => {
-    expect(isRouteEnabled("/admin/campanhas", "staging")).toBe(true);
+    expect(isRouteEnabled("/admin/marketplace", "staging")).toBe(true);
+    expect(isRouteEnabled("/admin/comunidade", "staging")).toBe(true);
   });
 
-  // CORREÇÃO 2026-07-17: /admin/biblia deve funcionar em produção também.
-  it("keeps /admin/biblia enabled in both production and staging", () => {
-    expect(isRouteEnabled("/admin/biblia", "production")).toBe(true);
-    expect(isRouteEnabled("/admin/biblia", "staging")).toBe(true);
+  // CORREÇÃO 2026-07-17: /admin/biblia, /admin/culto*, /admin/campanhas,
+  // /admin/cartas-recomendacao e /admin/relatorios devem funcionar em
+  // produção também — todos com backend real, nenhum depende de dado
+  // fictício.
+  it("keeps Bíblia, Culto, Campanhas, Cartas de Recomendação e Relatórios enabled in both production and staging", () => {
+    for (const path of [
+      "/admin/biblia",
+      "/admin/culto",
+      "/admin/culto/telao",
+      "/admin/campanhas",
+      "/admin/cartas-recomendacao",
+      "/admin/relatorios",
+    ]) {
+      expect(isRouteEnabled(path, "production")).toBe(true);
+      expect(isRouteEnabled(path, "staging")).toBe(true);
+    }
   });
 
   it("does not restrict routes absent from the route→module map", () => {

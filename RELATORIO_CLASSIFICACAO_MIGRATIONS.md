@@ -276,6 +276,60 @@ Os 33 arquivos históricos originais **permanecem intactos** em
 `supabase/migrations/` e no histórico do commit `c94024e` — nada foi
 destruído, apenas removido do workdir executável de produção.
 
+## Correção 2026-07-17 — GRANT ausente em 43 tabelas de produção (incidente real)
+
+Em 2026-07-17, um usuário real de produção (`municipal@ecclesiabr.online`,
+`church_admin` da matriz "Assembleia de Deus em Caxias do Sul") reportou a
+tela de erro "Não foi possível confirmar sua sessão / suas permissões de
+acesso", com os logs do console mostrando `403 (Forbidden)` e
+`permission denied for table user_roles` em
+`src/hooks/useAuthBootstrap.ts`.
+
+Investigação direta do catálogo do banco de produção
+(`information_schema.role_table_grants`) identificou que **43 tabelas** em
+`public` já tinham Row Level Security habilitado e policies corretas para o
+papel `authenticated` (e, em duas tabelas, também para `anon`), mas **nunca
+haviam recebido o `GRANT` de tabela correspondente**. Sem esse `GRANT` de
+base, o PostgreSQL bloqueia a consulta antes de sequer avaliar RLS — daí o
+erro ser "permission denied" (falha de permissão) em vez de simplesmente "0
+linhas" (comportamento normal de uma policy restritiva). Como
+`useAuthBootstrap.ts` corretamente trata qualquer erro real (não um
+resultado vazio legítimo) como falha de bootstrap, isso derrubava a sessão
+inteira para qualquer usuário autenticado, de forma consistente e recorrente
+— exatamente como relatado ("não é a primeira vez que esse bug acontece").
+
+Auditoria confirmou que o banco de teste/staging (`qkiiwopkbcslquyfhdec`)
+**não tem essa falha** — é exclusiva do banco de produção
+(`zsonukpxahaxffugavfu`).
+
+A correção imediata (`GRANT SELECT, INSERT, UPDATE, DELETE ... TO
+authenticated` nas 43 tabelas, mais `GRANT SELECT ... TO anon` nas 2 tabelas
+com policy `anon`) foi aplicada diretamente em produção via `supabase db
+query` no momento do incidente, e validada com uma consulta simulando o
+papel `authenticated` para o usuário afetado (sem erro, retorno correto do
+vínculo real dele em `organization_users`).
+
+Em seguida, a correção foi formalizada como migration única, forward-only
+(timestamp `20260717180000`, posterior a `20260716130000`), comum a staging
+e produção, byte a byte idêntica nos dois workdirs:
+
+- `supabase/migrations/20260717180000_fix_missing_authenticated_grants.sql`
+- `supabase-production/supabase/migrations/20260717180000_fix_missing_authenticated_grants.sql`
+
+Ela é idempotente e fail-closed: antes de conceder qualquer `GRANT`, confirma
+que cada tabela existe, tem RLS habilitado e já tem policy de
+`SELECT`/`ALL` para `authenticated` — se qualquer condição falhar para
+qualquer tabela, aborta inteira sem conceder nada. `GRANT` é naturalmente
+idempotente, então a execução em staging (onde os grants já estavam
+corretos) é um no-op comprovado pelo próprio preflight/verificação final.
+Não cria tabelas, não altera nenhuma policy de RLS existente, e não insere,
+atualiza nem exclui nenhuma linha de dado de negócio.
+
+`public.member_validation_tokens` foi auditada e **excluída
+deliberadamente** desta correção: tem RLS habilitado e zero policies (para
+qualquer papel), ou seja, é acessível apenas por funções `SECURITY DEFINER`
+— desenho intencional, não uma falha.
+
 ## Manifesto machine-readable
 
 A mesma classificação (incluindo destino funcional de produção/staging) está disponível

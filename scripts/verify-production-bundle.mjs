@@ -49,7 +49,6 @@ const OFFICIAL_DOMAIN = "ecclesiabr.online";
 // arquivo — chunks já têm hash e nomes minificados).
 const FORBIDDEN_TERMS_SOURCE = [
   "financeDemo",
-  "campaignsDemo",
   "FinanceExecutive",
   "FinanceCampaigns",
   "FinanceAccounts",
@@ -61,19 +60,18 @@ const FORBIDDEN_TERMS_SOURCE = [
   // "pages/Biblia" removido em 2026-07-17: Bíblia/IA foi promovida para
   // availability: "both" (não depende de tabela/migration staging-only) —
   // agora DEVE aparecer no bundle de produção. Ver src/config/modules.ts.
-  "pages/CultoLouvor",
-  "pages/Campanhas",
-  "pages/CartasRecomendacao",
-  "pages/Relatorios",
+  //
+  // "campaignsDemo", "pages/CultoLouvor", "pages/Campanhas",
+  // "pages/CartasRecomendacao", "pages/Relatorios", "culto/BibliotecaMusicas",
+  // "culto/RoteirosCulto", "culto/TelaoProjecao", "culto/AssistenteCulto" e
+  // "pages/ValidarCarta" removidos em 2026-07-17: Culto & Louvor, Campanhas,
+  // Cartas de Recomendação e Relatórios foram promovidos para
+  // availability: "both" — todos têm backend real no Supabase (nenhum
+  // depende de dado fictício exibido ao usuário). Ver src/config/modules.ts.
   "pages/Marketplace",
   "pages/Comunidade",
   "pages/DevocionalPublic",
-  "pages/ValidarCarta",
   "components/DailyDevotional",
-  "culto/BibliotecaMusicas",
-  "culto/RoteirosCulto",
-  "culto/TelaoProjecao",
-  "culto/AssistenteCulto",
   "tv-digital",
   "canal-ecclesia",
   "CanalEcclesia",

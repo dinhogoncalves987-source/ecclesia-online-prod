@@ -115,34 +115,46 @@ const ModoPorteiro = lazy(() => import("./pages/ModoPorteiro"));
 // IS_STAGING_BUILD.
 const Biblia = lazy(() => import("./pages/Biblia"));
 
-// Admin — staging-only (ver src/config/modules.ts, availability: "staging").
-// Nunca importados/empacotados num build de produção — apenas o gate
-// (ModuleGate) e a página de fallback (ModuleUnavailable) são bundladas.
-const CultoLouvor = IS_STAGING_BUILD ? lazy(() => import("./pages/CultoLouvor")) : null;
+// Culto & Louvor, Campanhas, Cartas de Recomendação e Relatórios foram
+// promovidos para availability: "both" em src/config/modules.ts
+// (CORREÇÃO 2026-07-17 — todos têm backend real no Supabase — worship_songs/
+// worship_setlists, campaigns/campaign_updates, recommendation_letters,
+// e Relatorios.tsx já consulta members/transactions/events/prayer_requests/
+// groups/documents reais via runScopedOrganizationQuery — nenhum depende de
+// dado fictício para funcionar). Carregados sempre, iguais aos módulos
+// "both" acima — nunca condicionados a IS_STAGING_BUILD.
+const CultoLouvor = lazy(() => import("./pages/CultoLouvor"));
 
-const CultoBiblioteca = IS_STAGING_BUILD ? lazy(() => import("./pages/culto/BibliotecaMusicas")) : null;
+const CultoBiblioteca = lazy(() => import("./pages/culto/BibliotecaMusicas"));
 
-const CultoRoteiros = IS_STAGING_BUILD ? lazy(() => import("./pages/culto/RoteirosCulto")) : null;
+const CultoRoteiros = lazy(() => import("./pages/culto/RoteirosCulto"));
 
-const CultoTelao = IS_STAGING_BUILD ? lazy(() => import("./pages/culto/TelaoProjecao")) : null;
+const CultoTelao = lazy(() => import("./pages/culto/TelaoProjecao"));
 
-const CultoAssistente = IS_STAGING_BUILD ? lazy(() => import("./pages/culto/AssistenteCulto")) : null;
+const CultoAssistente = lazy(() => import("./pages/culto/AssistenteCulto"));
 
-const Campanhas = IS_STAGING_BUILD ? lazy(() => import("./pages/Campanhas")) : null;
+const Campanhas = lazy(() => import("./pages/Campanhas"));
 
-const CartasRecomendacao = IS_STAGING_BUILD ? lazy(() => import("./pages/CartasRecomendacao")) : null;
+const CartasRecomendacao = lazy(() => import("./pages/CartasRecomendacao"));
 
-const Relatorios = IS_STAGING_BUILD ? lazy(() => import("./pages/Relatorios")) : null;
+const Relatorios = lazy(() => import("./pages/Relatorios"));
 
+// Marketplace e Comunidade permanecem staging-only de propósito: são telas
+// 100% de maquete (catálogo/feed fixos no código-fonte), sem nenhuma tabela
+// ou consulta real no Supabase — habilitá-las mostraria dado fictício para
+// igrejas reais. Ver src/config/modules.ts.
 const Marketplace = IS_STAGING_BUILD ? lazy(() => import("./pages/Marketplace")) : null;
 
 const Comunidade = IS_STAGING_BUILD ? lazy(() => import("./pages/Comunidade")) : null;
 
-// Público — staging-only (devotional/recommendation-letters). Mesma lógica:
-// null (e nenhum chunk) num build de produção.
+// Público — staging-only (devotional). Mesma lógica: null (e nenhum chunk)
+// num build de produção.
 const DevocionalPublic = IS_STAGING_BUILD ? lazy(() => import("./pages/DevocionalPublic")) : null;
 
-const ValidarCarta = IS_STAGING_BUILD ? lazy(() => import("./pages/ValidarCarta")) : null;
+// Cartas de Recomendação foi promovida (ver acima) — a página pública de
+// validação de carta precisa acompanhar, senão o QR/link de validação
+// impresso numa carta real de produção cairia num "módulo indisponível".
+const ValidarCarta = lazy(() => import("./pages/ValidarCarta"));
 
 
 
@@ -191,7 +203,7 @@ const App = () => (
               <Route path="/reset-password" element={<ResetPassword />} />
 
               <Route path="/share" element={<SharePublic />} />
-              <Route path="/validar/carta/:token" element={ValidarCarta ? <ValidarCarta /> : <PublicModuleUnavailable />} />
+              <Route path="/validar/carta/:token" element={<ValidarCarta />} />
               <Route path="/validar-membro/:id" element={<ValidarMembro />} />
               <Route path="/convite-membro/:token" element={<ConviteMembro />} />
               <Route path="/convite-acesso/:token" element={<ConviteAcesso />} />
@@ -201,7 +213,7 @@ const App = () => (
 
               <Route path="/admin" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
 
-              <Route path="/admin/campanhas" element={<ProtectedRoute><ModuleGate moduleId="campaigns">{Campanhas && <Campanhas />}</ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/campanhas" element={<ProtectedRoute><ModuleGate moduleId="campaigns"><Campanhas /></ModuleGate></ProtectedRoute>} />
 
               <Route path="/admin/financeiro" element={<ProtectedRoute><Financeiro /></ProtectedRoute>} />
 
@@ -211,15 +223,15 @@ const App = () => (
 
               <Route path="/admin/biblia" element={<ProtectedRoute><ModuleGate moduleId="bible-ai"><Biblia /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/culto" element={<ProtectedRoute><ModuleGate moduleId="worship">{CultoLouvor && <CultoLouvor />}</ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/culto" element={<ProtectedRoute><ModuleGate moduleId="worship"><CultoLouvor /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/culto/biblioteca" element={<ProtectedRoute><ModuleGate moduleId="worship">{CultoBiblioteca && <CultoBiblioteca />}</ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/culto/biblioteca" element={<ProtectedRoute><ModuleGate moduleId="worship"><CultoBiblioteca /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/culto/roteiros" element={<ProtectedRoute><ModuleGate moduleId="worship">{CultoRoteiros && <CultoRoteiros />}</ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/culto/roteiros" element={<ProtectedRoute><ModuleGate moduleId="worship"><CultoRoteiros /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/culto/telao" element={<ProtectedRoute><ModuleGate moduleId="worship">{CultoTelao && <CultoTelao />}</ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/culto/telao" element={<ProtectedRoute><ModuleGate moduleId="worship"><CultoTelao /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/culto/assistente" element={<ProtectedRoute><ModuleGate moduleId="worship">{CultoAssistente && <CultoAssistente />}</ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/culto/assistente" element={<ProtectedRoute><ModuleGate moduleId="worship"><CultoAssistente /></ModuleGate></ProtectedRoute>} />
 
               <Route path="/admin/oracoes" element={<ProtectedRoute><Oracoes /></ProtectedRoute>} />
 
@@ -229,9 +241,9 @@ const App = () => (
 
               <Route path="/admin/documentos" element={<ProtectedRoute><Documentos /></ProtectedRoute>} />
 
-              <Route path="/admin/cartas-recomendacao" element={<ProtectedRoute><ModuleGate moduleId="recommendation-letters">{CartasRecomendacao && <CartasRecomendacao />}</ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/cartas-recomendacao" element={<ProtectedRoute><ModuleGate moduleId="recommendation-letters"><CartasRecomendacao /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/relatorios" element={<ProtectedRoute><ModuleGate moduleId="reports">{Relatorios && <Relatorios />}</ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/relatorios" element={<ProtectedRoute><ModuleGate moduleId="reports"><Relatorios /></ModuleGate></ProtectedRoute>} />
 
               <Route path="/admin/escalas" element={<ProtectedRoute><Escalas /></ProtectedRoute>} />
 

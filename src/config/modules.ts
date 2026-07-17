@@ -123,6 +123,22 @@ const PRODUCTION_MODULES: readonly ModuleDefinition[] = [
   // deveria ter sido classificada como staging-only; corrigido em 2026-07-17
   // após regressão que removeu o módulo do menu de produção.
   { id: "bible-ai", availability: "both", label: "Bíblia / IA" },
+
+  // CORREÇÃO 2026-07-17 — promovidos de STAGING_ONLY_MODULES: os quatro têm
+  // backend real no Supabase (nenhum depende de dado fictício/financeDemo
+  // ou campaignsDemo como fonte de dados exibida ao usuário):
+  //   - worship: worship_songs / worship_setlists (src/lib/worshipStorage.ts)
+  //   - campaigns: campaigns / campaign_updates / campaign_media, com
+  //     fallback correto para lista vazia (nunca dado de demonstração) via
+  //     useCampaigns()/fetchCampaignsForChurch — ver src/hooks/useCampaigns.tsx
+  //   - recommendation-letters: recommendation_letters (src/lib/recommendationLetters.ts)
+  //   - reports: consulta members/transactions/events/prayer_requests/
+  //     groups/documents reais via runScopedOrganizationQuery — ver
+  //     src/pages/Relatorios.tsx
+  { id: "worship", availability: "both", label: "Culto & Louvor" },
+  { id: "campaigns", availability: "both", label: "Campanhas" },
+  { id: "recommendation-letters", availability: "both", label: "Cartas de Recomendação" },
+  { id: "reports", availability: "both", label: "Relatórios" },
 ] as const;
 
 /**
@@ -184,14 +200,14 @@ const STAGING_ONLY_MODULES: readonly ModuleDefinition[] = IS_STAGING_BUILD ? [
   },
 
   // Não constam na allowlist urgente de produção — permanecem em teste.
-  // ("bible-ai" foi promovida para PRODUCTION_MODULES — ver acima.)
-  { id: "recommendation-letters", availability: "staging", label: "Cartas de Recomendação" },
+  // ("bible-ai", "worship", "campaigns", "recommendation-letters" e
+  // "reports" foram promovidos para PRODUCTION_MODULES — ver acima.)
   { id: "devotional", availability: "staging", label: "Devocional" },
-  { id: "worship", availability: "staging", label: "Culto & Louvor" },
-  { id: "campaigns", availability: "staging", label: "Campanhas" },
+  // Marketplace e Comunidade são telas de maquete (dado 100% fixo no
+  // código-fonte, sem nenhuma tabela real no Supabase) — permanecem
+  // staging-only até virarem funcionalidades reais, nunca por regressão.
   { id: "marketplace", availability: "staging", label: "Marketplace" },
   { id: "community", availability: "staging", label: "Comunidade" },
-  { id: "reports", availability: "staging", label: "Relatórios" },
 
   // Stage-only — preservados em staging-tv-canal, restauração controlada
   // documentada em docs/AMBIENTES_PRODUCAO_STAGING.md. Nenhuma rota/arquivo

@@ -60,7 +60,8 @@
     "20260715151000_idempotent_remove_finalize_member_invite.sql",
     "20260715160000_reconcile_production_security.sql",
     "20260716110000_reconcile_common_management_integrity.sql",
-    "20260716130000_hierarchical_access_responsibilities.sql"
+    "20260716130000_hierarchical_access_responsibilities.sql",
+    "20260717180000_fix_missing_authenticated_grants.sql"
   ],
   "staging_feature": [
     "20260526100000_staging_worship_tables.sql",
