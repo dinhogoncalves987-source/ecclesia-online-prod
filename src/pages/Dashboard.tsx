@@ -14,6 +14,7 @@ import { useRole } from "@/hooks/useRole";
 import { useSupportContext } from "@/contexts/SupportContext";
 import { runScopedOrganizationQuery } from "@/lib/organizationScope";
 import { environment } from "@/config/environment";
+import { isReviewModeActive } from "@/config/reviewMode";
 
 // FASE 6 (separação de bundle por build): "devotional" é staging-only (ver
 // src/config/modules.ts). `import.meta.env.VITE_APP_ENV` é substituído por
@@ -56,6 +57,12 @@ const isPlatformCampaign = (value: unknown): value is PlatformCampaign => {
 };
 
 const loadPlatformAnnouncements = async (nowIso: string): Promise<PlatformCampaignSelect[]> => {
+  // Modo Avaliação: esta função ignora o cliente Supabase (Proxy simulável)
+  // e monta uma requisição REST crua com `environment.supabaseUrl` — por
+  // isso precisa de uma verificação explícita aqui para nunca contatar o
+  // Supabase real (produção/staging) enquanto avaliação estiver ativa.
+  if (isReviewModeActive()) return [];
+
   const { data: sessionData } = await supabase.auth.getSession();
   const url = new URL(`${environment.supabaseUrl}/rest/v1/platform_announcements`);
 

@@ -4,6 +4,8 @@ import { Sparkles, X, Upload, Loader2, CheckCircle2, AlertCircle, FileText, Imag
 import { useLanguage } from "@/hooks/useLanguage";
 import { environment } from "@/config/environment";
 import { getEdgeFunctionUrl } from "@/lib/edgeFetch";
+import { isReviewModeActive } from "@/config/reviewMode";
+import { notifyReviewSimulatedAction } from "@/reviewMode/reviewToast";
 
 type AIImportModalProps = {
   open: boolean;
@@ -50,6 +52,24 @@ export function AIImportModal({ open, onClose, onImport, fields, title, moduleNa
     setFileName(file.name);
     setStep("analyzing");
     setError("");
+
+    // Modo Avaliação: nunca envia o conteúdo do arquivo a uma edge function
+    // de IA real. Gera algumas linhas fictícias com os campos solicitados e
+    // segue direto para a revisão.
+    if (isReviewModeActive()) {
+      notifyReviewSimulatedAction("importação por IA");
+      window.setTimeout(() => {
+        const simulatedRows = Array.from({ length: 3 }, (_, idx) =>
+          fields.reduce<Record<string, string>>((acc, f) => {
+            acc[f.key] = `${f.label} de demonstração ${idx + 1} (fictício)`;
+            return acc;
+          }, {}),
+        );
+        setExtractedRows(simulatedRows);
+        setStep("preview");
+      }, 500);
+      return;
+    }
 
     try {
       const content = await readFileAsText(file);
