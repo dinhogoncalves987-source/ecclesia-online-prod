@@ -1805,6 +1805,7 @@ export type Database = {
           id: string
           joined_at: string | null
           marital_status: string | null
+          member_code: string | null
           member_role: string | null
           mother_name: string | null
           neighborhood: string | null
@@ -1845,6 +1846,7 @@ export type Database = {
           id?: string
           joined_at?: string | null
           marital_status?: string | null
+          member_code?: string | null
           member_role?: string | null
           mother_name?: string | null
           neighborhood?: string | null
@@ -1885,6 +1887,7 @@ export type Database = {
           id?: string
           joined_at?: string | null
           marital_status?: string | null
+          member_code?: string | null
           member_role?: string | null
           mother_name?: string | null
           neighborhood?: string | null

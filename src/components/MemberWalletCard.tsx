@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 export type WalletMember = {
   id: string;
   full_name: string;
+  member_code?: string | null;
   member_role: string | null;
   administrative_role?: string | null;
   status: string;
@@ -312,7 +313,10 @@ export function MemberWalletCard({ member, churchName, churchCity, churchState, 
 
   const issueDate  = format(new Date(), "dd/MM/yyyy", { locale: ptBR });
   const validUntil = format(new Date(new Date().setFullYear(new Date().getFullYear() + 1)), "dd/MM/yyyy", { locale: ptBR });
-  const code           = memberCode(member.id);
+  // Código informado pela igreja (migrado do sistema antigo) tem prioridade;
+  // sem ele, mantém a matrícula técnica gerada a partir do id — ver DEC-001
+  // / migration 20260717190000_members_add_member_code.sql.
+  const code           = member.member_code?.trim() || memberCode(member.id);
 
   const qrValue = qrState === "ready" && qrToken
     ? `${window.location.origin}/admin/porteiro?token=${encodeURIComponent(qrToken)}`

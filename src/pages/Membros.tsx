@@ -38,6 +38,7 @@ import {
 type Member = {
   id: string;
   full_name: string;
+  member_code: string | null;
   member_role: string | null;
   administrative_role: string | null;
   status: string;
@@ -86,6 +87,7 @@ type FilterStatus = "all" | MemberStatus;
 
 const EMPTY_FORM: Omit<Member, "id"> = {
   full_name: "",
+  member_code: "",
   member_role: "Membro",
   administrative_role: "Nenhum",
   status: "Ativo",
@@ -408,6 +410,7 @@ export default function Membros() {
       const q = searchQuery.toLowerCase();
       return (
         m.full_name.toLowerCase().includes(q) ||
+        (m.member_code || "").toLowerCase().includes(q) ||
         (m.member_role || "").toLowerCase().includes(q) ||
         (m.administrative_role || "").toLowerCase().includes(q) ||
         (m.email || "").toLowerCase().includes(q) ||
@@ -622,6 +625,11 @@ export default function Membros() {
       ))
     );
 
+  // Postgres 23505 (unique_violation) no índice parcial members_org_member_code_unique_idx —
+  // ver migration 20260717190000_members_add_member_code.sql
+  const isDuplicateMemberCodeError = (err: { message?: string; code?: string } | null): boolean =>
+    !!err && err.code === "23505" && !!err.message?.includes("members_org_member_code_unique_idx");
+
   /**
    * PGRST116 — the UPDATE found 0 matching rows.
    * This is PostgREST's response when the USING clause of an RLS policy
@@ -660,6 +668,7 @@ export default function Membros() {
     const civilDocType = getCivilDocLabel(form.marital_status || "") || form.civil_document_type?.trim() || null;
     return {
       photo_url:          photoUrl,
+      member_code:        form.member_code?.trim() || null,
       whatsapp:           form.whatsapp?.trim() || null,
       gender:             form.gender || null,
       marital_status:     form.marital_status || null,
@@ -761,6 +770,12 @@ export default function Membros() {
           .eq("id", memberId)
           .select("id")
           .single();
+        if (error && isDuplicateMemberCodeError(error)) {
+          toast.error(t("Este código de membro já está em uso por outro membro desta igreja."), {
+            description: t("Escolha outro código ou deixe o campo em branco."),
+          });
+          return false;
+        }
         if (error && isMissingColumnError(error)) {
           console.warn("[Membros] extended fields need migration:", error.message);
           toast.warning(
@@ -883,17 +898,18 @@ export default function Membros() {
   // ── Bulk import ──────────────────────────────────────────────────────────────
 
   const memberFields = [
-    { key: "name",   label: t("Nome"),      required: true },
-    { key: "cpf",    label: t("CPF"),       required: true },
-    { key: "phone",  label: t("Telefone"),  required: true },
-    { key: "role",   label: t("Função") },
-    { key: "email",  label: t("E-mail") },
-    { key: "status", label: t("Status") },
+    { key: "name",         label: t("Nome"),              required: true },
+    { key: "member_code",  label: t("Código do Membro") },
+    { key: "cpf",          label: t("CPF"),               required: true },
+    { key: "phone",        label: t("Telefone"),          required: true },
+    { key: "role",         label: t("Função") },
+    { key: "email",        label: t("E-mail") },
+    { key: "status",       label: t("Status") },
   ];
 
   const memberTemplate = [
-    { name: "João Silva",  cpf: "000.000.000-01", phone: "(11) 99999-0001", role: "Diácono", email: "joao@email.com",  status: "Ativo" },
-    { name: "Maria Souza", cpf: "000.000.000-02", phone: "(11) 99999-0002", role: "Membro",  email: "maria@email.com", status: "Ativo" },
+    { name: "João Silva",  member_code: "0001", cpf: "000.000.000-01", phone: "(11) 99999-0001", role: "Diácono", email: "joao@email.com",  status: "Ativo" },
+    { name: "Maria Souza", member_code: "0002", cpf: "000.000.000-02", phone: "(11) 99999-0002", role: "Membro",  email: "maria@email.com", status: "Ativo" },
   ];
 
   const handleBulkImport = async (rows: Record<string, string>[]) => {
@@ -905,6 +921,7 @@ export default function Membros() {
       const { error } = await insertWithOrganizationScope("members", church.id, {
         created_by: user.id,
         full_name: row.name,
+        member_code: row.member_code?.trim() || null,
         member_role: row.role || "Membro",
         cpf: row.cpf || null,
         phone: row.phone || null,
@@ -912,7 +929,12 @@ export default function Membros() {
         joined_at: new Date().toISOString().split("T")[0],
         status,
       });
-      if (error) errors++; else success++;
+      if (error) {
+        console.warn("[Membros] bulk import row failed:", String((error as { message?: string }).message || ""));
+        errors++;
+      } else {
+        success++;
+      }
     }
     if (success > 0) await reloadMembers();
     return { success, errors };
@@ -937,6 +959,7 @@ export default function Membros() {
   const toWalletMember = (m: Member) => ({
     id: m.id,
     full_name: m.full_name,
+    member_code: m.member_code,
     member_role: m.member_role,
     administrative_role: m.administrative_role,
     status: m.status,
@@ -980,6 +1003,7 @@ export default function Membros() {
                 module="member"
                 fields={[
                   { key: "name", label: t("Nome"), required: true },
+                  { key: "member_code", label: t("Código do Membro") },
                   { key: "role", label: t("Função"), options: ["Pastor", "Diácono", "Diaconisa", "Obreiro", "Membro"] },
                   { key: "phone", label: t("Telefone") },
                   { key: "email", label: t("E-mail") },
@@ -987,7 +1011,7 @@ export default function Membros() {
                 onConfirm={async data => {
                   if (!data.name || !user || !church) throw new Error(t("Nome obrigatório"));
                   const { error } = await insertWithOrganizationScope("members", church.id, {
-                    created_by: user.id, full_name: data.name, member_role: data.role || "Membro",
+                    created_by: user.id, full_name: data.name, member_code: data.member_code?.trim() || null, member_role: data.role || "Membro",
                     phone: data.phone || null, email: data.email || null,
                     joined_at: new Date().toISOString().split("T")[0], status: "Ativo",
                   });
@@ -996,7 +1020,7 @@ export default function Membros() {
                   toast.success(t("Membro cadastrado!"));
                 }}
                 onEdit={data => {
-                  setForm({ ...EMPTY_FORM, full_name: data.name || "", member_role: data.role || "Membro", phone: data.phone || "", email: data.email || "" });
+                  setForm({ ...EMPTY_FORM, full_name: data.name || "", member_code: data.member_code || "", member_role: data.role || "Membro", phone: data.phone || "", email: data.email || "" });
                   setIsNewMember(true); setEditingId(null); setActiveTab("pessoal"); setModalOpen(true);
                 }}
               />
@@ -1102,9 +1126,11 @@ export default function Membros() {
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0 inline-block" title="Documentação civil validada" />
                               )}
                             </div>
-                            {m.birth_date && (
+                            {(m.member_code || m.birth_date) && (
                               <p className="text-[11px] text-muted-foreground">
-                                Admissão: {m.joined_at ?? "—"}
+                                {m.member_code && <span className="font-mono">#{m.member_code}</span>}
+                                {m.member_code && m.birth_date && " · "}
+                                {m.birth_date && `Admissão: ${m.joined_at ?? "—"}`}
                               </p>
                             )}
                           </div>
@@ -1211,6 +1237,9 @@ export default function Membros() {
                         <p className="text-xs text-muted-foreground truncate">{m.member_role || "—"}</p>
                         {m.administrative_role && m.administrative_role !== "Nenhum" && (
                           <span className="text-[10px] text-muted-foreground/60">· {m.administrative_role}</span>
+                        )}
+                        {m.member_code && (
+                          <span className="text-[10px] text-muted-foreground/60 font-mono">· #{m.member_code}</span>
                         )}
                       </div>
                       {orgName(m.congregation_id || m.sector_id) && (
@@ -1338,10 +1367,18 @@ export default function Membros() {
                       <div className="sm:col-span-2">
                         <FormInput label="Nome completo" value={form.full_name} onChange={v => setField("full_name", v)} required placeholder="Nome e sobrenome completos" />
                       </div>
+                      <div className="sm:col-span-2">
+                        <FormInput
+                          label="Código do Membro"
+                          value={form.member_code || ""}
+                          onChange={v => setField("member_code", v)}
+                          placeholder={t("Opcional — use o código do sistema anterior, se houver")}
+                        />
+                      </div>
                       <FormInput label="Data de nascimento" value={form.birth_date || ""} onChange={v => setField("birth_date", v)} type="date" />
                       <FormSelect label="Sexo" value={form.gender || ""} onChange={v => setField("gender", v)} options={GENDER_OPTIONS} />
                       <FormSelect label="Estado civil" value={form.marital_status || ""} onChange={v => setField("marital_status", v)} options={MARITAL_STATUS_OPTIONS} />
-                      <FormInput label="CPF" value={form.cpf || ""} onChange={v => setField("cpf", v)} placeholder="000.000.000-00" />
+                      <FormInput label="CPF" value={form.cpf || ""} onChange={v => setField("cpf", v)} required placeholder="000.000.000-00" />
                     </div>
                   </div>
                 )}
@@ -1473,7 +1510,7 @@ export default function Membros() {
                 {/* ── Tab 3: Contato ── */}
                 {activeTab === "contato" && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <FormInput label="Telefone" value={form.phone || ""} onChange={v => setField("phone", v)} placeholder="(00) 00000-0000" type="tel" />
+                    <FormInput label="Telefone" value={form.phone || ""} onChange={v => setField("phone", v)} required placeholder="(00) 00000-0000" type="tel" />
                     <FormInput label="WhatsApp" value={form.whatsapp || ""} onChange={v => setField("whatsapp", v)} placeholder="(00) 00000-0000" type="tel" />
                     <div className="sm:col-span-2">
                       <FormInput label="E-mail" value={form.email || ""} onChange={v => setField("email", v)} placeholder="email@exemplo.com" type="email" />

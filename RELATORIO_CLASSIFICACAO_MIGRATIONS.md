@@ -330,6 +330,36 @@ deliberadamente** desta correção: tem RLS habilitado e zero policies (para
 qualquer papel), ou seja, é acessível apenas por funções `SECURITY DEFINER`
 — desenho intencional, não uma falha.
 
+## `members.member_code` — código histórico do membro (migração de cadastro antigo)
+
+Decisão de produto (DEC-001): ao migrar os membros do sistema anterior de
+uma igreja para o Ecclesia, é necessário preservar o código/matrícula que a
+igreja já usava — inclusive com zeros à esquerda — sem forçar renumeração.
+
+Migration única, forward-only (timestamp `20260717190000`, posterior a
+`20260717180000`), comum a staging e produção, byte a byte idêntica nos dois
+workdirs:
+
+- `supabase/migrations/20260717190000_members_add_member_code.sql`
+- `supabase-production/supabase/migrations/20260717190000_members_add_member_code.sql`
+
+Adiciona a coluna opcional `public.members.member_code` (`text`, sem
+formatação obrigatória) e um índice único parcial
+(`members_org_member_code_unique_idx`) sobre `(organization_id,
+member_code) WHERE member_code IS NOT NULL` — ou seja, o código só precisa
+ser único dentro da mesma igreja, e a restrição não se aplica a membros sem
+código informado. É idempotente (`ADD COLUMN IF NOT EXISTS` / `CREATE UNIQUE
+INDEX IF NOT EXISTS`) e não insere, atualiza nem remove nenhuma linha de
+dado de negócio.
+
+O campo é aceito na criação, edição, importação em lote (CSV) e no
+assistente rápido de cadastro (ver `src/pages/Membros.tsx`), é pesquisável
+na listagem de Membros, e — quando preenchido — substitui a matrícula
+técnica gerada automaticamente na Carteira de Membro (ver
+`src/components/MemberWalletCard.tsx`). Ficou fora deste escopo a tela
+pública de validação de carteira por QR (`src/pages/ValidarMembro.tsx`), que
+continua usando o código técnico gerado pelo backend de validação.
+
 ## Manifesto machine-readable
 
 A mesma classificação (incluindo destino funcional de produção/staging) está disponível
