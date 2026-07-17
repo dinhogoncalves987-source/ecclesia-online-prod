@@ -8,6 +8,8 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 import { environment } from '@/config/environment';
+import { isReviewModeActive } from '@/config/reviewMode';
+import { createMockSupabaseClient } from '@/reviewMode/mockSupabaseClient';
 
 const SUPABASE_URL = environment.supabaseUrl;
 const SUPABASE_PUBLISHABLE_KEY = environment.supabasePublishableKey;
@@ -15,10 +17,35 @@ const SUPABASE_PUBLISHABLE_KEY = environment.supabasePublishableKey;
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+const realSupabaseClient = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
   }
 });
+
+// MODO AVALIAÇÃO (ver src/config/reviewMode.ts) — despacho dinâmico por
+// Proxy, reavaliado em CADA acesso a `supabase.<algo>`, nunca fixado no
+// carregamento do módulo:
+//
+//   - Fora do Modo Avaliação (todo deploy de produção/staging, e qualquer
+//     aba de Preview que não tenha passado por `/avaliacao`): todo acesso
+//     cai direto no cliente real acima — comportamento idêntico ao arquivo
+//     original, sem nenhuma camada extra.
+//   - Dentro do Modo Avaliação (apenas a aba que navegou para `/avaliacao`
+//     num build com VITE_PUBLIC_REVIEW_MODE=true): todo acesso passa a usar
+//     o cliente simulado em memória — nenhuma leitura, escrita, upload ou
+//     RPC chega à rede real.
+//
+// Isto é o único ponto de desvio de todo o Modo Avaliação: nenhuma outra
+// página/hook precisa saber que o modo existe.
+const mockSupabaseClient = createMockSupabaseClient();
+
+export const supabase = new Proxy(realSupabaseClient, {
+  get(target, prop, receiver) {
+    const source = isReviewModeActive() ? (mockSupabaseClient as unknown as typeof target) : target;
+    const value = Reflect.get(source, prop, source);
+    return typeof value === 'function' ? value.bind(source) : value;
+  },
+}) as typeof realSupabaseClient;

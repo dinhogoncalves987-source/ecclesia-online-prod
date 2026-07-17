@@ -30,6 +30,8 @@ import { ModuleGate } from "@/components/ModuleGate";
 
 import { EnvironmentBanner } from "@/components/EnvironmentBanner";
 
+import { ReviewModeBanner } from "@/components/ReviewModeBanner";
+
 
 
 // Public / auth — kept synchronous (entry points, small footprint)
@@ -51,6 +53,7 @@ import ConviteAcesso from "./pages/ConviteAcesso";
 
 import NotFound from "./pages/NotFound";
 import PublicModuleUnavailable from "./pages/PublicModuleUnavailable";
+import Avaliacao from "./pages/Avaliacao";
 
 
 
@@ -171,6 +174,8 @@ const App = () => (
 
         <BrowserRouter>
 
+          <ReviewModeBanner />
+
           <Suspense fallback={<PageLoader />}>
 
             <Routes>
@@ -192,6 +197,15 @@ const App = () => (
               <Route path="/convite-acesso/:token" element={<ConviteAcesso />} />
 
               <Route path="/devocional" element={DevocionalPublic ? <DevocionalPublic /> : <PublicModuleUnavailable />} />
+
+              {/*
+                Modo Avaliação — rota pública exclusiva, só funcional quando
+                VITE_PUBLIC_REVIEW_MODE=true neste build (ver
+                src/pages/Avaliacao.tsx e src/config/reviewMode.ts). Quando a
+                flag não está ativa, esta rota apenas redireciona para "/"
+                como qualquer outra URL não reconhecida.
+              */}
+              <Route path="/avaliacao" element={<Avaliacao />} />
 
 
               <Route path="/admin" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

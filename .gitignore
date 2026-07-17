@@ -65,3 +65,5 @@ codigo-pwa-real.txt
 # Artefatos temporários de auditoria de schema (dumps de comparação
 # staging x produção) — nunca versionar, podem conter estrutura sensível.
 schema-audit/
+.vercel
+.env*.local

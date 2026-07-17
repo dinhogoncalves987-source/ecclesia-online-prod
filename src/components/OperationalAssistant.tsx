@@ -25,6 +25,8 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
 import { environment } from "@/config/environment";
 import { getEdgeFunctionUrl } from "@/lib/edgeFetch";
+import { isReviewModeActive } from "@/config/reviewMode";
+import { notifyReviewSimulatedAction } from "@/reviewMode/reviewToast";
 
 const MAX_INPUT = 1500;
 
@@ -120,6 +122,24 @@ export function OperationalAssistant({
     if (!trimmed) return;
     setStep("loading");
     setApiError("");
+
+    // Modo Avaliação: nunca contata o assistente de IA real (edge function
+    // externa). Preenche os campos com um valor de demonstração e segue
+    // direto para a revisão, mantendo a tela navegável sem sair do
+    // isolamento do modo avaliação.
+    if (isReviewModeActive()) {
+      notifyReviewSimulatedAction("análise por IA");
+      window.setTimeout(() => {
+        const simulated: Record<string, string> = {};
+        for (const field of fields) {
+          simulated[field.key] = field.options?.[0] ?? "Valor de demonstração (fictício)";
+        }
+        setExtracted(simulated);
+        setMissing([]);
+        setStep("preview");
+      }, 400);
+      return;
+    }
 
     try {
       const { data: { session } } = await supabase.auth.getSession();

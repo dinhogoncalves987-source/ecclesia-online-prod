@@ -5,8 +5,10 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, PhoneOff, Video, Phone, Shield, Lock } from "lucide-react";
+import { Loader2, PhoneOff, Video, Phone, Shield, Lock, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { isReviewModeActive } from "@/config/reviewMode";
+import { notifyReviewSimulatedAction } from "@/reviewMode/reviewToast";
 
 // ── Tipos da API externa ───────────────────────────────────────────────────────
 type JitsiAPI = {
@@ -83,7 +85,7 @@ export function JitsiCallModal({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<JitsiAPI | null>(null);
-  const [status, setStatus] = useState<"loading" | "active" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "active" | "error" | "simulated">("loading");
 
   const disposeJitsi = useCallback(() => {
     if (apiRef.current) {
@@ -94,6 +96,15 @@ export function JitsiCallModal({
 
   useEffect(() => {
     if (!open) { disposeJitsi(); setStatus("loading"); return; }
+
+    // Modo Avaliação: nunca carrega o script externo do Jitsi nem cria uma
+    // sala real (regra "não executar chamadas ou qualquer ação externa").
+    // Mostra uma tela de simulação e nunca contata meet.jit.si.
+    if (isReviewModeActive()) {
+      notifyReviewSimulatedAction("chamada de voz/vídeo");
+      setStatus("simulated");
+      return;
+    }
 
     let cancelled = false;
     setStatus("loading");
@@ -211,6 +222,11 @@ export function JitsiCallModal({
             {status === "error" && (
               <span className="text-xs text-red-400">Erro ao conectar</span>
             )}
+            {status === "simulated" && (
+              <span className="flex items-center gap-1.5 text-xs text-fuchsia-400">
+                <ShieldAlert size={11} /> Simulada
+              </span>
+            )}
           </div>
         </div>
 
@@ -268,12 +284,31 @@ export function JitsiCallModal({
           </div>
         )}
 
+        {/* Overlay de simulação — Modo Avaliação, nunca contata o Jitsi real */}
+        {status === "simulated" && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-[#0f172a]">
+            <div className="w-16 h-16 rounded-2xl bg-fuchsia-600/20 flex items-center justify-center">
+              <ShieldAlert size={28} className="text-fuchsia-400" />
+            </div>
+            <div className="text-center">
+              <p className="text-white/80 text-sm font-medium">Chamada simulada (Modo Avaliação)</p>
+              <p className="text-white/40 text-xs mt-1 max-w-xs">
+                Nenhuma chamada real foi iniciada. Nenhum dado foi alterado.
+              </p>
+            </div>
+            <Button size="sm" variant="outline" onClick={handleClose} className="border-white/20 text-white hover:bg-white/10">
+              <PhoneOff size={14} className="mr-1.5" />
+              Encerrar simulação
+            </Button>
+          </div>
+        )}
+
         {/* Iframe Jitsi — sempre no DOM para não perder a conexão */}
         <div ref={containerRef} className="w-full h-full" />
 
         {/* ── Overlays permanentes que cobrem watermarks do Jitsi ──────────────── */}
         {/* Aparece assim que o loading desaparece (status !== "loading") */}
-        {status !== "loading" && (
+        {status !== "loading" && status !== "simulated" && (
           <>
             {/* Canto superior esquerdo: cobre logo Jitsi */}
             <div
