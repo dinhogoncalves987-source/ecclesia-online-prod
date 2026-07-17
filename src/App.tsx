@@ -108,11 +108,16 @@ const CarteiraEcclesia = lazy(() => import("./pages/CarteiraEcclesia"));
 
 const ModoPorteiro = lazy(() => import("./pages/ModoPorteiro"));
 
+// Bíblia/IA foi promovida para availability: "both" em src/config/modules.ts
+// (CORREÇÃO 2026-07-17 — não depende de nenhuma tabela/migration ainda não
+// promovida, é um chat de IA sem escrita no banco). Por isso é carregada
+// sempre, igual aos outros módulos "both" acima — nunca condicionada a
+// IS_STAGING_BUILD.
+const Biblia = lazy(() => import("./pages/Biblia"));
+
 // Admin — staging-only (ver src/config/modules.ts, availability: "staging").
 // Nunca importados/empacotados num build de produção — apenas o gate
 // (ModuleGate) e a página de fallback (ModuleUnavailable) são bundladas.
-const Biblia = IS_STAGING_BUILD ? lazy(() => import("./pages/Biblia")) : null;
-
 const CultoLouvor = IS_STAGING_BUILD ? lazy(() => import("./pages/CultoLouvor")) : null;
 
 const CultoBiblioteca = IS_STAGING_BUILD ? lazy(() => import("./pages/culto/BibliotecaMusicas")) : null;
@@ -204,7 +209,7 @@ const App = () => (
 
               <Route path="/admin/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
 
-              <Route path="/admin/biblia" element={<ProtectedRoute><ModuleGate moduleId="bible-ai">{Biblia && <Biblia />}</ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/biblia" element={<ProtectedRoute><ModuleGate moduleId="bible-ai"><Biblia /></ModuleGate></ProtectedRoute>} />
 
               <Route path="/admin/culto" element={<ProtectedRoute><ModuleGate moduleId="worship">{CultoLouvor && <CultoLouvor />}</ModuleGate></ProtectedRoute>} />
 

@@ -374,7 +374,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-background flex">
       {/* Desktop Sidebar */}
       <aside
-        className={`hidden lg:flex flex-col bg-card shadow-executive transition-all duration-300 ${
+        className={`hidden lg:flex flex-col shrink-0 bg-card shadow-executive transition-all duration-300 ${
           sidebarCollapsed ? "w-[72px]" : "w-72"
         }`}
       >

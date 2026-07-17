@@ -47,6 +47,42 @@ function looksLikePersistedSession(value: unknown): boolean {
   return typeof candidate.access_token === "string" && candidate.access_token.length > 0;
 }
 
+/**
+ * True when the error is a DEFINITIVE, non-retryable auth failure — the
+ * refresh token itself is dead (invalid, not found, or expired) — as
+ * opposed to a transient network/timeout failure. Retrying `getSession()`
+ * can NEVER recover from this specific error: the token that was persisted
+ * on this device no longer works, full stop. Treating it the same as a
+ * network hiccup (see `connectionIssue`) is what caused the "Não foi
+ * possível confirmar sua sessão" screen to trap users forever with a
+ * "Tentar novamente" button that could never succeed.
+ */
+function isInvalidRefreshTokenError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const message = typeof (error as { message?: unknown }).message === "string"
+    ? (error as { message: string }).message
+    : "";
+  return /refresh token/i.test(message) && /(invalid|not found|expired)/i.test(message);
+}
+
+/** Removes any persisted Supabase session token from this device. Only
+ * called after confirming the refresh token is definitively dead — never
+ * for a transient/network failure. */
+function clearPersistedSupabaseSession(): void {
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const key = window.localStorage.key(i);
+      if (key && key.startsWith("sb-") && key.endsWith("-auth-token")) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => window.localStorage.removeItem(key));
+  } catch {
+    // localStorage indisponível (modo privado, storage bloqueado etc.)
+  }
+}
+
 function hasPersistedSupabaseSession(): boolean {
   try {
     for (let i = 0; i < window.localStorage.length; i += 1) {
@@ -172,6 +208,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .catch((error) => {
           console.warn("[Auth] getSession falhou (possível instabilidade de rede):", error);
           if (resolvedOnceRef.current) return;
+
+          if (isInvalidRefreshTokenError(error)) {
+            // O token persistido está definitivamente morto — nenhuma
+            // quantidade de "Tentar novamente" vai resolver isso, porque o
+            // erro não é de rede. Limpa o token local e resolve como
+            // deslogado (vai para /login), em vez de travar em
+            // connectionIssue para sempre.
+            console.warn("[Auth] Refresh token inválido/expirado — limpando sessão local.");
+            clearPersistedSupabaseSession();
+            hadPersistedSessionRef.current = false;
+            commit(null);
+            return;
+          }
 
           if (hadPersistedSessionRef.current) {
             // There IS a token on this device — a failed confirmation
