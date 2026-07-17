@@ -1792,7 +1792,13 @@ export type Database = {
           baptized_at: string | null
           birth_date: string | null
           city: string | null
+          civil_document_notes: string | null
+          civil_document_status: string
+          civil_document_type: string | null
+          civil_document_uploaded_at: string | null
+          civil_document_url: string | null
           congregation_id: string | null
+          consecration_date: string | null
           conversion_date: string | null
           country_code: string | null
           cpf: string | null
@@ -1802,6 +1808,7 @@ export type Database = {
           father_name: string | null
           full_name: string
           gender: string | null
+          holy_spirit_baptism_date: string | null
           id: string
           joined_at: string | null
           marital_status: string | null
@@ -1833,7 +1840,13 @@ export type Database = {
           baptized_at?: string | null
           birth_date?: string | null
           city?: string | null
+          civil_document_notes?: string | null
+          civil_document_status?: string
+          civil_document_type?: string | null
+          civil_document_uploaded_at?: string | null
+          civil_document_url?: string | null
           congregation_id?: string | null
+          consecration_date?: string | null
           conversion_date?: string | null
           country_code?: string | null
           cpf?: string | null
@@ -1843,6 +1856,7 @@ export type Database = {
           father_name?: string | null
           full_name: string
           gender?: string | null
+          holy_spirit_baptism_date?: string | null
           id?: string
           joined_at?: string | null
           marital_status?: string | null
@@ -1874,7 +1888,13 @@ export type Database = {
           baptized_at?: string | null
           birth_date?: string | null
           city?: string | null
+          civil_document_notes?: string | null
+          civil_document_status?: string
+          civil_document_type?: string | null
+          civil_document_uploaded_at?: string | null
+          civil_document_url?: string | null
           congregation_id?: string | null
+          consecration_date?: string | null
           conversion_date?: string | null
           country_code?: string | null
           cpf?: string | null
@@ -1884,6 +1904,7 @@ export type Database = {
           father_name?: string | null
           full_name?: string
           gender?: string | null
+          holy_spirit_baptism_date?: string | null
           id?: string
           joined_at?: string | null
           marital_status?: string | null

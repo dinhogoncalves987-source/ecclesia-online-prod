@@ -555,6 +555,7 @@ export default function Membros() {
     setEditingId(m.id);
     setForm({
       full_name:         m.full_name,
+      member_code:       m.member_code || "",
       member_role:       m.member_role || "Membro",
       administrative_role: m.administrative_role || "Nenhum",
       status:            isMemberStatus(m.status) ? m.status : "Ativo",

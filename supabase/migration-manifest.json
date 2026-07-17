@@ -62,7 +62,8 @@
     "20260716110000_reconcile_common_management_integrity.sql",
     "20260716130000_hierarchical_access_responsibilities.sql",
     "20260717180000_fix_missing_authenticated_grants.sql",
-    "20260717190000_members_add_member_code.sql"
+    "20260717190000_members_add_member_code.sql",
+    "20260717200000_members_civil_document_and_ecclesiastical_fields.sql"
   ],
   "staging_feature": [
     "20260526100000_staging_worship_tables.sql",
