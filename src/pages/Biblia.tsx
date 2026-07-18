@@ -88,7 +88,11 @@ export default function Biblia() {
   const [largeFont, setLargeFont] = useState(false);
   const [bookPickerOpen, setBookPickerOpen] = useState(false);
   const [selectedBookIndex, setSelectedBookIndex] = useState(0);
-  const [selectedChapter, setSelectedChapter] = useState<number | null>(1);
+  // Bíblia inicia "fechada" — nenhum capítulo é buscado automaticamente ao
+  // abrir a tela; o usuário escolhe o livro/capítulo (ver mensagem "Selecione
+  // um capítulo acima" abaixo). Antes iniciava em 1 (Gênesis 1), disparando
+  // uma busca de rede automática logo na abertura da tela.
+  const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
   const [verses, setVerses] = useState<Verse[]>([]);
   const [verseError, setVerseError] = useState("");
   const [versesFromCache, setVersesFromCache] = useState(false);

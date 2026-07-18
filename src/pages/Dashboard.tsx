@@ -4,7 +4,7 @@ import { MatrizDashboard } from "@/components/MatrizDashboard";
 import { isModuleEnabled, isRouteEnabled } from "@/config/modules";
 import { motion } from "framer-motion";
 import { Wallet, Users, TrendingUp, Calendar, Clock, Bell, Plus, ChevronRight, Loader2, Shield, Building2, Globe, BookOpen, Heart, Music2, MessageSquare, FileText } from "lucide-react";
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,8 +12,10 @@ import { useChurch } from "@/hooks/useChurchContext";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useRole } from "@/hooks/useRole";
 import { useSupportContext } from "@/contexts/SupportContext";
-import { runScopedOrganizationQuery } from "@/lib/organizationScope";
+import { insertWithOrganizationScope, runScopedOrganizationQuery } from "@/lib/organizationScope";
 import { environment } from "@/config/environment";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 // FASE 6 (separação de bundle por build): "devotional" é staging-only (ver
 // src/config/modules.ts). `import.meta.env.VITE_APP_ENV` é substituído por
@@ -149,10 +151,12 @@ export default function Dashboard() {
   const [superMetrics, setSuperMetrics] = useState<{ churches: number; users: number } | null>(null);
   const [upcomingEvents, setUpcomingEvents] = useState<{ id: string; title: string; date: string; time: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showQuickEventModal, setShowQuickEventModal] = useState(false);
+  const [savingQuickEvent, setSavingQuickEvent] = useState(false);
+  const [quickEvent, setQuickEvent] = useState({ title: "", date: "", startTime: "09:00", endTime: "", location: "" });
 
-  useEffect(() => {
-    if (!user) { setLoading(false); return; }
-    const load = async () => {
+  const load = useCallback(async () => {
+      if (!user) { setLoading(false); return; }
       setLoading(true);
       const nowIso = new Date().toISOString();
 
@@ -222,9 +226,44 @@ export default function Dashboard() {
       })));
 
       setLoading(false);
-    };
+  }, [user, church, t, lang, isSuperAdmin]);
+
+  useEffect(() => {
     load();
-  }, [user, church, t, isSuperAdmin]);
+  }, [load]);
+
+  const openQuickEventModal = () => {
+    setQuickEvent({ title: "", date: "", startTime: "09:00", endTime: "", location: "" });
+    setShowQuickEventModal(true);
+  };
+
+  const saveQuickEvent = async () => {
+    if (!user || !church || !quickEvent.title.trim() || !quickEvent.date || !quickEvent.startTime) {
+      toast.error(t("Erro ao salvar"), { description: t("Preencha título, data e horário inicial") });
+      return;
+    }
+    setSavingQuickEvent(true);
+    const startsAt = `${quickEvent.date}T${quickEvent.startTime}:00`;
+    const endsAt = quickEvent.endTime ? `${quickEvent.date}T${quickEvent.endTime}:00` : null;
+    const { error } = await insertWithOrganizationScope("events", church.id, {
+      created_by: user.id,
+      title: quickEvent.title.trim(),
+      starts_at: startsAt,
+      ends_at: endsAt,
+      location: quickEvent.location.trim() || t("A definir"),
+      event_type: "bg-accent",
+      description: null,
+      is_public: true,
+    });
+    setSavingQuickEvent(false);
+    if (error) {
+      toast.error(t("Erro ao salvar"), { description: String((error as { message?: string }).message || "") });
+      return;
+    }
+    toast.success(t("Evento salvo!"));
+    setShowQuickEventModal(false);
+    await load();
+  };
 
   useEffect(() => {
     if (platformCampaigns.length <= 1) return;
@@ -558,9 +597,13 @@ export default function Dashboard() {
                   <Shield size={16} strokeWidth={1.5} /> {t("Painel da Plataforma")}
                 </Link>
               )}
-              <Link to="/admin/agenda" className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+              <button
+                type="button"
+                onClick={openQuickEventModal}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+              >
                 <Plus size={16} strokeWidth={1.5} /> {t("Novo Evento")}
-              </Link>
+              </button>
             </div>
           )}
         </div>
@@ -619,6 +662,97 @@ export default function Dashboard() {
           (isAdmin || isPlatformOverviewMode) ? renderAdminDashboard() : renderMembroDashboard()
         )}
       </div>
+
+      {/* Card de criação rápida de evento — abre aqui mesmo no Dashboard, sem
+          navegar para a Agenda. O evento criado é gravado na mesma tabela
+          `events` usada pela Agenda (mesmo fluxo do app), só a tela some. */}
+      <Dialog open={showQuickEventModal} onOpenChange={setShowQuickEventModal}>
+        <DialogContent className="max-w-md">
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-serif text-lg">{t("Novo Evento")}</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">{t("Este evento será registrado na Agenda da igreja.")}</p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-muted-foreground">
+                  {t("Título")}<span className="text-destructive ml-0.5">*</span>
+                </label>
+                <input
+                  value={quickEvent.title}
+                  onChange={e => setQuickEvent(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder={t("Ex: Culto de Celebração")}
+                  className="px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="flex flex-col gap-1 col-span-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {t("Data")}<span className="text-destructive ml-0.5">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={quickEvent.date}
+                    onChange={e => setQuickEvent(prev => ({ ...prev, date: e.target.value }))}
+                    className="px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {t("Início")}<span className="text-destructive ml-0.5">*</span>
+                  </label>
+                  <input
+                    type="time"
+                    value={quickEvent.startTime}
+                    onChange={e => setQuickEvent(prev => ({ ...prev, startTime: e.target.value }))}
+                    className="px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-muted-foreground">{t("Fim")}</label>
+                  <input
+                    type="time"
+                    value={quickEvent.endTime}
+                    onChange={e => setQuickEvent(prev => ({ ...prev, endTime: e.target.value }))}
+                    className="px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-muted-foreground">{t("Local")}</label>
+                <input
+                  value={quickEvent.location}
+                  onChange={e => setQuickEvent(prev => ({ ...prev, location: e.target.value }))}
+                  placeholder={t("A definir")}
+                  className="px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowQuickEventModal(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors"
+              >
+                {t("Cancelar")}
+              </button>
+              <button
+                type="button"
+                disabled={savingQuickEvent}
+                onClick={saveQuickEvent}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {savingQuickEvent && <Loader2 size={14} className="animate-spin" />}
+                {t("Salvar Evento")}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }

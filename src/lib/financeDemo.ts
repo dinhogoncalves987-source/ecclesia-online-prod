@@ -78,22 +78,11 @@ export type FinanceAccountEntry = {
   category: string;
 };
 
-export const ACCOUNTS_PAYABLE: FinanceAccountEntry[] = [
-  { id: "ap1", description: "Aluguel — salão auxiliar", amount: 4_800, dueDate: "2026-06-05", status: "Pendente", category: "Infraestrutura" },
-  { id: "ap2", description: "Energia elétrica", amount: 2_340, dueDate: "2026-06-10", status: "Agendado", category: "Utilidades" },
-  { id: "ap3", description: "Água e esgoto", amount: 890, dueDate: "2026-05-28", status: "Vencido", category: "Utilidades" },
-  { id: "ap4", description: "Ajuda missionária — Moçambique", amount: 12_000, dueDate: "2026-06-15", status: "Pendente", category: "Missões" },
-  { id: "ap5", description: "Fornecedor — material de construção", amount: 18_500, dueDate: "2026-06-20", status: "Agendado", category: "Obras" },
-  { id: "ap6", description: "Congressos de Jovens — sinal", amount: 8_200, dueDate: "2026-05-15", status: "Pago", category: "Eventos" },
-];
-
-export const ACCOUNTS_RECEIVABLE: FinanceAccountEntry[] = [
-  { id: "ar1", description: "Recebível — Campanha Reforma do Templo", amount: 15_000, dueDate: "2026-06-08", status: "Pendente", category: "Campanhas" },
-  { id: "ar2", description: "Recebível — Congresso de Jovens", amount: 6_400, dueDate: "2026-06-12", status: "Agendado", category: "Eventos" },
-  { id: "ar3", description: "Repasse congregação filial", amount: 22_100, dueDate: "2026-06-01", status: "Pendente", category: "Consolidação" },
-  { id: "ar4", description: "Oferta especial — Missões", amount: 9_800, dueDate: "2026-05-20", status: "Pago", category: "Missões" },
-  { id: "ar5", description: "Recebível — evento beneficente", amount: 4_500, dueDate: "2026-06-18", status: "Agendado", category: "Eventos" },
-];
+// ACCOUNTS_PAYABLE/ACCOUNTS_RECEIVABLE (dado fictício) removidos em
+// 2026-07-17: FinanceAccounts.tsx passou a consultar `transactions` real —
+// ver src/components/financeiro/FinanceAccounts.tsx. `FinanceAccountEntry`/
+// `PayableReceivableStatus` continuam aqui pois ainda são o formato de
+// exibição compartilhado (tipo + `formatFinanceCurrency`).
 
 export const BUDGET_COST_CENTERS = [
   { name: "Missões", budgeted: 85_000, actual: 72_400, pct: 85 },

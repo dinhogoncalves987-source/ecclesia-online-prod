@@ -5,6 +5,7 @@ describe("isModuleEnabled", () => {
   it("enables 'both' modules in production", () => {
     expect(isModuleEnabled("dashboard", "production")).toBe(true);
     expect(isModuleEnabled("finance.treasury", "production")).toBe(true);
+    expect(isModuleEnabled("finance.accounts", "production")).toBe(true);
     expect(isModuleEnabled("wallet", "production")).toBe(true);
     expect(isModuleEnabled("gatekeeper", "production")).toBe(true);
   });
@@ -12,12 +13,15 @@ describe("isModuleEnabled", () => {
   it("enables 'both' modules in staging", () => {
     expect(isModuleEnabled("dashboard", "staging")).toBe(true);
     expect(isModuleEnabled("finance.treasury", "staging")).toBe(true);
+    expect(isModuleEnabled("finance.accounts", "staging")).toBe(true);
   });
 
+  // CORREÇÃO 2026-07-17: "Contas" passou a consultar `transactions` real
+  // (contas a pagar/receber com status/data reais) — não usa mais
+  // financeDemo como fonte de dado exibido. Promovido para "both".
   it("disables staging-only demo finance tabs in production", () => {
     expect(isModuleEnabled("finance.executive", "production")).toBe(false);
     expect(isModuleEnabled("finance.campaigns", "production")).toBe(false);
-    expect(isModuleEnabled("finance.accounts", "production")).toBe(false);
     expect(isModuleEnabled("finance.budget", "production")).toBe(false);
     expect(isModuleEnabled("finance.assets", "production")).toBe(false);
     expect(isModuleEnabled("finance.accountability", "production")).toBe(false);

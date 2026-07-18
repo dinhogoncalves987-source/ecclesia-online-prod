@@ -110,6 +110,11 @@ const PRODUCTION_MODULES: readonly ModuleDefinition[] = [
 
   { id: "finance.treasury", availability: "both", label: "Financeiro — Tesouraria" },
 
+  // CORREÇÃO 2026-07-17 — "Contas" passou a consultar `transactions` real
+  // (contas a pagar/receber com status/data reais, sem financeDemo como
+  // fonte de dado exibido) — ver src/components/financeiro/FinanceAccounts.tsx.
+  { id: "finance.accounts", availability: "both", label: "Financeiro — Contas" },
+
   // Hardening do fluxo de convite/carteira/portaria concluído e com testes
   // aprovados (revisão de segurança do commit ee86c3d + revisão do fluxo de
   // convite de membro) — habilitado na allowlist urgente de produção.
@@ -161,12 +166,6 @@ const STAGING_ONLY_MODULES: readonly ModuleDefinition[] = IS_STAGING_BUILD ? [
     availability: "staging",
     label: "Financeiro — Campanhas",
     note: "usa campaignsDemo",
-  },
-  {
-    id: "finance.accounts",
-    availability: "staging",
-    label: "Financeiro — Contas",
-    note: "usa financeDemo",
   },
   {
     id: "finance.budget",

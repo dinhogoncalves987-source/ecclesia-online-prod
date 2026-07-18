@@ -48,10 +48,17 @@ const OFFICIAL_DOMAIN = "ecclesiabr.online";
 // case-insensitive sobre o CONTEÚDO dos arquivos gerados (não sobre nomes de
 // arquivo — chunks já têm hash e nomes minificados).
 const FORBIDDEN_TERMS_SOURCE = [
-  "financeDemo",
+  // "financeDemo" removido em 2026-07-17: agora também é importado por
+  // FinanceAccounts (real, ver abaixo) só pelos tipos/formatação de moeda —
+  // as outras abas fictícias continuam banidas individualmente pelo nome do
+  // próprio componente (FinanceExecutive, FinanceBudget, etc.), que
+  // continuam condicionados a IS_STAGING_BUILD em src/pages/Financeiro.tsx.
   "FinanceExecutive",
   "FinanceCampaigns",
-  "FinanceAccounts",
+  // "FinanceAccounts" removido em 2026-07-17: passou a consultar
+  // `transactions` real (contas a pagar/receber com status/data reais) —
+  // ver src/components/financeiro/FinanceAccounts.tsx e
+  // src/config/modules.ts (finance.accounts agora "both").
   "FinanceBudget",
   "FinanceAssets",
   "FinanceAccountability",

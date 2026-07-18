@@ -28,9 +28,11 @@ const FinanceExecutive = IS_STAGING_BUILD
 const FinanceCampaigns = IS_STAGING_BUILD
   ? lazy(() => import("@/components/financeiro/FinanceCampaigns").then(m => ({ default: m.FinanceCampaigns })))
   : null;
-const FinanceAccounts = IS_STAGING_BUILD
-  ? lazy(() => import("@/components/financeiro/FinanceAccounts").then(m => ({ default: m.FinanceAccounts })))
-  : null;
+// CORREÇÃO 2026-07-17 — "Contas" passou a consultar `transactions` real
+// (contas a pagar/receber derivadas de status/data reais, sem nenhum dado
+// fictício) — ver src/components/financeiro/FinanceAccounts.tsx. Por isso
+// carregada sempre, nunca condicionada a IS_STAGING_BUILD.
+const FinanceAccounts = lazy(() => import("@/components/financeiro/FinanceAccounts").then(m => ({ default: m.FinanceAccounts })));
 const FinanceBudget = IS_STAGING_BUILD
   ? lazy(() => import("@/components/financeiro/FinanceBudget").then(m => ({ default: m.FinanceBudget })))
   : null;

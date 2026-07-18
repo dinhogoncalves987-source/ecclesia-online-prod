@@ -1,16 +1,47 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import {
-  ACCOUNTS_PAYABLE,
-  ACCOUNTS_RECEIVABLE,
   formatFinanceCurrency,
   type FinanceAccountEntry,
   type PayableReceivableStatus,
 } from "@/lib/financeDemo";
-import { ArrowDownLeft, ArrowUpRight, CheckCircle2 } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, CheckCircle2, Loader2 } from "lucide-react";
 import { DocExportMenu } from "@/components/shared/DocExportMenu";
 import { buildFinanceExportItems } from "@/lib/docExport";
 import { FinanceDetailModal } from "@/components/financeiro/FinanceDetailModal";
+import { supabase } from "@/integrations/supabase/client";
+import { useChurch } from "@/hooks/useChurchContext";
+import { useRole } from "@/hooks/useRole";
+import { runScopedOrganizationQuery } from "@/lib/organizationScope";
+import { isExpense, type TreasuryTransaction } from "@/lib/finance";
+import { toast } from "sonner";
+
+/**
+ * CORREÇÃO 2026-07-17 — "Contas a pagar/receber" passou a usar lançamentos
+ * reais de `transactions` (não existe tabela própria de payable/receivable
+ * ainda). Regra combinada com o usuário: não há campo de data de vencimento
+ * separado no banco — a própria data do lançamento (`date`) é usada como
+ * referência; se já passou e o status ainda não é "Pago", conta como
+ * "Vencido". "Confirmado" (status intermediário real) é exibido como
+ * "Agendado" para manter a linguagem já usada nesta tela.
+ */
+function deriveEntryStatus(tx: TreasuryTransaction): PayableReceivableStatus {
+  if (tx.status === "Pago") return "Pago";
+  if (tx.status === "Confirmado") return "Agendado";
+  const isOverdue = new Date(`${tx.date}T00:00:00`).getTime() < new Date(new Date().toISOString().split("T")[0] + "T00:00:00").getTime();
+  return isOverdue ? "Vencido" : "Pendente";
+}
+
+function transactionToEntry(tx: TreasuryTransaction): FinanceAccountEntry {
+  return {
+    id: tx.id,
+    description: tx.description,
+    amount: Number(tx.amount),
+    dueDate: tx.date,
+    status: deriveEntryStatus(tx),
+    category: tx.category ?? "—",
+  };
+}
 
 const STATUS_CLASS: Record<PayableReceivableStatus, string> = {
   Pago: "bg-green-500/15 text-green-700",
@@ -31,15 +62,16 @@ type Props = {
   items: FinanceAccountEntry[];
   lang: string;
   t: (k: string) => string;
-  overrides: Record<string, PayableReceivableStatus>;
+  savingId: string | null;
+  canWrite: boolean;
   onMarkPaid: (id: string) => void;
   onRowClick: (item: FinanceAccountEntry) => void;
 };
 
-function AccountTable({ items, lang, t, overrides, onMarkPaid, onRowClick }: Props) {
+function AccountTable({ items, lang, t, savingId, canWrite, onMarkPaid, onRowClick }: Props) {
   const fmt = (v: number) => formatFinanceCurrency(v, lang);
   const dateLoc = lang === "en" ? "en-US" : lang === "es" ? "es-MX" : "pt-BR";
-  const getStatus = (item: FinanceAccountEntry) => overrides[item.id] ?? item.status;
+  const getStatus = (item: FinanceAccountEntry) => item.status;
 
   return (
     <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -81,13 +113,14 @@ function AccountTable({ items, lang, t, overrides, onMarkPaid, onRowClick }: Pro
                   </span>
                 </td>
                 <td className="py-3 text-right px-2">
-                  {status !== "Pago" && (
+                  {status !== "Pago" && canWrite && (
                     <button
                       type="button"
+                      disabled={savingId === item.id}
                       onClick={e => { e.stopPropagation(); onMarkPaid(item.id); }}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-green-500/10 text-green-700 text-[10px] font-medium hover:bg-green-500/20 transition-colors"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-green-500/10 text-green-700 text-[10px] font-medium hover:bg-green-500/20 transition-colors disabled:opacity-50"
                     >
-                      <CheckCircle2 size={11} /> {t("Marcar como pago")}
+                      {savingId === item.id ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />} {t("Marcar como pago")}
                     </button>
                   )}
                 </td>
@@ -102,31 +135,75 @@ function AccountTable({ items, lang, t, overrides, onMarkPaid, onRowClick }: Pro
 
 export function FinanceAccounts() {
   const { t, lang } = useLanguage();
+  const { church } = useChurch();
+  const { hasRole, hasCapability } = useRole();
+  const canWriteFinance = hasCapability("finance.write")
+    || hasRole(["super_admin", "church_admin", "tesoureiro", "contador"]);
   const fmt = (v: number) => formatFinanceCurrency(v, lang);
   const dateLoc = lang === "en" ? "en-US" : lang === "es" ? "es-MX" : "pt-BR";
   const [subTab, setSubTab] = useState<"payable" | "receivable">("payable");
-  const [payableOverrides, setPayableOverrides] = useState<Record<string, PayableReceivableStatus>>({});
-  const [receivableOverrides, setReceivableOverrides] = useState<Record<string, PayableReceivableStatus>>({});
+  const [loading, setLoading] = useState(true);
+  const [payable, setPayable] = useState<FinanceAccountEntry[]>([]);
+  const [receivable, setReceivable] = useState<FinanceAccountEntry[]>([]);
   const [selectedEntry, setSelectedEntry] = useState<FinanceAccountEntry | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
 
-  const markPaid = (id: string, type: "payable" | "receivable") => {
-    if (type === "payable") setPayableOverrides(p => ({ ...p, [id]: "Pago" }));
-    else setReceivableOverrides(p => ({ ...p, [id]: "Pago" }));
+  const load = async () => {
+    if (!church) { setLoading(false); return; }
+    setLoading(true);
+    const { data, error } = await runScopedOrganizationQuery<TreasuryTransaction[]>(
+      "transactions",
+      church.id,
+      query => query.select("*").order("date", { ascending: false }).limit(200),
+    );
+    if (error) {
+      console.error("[FinanceAccounts] load:", error);
+      setLoading(false);
+      return;
+    }
+    const all = data ?? [];
+    setPayable(all.filter(tx => isExpense(tx.type)).map(transactionToEntry));
+    setReceivable(all.filter(tx => !isExpense(tx.type)).map(transactionToEntry));
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [church?.id]);
+
+  const markPaid = async (id: string) => {
+    if (!church || !canWriteFinance) return;
+    setSavingId(id);
+    const { error } = await supabase
+      .from("transactions")
+      .update({ status: "Pago" })
+      .eq("id", id)
+      .eq("organization_id", church.id);
+    setSavingId(null);
+    if (error) {
+      console.error("[FinanceAccounts] markPaid:", error);
+      toast.error(t("Não foi possível atualizar o lançamento."));
+      return;
+    }
+    setPayable(prev => prev.map(i => (i.id === id ? { ...i, status: "Pago" } : i)));
+    setReceivable(prev => prev.map(i => (i.id === id ? { ...i, status: "Pago" } : i)));
+    setSelectedEntry(prev => (prev?.id === id ? { ...prev, status: "Pago" } : prev));
   };
 
   const payableSummary = useMemo(() => {
-    const pending = ACCOUNTS_PAYABLE.filter(i => (payableOverrides[i.id] ?? i.status) !== "Pago");
-    const overdue = ACCOUNTS_PAYABLE.filter(i => (payableOverrides[i.id] ?? i.status) === "Vencido");
+    const pending = payable.filter(i => i.status !== "Pago");
+    const overdue = payable.filter(i => i.status === "Vencido");
     const totalPending = pending.reduce((s, i) => s + i.amount, 0);
     const totalOverdue = overdue.reduce((s, i) => s + i.amount, 0);
     return { totalPending, totalOverdue, count: pending.length };
-  }, [payableOverrides]);
+  }, [payable]);
 
   const receivableSummary = useMemo(() => {
-    const pending = ACCOUNTS_RECEIVABLE.filter(i => (receivableOverrides[i.id] ?? i.status) !== "Pago");
+    const pending = receivable.filter(i => i.status !== "Pago");
     const totalPending = pending.reduce((s, i) => s + i.amount, 0);
     return { totalPending, count: pending.length };
-  }, [receivableOverrides]);
+  }, [receivable]);
 
   const tabs = [
     { key: "payable" as const, label: t("Contas a pagar"), icon: ArrowUpRight },
@@ -134,8 +211,8 @@ export function FinanceAccounts() {
   ];
 
   const isPayable = subTab === "payable";
-  const activeOverrides = isPayable ? payableOverrides : receivableOverrides;
-  const selectedStatus = selectedEntry ? (activeOverrides[selectedEntry.id] ?? selectedEntry.status) : "Pendente";
+  const activeItems = isPayable ? payable : receivable;
+  const selectedStatus = selectedEntry?.status ?? "Pendente";
 
   return (
     <div className="space-y-4">
@@ -185,29 +262,29 @@ export function FinanceAccounts() {
             summary: isPayable
               ? `Pendente: ${fmt(payableSummary.totalPending)} | Vencido: ${fmt(payableSummary.totalOverdue)}`
               : `A receber: ${fmt(receivableSummary.totalPending)}`,
-            csvFn: () => buildCSV(isPayable ? ACCOUNTS_PAYABLE : ACCOUNTS_RECEIVABLE),
+            csvFn: () => buildCSV(activeItems),
             csvFilename: `contas_${isPayable ? "pagar" : "receber"}.csv`,
           })}
         />
       </div>
 
       <section className="bg-card rounded-xl shadow-executive p-5">
-        {isPayable ? (
-          <AccountTable
-            items={ACCOUNTS_PAYABLE}
-            lang={lang}
-            t={t}
-            overrides={payableOverrides}
-            onMarkPaid={id => markPaid(id, "payable")}
-            onRowClick={setSelectedEntry}
-          />
+        {loading ? (
+          <div className="flex items-center justify-center py-10 text-muted-foreground gap-2 text-sm">
+            <Loader2 size={16} className="animate-spin" /> {t("Carregando...")}
+          </div>
+        ) : activeItems.length === 0 ? (
+          <p className="text-center text-sm text-muted-foreground py-10">
+            {isPayable ? t("Nenhuma conta a pagar no momento.") : t("Nenhuma conta a receber no momento.")}
+          </p>
         ) : (
           <AccountTable
-            items={ACCOUNTS_RECEIVABLE}
+            items={activeItems}
             lang={lang}
             t={t}
-            overrides={receivableOverrides}
-            onMarkPaid={id => markPaid(id, "receivable")}
+            savingId={savingId}
+            canWrite={canWriteFinance}
+            onMarkPaid={markPaid}
             onRowClick={setSelectedEntry}
           />
         )}
@@ -253,11 +330,12 @@ export function FinanceAccounts() {
               </div>
             </div>
 
-            {selectedStatus !== "Pago" && (
+            {selectedStatus !== "Pago" && canWriteFinance && (
               <button
                 type="button"
+                disabled={savingId === selectedEntry.id}
                 onClick={() => {
-                  markPaid(selectedEntry.id, isPayable ? "payable" : "receivable");
+                  markPaid(selectedEntry.id);
                   setSelectedEntry(null);
                 }}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-green-500/10 text-green-700 hover:bg-green-500/20 text-sm font-medium transition-colors"
