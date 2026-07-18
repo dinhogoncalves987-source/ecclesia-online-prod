@@ -410,6 +410,94 @@ export async function uploadInternalAttachment(
   return { ok: true, attachment: mapDbAttachmentToUi(row) };
 }
 
+/**
+ * Marca como lidas todas as mensagens de outros participantes numa thread.
+ * Usa RPC SECURITY DEFINER (mark_internal_thread_read) porque a policy de
+ * UPDATE em internal_messages hoje só permite staff — assim qualquer
+ * participante autorizado (dono, membro vinculado ou staff) consegue marcar
+ * sua própria leitura sem precisar de uma policy de UPDATE ampla.
+ * Fire-and-forget: falha aqui nunca deve travar a experiência de leitura.
+ */
+export async function markInternalThreadRead(threadId: string): Promise<void> {
+  try {
+    await supabase.rpc("mark_internal_thread_read", { _thread_id: threadId });
+  } catch (err) {
+    console.warn("[markInternalThreadRead]", err);
+  }
+}
+
+/**
+ * Reenvia (forward) uma mensagem — com ou sem anexo — para outra conversa.
+ * Anexos NÃO são reenviados (novo upload); apontam para o mesmo arquivo já
+ * salvo no bucket internal-message-media, evitando duplicar armazenamento.
+ */
+export async function forwardInternalMessage(
+  organizationId: string,
+  targetThreadId: string,
+  userId: string,
+  message: InternalMessage,
+): Promise<{ ok: boolean; message?: InternalMessage; error?: string }> {
+  if (!message.body && message.attachments.length === 0) {
+    return { ok: false, error: "empty_message" };
+  }
+
+  const memberId = await resolveMemberIdForUser(organizationId, userId);
+  const messageType = message.attachments.length > 0 ? message.messageType : "text";
+
+  const { data: msgData, error: msgError } = await insertWithOrganizationScope<DbInternalMessageRow>(
+    "internal_messages",
+    organizationId,
+    {
+      thread_id: targetThreadId,
+      sender_user_id: userId,
+      sender_member_id: memberId,
+      sender_role: null,
+      body: message.body ?? null,
+      message_type: messageType,
+    },
+    (query) => query.select("*").single(),
+  );
+
+  if (msgError) {
+    return { ok: false, error: String((msgError as { message?: string }).message ?? msgError) };
+  }
+
+  const msgRow = (Array.isArray(msgData) ? msgData[0] : msgData) as DbInternalMessageRow | undefined;
+  if (!msgRow) return { ok: false, error: "missing_message" };
+
+  const attachments: InternalMessageAttachment[] = [];
+  for (const att of message.attachments) {
+    const { data, error } = await insertWithOrganizationScope<DbInternalAttachmentRow>(
+      "internal_message_attachments",
+      organizationId,
+      {
+        message_id: msgRow.id,
+        thread_id: targetThreadId,
+        uploaded_by: userId,
+        storage_bucket: att.storageBucket,
+        storage_path: att.storagePath,
+        public_url: att.publicUrl,
+        file_name: att.fileName,
+        file_type: att.fileType,
+        file_size: att.fileSize,
+        duration_seconds: att.durationSeconds,
+      },
+      (query) => query.select("*").single(),
+    );
+    if (error) {
+      return { ok: false, error: String((error as { message?: string }).message ?? error) };
+    }
+    const row = (Array.isArray(data) ? data[0] : data) as DbInternalAttachmentRow | undefined;
+    if (row) attachments.push(mapDbAttachmentToUi(row));
+  }
+
+  const forwarded = mapDbMessageToUi(msgRow, attachments);
+  forwarded.isOwn = true;
+  forwarded.senderName = "Você";
+
+  return { ok: true, message: forwarded };
+}
+
 export async function closeInternalThread(
   organizationId: string,
   threadId: string,

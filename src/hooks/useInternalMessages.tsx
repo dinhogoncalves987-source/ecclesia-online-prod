@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fetchThreadMessages, type InternalMessage } from "@/lib/internalMessages";
 import {
   deleteInternalMessage,
+  markInternalThreadRead,
   sendInternalMessage,
   type SendMessagePayload,
 } from "@/lib/internalMessageMutations";
@@ -40,6 +41,12 @@ export function useInternalMessages({
     setMessages(result.messages);
     setFromDatabase(result.fromDatabase);
     setLoading(false);
+
+    // Abrir a conversa marca como lidas as mensagens recebidas — é isso que
+    // faz o badge de não lidas (sidebar/ícone do app) zerar para esta thread.
+    if (result.fromDatabase && result.messages.some((m) => !m.isOwn && !m.readAt)) {
+      void markInternalThreadRead(threadId);
+    }
   }, [organizationId, threadId, currentUserId, enabled]);
 
   useEffect(() => {

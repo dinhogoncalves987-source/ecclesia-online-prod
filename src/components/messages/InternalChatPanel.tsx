@@ -26,6 +26,8 @@ type Props = {
   onBack?: () => void;
   onThreadCreated?: (thread: InternalThread) => void;
   onThreadUpdated?: () => void;
+  /** Abre o seletor de conversa para reenviar (like WhatsApp) — só existe em modo inbox */
+  onForwardMessage?: (message: InternalMessage) => void;
 };
 
 export function InternalChatPanel({
@@ -42,6 +44,7 @@ export function InternalChatPanel({
   onBack,
   onThreadCreated,
   onThreadUpdated,
+  onForwardMessage,
 }: Props) {
   const { user } = useAuth();
   const { t } = useLanguage();
@@ -205,6 +208,7 @@ export function InternalChatPanel({
           canDeleteForAll={isStaff}
           deleting={deleting}
           onDeleteMessage={handleDeleteMessage}
+          onForwardMessage={onForwardMessage}
         />
       ) : (
         emptyHint ?? (
@@ -215,6 +219,7 @@ export function InternalChatPanel({
             canDeleteForAll={isStaff}
             deleting={deleting}
             onDeleteMessage={handleDeleteMessage}
+            onForwardMessage={onForwardMessage}
           />
         )
       )}

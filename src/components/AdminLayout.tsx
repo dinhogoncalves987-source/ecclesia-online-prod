@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useRole } from "@/hooks/useRole";
 import { useChurch } from "@/hooks/useChurchContext";
+import { useUnreadInternalMessages } from "@/hooks/useUnreadInternalMessages";
 import { supabase } from "@/integrations/supabase/client";
 import { SupportModeBanner } from "@/components/platform/SupportModeBanner";
 import { RequireSupportOrganization } from "@/components/platform/RequireSupportOrganization";
@@ -147,6 +148,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const { canAccess, isAdmin, isSuperAdmin } = useRole();
   const { church } = useChurch();
   const { isPlatformUser, isSupportModeActive } = useSupportContext();
+  const { unreadCount: unreadChatCount } = useUnreadInternalMessages(church?.id, user?.id);
 
   // Routes that are platform-level and do NOT require a support org selected
   const UNGUARDED_PLATFORM_PATHS = [
@@ -336,13 +338,20 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                             : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                         }`}
                       >
-                        <item.icon
-                          size={18}
-                          strokeWidth={1.5}
-                          className={`flex-shrink-0 ${
-                            isActive(item.path) ? "text-accent" : "group-hover:text-foreground"
-                          }`}
-                        />
+                        <span className="relative flex-shrink-0">
+                          <item.icon
+                            size={18}
+                            strokeWidth={1.5}
+                            className={
+                              isActive(item.path) ? "text-accent" : "group-hover:text-foreground"
+                            }
+                          />
+                          {item.path === GLOBAL_CHAT_PATH && unreadChatCount > 0 && (
+                            <span className="absolute -top-1.5 -right-2 min-w-[15px] h-[15px] px-[3px] rounded-full bg-emerald-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                              {unreadChatCount > 99 ? "99+" : unreadChatCount}
+                            </span>
+                          )}
+                        </span>
                         {!collapsed && <span>{t(item.label)}</span>}
                       </Link>
                     ))}
@@ -669,7 +678,14 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               isActive(item.path) ? "text-accent" : "text-muted-foreground"
             }`}
           >
-            <item.icon size={20} strokeWidth={1.5} />
+            <span className="relative">
+              <item.icon size={20} strokeWidth={1.5} />
+              {item.path === GLOBAL_CHAT_PATH && unreadChatCount > 0 && (
+                <span className="absolute -top-1 -right-1.5 min-w-[15px] h-[15px] px-[3px] rounded-full bg-emerald-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                  {unreadChatCount > 99 ? "99+" : unreadChatCount}
+                </span>
+              )}
+            </span>
             <span className="text-[10px] font-medium">{t(item.label)}</span>
           </Link>
         ))}

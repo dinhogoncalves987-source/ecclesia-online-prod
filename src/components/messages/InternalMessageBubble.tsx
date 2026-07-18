@@ -1,4 +1,4 @@
-import { EyeOff, MoreVertical, Trash2 } from "lucide-react";
+import { EyeOff, Forward, MoreVertical, Share2, Trash2 } from "lucide-react";
 import { InternalAudioPreview } from "@/components/messages/InternalAudioPreview";
 import { InternalDocumentPreview } from "@/components/messages/InternalDocumentPreview";
 import { InternalImagePreview } from "@/components/messages/InternalImagePreview";
@@ -22,7 +22,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useToast } from "@/hooks/use-toast";
 import type { InternalMessage } from "@/lib/internalMessages";
+import { shareInternalMessage } from "@/lib/shareMedia";
 import { cn } from "@/lib/utils";
 
 type DeleteTarget = "for-me" | "for-all" | null;
@@ -35,6 +37,8 @@ type Props = {
   onDeleteForAll?: (messageId: string) => void | Promise<void>;
   /** Callback chamado quando usuário escolhe "Apagar para mim" */
   onHideForMe?: (messageId: string) => void;
+  /** Abre o seletor de conversa para reenviar esta mensagem (like WhatsApp) */
+  onForward?: (message: InternalMessage) => void;
 };
 
 export function InternalMessageBubble({
@@ -43,9 +47,25 @@ export function InternalMessageBubble({
   deleting = false,
   onDeleteForAll,
   onHideForMe,
+  onForward,
 }: Props) {
   const { lang, t } = useLanguage();
+  const { toast } = useToast();
   const [confirmTarget, setConfirmTarget] = useState<DeleteTarget>(null);
+  const canForward = Boolean(onForward) && (Boolean(message.body) || message.attachments.length > 0);
+
+  const handleShare = async () => {
+    const result = await shareInternalMessage(message);
+    if (result.ok && result.method === "clipboard") {
+      toast({ title: t("Link copiado"), description: t("Cole em qualquer app para compartilhar.") });
+    } else if (!result.ok && result.error !== "cancelled") {
+      toast({
+        title: t("Não foi possível compartilhar"),
+        description: t("Seu navegador não tem suporte a compartilhamento nativo."),
+        variant: "destructive",
+      });
+    }
+  };
 
   const isOwn = message.isOwn ?? false;
   const dateLoc = lang === "en" ? "en-US" : lang === "es" ? "es-MX" : "pt-BR";
@@ -55,8 +75,9 @@ export function InternalMessageBubble({
     minute: "2-digit",
   });
 
-  const showDeleteMenu =
-    Boolean(onHideForMe) || (canDeleteForAll && Boolean(onDeleteForAll));
+  // Neste ponto a mensagem já não é "system" nem "deleted" (early returns acima),
+  // então sempre há ao menos a opção de compartilhar.
+  const showActionsMenu = true;
 
   /* ── Mensagem do sistema ─────────────────────────────────────────────────── */
   if (message.messageType === "system") {
@@ -125,6 +146,11 @@ export function InternalMessageBubble({
         sideOffset={4}
         className="min-w-[180px] z-[9999]"
       >
+        <DropdownMenuItem className="gap-2.5 cursor-pointer" onSelect={() => void handleShare()}>
+          <Share2 size={14} className="text-muted-foreground flex-shrink-0" />
+          {t("Compartilhar")}
+        </DropdownMenuItem>
+        {(Boolean(onHideForMe) || (canDeleteForAll && Boolean(onDeleteForAll))) && <DropdownMenuSeparator />}
         {Boolean(onHideForMe) && (
           <DropdownMenuItem
             className="gap-2.5 cursor-pointer"
@@ -151,14 +177,28 @@ export function InternalMessageBubble({
     </DropdownMenu>
   );
 
+  /* ── Botão de reenviar (seta estilo WhatsApp, sempre visível junto ao ⋮) ── */
+  const ForwardButton = () => (
+    <button
+      type="button"
+      onClick={() => onForward?.(message)}
+      className="h-7 w-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+      aria-label={t("Reenviar mensagem")}
+      title={t("Reenviar")}
+    >
+      <Forward size={14} />
+    </button>
+  );
+
   /* ── Bubble normal ───────────────────────────────────────────────────────── */
   return (
     <>
       <div className={cn("flex w-full group items-end gap-1", isOwn ? "justify-end" : "justify-start")}>
         {/* Menu lado esquerdo (mensagens dos outros) */}
-        {showDeleteMenu && !isOwn && (
-          <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity self-end pb-2">
-            <MenuButton />
+        {!isOwn && (
+          <div className="flex-shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity self-end pb-2">
+            {canForward && <ForwardButton />}
+            {showActionsMenu && <MenuButton />}
           </div>
         )}
 
@@ -206,9 +246,10 @@ export function InternalMessageBubble({
         </div>
 
         {/* Menu lado direito (mensagens próprias) */}
-        {showDeleteMenu && isOwn && (
-          <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity self-end pb-2">
-            <MenuButton />
+        {isOwn && (
+          <div className="flex-shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity self-end pb-2">
+            {showActionsMenu && <MenuButton />}
+            {canForward && <ForwardButton />}
           </div>
         )}
       </div>

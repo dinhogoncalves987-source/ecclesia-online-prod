@@ -16,10 +16,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, MessageSquarePlus, Search, X } from "lucide-react";
 import { InternalChatPanel } from "@/components/messages/InternalChatPanel";
+import { InternalForwardDialog } from "@/components/messages/InternalForwardDialog";
 import { InternalThreadList } from "@/components/messages/InternalThreadList";
 import { useAuth } from "@/hooks/useAuth";
 import { useInternalThreads } from "@/hooks/useInternalThreads";
-import { fetchCampaignSharedThread, type InternalThread, type InternalThreadSource } from "@/lib/internalMessages";
+import {
+  fetchCampaignSharedThread,
+  type InternalMessage,
+  type InternalThread,
+  type InternalThreadSource,
+} from "@/lib/internalMessages";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -71,6 +77,7 @@ export function InternalChat({
   const [selectedThread, setSelectedThread] = useState<InternalThread | null>(null);
   const [mobileShowPanel, setMobileShowPanel] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [forwardMessage, setForwardMessage] = useState<InternalMessage | null>(null);
 
   // Auto-selecionar primeira conversa ao carregar (inbox) ou forcedThread
   useEffect(() => {
@@ -249,6 +256,7 @@ export function InternalChat({
                 subtitle={subtitle}
                 onThreadCreated={(t) => setSelectedThread(t)}
                 onThreadUpdated={() => void refetchThreads()}
+                onForwardMessage={(message) => setForwardMessage(message)}
               />
             </>
           ) : threadsLoading ? (
@@ -266,6 +274,17 @@ export function InternalChat({
           )}
         </div>
       </div>
+
+      <InternalForwardDialog
+        open={forwardMessage !== null}
+        onOpenChange={(open) => { if (!open) setForwardMessage(null); }}
+        message={forwardMessage}
+        threads={threads}
+        currentThreadId={activeThread?.id ?? null}
+        organizationId={organizationId}
+        userId={user?.id ?? ""}
+        onForwarded={() => setForwardMessage(null)}
+      />
     </div>
   );
 }

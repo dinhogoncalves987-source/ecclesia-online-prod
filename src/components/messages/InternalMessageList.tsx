@@ -35,6 +35,8 @@ type Props = {
   canDeleteForAll?: boolean;
   deleting?: boolean;
   onDeleteMessage?: (messageId: string) => void | Promise<void>;
+  /** Abre o seletor de conversa para reenviar (like WhatsApp) */
+  onForwardMessage?: (message: InternalMessage) => void;
 };
 
 export function InternalMessageList({
@@ -44,6 +46,7 @@ export function InternalMessageList({
   canDeleteForAll = false,
   deleting = false,
   onDeleteMessage,
+  onForwardMessage,
 }: Props) {
   const { t } = useLanguage();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -110,6 +113,11 @@ export function InternalMessageList({
             onHideForMe={
               message.messageType !== "system" && message.messageType !== "deleted"
                 ? handleHideForMe
+                : undefined
+            }
+            onForward={
+              onForwardMessage && message.messageType !== "system" && message.messageType !== "deleted"
+                ? onForwardMessage
                 : undefined
             }
           />
