@@ -68,7 +68,9 @@
     "20260718090000_chat_delivery_status_and_presence.sql",
     "20260718100000_internal_threads_hide_for_user.sql",
     "20260718110000_internal_threads_call_room_token.sql",
-    "20260718120000_internal_chat_missing_authenticated_grants.sql"
+    "20260718120000_internal_chat_missing_authenticated_grants.sql",
+    "20260718130000_push_subscriptions.sql",
+    "20260718140000_internal_thread_notification_recipients.sql"
   ],
   "staging_feature": [
     "20260526100000_staging_worship_tables.sql",

@@ -46,6 +46,11 @@ export default defineConfig(({ mode, command }) => {
       // configuração "manifest" abaixo.
       // Service Worker gerado via workbox
       workbox: {
+        // push-sw.js (raiz, não processado pelo Workbox) adiciona os
+        // listeners 'push'/'notificationclick' ao MESMO Service Worker
+        // gerado abaixo — permite notificação real de mensagem nova com o
+        // app fechado/celular travado (ver src/lib/webPush.ts).
+        importScripts: ["push-sw.js"],
         // Precache restrito ao app shell (JS/CSS/HTML do build) e aos
         // ícones essenciais do manifesto (pequenos, poucos KB cada).
         // NUNCA precachear campanhas, mídia, uploads ou documentos — isso

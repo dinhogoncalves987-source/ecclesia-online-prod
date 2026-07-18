@@ -10,3 +10,9 @@ verify_jwt = false
 
 [functions.daily-devotional]
 verify_jwt = false
+
+# send-chat-push recebe o JWT REAL do remetente (nunca a publishable key) —
+# precisa do gateway validando o JWT antes mesmo do código da função rodar
+# (defesa em profundidade, além da checagem própria em index.ts).
+[functions.send-chat-push]
+verify_jwt = true

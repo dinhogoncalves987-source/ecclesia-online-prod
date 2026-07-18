@@ -45,6 +45,7 @@ import {
   type InternalThreadSource,
 } from "@/lib/internalMessages";
 import { cn } from "@/lib/utils";
+import { subscribeToWebPush } from "@/lib/webPush";
 
 type Props = {
   mode: "inbox" | "panel";
@@ -112,7 +113,19 @@ export function InternalChat({
   const handleRequestNotifPermission = async () => {
     const result = await requestChatNotificationPermission();
     setNotifPermission(result);
+    if (result === "granted" && user?.id) {
+      void subscribeToWebPush(user.id);
+    }
   };
+
+  // Permissão já concedida em visita anterior (ex.: recarregou a página) —
+  // garante que este dispositivo continua com uma inscrição de Web Push
+  // válida, sem precisar que o usuário clique no banner novamente.
+  useEffect(() => {
+    if (notifPermission === "granted" && user?.id) {
+      void subscribeToWebPush(user.id);
+    }
+  }, [notifPermission, user?.id]);
 
   // ── INBOX: lista de threads ───────────────────────────────────────────────
   const {

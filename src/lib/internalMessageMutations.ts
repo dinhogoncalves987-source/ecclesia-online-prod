@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { insertWithOrganizationScope } from "@/lib/organizationScope";
+import { triggerChatPush } from "@/lib/webPush";
 import {
   INTERNAL_ATTACHMENT_MIME,
   INTERNAL_AUDIO_MAX_BYTES,
@@ -357,6 +358,8 @@ export async function sendInternalMessage(
   message.isOwn = true;
   message.senderName = "Você";
 
+  triggerChatPush(msgRow.id);
+
   return { ok: true, message };
 }
 
@@ -510,6 +513,8 @@ export async function forwardInternalMessage(
   const forwarded = mapDbMessageToUi(msgRow, attachments);
   forwarded.isOwn = true;
   forwarded.senderName = "Você";
+
+  triggerChatPush(msgRow.id);
 
   return { ok: true, message: forwarded };
 }
