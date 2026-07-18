@@ -14,6 +14,8 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useRole } from "@/hooks/useRole";
 import { useChurch } from "@/hooks/useChurchContext";
 import { useUnreadInternalMessages } from "@/hooks/useUnreadInternalMessages";
+import { PresenceProvider } from "@/hooks/usePresence";
+import { useOwnProfile } from "@/hooks/useOwnProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { SupportModeBanner } from "@/components/platform/SupportModeBanner";
 import { RequireSupportOrganization } from "@/components/platform/RequireSupportOrganization";
@@ -225,8 +227,9 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     }
   }, [location.pathname]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [profileName, setProfileName] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const { data: ownProfile } = useOwnProfile(user?.id);
+  const profileName = ownProfile?.full_name ?? "";
+  const avatarUrl = ownProfile?.avatar_url ?? null;
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -258,19 +261,6 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       document.removeEventListener("webkitfullscreenchange", handler);
     };
   }, []);
-
-  useEffect(() => {
-    if (!user) return;
-    supabase
-      .from("profiles")
-      .select("full_name, avatar_url")
-      .eq("user_id", user.id)
-      .single()
-      .then(({ data }) => {
-        if (data?.full_name) setProfileName(data.full_name);
-        if (data?.avatar_url) setAvatarUrl(data.avatar_url);
-      });
-  }, [user]);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -380,6 +370,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const initials = displayName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
 
   return (
+    <PresenceProvider organizationId={church?.id} currentUserId={user?.id}>
     <div className="min-h-screen bg-background flex">
       {/* Desktop Sidebar */}
       <aside
@@ -744,5 +735,6 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         )}
       </AnimatePresence>
     </div>
+    </PresenceProvider>
   );
 }

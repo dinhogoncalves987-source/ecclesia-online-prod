@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { playMessageReceivedSound, showChatMessageNotification } from "@/lib/chatNotifications";
+import type { DbInternalMessageRow } from "@/lib/internalMessages";
 
 /**
  * Badge de mensagens não lidas do chat interno (internal_messages).
@@ -50,6 +52,8 @@ export function useUnreadInternalMessages(organizationId?: string | null, userId
     staleTime: 15_000,
   });
 
+  const notifiedIdsRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     if (!organizationId || !userId) return;
 
@@ -58,8 +62,28 @@ export function useUnreadInternalMessages(organizationId?: string | null, userId
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "internal_messages", filter: `organization_id=eq.${organizationId}` },
-        () => {
+        (payload) => {
           void queryClient.invalidateQueries({ queryKey });
+
+          // Som + notificação — só para INSERT de outra pessoa, nunca para
+          // a própria mensagem, e nunca repetido para a mesma mensagem.
+          if (payload.eventType !== "INSERT") return;
+          const row = payload.new as DbInternalMessageRow;
+          if (row.sender_user_id === userId) return;
+          if (notifiedIdsRef.current.has(row.id)) return;
+          notifiedIdsRef.current.add(row.id);
+
+          playMessageReceivedSound();
+
+          // Notificação do navegador/PWA só quando o app está em segundo
+          // plano — em primeiro plano o usuário já vê o badge/som.
+          if (document.visibilityState !== "visible") {
+            showChatMessageNotification({
+              title: "Nova mensagem — Ecclesia",
+              body: row.body ?? "Você recebeu uma nova mensagem.",
+              threadId: row.thread_id,
+            });
+          }
         },
       )
       .subscribe();

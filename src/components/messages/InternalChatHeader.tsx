@@ -1,6 +1,8 @@
 import { ArrowLeft, Phone, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
+import { usePresenceStatus } from "@/hooks/usePresence";
+import { formatLastSeen } from "@/lib/presenceFormat";
 import type { InternalThread } from "@/lib/internalMessages";
 import { cn } from "@/lib/utils";
 
@@ -30,8 +32,16 @@ export function InternalChatHeader({
   onVoiceCall,
   onVideoCall,
 }: Props) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const { isOnline } = usePresenceStatus();
   const displayTitle = title ?? thread?.subject ?? t("Conversa");
+
+  const online = isOnline(thread?.participantUserId);
+  const presenceLabel = online
+    ? t("Online")
+    : thread?.participantLastSeenAt
+      ? formatLastSeen(thread.participantLastSeenAt, lang)
+      : null;
 
   return (
     <header className="flex-shrink-0 flex items-center gap-2 border-b border-border/50 bg-card px-3 sm:px-4 py-3 min-h-[56px]">
@@ -50,8 +60,22 @@ export function InternalChatHeader({
 
       {/* Avatar / ícone da conversa */}
       {thread && (
-        <div className="flex-shrink-0 h-9 w-9 rounded-full bg-primary/15 flex items-center justify-center text-sm font-semibold text-primary uppercase">
-          {displayTitle.charAt(0)}
+        <div className="relative flex-shrink-0">
+          {thread.participantAvatarUrl ? (
+            <img
+              src={thread.participantAvatarUrl}
+              alt={displayTitle}
+              className="h-9 w-9 rounded-full object-cover bg-muted"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+            />
+          ) : (
+            <div className="h-9 w-9 rounded-full bg-primary/15 flex items-center justify-center text-sm font-semibold text-primary uppercase">
+              {displayTitle.charAt(0)}
+            </div>
+          )}
+          {online && (
+            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-card" />
+          )}
         </div>
       )}
 
@@ -60,7 +84,9 @@ export function InternalChatHeader({
         {subtitle ? (
           <p className="text-[11px] text-muted-foreground truncate">{subtitle}</p>
         ) : thread?.participantName && isStaff ? (
-          <p className="text-[11px] text-muted-foreground truncate">{thread.participantName}</p>
+          <p className={cn("text-[11px] truncate", online ? "text-emerald-600 font-medium" : "text-muted-foreground")}>
+            {presenceLabel ?? thread.participantName}
+          </p>
         ) : null}
       </div>
 

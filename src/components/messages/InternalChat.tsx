@@ -14,14 +14,32 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, MessageSquarePlus, Search, X } from "lucide-react";
+import { Bell, BellOff, CheckSquare, Loader2, MessageSquarePlus, Search, Trash2, X } from "lucide-react";
 import { InternalChatPanel } from "@/components/messages/InternalChatPanel";
 import { InternalForwardDialog } from "@/components/messages/InternalForwardDialog";
 import { InternalThreadList } from "@/components/messages/InternalThreadList";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useInternalThreads } from "@/hooks/useInternalThreads";
+import { useLanguage } from "@/hooks/useLanguage";
+import { useToast } from "@/hooks/use-toast";
+import {
+  getChatNotificationPermission,
+  requestChatNotificationPermission,
+  type ChatNotificationPermission,
+} from "@/lib/chatNotifications";
 import {
   fetchCampaignSharedThread,
+  hideInternalThreadForUser,
   type InternalMessage,
   type InternalThread,
   type InternalThreadSource,
@@ -62,6 +80,39 @@ export function InternalChat({
   onForcedThreadConsumed,
 }: Props) {
   const { user } = useAuth();
+  const { t } = useLanguage();
+  const { toast } = useToast();
+
+  // ── Apagar conversas (seleção múltipla, "apagar para mim") ──────────────
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedThreadIds, setSelectedThreadIds] = useState<Set<string>>(new Set());
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deletingThreads, setDeletingThreads] = useState(false);
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedThreadIds(new Set());
+  };
+
+  const toggleThreadSelection = (thread: InternalThread) => {
+    setSelectedThreadIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(thread.id)) next.delete(thread.id);
+      else next.add(thread.id);
+      return next;
+    });
+  };
+
+  // ── Notificações do navegador — solicitação explícita e visível ─────────
+  const [notifPermission, setNotifPermission] = useState<ChatNotificationPermission>(
+    getChatNotificationPermission(),
+  );
+  const [notifBannerDismissed, setNotifBannerDismissed] = useState(false);
+
+  const handleRequestNotifPermission = async () => {
+    const result = await requestChatNotificationPermission();
+    setNotifPermission(result);
+  };
 
   // ── INBOX: lista de threads ───────────────────────────────────────────────
   const {
@@ -71,6 +122,7 @@ export function InternalChat({
   } = useInternalThreads({
     organizationId,
     source,
+    currentUserId: user?.id ?? null,
     enabled: mode === "inbox" && Boolean(organizationId),
   });
 
@@ -107,6 +159,37 @@ export function InternalChat({
       t.participantName?.toLowerCase().includes(q),
     );
   }, [threads, searchQuery]);
+
+  const selectAllVisible = () => setSelectedThreadIds(new Set(filteredThreads.map((t) => t.id)));
+
+  const handleConfirmDeleteThreads = async () => {
+    if (!user?.id) return;
+    setDeletingThreads(true);
+
+    const ids = Array.from(selectedThreadIds);
+    const results = await Promise.all(ids.map((id) => hideInternalThreadForUser(id, user.id)));
+    const failed = results.filter((r) => !r.ok).length;
+
+    setDeletingThreads(false);
+    setConfirmDeleteOpen(false);
+
+    if (selectedThread && selectedThreadIds.has(selectedThread.id)) {
+      setSelectedThread(null);
+    }
+
+    exitSelectionMode();
+    await refetchThreads();
+
+    if (failed > 0) {
+      toast({
+        title: t("Algumas conversas não puderam ser apagadas"),
+        description: t("Tente novamente ou contate o administrador."),
+        variant: "destructive",
+      });
+    } else {
+      toast({ title: ids.length > 1 ? t("Conversas apagadas") : t("Conversa apagada") });
+    }
+  };
 
   // ── PANEL: thread única (campanha) ────────────────────────────────────────
   const [panelThread, setPanelThread] = useState<InternalThread | null>(null);
@@ -187,28 +270,108 @@ export function InternalChat({
             mobileShowPanel ? "hidden sm:flex" : "flex",
           )}
         >
-          {/* Barra de busca WhatsApp-style */}
-          <div className="flex-shrink-0 px-3 py-2 border-b border-border/30 bg-card">
-            <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Pesquisar conversas..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg bg-muted/50 border border-border/40 placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring/50 focus:bg-background transition-colors"
-              />
-              {searchQuery && (
+          {/* Aviso de notificações — só quando ainda não decidido/negado, e não dispensado */}
+          {mode === "inbox" && !notifBannerDismissed && notifPermission !== "unsupported" && notifPermission !== "granted" && (
+            <div className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200/60 dark:border-amber-800/40 text-[11px]">
+              {notifPermission === "denied" ? (
+                <>
+                  <BellOff size={13} className="text-amber-600 flex-shrink-0" />
+                  <span className="flex-1 text-amber-800 dark:text-amber-300">
+                    {t("Notificações bloqueadas pelo navegador. Ative nas configurações do site para receber avisos de novas mensagens.")}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Bell size={13} className="text-amber-600 flex-shrink-0" />
+                  <span className="flex-1 text-amber-800 dark:text-amber-300">
+                    {t("Ativar notificações de novas mensagens?")}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void handleRequestNotifPermission()}
+                    className="text-amber-900 dark:text-amber-200 font-semibold underline flex-shrink-0"
+                  >
+                    {t("Ativar")}
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => setNotifBannerDismissed(true)}
+                className="text-amber-600 hover:text-amber-800 flex-shrink-0"
+                aria-label={t("Dispensar")}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
+
+          {/* Barra de busca WhatsApp-style OU barra de seleção (apagar conversas) */}
+          {selectionMode ? (
+            <div className="flex-shrink-0 flex items-center gap-2 px-3 py-2 border-b border-border/30 bg-card">
+              <button
+                type="button"
+                onClick={exitSelectionMode}
+                className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground"
+                aria-label={t("Cancelar seleção")}
+              >
+                <X size={16} />
+              </button>
+              <span className="text-xs font-medium flex-1">
+                {selectedThreadIds.size} {t("selecionada(s)")}
+              </span>
+              <button
+                type="button"
+                onClick={selectAllVisible}
+                className="text-xs text-primary font-medium hover:underline"
+              >
+                {t("Selecionar todas")}
+              </button>
+              <button
+                type="button"
+                disabled={selectedThreadIds.size === 0}
+                onClick={() => setConfirmDeleteOpen(true)}
+                className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive disabled:opacity-30 disabled:hover:bg-transparent"
+                aria-label={t("Apagar conversa")}
+                title={t("Apagar conversa")}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ) : (
+            <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 border-b border-border/30 bg-card">
+              <div className="relative flex-1">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Pesquisar conversas..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg bg-muted/50 border border-border/40 placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring/50 focus:bg-background transition-colors"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+              {filteredThreads.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setSelectionMode(true)}
+                  className="flex-shrink-0 p-1.5 rounded-md hover:bg-secondary text-muted-foreground"
+                  aria-label={t("Selecionar conversas")}
+                  title={t("Selecionar conversas")}
                 >
-                  <X size={13} />
+                  <CheckSquare size={16} />
                 </button>
               )}
             </div>
-          </div>
+          )}
           <InternalThreadList
             threads={filteredThreads}
             selectedId={activeThread?.id ?? null}
@@ -217,6 +380,9 @@ export function InternalChat({
               setSelectedThread(t);
               setMobileShowPanel(true);
             }}
+            selectionMode={selectionMode}
+            selectedIds={selectedThreadIds}
+            onToggleSelect={toggleThreadSelection}
           />
           {!threadsLoading && searchQuery && filteredThreads.length === 0 && (
             <div className="flex flex-col items-center justify-center py-8 px-4 text-center text-muted-foreground">
@@ -285,6 +451,32 @@ export function InternalChat({
         userId={user?.id ?? ""}
         onForwarded={() => setForwardMessage(null)}
       />
+
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {selectedThreadIds.size > 1 ? t("Apagar conversas selecionadas?") : t("Apagar conversa?")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("A conversa será ocultada apenas para você. Os outros participantes continuarão vendo normalmente e nenhuma mensagem será apagada.")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingThreads}>{t("Cancelar")}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deletingThreads}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                void handleConfirmDeleteThreads();
+              }}
+            >
+              {t("Apagar para mim")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

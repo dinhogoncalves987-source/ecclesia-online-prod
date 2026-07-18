@@ -20,6 +20,7 @@ import {
   findOrCreateDirectThread,
   sendInternalMessage,
 } from "@/lib/internalMessageMutations";
+import { fetchThreadById } from "@/lib/internalMessages";
 import { JitsiCallModal } from "@/components/messages/JitsiCallModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -117,6 +118,25 @@ export default function ChatSecretaria() {
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [church?.id, user?.id]);
+
+  // ── Abrir conversa correta ao clicar numa notificação (?thread=<id>) ────
+  const processedNotifThread = useRef(false);
+  useEffect(() => {
+    if (processedNotifThread.current) return;
+    const params = new URLSearchParams(location.search);
+    const threadId = params.get("thread");
+    if (!threadId || !church?.id) return;
+
+    processedNotifThread.current = true;
+    navigate(pathname, { replace: true });
+
+    void fetchThreadById(church.id, threadId).then((thread) => {
+      if (thread) {
+        setForcedThread(thread);
+        setRefetchKey((k) => k + 1);
+      }
+    });
+  }, [location.search, church?.id, navigate, pathname]);
 
   // tópico geral
   const [newSubject, setNewSubject] = useState("");
@@ -381,6 +401,7 @@ export default function ChatSecretaria() {
           }}
           organizationId={church?.id ?? ""}
           threadId={meetingThread.id}
+          callRoomToken={meetingThread.callRoomToken ?? meetingThread.id}
           mode="video"
           displayName={
             (user?.user_metadata as Record<string, string> | undefined)?.full_name ||
@@ -388,6 +409,15 @@ export default function ChatSecretaria() {
             t("Participante")
           }
           callTitle={`${t("Reunião:")} ${meetingThread.subject}`}
+          onBlocked={() => {
+            setMeetingCallOpen(false);
+            setMeetingThread(null);
+            toast({
+              title: t("Já existe uma chamada em andamento"),
+              description: t("Encerre a chamada atual antes de iniciar outra."),
+              variant: "destructive",
+            });
+          }}
         />
       )}
 

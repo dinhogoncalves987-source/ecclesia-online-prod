@@ -691,6 +691,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          last_seen_at: string | null
           phone: string | null
           platform_role: string | null
           role_title: string | null
@@ -703,6 +704,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          last_seen_at?: string | null
           phone?: string | null
           platform_role?: string | null
           role_title?: string | null
@@ -715,6 +717,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          last_seen_at?: string | null
           phone?: string | null
           platform_role?: string | null
           role_title?: string | null
@@ -1415,6 +1418,7 @@ export type Database = {
         Row: {
           body: string | null
           created_at: string
+          delivered_at: string | null
           id: string
           message_type: string
           organization_id: string
@@ -1428,6 +1432,7 @@ export type Database = {
         Insert: {
           body?: string | null
           created_at?: string
+          delivered_at?: string | null
           id?: string
           message_type?: string
           organization_id: string
@@ -1441,6 +1446,7 @@ export type Database = {
         Update: {
           body?: string | null
           created_at?: string
+          delivered_at?: string | null
           id?: string
           message_type?: string
           organization_id?: string
@@ -1461,9 +1467,36 @@ export type Database = {
           },
         ]
       }
+      internal_thread_hidden_for_user: {
+        Row: {
+          hidden_at: string
+          thread_id: string
+          user_id: string
+        }
+        Insert: {
+          hidden_at?: string
+          thread_id: string
+          user_id: string
+        }
+        Update: {
+          hidden_at?: string
+          thread_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internal_thread_hidden_for_user_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "internal_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       internal_threads: {
         Row: {
           assigned_to: string | null
+          call_room_token: string
           campaign_id: string | null
           closed_at: string | null
           created_at: string
@@ -1480,6 +1513,7 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          call_room_token?: string
           campaign_id?: string | null
           closed_at?: string | null
           created_at?: string
@@ -1496,6 +1530,7 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          call_room_token?: string
           campaign_id?: string | null
           closed_at?: string | null
           created_at?: string

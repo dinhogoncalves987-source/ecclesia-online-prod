@@ -1,4 +1,4 @@
-import { EyeOff, Forward, MoreVertical, Share2, Trash2 } from "lucide-react";
+import { Check, CheckCheck, Clock, EyeOff, Forward, MoreVertical, Share2, Trash2, AlertCircle } from "lucide-react";
 import { InternalAudioPreview } from "@/components/messages/InternalAudioPreview";
 import { InternalDocumentPreview } from "@/components/messages/InternalDocumentPreview";
 import { InternalImagePreview } from "@/components/messages/InternalImagePreview";
@@ -23,7 +23,7 @@ import {
 import { useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
-import type { InternalMessage } from "@/lib/internalMessages";
+import { getInternalMessageStatus, type InternalMessage } from "@/lib/internalMessages";
 import { shareInternalMessage } from "@/lib/shareMedia";
 import { cn } from "@/lib/utils";
 
@@ -177,6 +177,25 @@ export function InternalMessageBubble({
     </DropdownMenu>
   );
 
+  /* ── Status real da mensagem (relógio/check/check-duplo) — só para mensagens próprias ── */
+  const StatusTicks = () => {
+    const status = getInternalMessageStatus(message);
+    if (status === "pending") {
+      return <Clock size={11} className="text-primary-foreground/60" aria-label={t("Enviando...")} />;
+    }
+    if (status === "failed") {
+      return <AlertCircle size={11} className="text-red-300" aria-label={t("Falha ao enviar")} />;
+    }
+    if (status === "sent") {
+      return <Check size={13} className="text-primary-foreground/70" aria-label={t("Enviada")} />;
+    }
+    if (status === "delivered") {
+      return <CheckCheck size={13} className="text-primary-foreground/70" aria-label={t("Entregue")} />;
+    }
+    // read — dois checks com mudança de cor (destacado)
+    return <CheckCheck size={13} className="text-sky-300" aria-label={t("Lida")} />;
+  };
+
   /* ── Botão de reenviar (seta estilo WhatsApp, sempre visível junto ao ⋮) ── */
   const ForwardButton = () => (
     <button
@@ -193,7 +212,25 @@ export function InternalMessageBubble({
   /* ── Bubble normal ───────────────────────────────────────────────────────── */
   return (
     <>
-      <div className={cn("flex w-full group items-end gap-1", isOwn ? "justify-end" : "justify-start")}>
+      <div className={cn("flex w-full group items-end gap-1.5", isOwn ? "justify-end" : "justify-start")}>
+        {/* Avatar do remetente (mensagens recebidas) — iniciais como fallback, nunca imagem quebrada */}
+        {!isOwn && (
+          <div className="flex-shrink-0 self-end mb-1">
+            {message.senderAvatarUrl ? (
+              <img
+                src={message.senderAvatarUrl}
+                alt={message.senderName ?? ""}
+                className="h-6 w-6 rounded-full object-cover bg-muted"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              />
+            ) : (
+              <div className="h-6 w-6 rounded-full bg-primary/15 flex items-center justify-center text-[10px] font-semibold text-primary uppercase">
+                {(message.senderName ?? "?").charAt(0)}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Menu lado esquerdo (mensagens dos outros) */}
         {!isOwn && (
           <div className="flex-shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity self-end pb-2">
@@ -234,14 +271,15 @@ export function InternalMessageBubble({
             return <InternalDocumentPreview key={att.id} attachment={att} />;
           })}
 
-          {/* Timestamp */}
+          {/* Timestamp + status real (relógio/check/check-duplo) */}
           <p
             className={cn(
-              "text-[10px] mt-1 text-right tabular-nums",
+              "text-[10px] mt-1 text-right tabular-nums flex items-center justify-end gap-1",
               isOwn ? "text-primary-foreground/70" : "text-muted-foreground",
             )}
           >
             {time}
+            {isOwn && <StatusTicks />}
           </p>
         </div>
 

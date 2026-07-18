@@ -5,11 +5,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Loader2, Camera, Save } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useOwnProfile, useInvalidateOwnProfile } from "@/hooks/useOwnProfile";
 
 export default function Perfil() {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const [loading, setLoading] = useState(true);
+  const { data: profile, isLoading: loading } = useOwnProfile(user?.id);
+  const invalidateOwnProfile = useInvalidateOwnProfile();
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [fullName, setFullName] = useState("");
@@ -17,23 +19,15 @@ export default function Perfil() {
   const [roleTitle, setRoleTitle] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
+  // Sincroniza o formulário com os dados reais do banco sempre que chegarem
+  // (carga inicial e após qualquer invalidação/refetch da query compartilhada).
   useEffect(() => {
-    if (!user) return;
-    supabase
-      .from("profiles")
-      .select("full_name, phone, role_title, avatar_url")
-      .eq("user_id", user.id)
-      .single()
-      .then(({ data }) => {
-        if (data) {
-          setFullName(data.full_name || "");
-          setPhone(data.phone || "");
-          setRoleTitle(data.role_title || "");
-          setAvatarUrl(data.avatar_url);
-        }
-        setLoading(false);
-      });
-  }, [user]);
+    if (!profile) return;
+    setFullName(profile.full_name || "");
+    setPhone(profile.phone || "");
+    setRoleTitle(profile.role_title || "");
+    setAvatarUrl(profile.avatar_url);
+  }, [profile]);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -56,9 +50,27 @@ export default function Perfil() {
     const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
     const url = urlData.publicUrl + "?t=" + Date.now();
 
-    await supabase.from("profiles").update({ avatar_url: url }).eq("user_id", user.id);
-    setAvatarUrl(url);
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ avatar_url: url })
+      .eq("user_id", user.id)
+      .select("user_id")
+      .single();
+
     setUploading(false);
+
+    if (updateError) {
+      // Nunca mostrar sucesso sem persistência real confirmada.
+      toast({
+        title: t("Erro ao salvar foto"),
+        description: updateError.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setAvatarUrl(url);
+    await invalidateOwnProfile(user.id);
     toast({ title: t("Foto atualizada!") });
   };
 
@@ -68,15 +80,27 @@ export default function Perfil() {
 
     const { error } = await supabase
       .from("profiles")
-      .update({ full_name: fullName, phone, role_title: roleTitle })
-      .eq("user_id", user.id);
+      .update({ full_name: fullName.trim(), phone: phone.trim(), role_title: roleTitle.trim() })
+      .eq("user_id", user.id)
+      .select("user_id")
+      .single();
 
     if (error) {
-      toast({ title: t("Erro ao salvar"), description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: t("Perfil atualizado com sucesso!") });
+      toast({
+        title: t("Erro ao salvar"),
+        description: error.message || t("Não foi possível salvar. Tente novamente."),
+        variant: "destructive",
+      });
+      setSaving(false);
+      return;
     }
+
+    // Só mostra sucesso DEPOIS de confirmar a persistência real no banco —
+    // e recarrega a fonte única (React Query), que também atualiza o
+    // cabeçalho/avatar/menu do AdminLayout imediatamente, sem novo login.
+    await invalidateOwnProfile(user.id);
     setSaving(false);
+    toast({ title: t("Perfil atualizado com sucesso!") });
   };
 
   const initials = fullName

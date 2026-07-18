@@ -1,7 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
-import { fetchThreadMessages, type InternalMessage } from "@/lib/internalMessages";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  fetchThreadMessages,
+  mapDbAttachmentToUi,
+  mapDbMessageToUi,
+  type DbInternalAttachmentRow,
+  type DbInternalMessageRow,
+  type InternalMessage,
+} from "@/lib/internalMessages";
 import {
   deleteInternalMessage,
+  markInternalThreadDelivered,
   markInternalThreadRead,
   sendInternalMessage,
   type SendMessagePayload,
@@ -15,6 +24,19 @@ type Options = {
   enabled?: boolean;
 };
 
+/**
+ * Mensagens de uma conversa aberta, com tempo real de verdade:
+ *  - INSERT/UPDATE em internal_messages filtrados por thread_id via
+ *    Supabase Realtime — mensagens do outro participante aparecem
+ *    imediatamente, sem precisar sair/voltar à conversa ou atualizar.
+ *  - Anexos chegam por um INSERT separado em internal_message_attachments
+ *    (a mensagem já existe; o anexo é mesclado quando chega).
+ *  - Envio otimista: a mensagem aparece na hora com status "pending"
+ *    (relógio) e é substituída pelo registro real quando o servidor
+ *    confirma — nunca duplicada (dedupe por id real).
+ *  - Reconexão: ao voltar a ficar visível/online, ou se o canal cair,
+ *    refaz a busca para recuperar mensagens perdidas durante a queda.
+ */
 export function useInternalMessages({
   organizationId,
   threadId,
@@ -27,20 +49,27 @@ export function useInternalMessages({
   const [sending, setSending] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [fromDatabase, setFromDatabase] = useState(false);
+  const knownIdsRef = useRef<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     if (!organizationId || !threadId || !enabled) {
       setMessages([]);
       setFromDatabase(false);
       setLoading(false);
+      knownIdsRef.current = new Set();
       return;
     }
 
     setLoading(true);
     const result = await fetchThreadMessages(organizationId, threadId, currentUserId);
     setMessages(result.messages);
+    knownIdsRef.current = new Set(result.messages.map((m) => m.id));
     setFromDatabase(result.fromDatabase);
     setLoading(false);
+
+    if (result.fromDatabase && result.messages.some((m) => !m.isOwn && !m.deliveredAt)) {
+      void markInternalThreadDelivered(threadId);
+    }
 
     // Abrir a conversa marca como lidas as mensagens recebidas — é isso que
     // faz o badge de não lidas (sidebar/ícone do app) zerar para esta thread.
@@ -57,11 +86,129 @@ export function useInternalMessages({
     await load();
   }, [load]);
 
+  // ── Tempo real ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!organizationId || !threadId || !enabled) return;
+
+    const channel = supabase
+      .channel(`internal-messages-thread-${threadId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "internal_messages", filter: `thread_id=eq.${threadId}` },
+        (payload) => {
+          const row = payload.new as DbInternalMessageRow;
+          if (knownIdsRef.current.has(row.id)) return;
+          knownIdsRef.current.add(row.id);
+
+          const isOwn = Boolean(currentUserId && row.sender_user_id === currentUserId);
+          const msg = mapDbMessageToUi(row, []);
+          msg.isOwn = isOwn;
+
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === row.id)) return prev;
+            return [...prev, msg];
+          });
+
+          void enrichIncomingSender(msg, currentUserId).then((enriched) => {
+            if (!enriched) return;
+            setMessages((prev) => prev.map((m) => (m.id === row.id ? { ...m, ...enriched } : m)));
+          });
+
+          // Mensagem de outra pessoa recebida em tempo real: já foi
+          // "entregue" de fato (o cliente a recebeu agora). Se a conversa
+          // está aberta, também marca como lida (visualizada na hora).
+          if (!isOwn) {
+            void markInternalThreadDelivered(threadId);
+            if (document.visibilityState === "visible") {
+              void markInternalThreadRead(threadId);
+            }
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "internal_messages", filter: `thread_id=eq.${threadId}` },
+        (payload) => {
+          const row = payload.new as DbInternalMessageRow;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === row.id
+                ? {
+                    ...m,
+                    body: row.body,
+                    messageType: row.message_type as InternalMessage["messageType"],
+                    readAt: row.read_at,
+                    deliveredAt: row.delivered_at,
+                    attachments: row.message_type === "deleted" ? [] : m.attachments,
+                  }
+                : m,
+            ),
+          );
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "internal_message_attachments", filter: `thread_id=eq.${threadId}` },
+        (payload) => {
+          const row = payload.new as DbInternalAttachmentRow;
+          const attachment = mapDbAttachmentToUi(row);
+          setMessages((prev) =>
+            prev.map((m) => {
+              if (m.id !== row.message_id) return m;
+              if (m.attachments.some((a) => a.id === attachment.id)) return m;
+              return { ...m, attachments: [...m.attachments, attachment] };
+            }),
+          );
+        },
+      )
+      .subscribe((status) => {
+        // Reconexão após queda: recupera mensagens perdidas durante o gap.
+        if (status === "SUBSCRIBED") void load();
+      });
+
+    const onVisible = () => { if (document.visibilityState === "visible") void load(); };
+    const onOnline = () => void load();
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onOnline);
+
+    return () => {
+      void supabase.removeChannel(channel);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onOnline);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId, threadId, enabled, currentUserId]);
+
   const send = useCallback(
     async (payload: SendMessagePayload, file?: File) => {
       if (!organizationId || !threadId || !currentUserId) {
         return { ok: false as const, error: "not_authenticated" };
       }
+
+      // Envio otimista: mostra a mensagem imediatamente com status
+      // "pending" (relógio) — nunca finge entrega/leitura, só o envio local.
+      const tempId = `temp-${crypto.randomUUID()}`;
+      const optimistic: InternalMessage = {
+        id: tempId,
+        threadId,
+        organizationId,
+        senderUserId: currentUserId,
+        senderMemberId: null,
+        senderRole: payload.senderRole ?? senderRole ?? null,
+        body: payload.body?.trim() || null,
+        // Só é exibida quando NÃO há arquivo (envio de texto puro) — ver
+        // condição abaixo; para uploads o tipo real é definido pelo servidor.
+        messageType: payload.messageType ?? "text",
+        replyToMessageId: null,
+        createdAt: new Date().toISOString(),
+        readAt: null,
+        deliveredAt: null,
+        attachments: [],
+        senderName: "Você",
+        isOwn: true,
+        isPending: true,
+      };
+      if (!file) setMessages((prev) => [...prev, optimistic]);
 
       setSending(true);
       const result = await sendInternalMessage(
@@ -74,7 +221,16 @@ export function useInternalMessages({
       setSending(false);
 
       if (result.ok && result.message) {
-        setMessages((prev) => [...prev, result.message!]);
+        knownIdsRef.current.add(result.message.id);
+        setMessages((prev) => {
+          const withoutTemp = prev.filter((m) => m.id !== tempId);
+          if (withoutTemp.some((m) => m.id === result.message!.id)) return withoutTemp;
+          return [...withoutTemp, result.message!];
+        });
+      } else if (!file) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? { ...m, isPending: false, isFailed: true } : m)),
+        );
       }
 
       return result;
@@ -109,4 +265,21 @@ export function useInternalMessages({
   );
 
   return { messages, loading, sending, deleting, fromDatabase, refetch, send, remove };
+}
+
+async function enrichIncomingSender(
+  message: InternalMessage,
+  currentUserId?: string | null,
+): Promise<Partial<InternalMessage> | null> {
+  if (!message.senderUserId) return null;
+  if (message.senderUserId === currentUserId) return { senderName: "Você" };
+
+  const { data } = await supabase
+    .from("profiles")
+    .select("full_name, avatar_url")
+    .eq("user_id", message.senderUserId)
+    .maybeSingle();
+
+  if (!data) return null;
+  return { senderName: data.full_name ?? "Membro", senderAvatarUrl: data.avatar_url ?? null };
 }

@@ -38,21 +38,35 @@ type Props = {
   onClose: () => void;
   organizationId: string;
   threadId: string;
+  /**
+   * Token aleatório e imprevisível (internal_threads.call_room_token) usado
+   * para compor o nome da sala. Obrigatório: sem ele a sala seria derivada
+   * apenas de organization_id/threadId, previsível para quem conhece esses
+   * IDs. Ver migration 20260718110000_internal_threads_call_room_token.
+   */
+  callRoomToken: string;
   mode: JitsiCallMode;
   displayName?: string;
   callTitle?: string;
+  /** Chamado quando esta chamada não pôde abrir por já existir outra ativa (impede múltiplas salas simultâneas). */
+  onBlocked?: () => void;
 };
 
 // ── Utilitários ────────────────────────────────────────────────────────────────
 
-function makeRoomName(orgId: string, threadId: string): string {
+function makeRoomName(threadId: string, roomToken: string): string {
   const clean = (s: string) => s.replace(/[^a-zA-Z0-9]/g, "");
-  const part = (s: string) => {
-    const c = clean(s);
-    return (c.slice(0, 6) + c.slice(-6)).slice(0, 12);
-  };
-  return `ec-${part(orgId)}-${part(threadId)}`;
+  // Prefixo do threadId apenas para facilitar depuração manual; a
+  // imprevisibilidade real vem inteiramente do call_room_token (uuid
+  // aleatório gerado no banco, nunca exposto fora da API autenticada).
+  return `ec-${clean(threadId).slice(0, 8)}-${clean(roomToken)}`;
 }
+
+// Trava global (módulo) — só permite UMA chamada Jitsi ativa por vez em toda
+// a aplicação, mesmo entre componentes diferentes (ex: chamada individual
+// aberta em InternalChatPanel + criação de reunião em ChatSecretaria).
+// Evita múltiplos iframes/tracks/mic simultâneos.
+let activeCallInstanceId: symbol | null = null;
 
 let jitsiScriptPromise: Promise<void> | null = null;
 
@@ -75,14 +89,17 @@ function loadJitsiScript(): Promise<void> {
 export function JitsiCallModal({
   open,
   onClose,
-  organizationId,
+  organizationId: _organizationId,
   threadId,
+  callRoomToken,
   mode,
   displayName = "Participante",
   callTitle,
+  onBlocked,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<JitsiAPI | null>(null);
+  const instanceIdRef = useRef<symbol | null>(null);
   const [status, setStatus] = useState<"loading" | "active" | "error">("loading");
 
   const disposeJitsi = useCallback(() => {
@@ -90,10 +107,25 @@ export function JitsiCallModal({
       try { apiRef.current.dispose(); } catch { /* ignora */ }
       apiRef.current = null;
     }
+    if (instanceIdRef.current && activeCallInstanceId === instanceIdRef.current) {
+      activeCallInstanceId = null;
+    }
+    instanceIdRef.current = null;
   }, []);
 
   useEffect(() => {
     if (!open) { disposeJitsi(); setStatus("loading"); return; }
+
+    // Impede múltiplas salas simultâneas: se já existe outra chamada ativa
+    // em qualquer parte da aplicação, esta não abre.
+    if (activeCallInstanceId !== null) {
+      onBlocked?.();
+      onClose();
+      return;
+    }
+    const instanceId = Symbol("jitsi-call");
+    activeCallInstanceId = instanceId;
+    instanceIdRef.current = instanceId;
 
     let cancelled = false;
     setStatus("loading");
@@ -102,7 +134,7 @@ export function JitsiCallModal({
       .then(() => {
         if (cancelled || !containerRef.current || !window.JitsiMeetExternalAPI) return;
 
-        const roomName = makeRoomName(organizationId, threadId);
+        const roomName = makeRoomName(threadId, callRoomToken);
         const callSubject = mode === "video" ? "Videochamada Ecclesia" : "Chamada de Voz Ecclesia";
 
         const api = new window.JitsiMeetExternalAPI("meet.jit.si", {
@@ -163,9 +195,17 @@ export function JitsiCallModal({
       })
       .catch(() => { if (!cancelled) setStatus("error"); });
 
-    return () => { cancelled = true; };
+    // Limpeza real: roda ao desmontar o componente OU quando as deps mudam
+    // (ex: troca de thread com o modal ainda "aberto") — evita vazar a
+    // conexão WebRTC e a câmera/microfone ligados em segundo plano quando o
+    // usuário navega para outra página sem clicar em "Encerrar".
+    return () => { cancelled = true; disposeJitsi(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, organizationId, threadId, mode, displayName]);
+  }, [open, threadId, callRoomToken, mode, displayName]);
+
+  // Salvaguarda extra: garante encerramento se o componente for desmontado
+  // enquanto uma chamada está ativa (ex: troca de rota).
+  useEffect(() => () => disposeJitsi(), [disposeJitsi]);
 
   const handleClose = useCallback(() => { disposeJitsi(); onClose(); }, [disposeJitsi, onClose]);
 

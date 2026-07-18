@@ -171,18 +171,27 @@ export function InternalChatPanel({
         isStaff={isStaff}
         showBack={showBack}
         onBack={onBack}
-        onVoiceCall={thread && isStaff ? () => { setCallMode("voice"); setCallOpen(true); } : undefined}
-        onVideoCall={thread && isStaff ? () => { setCallMode("video"); setCallOpen(true); } : undefined}
+        onVoiceCall={thread && isStaff && thread.callRoomToken ? () => { setCallMode("voice"); setCallOpen(true); } : undefined}
+        onVideoCall={thread && isStaff && thread.callRoomToken ? () => { setCallMode("video"); setCallOpen(true); } : undefined}
       />
 
-      {/* Modal Jitsi — apenas para staff com thread ativa */}
-      {thread && isStaff && (
+      {/* Modal Jitsi — apenas para staff com thread ativa e token de sala seguro */}
+      {thread && isStaff && thread.callRoomToken && (
         <JitsiCallModal
           open={callOpen}
           onClose={() => setCallOpen(false)}
           organizationId={organizationId}
           threadId={thread.id}
+          callRoomToken={thread.callRoomToken}
           mode={callMode}
+          onBlocked={() => {
+            setCallOpen(false);
+            toast({
+              title: t("Já existe uma chamada em andamento"),
+              description: t("Encerre a chamada atual antes de iniciar outra."),
+              variant: "destructive",
+            });
+          }}
           displayName={
             (user?.user_metadata as Record<string, string> | undefined)?.full_name ||
             user?.email?.split("@")[0] ||

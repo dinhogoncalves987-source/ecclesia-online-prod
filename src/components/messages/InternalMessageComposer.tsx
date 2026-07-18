@@ -5,6 +5,7 @@ import { InternalAttachmentButton } from "@/components/messages/InternalAttachme
 import { InternalAudioRecorder } from "@/components/messages/InternalAudioRecorder";
 import { useLanguage } from "@/hooks/useLanguage";
 import { cn } from "@/lib/utils";
+import { isMobileViewport } from "@/lib/mobileScroll";
 
 type Props = {
   disabled?: boolean;
@@ -49,6 +50,7 @@ export function InternalMessageComposer({
   const [text, setText] = useState("");
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const composerRootRef = useRef<HTMLDivElement>(null);
 
   const canSend = !disabled && !sending && (text.trim().length > 0 || Boolean(pendingFile));
   const showMic = !disabled && !pendingFile && text.trim().length === 0;
@@ -82,8 +84,20 @@ export function InternalMessageComposer({
     await onSend("", file);
   };
 
+  // Teclado mobile não pode cobrir o composer: quando o campo ganha foco,
+  // aguarda a animação do teclado virtual e garante que o composer continue
+  // visível (rola a própria caixa para dentro da área visível do viewport).
+  const handleFocus = useCallback(() => {
+    if (!isMobileViewport()) return;
+    const scrollIntoView = () => {
+      composerRootRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+    };
+    setTimeout(scrollIntoView, 300);
+    window.visualViewport?.addEventListener("resize", scrollIntoView, { once: true });
+  }, []);
+
   return (
-    <div className="flex-shrink-0 border-t border-border/50 bg-card">
+    <div ref={composerRootRef} className="flex-shrink-0 border-t border-border/50 bg-card">
       <InternalAudioRecorder disabled={disabled || sending} onAudioReady={handleAudioReady}>
         {({ isRecording, isPreparing, elapsedSeconds, start, stopAndSend, cancel }) => {
 
@@ -179,7 +193,20 @@ export function InternalMessageComposer({
                 />
 
                 {/* Input + mic/enviar integrados */}
-                <div className="flex-1 flex items-end gap-0 rounded-2xl border border-border/50 bg-secondary/30 overflow-hidden px-3 py-[7px]">
+                <div
+                  className="flex-1 flex items-end gap-0 rounded-2xl border border-border/50 bg-secondary/30 px-3 py-[7px] touch-manipulation"
+                  // Toque em qualquer parte da caixa (ex: padding ao redor da
+                  // textarea) sempre foca e abre o teclado — nunca depende de
+                  // ter iniciado uma gravação de áudio antes. Isso corrige o
+                  // caso em que o alvo exato do toque não é a própria
+                  // textarea (ex: nas bordas/padding do balão).
+                  onPointerDown={(e) => {
+                    if (e.target !== textareaRef.current) {
+                      e.preventDefault();
+                      textareaRef.current?.focus({ preventScroll: true });
+                    }
+                  }}
+                >
                   <textarea
                     ref={textareaRef}
                     value={text}
@@ -190,9 +217,17 @@ export function InternalMessageComposer({
                     spellCheck
                     autoComplete="on"
                     autoCorrect="on"
-                    className="flex-1 min-w-0 resize-none bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 leading-5 overflow-y-auto"
+                    // enterKeyHint="send" faz o teclado virtual mobile mostrar
+                    // o botão "Enviar" e dispara um keydown "Enter" confiável
+                    // na maioria dos navegadores/IMEs mobile modernos.
+                    enterKeyHint="send"
+                    inputMode="text"
+                    className="flex-1 min-w-0 resize-none bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 leading-5 overflow-y-auto touch-manipulation"
                     style={{ maxHeight: "128px" }}
+                    onFocus={handleFocus}
                     onKeyDown={(e) => {
+                      // Ignora Enter durante composição de IME (acentos, chinês/japonês, etc.)
+                      if (e.nativeEvent.isComposing) return;
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
                         void handleSend();

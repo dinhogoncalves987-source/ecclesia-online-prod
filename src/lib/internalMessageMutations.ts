@@ -427,6 +427,22 @@ export async function markInternalThreadRead(threadId: string): Promise<void> {
 }
 
 /**
+ * Marca como "entregues" (delivered_at) as mensagens de outros
+ * participantes numa thread — chamado quando o cliente do destinatário
+ * efetivamente recebe as mensagens (abriu a lista/thread ou recebeu via
+ * Realtime). Timestamp real, nunca simulado. Mesma lógica de RPC
+ * SECURITY DEFINER que markInternalThreadRead, para não depender de uma
+ * policy de UPDATE ampla em internal_messages.
+ */
+export async function markInternalThreadDelivered(threadId: string): Promise<void> {
+  try {
+    await supabase.rpc("mark_internal_thread_delivered", { _thread_id: threadId });
+  } catch (err) {
+    console.warn("[markInternalThreadDelivered]", err);
+  }
+}
+
+/**
  * Reenvia (forward) uma mensagem — com ou sem anexo — para outra conversa.
  * Anexos NÃO são reenviados (novo upload); apontam para o mesmo arquivo já
  * salvo no bucket internal-message-media, evitando duplicar armazenamento.
