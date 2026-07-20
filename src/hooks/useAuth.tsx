@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 import { markBoot } from "@/lib/bootPerf";
+import { queryClient } from "@/lib/queryClient";
 
 interface AuthContextType {
   user: User | null;
@@ -272,6 +273,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    // CORREÇÃO (cache stale pós-login): sem isto, o React Query mantém em
+    // memória o resultado do último bootstrap (roles/memberships/org ativa)
+    // pelo `gcTime` configurado (10 min) mesmo após o logout. Se o usuário
+    // fizer login novamente na mesma aba/PWA dentro desse intervalo — e seu
+    // vínculo de organização tiver sido corrigido/criado nesse meio-tempo —
+    // o app reaproveitaria o resultado antigo (memberships vazio) em vez de
+    // buscar de novo, exibindo "sem igreja vinculada" mesmo com o banco
+    // correto. `clear()` remove TODO o cache (não só o bootstrap), o que é
+    // seguro aqui: o app está prestes a mostrar a tela de login, então não
+    // há UI presa observando dados obsoletos.
+    queryClient.clear();
   };
 
   return (

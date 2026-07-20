@@ -1,6 +1,8 @@
 import { lazy, Suspense } from "react";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+
+import { queryClient } from "@/lib/queryClient";
 
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
@@ -156,10 +158,6 @@ const DevocionalPublic = lazy(() => import("./pages/DevocionalPublic"));
 // validação de carta precisa acompanhar, senão o QR/link de validação
 // impresso numa carta real de produção cairia num "módulo indisponível".
 const ValidarCarta = lazy(() => import("./pages/ValidarCarta"));
-
-
-
-const queryClient = new QueryClient();
 
 
 
