@@ -74,7 +74,12 @@ const FORBIDDEN_TERMS_SOURCE = [
   // Financeiro): passou a fazer CRUD real sobre public.finance_assets — ver
   // src/components/financeiro/FinanceAssets.tsx e src/config/modules.ts
   // (finance.assets agora "both").
-  "FinanceAccountability",
+  //
+  // "FinanceAccountability" removido em 2026-07-23 (Fase F — restauração do
+  // Financeiro): os "Relatórios históricos" passaram a ler/gravar
+  // public.finance_accountability_reports/_approvals real — ver
+  // src/components/financeiro/FinanceAccountability.tsx e
+  // src/config/modules.ts (finance.accountability agora "both").
   "FinanceIntelligence",
   // "FinanceAudit" removido em 2026-07-20 (Fase A — restauração do
   // Financeiro): passou a consultar `finance_transaction_audit_logs` real

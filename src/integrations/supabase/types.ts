@@ -281,6 +281,97 @@ export type Database = {
           },
         ]
       }
+      finance_accountability_approvals: {
+        Row: {
+          approver_name: string
+          created_at: string
+          decided_at: string | null
+          done: boolean
+          id: string
+          report_id: string
+          role: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          approver_name: string
+          created_at?: string
+          decided_at?: string | null
+          done?: boolean
+          id?: string
+          report_id: string
+          role: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          approver_name?: string
+          created_at?: string
+          decided_at?: string | null
+          done?: boolean
+          id?: string
+          report_id?: string
+          role?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_accountability_approvals_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "finance_accountability_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_accountability_reports: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          organization_id: string
+          period_key: string
+          period_label: string
+          report_type: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          organization_id: string
+          period_key: string
+          period_label: string
+          report_type: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          organization_id?: string
+          period_key?: string
+          period_label?: string
+          report_type?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_accountability_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finance_accounts: {
         Row: {
           created_at: string

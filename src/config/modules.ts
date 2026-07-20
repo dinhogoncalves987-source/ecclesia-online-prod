@@ -199,6 +199,15 @@ const PRODUCTION_MODULES: readonly ModuleDefinition[] = [
   // src/components/financeiro/FinanceAssets.tsx. Não depende mais de
   // financeDemo.
   { id: "finance.assets", availability: "both", label: "Financeiro — Patrimônio" },
+
+  // CORREÇÃO 2026-07-23 (Fase F — restauração do Financeiro) — "Prestação de
+  // Contas": os "Relatórios históricos" passaram a ler/gravar
+  // public.finance_accountability_reports/_approvals real (migration
+  // 20260723090000_finance_accountability.sql) — ver
+  // src/components/financeiro/FinanceAccountability.tsx. Os "Relatórios
+  // Contábeis" (FinanceReports.tsx), dentro da mesma aba, já usavam dados
+  // reais desde antes. Não depende mais de financeDemo.
+  { id: "finance.accountability", availability: "both", label: "Financeiro — Prestação de Contas" },
 ] as const;
 
 /**
@@ -214,12 +223,6 @@ const STAGING_ONLY_MODULES: readonly ModuleDefinition[] = IS_STAGING_BUILD ? [
     id: "finance.executive",
     availability: "staging",
     label: "Financeiro — Executivo",
-    note: "usa financeDemo",
-  },
-  {
-    id: "finance.accountability",
-    availability: "staging",
-    label: "Financeiro — Prestação de Contas",
     note: "usa financeDemo",
   },
   {

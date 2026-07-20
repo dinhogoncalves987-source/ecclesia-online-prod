@@ -56,9 +56,15 @@ const FinanceBudget = lazy(() => import("@/components/financeiro/FinanceBudget")
 // src/components/financeiro/FinanceAssets.tsx. Por isso carregada sempre,
 // nunca condicionada a IS_STAGING_BUILD.
 const FinanceAssets = lazy(() => import("@/components/financeiro/FinanceAssets").then(m => ({ default: m.FinanceAssets })));
-const FinanceAccountability = IS_STAGING_BUILD
-  ? lazy(() => import("@/components/financeiro/FinanceAccountability").then(m => ({ default: m.FinanceAccountability })))
-  : null;
+// CORREÇÃO 2026-07-23 (Fase F — restauração do Financeiro) — "Prestação de
+// Contas" tinha os "Relatórios históricos" 100% fictícios
+// (ACCOUNTABILITY_REPORTS de financeDemo.ts). Agora vêm de
+// public.finance_accountability_reports/_approvals real (migration
+// 20260723090000_finance_accountability.sql) — ver
+// src/components/financeiro/FinanceAccountability.tsx. Os "Relatórios
+// Contábeis" (FinanceReports.tsx) já usavam dados reais. Por isso carregada
+// sempre, nunca condicionada a IS_STAGING_BUILD.
+const FinanceAccountability = lazy(() => import("@/components/financeiro/FinanceAccountability").then(m => ({ default: m.FinanceAccountability })));
 // CORREÇÃO 2026-07-20 (Fase A — restauração do Financeiro) — "Auditoria"
 // passou a consultar `finance_transaction_audit_logs` real (populada por
 // trigger em todo INSERT/UPDATE/DELETE de `transactions`), sem nenhum dado
@@ -230,7 +236,7 @@ export default function Financeiro() {
           {activeTab === "accounts" && FinanceAccounts && <FinanceAccounts />}
           {activeTab === "budget" && <FinanceBudget transactions={transactions} />}
           {activeTab === "assets" && <FinanceAssets />}
-          {activeTab === "accountability" && FinanceAccountability && <FinanceAccountability transactions={transactions} />}
+          {activeTab === "accountability" && <FinanceAccountability transactions={transactions} />}
           {activeTab === "audit" && FinanceAudit && <FinanceAudit />}
           {activeTab === "intelligence" && FinanceIntelligence && <FinanceIntelligence onTabChange={setActiveTab} />}
         </Suspense>
