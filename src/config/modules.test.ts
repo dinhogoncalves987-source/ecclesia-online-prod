@@ -21,7 +21,6 @@ describe("isModuleEnabled", () => {
   // financeDemo como fonte de dado exibido. Promovido para "both".
   it("disables staging-only demo finance tabs in production", () => {
     expect(isModuleEnabled("finance.executive", "production")).toBe(false);
-    expect(isModuleEnabled("finance.assets", "production")).toBe(false);
     expect(isModuleEnabled("finance.accountability", "production")).toBe(false);
     expect(isModuleEnabled("finance.intelligence", "production")).toBe(false);
   });
@@ -62,9 +61,18 @@ describe("isModuleEnabled", () => {
     expect(isModuleEnabled("finance.budget", "staging")).toBe(true);
   });
 
+  // CORREÇÃO 2026-07-22 (Fase E — restauração do Financeiro): "Patrimônio"
+  // passou a fazer CRUD real sobre public.finance_assets (migration
+  // 20260722090000_finance_assets.sql) — não usa mais financeDemo como fonte
+  // de dado exibido. Promovida para "both".
+  it("enables finance.assets in production and staging (CRUD real de patrimonio)", () => {
+    expect(isModuleEnabled("finance.assets", "production")).toBe(true);
+    expect(isModuleEnabled("finance.assets", "staging")).toBe(true);
+  });
+
   it("enables staging-only demo finance tabs in staging", () => {
     expect(isModuleEnabled("finance.executive", "staging")).toBe(true);
-    expect(isModuleEnabled("finance.assets", "staging")).toBe(true);
+    expect(isModuleEnabled("finance.accountability", "staging")).toBe(true);
   });
 
   it("classifies TV Digital and Canal Ecclésia as stage-only", () => {

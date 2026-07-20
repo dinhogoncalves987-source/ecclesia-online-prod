@@ -192,6 +192,13 @@ const PRODUCTION_MODULES: readonly ModuleDefinition[] = [
   // src/components/financeiro/FinanceBudget.tsx. Não depende mais de
   // financeDemo.
   { id: "finance.budget", availability: "both", label: "Financeiro — Orçamento" },
+
+  // CORREÇÃO 2026-07-22 (Fase E — restauração do Financeiro) — "Patrimônio"
+  // passou a fazer CRUD real sobre public.finance_assets (migration
+  // 20260722090000_finance_assets.sql) — ver
+  // src/components/financeiro/FinanceAssets.tsx. Não depende mais de
+  // financeDemo.
+  { id: "finance.assets", availability: "both", label: "Financeiro — Patrimônio" },
 ] as const;
 
 /**
@@ -207,12 +214,6 @@ const STAGING_ONLY_MODULES: readonly ModuleDefinition[] = IS_STAGING_BUILD ? [
     id: "finance.executive",
     availability: "staging",
     label: "Financeiro — Executivo",
-    note: "usa financeDemo",
-  },
-  {
-    id: "finance.assets",
-    availability: "staging",
-    label: "Financeiro — Patrimônio",
     note: "usa financeDemo",
   },
   {

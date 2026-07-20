@@ -69,7 +69,11 @@ const FORBIDDEN_TERMS_SOURCE = [
   // "realizado" agregado de `transactions` por centro de custo — ver
   // src/components/financeiro/FinanceBudget.tsx e src/config/modules.ts
   // (finance.budget agora "both").
-  "FinanceAssets",
+  //
+  // "FinanceAssets" removido em 2026-07-22 (Fase E — restauração do
+  // Financeiro): passou a fazer CRUD real sobre public.finance_assets — ver
+  // src/components/financeiro/FinanceAssets.tsx e src/config/modules.ts
+  // (finance.assets agora "both").
   "FinanceAccountability",
   "FinanceIntelligence",
   // "FinanceAudit" removido em 2026-07-20 (Fase A — restauração do

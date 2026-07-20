@@ -328,6 +328,62 @@ export type Database = {
           },
         ]
       }
+      finance_assets: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          estimated_value: number
+          id: string
+          location: string | null
+          name: string
+          notes: string | null
+          organization_id: string
+          responsible: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          created_by?: string | null
+          estimated_value?: number
+          id?: string
+          location?: string | null
+          name: string
+          notes?: string | null
+          organization_id: string
+          responsible?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          estimated_value?: number
+          id?: string
+          location?: string | null
+          name?: string
+          notes?: string | null
+          organization_id?: string
+          responsible?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_assets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finance_cost_centers: {
         Row: {
           created_at: string
