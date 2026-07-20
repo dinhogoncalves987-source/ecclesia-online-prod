@@ -20,7 +20,6 @@ describe("isModuleEnabled", () => {
   // (contas a pagar/receber com status/data reais) — não usa mais
   // financeDemo como fonte de dado exibido. Promovido para "both".
   it("disables staging-only demo finance tabs in production", () => {
-    expect(isModuleEnabled("finance.executive", "production")).toBe(false);
     expect(isModuleEnabled("finance.intelligence", "production")).toBe(false);
   });
 
@@ -79,8 +78,16 @@ describe("isModuleEnabled", () => {
     expect(isModuleEnabled("finance.accountability", "staging")).toBe(true);
   });
 
-  it("enables staging-only demo finance tabs in staging", () => {
+  // CORREÇÃO 2026-07-24 (Fase G — restauração do Financeiro): "Executivo"
+  // passou a agregar transactions/campanhas/finance_budgets reais e a
+  // árvore real de organizações para o consolidado por hierarquia — não usa
+  // mais financeDemo como fonte de dado exibido. Promovida para "both".
+  it("enables finance.executive in production and staging (agregacoes reais)", () => {
+    expect(isModuleEnabled("finance.executive", "production")).toBe(true);
     expect(isModuleEnabled("finance.executive", "staging")).toBe(true);
+  });
+
+  it("enables staging-only demo finance tabs in staging", () => {
     expect(isModuleEnabled("finance.intelligence", "staging")).toBe(true);
   });
 

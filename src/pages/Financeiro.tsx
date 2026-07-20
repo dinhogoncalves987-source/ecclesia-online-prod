@@ -22,9 +22,12 @@ import { isModuleEnabled, type ModuleId } from "@/config/modules";
 // no grafo de módulos do build de produção e nenhum chunk é emitido.
 const IS_STAGING_BUILD = import.meta.env.VITE_APP_ENV === "staging";
 
-const FinanceExecutive = IS_STAGING_BUILD
-  ? lazy(() => import("@/components/financeiro/FinanceExecutive").then(m => ({ default: m.FinanceExecutive })))
-  : null;
+// CORREÇÃO 2026-07-24 (Fase G — restauração do Financeiro) — "Executivo"
+// passou a agregar transactions/campanhas/finance_budgets reais e a árvore
+// real de organizações para o consolidado por hierarquia — ver
+// src/components/financeiro/FinanceExecutive.tsx. Por isso carregada
+// sempre, nunca condicionada a IS_STAGING_BUILD.
+const FinanceExecutive = lazy(() => import("@/components/financeiro/FinanceExecutive").then(m => ({ default: m.FinanceExecutive })));
 // CORREÇÃO 2026-07-20 (Fase C — restauração do Financeiro) — "Dízimos &
 // Ofertas" foi removida do render em 07/07/2026 (commit d394a1d) antes
 // mesmo da separação de bundle por ambiente; nunca deveria ter saído, pois
@@ -230,7 +233,7 @@ export default function Financeiro() {
         {/* Abas staging-only — ver IS_STAGING_BUILD acima. Suspense próprio
             porque estes componentes são lazy apenas quando existem. */}
         <Suspense fallback={null}>
-          {activeTab === "executive" && FinanceExecutive && <FinanceExecutive onTabChange={setActiveTab} />}
+          {activeTab === "executive" && <FinanceExecutive onTabChange={setActiveTab} transactions={transactions} />}
           {activeTab === "tithes" && <FinanceTithesOfferings transactions={transactions} />}
           {activeTab === "campaigns" && FinanceCampaigns && <FinanceCampaigns />}
           {activeTab === "accounts" && FinanceAccounts && <FinanceAccounts />}

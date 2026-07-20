@@ -208,6 +208,14 @@ const PRODUCTION_MODULES: readonly ModuleDefinition[] = [
   // Contábeis" (FinanceReports.tsx), dentro da mesma aba, já usavam dados
   // reais desde antes. Não depende mais de financeDemo.
   { id: "finance.accountability", availability: "both", label: "Financeiro — Prestação de Contas" },
+
+  // CORREÇÃO 2026-07-24 (Fase G — restauração do Financeiro) — "Executivo"
+  // passou a agregar `transactions`/campanhas/finance_budgets reais (mesmas
+  // fontes já usadas em Tesouraria/Campanhas/Orçamento) e a árvore real de
+  // organizações (useChurch().congregations) para o consolidado por
+  // hierarquia — ver src/components/financeiro/FinanceExecutive.tsx e
+  // src/lib/financeIntelligence.ts. Não depende mais de financeDemo.
+  { id: "finance.executive", availability: "both", label: "Financeiro — Executivo" },
 ] as const;
 
 /**
@@ -219,12 +227,6 @@ const PRODUCTION_MODULES: readonly ModuleDefinition[] = [
  */
 const STAGING_ONLY_MODULES: readonly ModuleDefinition[] = IS_STAGING_BUILD ? [
   // Financeiro — abas que ainda dependem de financeDemo/campaignsDemo.
-  {
-    id: "finance.executive",
-    availability: "staging",
-    label: "Financeiro — Executivo",
-    note: "usa financeDemo",
-  },
   {
     id: "finance.intelligence",
     availability: "staging",

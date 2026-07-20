@@ -53,7 +53,14 @@ const FORBIDDEN_TERMS_SOURCE = [
   // as outras abas fictícias continuam banidas individualmente pelo nome do
   // próprio componente (FinanceExecutive, FinanceBudget, etc.), que
   // continuam condicionados a IS_STAGING_BUILD em src/pages/Financeiro.tsx.
-  "FinanceExecutive",
+  //
+  // "FinanceExecutive" removido em 2026-07-24 (Fase G — restauração do
+  // Financeiro): os 6 KPIs, o consolidado por hierarquia e o desempenho por
+  // centro de custo passaram a vir de transactions/campanhas/finance_budgets
+  // reais e da árvore real de organizações — ver
+  // src/components/financeiro/FinanceExecutive.tsx, src/lib/financeIntelligence.ts
+  // e src/config/modules.ts (finance.executive agora "both").
+  //
   // "FinanceCampaigns" removido em 2026-07-20 (Fase B — restauração do
   // Financeiro): consulta campaigns/campaign_contributions reais via
   // useCampaigns(), sem depender de campaignsDemo como fonte de dado
