@@ -44,7 +44,10 @@ export type ModuleId =
   | "member-invite"
   | "access-invite"
   | "gatekeeper"
-  // Financeiro — abas que ainda usam financeDemo/campaignsDemo (staging)
+  // Financeiro — restauradas fase a fase (Fases A-H, 2026-07-20 a
+  // 2026-07-24); todas ligadas a dados reais, disponíveis em produção
+  // (availability: "both" abaixo). Agrupadas aqui só por afinidade, não por
+  // ambiente.
   | "finance.executive"
   | "finance.campaigns"
   | "finance.accounts"
@@ -214,8 +217,17 @@ const PRODUCTION_MODULES: readonly ModuleDefinition[] = [
   // fontes já usadas em Tesouraria/Campanhas/Orçamento) e a árvore real de
   // organizações (useChurch().congregations) para o consolidado por
   // hierarquia — ver src/components/financeiro/FinanceExecutive.tsx e
-  // src/lib/financeIntelligence.ts. Não depende mais de financeDemo.
+  // src/lib/financeInsights.ts. Não depende mais de financeDemo.
   { id: "finance.executive", availability: "both", label: "Financeiro — Executivo" },
+
+  // CORREÇÃO 2026-07-24 (Fase H — restauração do Financeiro) — "Inteligência"
+  // passou a gerar alertas/insights/ações por regras determinísticas sobre
+  // dados reais (mesma fonte de src/lib/financeInsights.ts usada pelo
+  // Executivo — comparação de período, orçamento, status de campanha e
+  // prestação de contas) — ver
+  // src/components/financeiro/FinanceIntelligence.tsx. Sem IA generativa,
+  // sem dado fictício. Não depende mais de financeDemo.
+  { id: "finance.intelligence", availability: "both", label: "Financeiro — Inteligência" },
 ] as const;
 
 /**
@@ -226,14 +238,6 @@ const PRODUCTION_MODULES: readonly ModuleDefinition[] = [
  * tree-shaking.
  */
 const STAGING_ONLY_MODULES: readonly ModuleDefinition[] = IS_STAGING_BUILD ? [
-  // Financeiro — abas que ainda dependem de financeDemo/campaignsDemo.
-  {
-    id: "finance.intelligence",
-    availability: "staging",
-    label: "Financeiro — Inteligência",
-    note: "usa financeDemo",
-  },
-
   // Não constam na allowlist urgente de produção — permanecem em teste.
   // ("bible-ai", "worship", "campaigns", "recommendation-letters",
   // "reports" e "devotional" foram promovidos para PRODUCTION_MODULES —

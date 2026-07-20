@@ -14,69 +14,23 @@ import { supabase } from "@/integrations/supabase/client";
 import type { TreasuryTransaction } from "@/lib/finance";
 import { isModuleEnabled, type ModuleId } from "@/config/modules";
 
-// FASE 6 (separação de bundle por build) — estas 8 abas dependem de
-// financeDemo/campaignsDemo e são staging-only (ver ALL_TABS/TABS abaixo e
-// src/config/modules.ts). Import condicional + lazy: em produção,
-// `IS_STAGING_BUILD` é `false` (literal, substituído em build-time — mesmo
-// mecanismo de src/App.tsx), então nenhuma dessas chamadas `import()` entra
-// no grafo de módulos do build de produção e nenhum chunk é emitido.
-const IS_STAGING_BUILD = import.meta.env.VITE_APP_ENV === "staging";
-
-// CORREÇÃO 2026-07-24 (Fase G — restauração do Financeiro) — "Executivo"
-// passou a agregar transactions/campanhas/finance_budgets reais e a árvore
-// real de organizações para o consolidado por hierarquia — ver
-// src/components/financeiro/FinanceExecutive.tsx. Por isso carregada
-// sempre, nunca condicionada a IS_STAGING_BUILD.
+// RESTAURAÇÃO DO FINANCEIRO (2026-07-20 a 2026-07-24, Fases A-H) — em
+// 15/07/2026 estas 9 abas foram ocultadas de produção (FASE 6) por
+// dependerem de financeDemo/campaignsDemo (dado fictício). Cada uma foi
+// religada a dados reais do Supabase, fase a fase — ver o histórico de
+// comentários "CORREÇÃO 2026-07-2x (Fase X)" nos próprios componentes
+// (src/components/financeiro/*.tsx) e em src/config/modules.ts. Nenhuma
+// depende mais de IS_STAGING_BUILD: todas são carregadas sempre, em
+// qualquer ambiente.
 const FinanceExecutive = lazy(() => import("@/components/financeiro/FinanceExecutive").then(m => ({ default: m.FinanceExecutive })));
-// CORREÇÃO 2026-07-20 (Fase C — restauração do Financeiro) — "Dízimos &
-// Ofertas" foi removida do render em 07/07/2026 (commit d394a1d) antes
-// mesmo da separação de bundle por ambiente; nunca deveria ter saído, pois
-// os valores agora vêm de `transactions` real, classificados por categoria
-// (Dízimos/Ofertas/Missões) — ver
-// src/components/financeiro/FinanceTithesOfferings.tsx. Carregada sempre.
 const FinanceTithesOfferings = lazy(() => import("@/components/financeiro/FinanceTithesOfferings").then(m => ({ default: m.FinanceTithesOfferings })));
-// CORREÇÃO 2026-07-20 (Fase B — restauração do Financeiro) — "Campanhas"
-// consulta campaigns/campaign_contributions reais via useCampaigns() (mesma
-// fonte de /admin/campanhas); taxa operacional passou a somar fees reais em
-// vez de estimativa fixa — ver src/components/financeiro/FinanceCampaigns.tsx.
-// Por isso carregada sempre, nunca condicionada a IS_STAGING_BUILD.
 const FinanceCampaigns = lazy(() => import("@/components/financeiro/FinanceCampaigns").then(m => ({ default: m.FinanceCampaigns })));
-// CORREÇÃO 2026-07-17 — "Contas" passou a consultar `transactions` real
-// (contas a pagar/receber derivadas de status/data reais, sem nenhum dado
-// fictício) — ver src/components/financeiro/FinanceAccounts.tsx. Por isso
-// carregada sempre, nunca condicionada a IS_STAGING_BUILD.
 const FinanceAccounts = lazy(() => import("@/components/financeiro/FinanceAccounts").then(m => ({ default: m.FinanceAccounts })));
-// CORREÇÃO 2026-07-20 (Fase D — restauração do Financeiro) — "Orçamento"
-// passou a ler/gravar public.finance_budgets real (migration
-// 20260721090000_finance_budgets.sql), com "realizado" agregado de
-// `transactions` por centro de custo — ver
-// src/components/financeiro/FinanceBudget.tsx. Por isso carregada sempre,
-// nunca condicionada a IS_STAGING_BUILD.
 const FinanceBudget = lazy(() => import("@/components/financeiro/FinanceBudget").then(m => ({ default: m.FinanceBudget })));
-// CORREÇÃO 2026-07-22 (Fase E — restauração do Financeiro) — "Patrimônio"
-// passou a fazer CRUD real sobre public.finance_assets (migration
-// 20260722090000_finance_assets.sql) — ver
-// src/components/financeiro/FinanceAssets.tsx. Por isso carregada sempre,
-// nunca condicionada a IS_STAGING_BUILD.
 const FinanceAssets = lazy(() => import("@/components/financeiro/FinanceAssets").then(m => ({ default: m.FinanceAssets })));
-// CORREÇÃO 2026-07-23 (Fase F — restauração do Financeiro) — "Prestação de
-// Contas" tinha os "Relatórios históricos" 100% fictícios
-// (ACCOUNTABILITY_REPORTS de financeDemo.ts). Agora vêm de
-// public.finance_accountability_reports/_approvals real (migration
-// 20260723090000_finance_accountability.sql) — ver
-// src/components/financeiro/FinanceAccountability.tsx. Os "Relatórios
-// Contábeis" (FinanceReports.tsx) já usavam dados reais. Por isso carregada
-// sempre, nunca condicionada a IS_STAGING_BUILD.
 const FinanceAccountability = lazy(() => import("@/components/financeiro/FinanceAccountability").then(m => ({ default: m.FinanceAccountability })));
-// CORREÇÃO 2026-07-20 (Fase A — restauração do Financeiro) — "Auditoria"
-// passou a consultar `finance_transaction_audit_logs` real (populada por
-// trigger em todo INSERT/UPDATE/DELETE de `transactions`), sem nenhum dado
-// fictício — ver src/components/financeiro/FinanceAudit.tsx. Por isso
-// carregada sempre, nunca condicionada a IS_STAGING_BUILD.
 const FinanceAudit = lazy(() => import("@/components/financeiro/FinanceAudit").then(m => ({ default: m.FinanceAudit })));
-const FinanceIntelligence = IS_STAGING_BUILD
-  ? lazy(() => import("@/components/financeiro/FinanceIntelligence").then(m => ({ default: m.FinanceIntelligence })))
-  : null;
+const FinanceIntelligence = lazy(() => import("@/components/financeiro/FinanceIntelligence").then(m => ({ default: m.FinanceIntelligence })));
 
 const ALL_TABS = [
   { key: "executive",      icon: BarChart3,    labelKey: "Executivo",           moduleId: "finance.executive" },
@@ -91,10 +45,9 @@ const ALL_TABS = [
   { key: "intelligence",   icon: Sparkles,     labelKey: "Inteligência",        moduleId: "finance.intelligence" },
 ] as const satisfies ReadonlyArray<{ key: string; icon: unknown; labelKey: string; moduleId: ModuleId }>;
 
-// Apenas Tesouraria usa dados reais na allowlist urgente de produção; as
-// demais abas dependem de financeDemo/campaignsDemo e ficam restritas a
-// staging (ver src/config/modules.ts). Filtrado aqui — nunca uma regra
-// paralela de gating.
+// Todas as abas usam dados reais desde a restauração completa (Fases A-H,
+// ver src/config/modules.ts) — filtro aqui apenas reflete a allowlist de
+// módulos por ambiente, nunca uma regra paralela de gating.
 const TABS = ALL_TABS.filter(tab => isModuleEnabled(tab.moduleId));
 
 type TabKey = typeof ALL_TABS[number]["key"];
@@ -230,18 +183,17 @@ export default function Financeiro() {
             </div>
           </div>
         )}
-        {/* Abas staging-only — ver IS_STAGING_BUILD acima. Suspense próprio
-            porque estes componentes são lazy apenas quando existem. */}
+        {/* Demais abas — todas lazy-loaded, todas com dados reais (Fases A-H). */}
         <Suspense fallback={null}>
           {activeTab === "executive" && <FinanceExecutive onTabChange={setActiveTab} transactions={transactions} />}
           {activeTab === "tithes" && <FinanceTithesOfferings transactions={transactions} />}
-          {activeTab === "campaigns" && FinanceCampaigns && <FinanceCampaigns />}
-          {activeTab === "accounts" && FinanceAccounts && <FinanceAccounts />}
+          {activeTab === "campaigns" && <FinanceCampaigns />}
+          {activeTab === "accounts" && <FinanceAccounts />}
           {activeTab === "budget" && <FinanceBudget transactions={transactions} />}
           {activeTab === "assets" && <FinanceAssets />}
           {activeTab === "accountability" && <FinanceAccountability transactions={transactions} />}
-          {activeTab === "audit" && FinanceAudit && <FinanceAudit />}
-          {activeTab === "intelligence" && FinanceIntelligence && <FinanceIntelligence onTabChange={setActiveTab} />}
+          {activeTab === "audit" && <FinanceAudit />}
+          {activeTab === "intelligence" && <FinanceIntelligence onTabChange={setActiveTab} transactions={transactions} />}
         </Suspense>
       </div>
     </AdminLayout>

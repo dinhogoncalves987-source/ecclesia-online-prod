@@ -58,7 +58,7 @@ const FORBIDDEN_TERMS_SOURCE = [
   // Financeiro): os 6 KPIs, o consolidado por hierarquia e o desempenho por
   // centro de custo passaram a vir de transactions/campanhas/finance_budgets
   // reais e da árvore real de organizações — ver
-  // src/components/financeiro/FinanceExecutive.tsx, src/lib/financeIntelligence.ts
+  // src/components/financeiro/FinanceExecutive.tsx, src/lib/financeInsights.ts
   // e src/config/modules.ts (finance.executive agora "both").
   //
   // "FinanceCampaigns" removido em 2026-07-20 (Fase B — restauração do
@@ -87,12 +87,19 @@ const FORBIDDEN_TERMS_SOURCE = [
   // public.finance_accountability_reports/_approvals real — ver
   // src/components/financeiro/FinanceAccountability.tsx e
   // src/config/modules.ts (finance.accountability agora "both").
-  "FinanceIntelligence",
+  //
   // "FinanceAudit" removido em 2026-07-20 (Fase A — restauração do
   // Financeiro): passou a consultar `finance_transaction_audit_logs` real
   // (populada por trigger em transactions), sem nenhum dado fictício — ver
   // src/components/financeiro/FinanceAudit.tsx e src/config/modules.ts
   // (finance.audit agora "both").
+  //
+  // "FinanceIntelligence" removido em 2026-07-24 (Fase H — restauração do
+  // Financeiro): alertas/insights/ações recomendadas passaram a vir de
+  // regras determinísticas sobre dados reais (mesma fonte do Executivo,
+  // src/lib/financeInsights.ts), sem IA generativa e sem dado fictício —
+  // ver src/components/financeiro/FinanceIntelligence.tsx e
+  // src/config/modules.ts (finance.intelligence agora "both").
   //
   // "pages/Biblia" removido em 2026-07-17: Bíblia/IA foi promovida para
   // availability: "both" (não depende de tabela/migration staging-only) —

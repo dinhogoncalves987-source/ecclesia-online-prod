@@ -16,11 +16,14 @@ describe("isModuleEnabled", () => {
     expect(isModuleEnabled("finance.accounts", "staging")).toBe(true);
   });
 
-  // CORREÇÃO 2026-07-17: "Contas" passou a consultar `transactions` real
-  // (contas a pagar/receber com status/data reais) — não usa mais
-  // financeDemo como fonte de dado exibido. Promovido para "both".
-  it("disables staging-only demo finance tabs in production", () => {
-    expect(isModuleEnabled("finance.intelligence", "production")).toBe(false);
+  // CORREÇÃO 2026-07-24 (Fase H — restauração do Financeiro): "Inteligência"
+  // passou a gerar alertas/insights/ações por regras determinísticas sobre
+  // dados reais (mesma fonte do Executivo, src/lib/financeInsights.ts) —
+  // não usa mais financeDemo como fonte de dado exibido. Promovida para
+  // "both".
+  it("enables finance.intelligence in production and staging (regras deterministicas sobre dados reais)", () => {
+    expect(isModuleEnabled("finance.intelligence", "production")).toBe(true);
+    expect(isModuleEnabled("finance.intelligence", "staging")).toBe(true);
   });
 
   // CORREÇÃO 2026-07-20 (Fase A — restauração do Financeiro): "Auditoria"
@@ -85,10 +88,6 @@ describe("isModuleEnabled", () => {
   it("enables finance.executive in production and staging (agregacoes reais)", () => {
     expect(isModuleEnabled("finance.executive", "production")).toBe(true);
     expect(isModuleEnabled("finance.executive", "staging")).toBe(true);
-  });
-
-  it("enables staging-only demo finance tabs in staging", () => {
-    expect(isModuleEnabled("finance.intelligence", "staging")).toBe(true);
   });
 
   it("classifies TV Digital and Canal Ecclésia as stage-only", () => {
