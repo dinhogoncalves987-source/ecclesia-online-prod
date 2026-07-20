@@ -184,6 +184,14 @@ const PRODUCTION_MODULES: readonly ModuleDefinition[] = [
   // src/components/financeiro/FinanceTithesOfferings.tsx. A configuração de
   // PIX agora persiste em finance_accounts (mesma tabela do PixCard).
   { id: "finance.tithes", availability: "both", label: "Financeiro — Dízimos & Ofertas" },
+
+  // CORREÇÃO 2026-07-20 (Fase D — restauração do Financeiro) — "Orçamento"
+  // passou a ler/gravar public.finance_budgets real (migration
+  // 20260721090000_finance_budgets.sql), com "realizado" agregado de
+  // `transactions` real por centro de custo — ver
+  // src/components/financeiro/FinanceBudget.tsx. Não depende mais de
+  // financeDemo.
+  { id: "finance.budget", availability: "both", label: "Financeiro — Orçamento" },
 ] as const;
 
 /**
@@ -199,12 +207,6 @@ const STAGING_ONLY_MODULES: readonly ModuleDefinition[] = IS_STAGING_BUILD ? [
     id: "finance.executive",
     availability: "staging",
     label: "Financeiro — Executivo",
-    note: "usa financeDemo",
-  },
-  {
-    id: "finance.budget",
-    availability: "staging",
-    label: "Financeiro — Orçamento",
     note: "usa financeDemo",
   },
   {

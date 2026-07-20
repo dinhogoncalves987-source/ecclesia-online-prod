@@ -72,7 +72,8 @@
     "20260718130000_push_subscriptions.sql",
     "20260718140000_internal_thread_notification_recipients.sql",
     "20260720100000_profiles_missing_authenticated_update_grant.sql",
-    "20260720110000_internal_thread_hidden_for_user_update_grant.sql"
+    "20260720110000_internal_thread_hidden_for_user_update_grant.sql",
+    "20260721090000_finance_budgets.sql"
   ],
   "staging_feature": [
     "20260526100000_staging_worship_tables.sql",

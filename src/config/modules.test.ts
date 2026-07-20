@@ -21,7 +21,6 @@ describe("isModuleEnabled", () => {
   // financeDemo como fonte de dado exibido. Promovido para "both".
   it("disables staging-only demo finance tabs in production", () => {
     expect(isModuleEnabled("finance.executive", "production")).toBe(false);
-    expect(isModuleEnabled("finance.budget", "production")).toBe(false);
     expect(isModuleEnabled("finance.assets", "production")).toBe(false);
     expect(isModuleEnabled("finance.accountability", "production")).toBe(false);
     expect(isModuleEnabled("finance.intelligence", "production")).toBe(false);
@@ -53,9 +52,19 @@ describe("isModuleEnabled", () => {
     expect(isModuleEnabled("finance.tithes", "staging")).toBe(true);
   });
 
+  // CORREÇÃO 2026-07-20 (Fase D — restauração do Financeiro): "Orçamento"
+  // passou a ler/gravar public.finance_budgets real (migration
+  // 20260721090000_finance_budgets.sql), com "realizado" agregado de
+  // transactions por centro de custo — não usa mais financeDemo como fonte
+  // de dado exibido. Promovida para "both".
+  it("enables finance.budget in production and staging (dados reais de orçamento)", () => {
+    expect(isModuleEnabled("finance.budget", "production")).toBe(true);
+    expect(isModuleEnabled("finance.budget", "staging")).toBe(true);
+  });
+
   it("enables staging-only demo finance tabs in staging", () => {
     expect(isModuleEnabled("finance.executive", "staging")).toBe(true);
-    expect(isModuleEnabled("finance.budget", "staging")).toBe(true);
+    expect(isModuleEnabled("finance.assets", "staging")).toBe(true);
   });
 
   it("classifies TV Digital and Canal Ecclésia as stage-only", () => {

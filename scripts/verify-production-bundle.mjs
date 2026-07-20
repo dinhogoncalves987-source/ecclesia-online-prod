@@ -64,7 +64,11 @@ const FORBIDDEN_TERMS_SOURCE = [
   // `transactions` real (contas a pagar/receber com status/data reais) —
   // ver src/components/financeiro/FinanceAccounts.tsx e
   // src/config/modules.ts (finance.accounts agora "both").
-  "FinanceBudget",
+  // "FinanceBudget" removido em 2026-07-20 (Fase D — restauração do
+  // Financeiro): passou a ler/gravar public.finance_budgets real, com
+  // "realizado" agregado de `transactions` por centro de custo — ver
+  // src/components/financeiro/FinanceBudget.tsx e src/config/modules.ts
+  // (finance.budget agora "both").
   "FinanceAssets",
   "FinanceAccountability",
   "FinanceIntelligence",

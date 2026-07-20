@@ -43,9 +43,13 @@ const FinanceCampaigns = lazy(() => import("@/components/financeiro/FinanceCampa
 // fictício) — ver src/components/financeiro/FinanceAccounts.tsx. Por isso
 // carregada sempre, nunca condicionada a IS_STAGING_BUILD.
 const FinanceAccounts = lazy(() => import("@/components/financeiro/FinanceAccounts").then(m => ({ default: m.FinanceAccounts })));
-const FinanceBudget = IS_STAGING_BUILD
-  ? lazy(() => import("@/components/financeiro/FinanceBudget").then(m => ({ default: m.FinanceBudget })))
-  : null;
+// CORREÇÃO 2026-07-20 (Fase D — restauração do Financeiro) — "Orçamento"
+// passou a ler/gravar public.finance_budgets real (migration
+// 20260721090000_finance_budgets.sql), com "realizado" agregado de
+// `transactions` por centro de custo — ver
+// src/components/financeiro/FinanceBudget.tsx. Por isso carregada sempre,
+// nunca condicionada a IS_STAGING_BUILD.
+const FinanceBudget = lazy(() => import("@/components/financeiro/FinanceBudget").then(m => ({ default: m.FinanceBudget })));
 const FinanceAssets = IS_STAGING_BUILD
   ? lazy(() => import("@/components/financeiro/FinanceAssets").then(m => ({ default: m.FinanceAssets })))
   : null;
@@ -221,7 +225,7 @@ export default function Financeiro() {
           {activeTab === "tithes" && <FinanceTithesOfferings transactions={transactions} />}
           {activeTab === "campaigns" && FinanceCampaigns && <FinanceCampaigns />}
           {activeTab === "accounts" && FinanceAccounts && <FinanceAccounts />}
-          {activeTab === "budget" && FinanceBudget && <FinanceBudget />}
+          {activeTab === "budget" && <FinanceBudget transactions={transactions} />}
           {activeTab === "assets" && FinanceAssets && <FinanceAssets />}
           {activeTab === "accountability" && FinanceAccountability && <FinanceAccountability transactions={transactions} />}
           {activeTab === "audit" && FinanceAudit && <FinanceAudit />}

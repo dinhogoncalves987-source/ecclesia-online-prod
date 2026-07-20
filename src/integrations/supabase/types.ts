@@ -366,6 +366,63 @@ export type Database = {
           },
         ]
       }
+      finance_budgets: {
+        Row: {
+          budgeted_amount: number
+          cost_center_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          organization_id: string
+          period_month: number | null
+          period_year: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          budgeted_amount?: number
+          cost_center_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          organization_id: string
+          period_month?: number | null
+          period_year: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          budgeted_amount?: number
+          cost_center_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          period_month?: number | null
+          period_year?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_budgets_cost_center_id_fkey"
+            columns: ["cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "finance_cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_budgets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finance_monthly_closings: {
         Row: {
           closed_at: string
