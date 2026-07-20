@@ -25,8 +25,16 @@ describe("isModuleEnabled", () => {
     expect(isModuleEnabled("finance.budget", "production")).toBe(false);
     expect(isModuleEnabled("finance.assets", "production")).toBe(false);
     expect(isModuleEnabled("finance.accountability", "production")).toBe(false);
-    expect(isModuleEnabled("finance.audit", "production")).toBe(false);
     expect(isModuleEnabled("finance.intelligence", "production")).toBe(false);
+  });
+
+  // CORREÇÃO 2026-07-20 (Fase A — restauração do Financeiro): "Auditoria"
+  // passou a consultar finance_transaction_audit_logs real (populada por
+  // trigger em toda alteração de transactions) — não usa mais financeDemo
+  // como fonte de dado exibido. Promovida individualmente para "both".
+  it("enables finance.audit in production and staging (dados reais de auditoria)", () => {
+    expect(isModuleEnabled("finance.audit", "production")).toBe(true);
+    expect(isModuleEnabled("finance.audit", "staging")).toBe(true);
   });
 
   it("enables staging-only demo finance tabs in staging", () => {

@@ -42,9 +42,12 @@ const FinanceAssets = IS_STAGING_BUILD
 const FinanceAccountability = IS_STAGING_BUILD
   ? lazy(() => import("@/components/financeiro/FinanceAccountability").then(m => ({ default: m.FinanceAccountability })))
   : null;
-const FinanceAudit = IS_STAGING_BUILD
-  ? lazy(() => import("@/components/financeiro/FinanceAudit").then(m => ({ default: m.FinanceAudit })))
-  : null;
+// CORREÇÃO 2026-07-20 (Fase A — restauração do Financeiro) — "Auditoria"
+// passou a consultar `finance_transaction_audit_logs` real (populada por
+// trigger em todo INSERT/UPDATE/DELETE de `transactions`), sem nenhum dado
+// fictício — ver src/components/financeiro/FinanceAudit.tsx. Por isso
+// carregada sempre, nunca condicionada a IS_STAGING_BUILD.
+const FinanceAudit = lazy(() => import("@/components/financeiro/FinanceAudit").then(m => ({ default: m.FinanceAudit })));
 const FinanceIntelligence = IS_STAGING_BUILD
   ? lazy(() => import("@/components/financeiro/FinanceIntelligence").then(m => ({ default: m.FinanceIntelligence })))
   : null;

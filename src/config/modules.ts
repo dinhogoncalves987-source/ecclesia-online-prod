@@ -154,6 +154,16 @@ const PRODUCTION_MODULES: readonly ModuleDefinition[] = [
   // irmãos) também não depende de nenhum dado de demonstração. Mesma
   // categoria de "bible-ai" — promovido de volta para "both".
   { id: "devotional", availability: "both", label: "Devocional" },
+
+  // CORREÇÃO 2026-07-20 (Fase A — restauração do Financeiro) — "Auditoria"
+  // consulta finance_transaction_audit_logs real, populada automaticamente
+  // por trigger em todo INSERT/UPDATE/DELETE de `transactions` (ver
+  // src/components/financeiro/FinanceAudit.tsx). Nunca usou dado fictício
+  // como fonte exibida — só estava presa à allowlist urgente junto das
+  // demais abas do Financeiro. Promovida individualmente; as demais abas
+  // (Executivo, Campanhas, Orçamento, Patrimônio, Prestação de Contas,
+  // Inteligência) seguem cada uma sua própria fase de restauração.
+  { id: "finance.audit", availability: "both", label: "Financeiro — Auditoria" },
 ] as const;
 
 /**
@@ -193,12 +203,6 @@ const STAGING_ONLY_MODULES: readonly ModuleDefinition[] = IS_STAGING_BUILD ? [
     id: "finance.accountability",
     availability: "staging",
     label: "Financeiro — Prestação de Contas",
-    note: "usa financeDemo",
-  },
-  {
-    id: "finance.audit",
-    availability: "staging",
-    label: "Financeiro — Auditoria",
     note: "usa financeDemo",
   },
   {

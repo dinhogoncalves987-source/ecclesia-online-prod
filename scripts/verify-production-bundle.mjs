@@ -62,8 +62,13 @@ const FORBIDDEN_TERMS_SOURCE = [
   "FinanceBudget",
   "FinanceAssets",
   "FinanceAccountability",
-  "FinanceAudit",
   "FinanceIntelligence",
+  // "FinanceAudit" removido em 2026-07-20 (Fase A — restauração do
+  // Financeiro): passou a consultar `finance_transaction_audit_logs` real
+  // (populada por trigger em transactions), sem nenhum dado fictício — ver
+  // src/components/financeiro/FinanceAudit.tsx e src/config/modules.ts
+  // (finance.audit agora "both").
+  //
   // "pages/Biblia" removido em 2026-07-17: Bíblia/IA foi promovida para
   // availability: "both" (não depende de tabela/migration staging-only) —
   // agora DEVE aparecer no bundle de produção. Ver src/config/modules.ts.
