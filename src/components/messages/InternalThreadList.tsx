@@ -2,7 +2,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { usePresenceStatus } from "@/hooks/usePresence";
 import type { InternalThread } from "@/lib/internalMessages";
 import { cn } from "@/lib/utils";
-import { Loader2, MessageCircle } from "lucide-react";
+import { Loader2, MessageCircle, Trash2 } from "lucide-react";
 
 type Props = {
   threads: InternalThread[];
@@ -13,6 +13,10 @@ type Props = {
   selectionMode?: boolean;
   selectedIds?: Set<string>;
   onToggleSelect?: (thread: InternalThread) => void;
+  /** Apagar uma única conversa direto pela lixeira que aparece ao passar o
+   * mouse/dedo sobre a linha (estilo WhatsApp) — independente do modo de
+   * seleção múltipla. */
+  onDeleteThread?: (thread: InternalThread) => void;
 };
 
 const STATUS_DOT: Record<string, string> = {
@@ -60,6 +64,7 @@ export function InternalThreadList({
   selectionMode = false,
   selectedIds,
   onToggleSelect,
+  onDeleteThread,
 }: Props) {
   const { t, lang } = useLanguage();
   const { isOnline } = usePresenceStatus();
@@ -95,12 +100,20 @@ export function InternalThreadList({
         const checked = selectedIds?.has(thread.id) ?? false;
 
         return (
-          <li key={thread.id}>
-            <button
-              type="button"
+          <li key={thread.id} className="group relative">
+            <div
+              role="button"
+              tabIndex={0}
               onClick={() => (selectionMode ? onToggleSelect?.(thread) : onSelect(thread))}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" && e.key !== " ") return;
+                e.preventDefault();
+                if (selectionMode) onToggleSelect?.(thread);
+                else onSelect(thread);
+              }}
               className={cn(
-                "w-full text-left px-3 sm:px-4 py-3 flex items-start gap-3 hover:bg-secondary/40 transition-colors",
+                "w-full text-left px-3 sm:px-4 py-3 flex items-start gap-3 hover:bg-secondary/40 transition-colors cursor-pointer",
+                !selectionMode && onDeleteThread && "pr-11 sm:pr-12",
                 active && !selectionMode && "bg-secondary/60",
                 selectionMode && checked && "bg-primary/10",
               )}
@@ -145,7 +158,32 @@ export function InternalThreadList({
                   )}
                 />
               )}
-            </button>
+            </div>
+
+            {/* Lixeira estilo WhatsApp — espaço reservado à direita da linha
+                (não sobrepõe nome/horário/prévia). No desktop fica invisível
+                até o mouse passar sobre a linha (group-hover); em telas
+                touch (sem hover real), fica sempre visível com opacidade
+                reduzida, e o toque direto nela apaga a conversa sem precisar
+                de nenhum modo de seleção. */}
+            {!selectionMode && onDeleteThread && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteThread(thread);
+                }}
+                className={cn(
+                  "absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full flex items-center justify-center",
+                  "text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors",
+                  "opacity-60 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100",
+                )}
+                aria-label={t("Apagar conversa")}
+                title={t("Apagar conversa")}
+              >
+                <Trash2 size={15} />
+              </button>
+            )}
           </li>
         );
       })}

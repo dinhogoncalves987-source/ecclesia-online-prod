@@ -75,10 +75,13 @@ const FORBIDDEN_TERMS_SOURCE = [
   // Cartas de Recomendação e Relatórios foram promovidos para
   // availability: "both" — todos têm backend real no Supabase (nenhum
   // depende de dado fictício exibido ao usuário). Ver src/config/modules.ts.
+  //
+  // "pages/DevocionalPublic" e "components/DailyDevotional" removidos em
+  // 2026-07-20: "devotional" foi promovido para availability: "both" —
+  // banco de versículos reais (edge function daily-devotional), sem
+  // nenhum dado fictício exibido ao usuário. Ver src/config/modules.ts.
   "pages/Marketplace",
   "pages/Comunidade",
-  "pages/DevocionalPublic",
-  "components/DailyDevotional",
   "tv-digital",
   "canal-ecclesia",
   "CanalEcclesia",

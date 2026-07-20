@@ -17,16 +17,14 @@ import { environment } from "@/config/environment";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
-// FASE 6 (separação de bundle por build): "devotional" é staging-only (ver
-// src/config/modules.ts). `import.meta.env.VITE_APP_ENV` é substituído por
-// uma string literal em build-time pelo Vite, tornando esta comparação uma
-// expressão constante ANTES do tree-shaking do Rollup — o branch morto
-// (incluindo o `import()`) nunca entra no grafo de módulos de um build de
-// produção. Mesmo padrão de src/App.tsx e src/pages/Financeiro.tsx.
-const IS_STAGING_BUILD = import.meta.env.VITE_APP_ENV === "staging";
-const DailyDevotional = IS_STAGING_BUILD
-  ? lazy(() => import("@/components/DailyDevotional").then((m) => ({ default: m.DailyDevotional })))
-  : null;
+// CORREÇÃO 2026-07-20: "devotional" foi promovido de volta para "both" em
+// src/config/modules.ts (não depende de dado fictício — ver comentário lá).
+// O carregamento continua lazy (code-splitting), mas agora em produção e
+// staging igualmente; a visibilidade real é só `isModuleEnabled("devotional")`
+// abaixo, nunca um branch de build separado.
+const DailyDevotional = lazy(() =>
+  import("@/components/DailyDevotional").then((m) => ({ default: m.DailyDevotional })),
+);
 
 interface PlatformCampaign {
   id: string;

@@ -104,6 +104,15 @@ export function InternalChat({
     });
   };
 
+  // Lixeira que aparece ao passar o mouse/dedo sobre a conversa (estilo
+  // WhatsApp) — apaga direto, sem precisar entrar no modo de seleção
+  // múltipla. Reaproveita o mesmo diálogo de confirmação e a mesma rotina
+  // de exclusão ("apagar para mim") usados pela seleção múltipla.
+  const requestDeleteSingleThread = (thread: InternalThread) => {
+    setSelectedThreadIds(new Set([thread.id]));
+    setConfirmDeleteOpen(true);
+  };
+
   // ── Notificações do navegador — solicitação explícita e visível ─────────
   const [notifPermission, setNotifPermission] = useState<ChatNotificationPermission>(
     getChatNotificationPermission(),
@@ -396,6 +405,7 @@ export function InternalChat({
             selectionMode={selectionMode}
             selectedIds={selectedThreadIds}
             onToggleSelect={toggleThreadSelection}
+            onDeleteThread={requestDeleteSingleThread}
           />
           {!threadsLoading && searchQuery && filteredThreads.length === 0 && (
             <div className="flex flex-col items-center justify-center py-8 px-4 text-center text-muted-foreground">

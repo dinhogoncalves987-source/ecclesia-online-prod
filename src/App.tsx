@@ -50,7 +50,6 @@ import ConviteMembro from "./pages/ConviteMembro";
 import ConviteAcesso from "./pages/ConviteAcesso";
 
 import NotFound from "./pages/NotFound";
-import PublicModuleUnavailable from "./pages/PublicModuleUnavailable";
 
 
 
@@ -147,9 +146,11 @@ const Marketplace = IS_STAGING_BUILD ? lazy(() => import("./pages/Marketplace"))
 
 const Comunidade = IS_STAGING_BUILD ? lazy(() => import("./pages/Comunidade")) : null;
 
-// Público — staging-only (devotional). Mesma lógica: null (e nenhum chunk)
-// num build de produção.
-const DevocionalPublic = IS_STAGING_BUILD ? lazy(() => import("./pages/DevocionalPublic")) : null;
+// CORREÇÃO 2026-07-20: "devotional" foi promovido de volta para "both" em
+// src/config/modules.ts — a página pública de compartilhamento do
+// versículo do dia precisa acompanhar, senão um link enviado por um membro
+// em produção cairia num "módulo indisponível".
+const DevocionalPublic = lazy(() => import("./pages/DevocionalPublic"));
 
 // Cartas de Recomendação foi promovida (ver acima) — a página pública de
 // validação de carta precisa acompanhar, senão o QR/link de validação
@@ -208,7 +209,7 @@ const App = () => (
               <Route path="/convite-membro/:token" element={<ConviteMembro />} />
               <Route path="/convite-acesso/:token" element={<ConviteAcesso />} />
 
-              <Route path="/devocional" element={DevocionalPublic ? <DevocionalPublic /> : <PublicModuleUnavailable />} />
+              <Route path="/devocional" element={<DevocionalPublic />} />
 
 
               <Route path="/admin" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

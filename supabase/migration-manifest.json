@@ -70,7 +70,9 @@
     "20260718110000_internal_threads_call_room_token.sql",
     "20260718120000_internal_chat_missing_authenticated_grants.sql",
     "20260718130000_push_subscriptions.sql",
-    "20260718140000_internal_thread_notification_recipients.sql"
+    "20260718140000_internal_thread_notification_recipients.sql",
+    "20260720100000_profiles_missing_authenticated_update_grant.sql",
+    "20260720110000_internal_thread_hidden_for_user_update_grant.sql"
   ],
   "staging_feature": [
     "20260526100000_staging_worship_tables.sql",

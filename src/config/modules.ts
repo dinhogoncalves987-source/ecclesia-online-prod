@@ -144,6 +144,16 @@ const PRODUCTION_MODULES: readonly ModuleDefinition[] = [
   { id: "campaigns", availability: "both", label: "Campanhas" },
   { id: "recommendation-letters", availability: "both", label: "Cartas de Recomendação" },
   { id: "reports", availability: "both", label: "Relatórios" },
+
+  // CORREÇÃO 2026-07-20 — "devotional" foi classificado como staging-only por
+  // engano numa reorganização anterior (FASE 6), removendo do Dashboard de
+  // produção o card do versículo do dia sem autorização e sem relação com
+  // dado fictício: a edge function daily-devotional serve um banco de
+  // versículos bíblicos reais (curado, sem financeDemo/campaignsDemo) e a
+  // página pública /devocional (compartilhamento do versículo com os
+  // irmãos) também não depende de nenhum dado de demonstração. Mesma
+  // categoria de "bible-ai" — promovido de volta para "both".
+  { id: "devotional", availability: "both", label: "Devocional" },
 ] as const;
 
 /**
@@ -199,9 +209,9 @@ const STAGING_ONLY_MODULES: readonly ModuleDefinition[] = IS_STAGING_BUILD ? [
   },
 
   // Não constam na allowlist urgente de produção — permanecem em teste.
-  // ("bible-ai", "worship", "campaigns", "recommendation-letters" e
-  // "reports" foram promovidos para PRODUCTION_MODULES — ver acima.)
-  { id: "devotional", availability: "staging", label: "Devocional" },
+  // ("bible-ai", "worship", "campaigns", "recommendation-letters",
+  // "reports" e "devotional" foram promovidos para PRODUCTION_MODULES —
+  // ver acima.)
   // Marketplace e Comunidade são telas de maquete (dado 100% fixo no
   // código-fonte, sem nenhuma tabela real no Supabase) — permanecem
   // staging-only até virarem funcionalidades reais, nunca por regressão.

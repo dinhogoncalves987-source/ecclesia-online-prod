@@ -41,8 +41,8 @@ describe("isModuleEnabled", () => {
     expect(isModuleEnabled("canal-ecclesia", "staging")).toBe(true);
   });
 
-  it("disables in-testing modules (Devocional, Marketplace, Comunidade) in production — telas de maquete, sem backend real", () => {
-    for (const id of ["devotional", "marketplace", "community"] as const) {
+  it("disables in-testing modules (Marketplace, Comunidade) in production — telas de maquete, sem backend real", () => {
+    for (const id of ["marketplace", "community"] as const) {
       expect(isModuleEnabled(id, "production")).toBe(false);
       expect(isModuleEnabled(id, "staging")).toBe(true);
     }
@@ -53,8 +53,13 @@ describe("isModuleEnabled", () => {
   // usuário (todos têm backend real no Supabase) — nunca deveriam ter sido
   // staging-only. Promovidos para "both" após regressão que os removeu do
   // menu de produção.
-  it("enables Bíblia/IA, Culto & Louvor, Campanhas, Cartas de Recomendação e Relatórios em produção e staging", () => {
-    for (const id of ["bible-ai", "worship", "campaigns", "recommendation-letters", "reports"] as const) {
+  //
+  // CORREÇÃO 2026-07-20: "devotional" teve a mesma regressão — a edge
+  // function daily-devotional (banco de versículos reais) e a página
+  // pública /devocional de compartilhamento não dependem de dado fictício.
+  // Promovido de volta para "both".
+  it("enables Bíblia/IA, Culto & Louvor, Campanhas, Cartas de Recomendação, Relatórios e Devocional em produção e staging", () => {
+    for (const id of ["bible-ai", "worship", "campaigns", "recommendation-letters", "reports", "devotional"] as const) {
       expect(isModuleEnabled(id, "production")).toBe(true);
       expect(isModuleEnabled(id, "staging")).toBe(true);
     }
