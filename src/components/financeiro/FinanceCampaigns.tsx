@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useCampaigns } from "@/hooks/useCampaigns";
@@ -14,8 +15,56 @@ import { formatFinanceCurrency } from "@/lib/financeDemo";
 import { ArrowDown, ChevronRight, Megaphone } from "lucide-react";
 import { DocExportMenu } from "@/components/shared/DocExportMenu";
 import { buildFinanceExportItems } from "@/lib/docExport";
+import { runScopedOrganizationQuery } from "@/lib/organizationScope";
 
-const OPERATING_FEE_RATE = 0.025;
+/**
+ * CORREÇÃO 2026-07-20 (Fase B — restauração do Financeiro) — a taxa
+ * operacional e o repasse líquido deixaram de usar uma estimativa fixa de
+ * 2,5% e passaram a somar `gateway_fee_amount` + `platform_fee_amount` (e
+ * `net_amount`) das contribuições reais em `campaign_contributions`
+ * (migration 20260608130000_staging_campaigns_finance_integration.sql).
+ * Sem contribuição confirmada ainda, os totais ficam corretamente em zero
+ * em vez de uma estimativa fictícia.
+ */
+type ContributionFeeRow = { amount: number; gateway_fee_amount: number; platform_fee_amount: number; net_amount: number };
+
+function useCampaignFeeSummary(organizationId: string | undefined, campaignIds: string[]) {
+  const [summary, setSummary] = useState({ totalFees: 0, totalNet: 0, loading: true });
+  const campaignIdsKey = campaignIds.join(",");
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      if (!organizationId || campaignIds.length === 0) {
+        if (active) setSummary({ totalFees: 0, totalNet: 0, loading: false });
+        return;
+      }
+      const { data, error } = await runScopedOrganizationQuery<ContributionFeeRow[]>(
+        "campaign_contributions",
+        organizationId,
+        query => query
+          .select("amount, gateway_fee_amount, platform_fee_amount, net_amount")
+          .eq("payment_status", "confirmed")
+          .in("campaign_id", campaignIds),
+      );
+      if (!active) return;
+      if (error) {
+        console.error("[FinanceCampaigns] fee summary:", error);
+        setSummary({ totalFees: 0, totalNet: 0, loading: false });
+        return;
+      }
+      const rows = data ?? [];
+      const totalFees = rows.reduce((s, r) => s + Number(r.gateway_fee_amount) + Number(r.platform_fee_amount), 0);
+      const totalNet = rows.reduce((s, r) => s + Number(r.net_amount), 0);
+      setSummary({ totalFees, totalNet, loading: false });
+    };
+    load();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId, campaignIdsKey]);
+
+  return summary;
+}
 
 export function FinanceCampaigns() {
   const { t, lang } = useLanguage();
@@ -28,8 +77,11 @@ export function FinanceCampaigns() {
   const stats = getCampaignStats(campaigns);
   const active = activeCampaigns(campaigns);
   const gap = Math.max(0, stats.totalGoal - stats.totalRaised);
-  const operatingFee = Math.round(stats.totalRaised * OPERATING_FEE_RATE);
-  const netTransfer = stats.totalRaised - operatingFee;
+  const feeSummary = useCampaignFeeSummary(church?.id, active.map(c => c.id));
+  const operatingFee = feeSummary.totalFees;
+  // raised_amount (soma das contribuições confirmadas) - taxas reais das
+  // mesmas contribuições = repasse líquido real, sem estimativa.
+  const netTransfer = Math.max(0, stats.totalRaised - operatingFee);
 
   const buildCSV = () => {
     let csv = "Campanha,Meta,Arrecadado,Progresso\n";
@@ -62,11 +114,11 @@ export function FinanceCampaigns() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-card rounded-xl p-5 border border-border/50">
-          <p className="text-sm text-muted-foreground">{t("Taxa operacional estimada")} (2,5%)</p>
+          <p className="text-sm text-muted-foreground">{t("Taxas de contribuição (gateway + plataforma)")}</p>
           <p className="text-xl font-semibold mt-1 tabular-nums">{formatFinanceCurrency(operatingFee, lang)}</p>
         </div>
         <div className="bg-card rounded-xl p-5 border border-border/50">
-          <p className="text-sm text-muted-foreground">{t("Repasse líquido estimado")}</p>
+          <p className="text-sm text-muted-foreground">{t("Repasse líquido")}</p>
           <p className="text-xl font-semibold mt-1 tabular-nums text-green-600">{formatFinanceCurrency(netTransfer, lang)}</p>
         </div>
       </div>

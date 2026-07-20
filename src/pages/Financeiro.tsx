@@ -25,9 +25,12 @@ const IS_STAGING_BUILD = import.meta.env.VITE_APP_ENV === "staging";
 const FinanceExecutive = IS_STAGING_BUILD
   ? lazy(() => import("@/components/financeiro/FinanceExecutive").then(m => ({ default: m.FinanceExecutive })))
   : null;
-const FinanceCampaigns = IS_STAGING_BUILD
-  ? lazy(() => import("@/components/financeiro/FinanceCampaigns").then(m => ({ default: m.FinanceCampaigns })))
-  : null;
+// CORREÇÃO 2026-07-20 (Fase B — restauração do Financeiro) — "Campanhas"
+// consulta campaigns/campaign_contributions reais via useCampaigns() (mesma
+// fonte de /admin/campanhas); taxa operacional passou a somar fees reais em
+// vez de estimativa fixa — ver src/components/financeiro/FinanceCampaigns.tsx.
+// Por isso carregada sempre, nunca condicionada a IS_STAGING_BUILD.
+const FinanceCampaigns = lazy(() => import("@/components/financeiro/FinanceCampaigns").then(m => ({ default: m.FinanceCampaigns })));
 // CORREÇÃO 2026-07-17 — "Contas" passou a consultar `transactions` real
 // (contas a pagar/receber derivadas de status/data reais, sem nenhum dado
 // fictício) — ver src/components/financeiro/FinanceAccounts.tsx. Por isso

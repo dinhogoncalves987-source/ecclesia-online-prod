@@ -164,6 +164,16 @@ const PRODUCTION_MODULES: readonly ModuleDefinition[] = [
   // (Executivo, Campanhas, Orçamento, Patrimônio, Prestação de Contas,
   // Inteligência) seguem cada uma sua própria fase de restauração.
   { id: "finance.audit", availability: "both", label: "Financeiro — Auditoria" },
+
+  // CORREÇÃO 2026-07-20 (Fase B — restauração do Financeiro) — "Campanhas"
+  // já consultava campaigns/campaign_contributions reais via useCampaigns()
+  // (mesma fonte da página /admin/campanhas); só a taxa operacional usava
+  // uma estimativa fixa de 2,5% em vez de somar gateway_fee_amount +
+  // platform_fee_amount reais — corrigido em
+  // src/components/financeiro/FinanceCampaigns.tsx. Nunca dependeu de
+  // campaignsDemo como fonte de dado exibido (só helpers puros de
+  // formatação/cálculo, que operam sobre o array real).
+  { id: "finance.campaigns", availability: "both", label: "Financeiro — Campanhas" },
 ] as const;
 
 /**
@@ -180,12 +190,6 @@ const STAGING_ONLY_MODULES: readonly ModuleDefinition[] = IS_STAGING_BUILD ? [
     availability: "staging",
     label: "Financeiro — Executivo",
     note: "usa financeDemo",
-  },
-  {
-    id: "finance.campaigns",
-    availability: "staging",
-    label: "Financeiro — Campanhas",
-    note: "usa campaignsDemo",
   },
   {
     id: "finance.budget",

@@ -54,7 +54,12 @@ const FORBIDDEN_TERMS_SOURCE = [
   // próprio componente (FinanceExecutive, FinanceBudget, etc.), que
   // continuam condicionados a IS_STAGING_BUILD em src/pages/Financeiro.tsx.
   "FinanceExecutive",
-  "FinanceCampaigns",
+  // "FinanceCampaigns" removido em 2026-07-20 (Fase B — restauração do
+  // Financeiro): consulta campaigns/campaign_contributions reais via
+  // useCampaigns(), sem depender de campaignsDemo como fonte de dado
+  // exibido — ver src/components/financeiro/FinanceCampaigns.tsx e
+  // src/config/modules.ts (finance.campaigns agora "both").
+  //
   // "FinanceAccounts" removido em 2026-07-17: passou a consultar
   // `transactions` real (contas a pagar/receber com status/data reais) —
   // ver src/components/financeiro/FinanceAccounts.tsx e
