@@ -45,6 +45,14 @@ describe("isModuleEnabled", () => {
     expect(isModuleEnabled("finance.campaigns", "staging")).toBe(true);
   });
 
+  // CORREÇÃO 2026-07-20 (Fase C — restauração do Financeiro): "Dízimos &
+  // Ofertas" consulta transactions reais classificadas por categoria — ver
+  // src/components/financeiro/FinanceTithesOfferings.tsx.
+  it("enables finance.tithes in production and staging (dados reais de dizimos e ofertas)", () => {
+    expect(isModuleEnabled("finance.tithes", "production")).toBe(true);
+    expect(isModuleEnabled("finance.tithes", "staging")).toBe(true);
+  });
+
   it("enables staging-only demo finance tabs in staging", () => {
     expect(isModuleEnabled("finance.executive", "staging")).toBe(true);
     expect(isModuleEnabled("finance.budget", "staging")).toBe(true);

@@ -6,7 +6,7 @@ import { useChurch } from "@/hooks/useChurchContext";
 import { runScopedOrganizationQuery } from "@/lib/organizationScope";
 import type { FinanceAccount } from "@/lib/finance";
 
-export function PixCard() {
+export function PixCard({ refreshKey }: { refreshKey?: number } = {}) {
   const { t } = useLanguage();
   const { church } = useChurch();
   const [pixAccount, setPixAccount] = useState<FinanceAccount | null>(null);
@@ -20,7 +20,9 @@ export function PixCard() {
       setPixAccount(data?.[0] || null);
     };
     loadPixAccount();
-  }, [church]);
+    // refreshKey força reconsulta após salvar a configuração de PIX em
+    // FinanceTithesOfferings (mesma tabela finance_accounts).
+  }, [church, refreshKey]);
 
   const pixKey = pixAccount?.pix_key || "";
 

@@ -7,7 +7,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { FinanceOverview } from "@/components/financeiro/FinanceOverview";
 import { TransactionList } from "@/components/financeiro/TransactionList";
 import {
-  BarChart3, ChevronLeft, ChevronRight, Wallet, Megaphone, ArrowLeftRight, PieChart,
+  BarChart3, ChevronLeft, ChevronRight, Wallet, Heart, Megaphone, ArrowLeftRight, PieChart,
   Building2, FileCheck, ShieldCheck, Sparkles,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,6 +25,13 @@ const IS_STAGING_BUILD = import.meta.env.VITE_APP_ENV === "staging";
 const FinanceExecutive = IS_STAGING_BUILD
   ? lazy(() => import("@/components/financeiro/FinanceExecutive").then(m => ({ default: m.FinanceExecutive })))
   : null;
+// CORREÇÃO 2026-07-20 (Fase C — restauração do Financeiro) — "Dízimos &
+// Ofertas" foi removida do render em 07/07/2026 (commit d394a1d) antes
+// mesmo da separação de bundle por ambiente; nunca deveria ter saído, pois
+// os valores agora vêm de `transactions` real, classificados por categoria
+// (Dízimos/Ofertas/Missões) — ver
+// src/components/financeiro/FinanceTithesOfferings.tsx. Carregada sempre.
+const FinanceTithesOfferings = lazy(() => import("@/components/financeiro/FinanceTithesOfferings").then(m => ({ default: m.FinanceTithesOfferings })));
 // CORREÇÃO 2026-07-20 (Fase B — restauração do Financeiro) — "Campanhas"
 // consulta campaigns/campaign_contributions reais via useCampaigns() (mesma
 // fonte de /admin/campanhas); taxa operacional passou a somar fees reais em
@@ -58,6 +65,7 @@ const FinanceIntelligence = IS_STAGING_BUILD
 const ALL_TABS = [
   { key: "executive",      icon: BarChart3,    labelKey: "Executivo",           moduleId: "finance.executive" },
   { key: "treasury",       icon: Wallet,       labelKey: "Tesouraria",          moduleId: "finance.treasury" },
+  { key: "tithes",         icon: Heart,        labelKey: "Dízimos & Ofertas",   moduleId: "finance.tithes" },
   { key: "campaigns",      icon: Megaphone,    labelKey: "Campanhas",           moduleId: "finance.campaigns" },
   { key: "accounts",       icon: ArrowLeftRight, labelKey: "Contas",            moduleId: "finance.accounts" },
   { key: "budget",         icon: PieChart,     labelKey: "Orçamento",           moduleId: "finance.budget" },
@@ -210,6 +218,7 @@ export default function Financeiro() {
             porque estes componentes são lazy apenas quando existem. */}
         <Suspense fallback={null}>
           {activeTab === "executive" && FinanceExecutive && <FinanceExecutive onTabChange={setActiveTab} />}
+          {activeTab === "tithes" && <FinanceTithesOfferings transactions={transactions} />}
           {activeTab === "campaigns" && FinanceCampaigns && <FinanceCampaigns />}
           {activeTab === "accounts" && FinanceAccounts && <FinanceAccounts />}
           {activeTab === "budget" && FinanceBudget && <FinanceBudget />}

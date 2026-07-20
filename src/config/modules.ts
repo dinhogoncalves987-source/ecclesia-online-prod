@@ -39,6 +39,7 @@ export type ModuleId =
   | "admin-requests"
   | "profile"
   | "finance.treasury"
+  | "finance.tithes"
   | "wallet"
   | "member-invite"
   | "access-invite"
@@ -174,6 +175,15 @@ const PRODUCTION_MODULES: readonly ModuleDefinition[] = [
   // campaignsDemo como fonte de dado exibido (só helpers puros de
   // formatação/cálculo, que operam sobre o array real).
   { id: "finance.campaigns", availability: "both", label: "Financeiro — Campanhas" },
+
+  // CORREÇÃO 2026-07-20 (Fase C — restauração do Financeiro) — "Dízimos &
+  // Ofertas" foi removida do render em 07/07/2026 (antes até da separação
+  // de bundle por ambiente) e nunca chegou a ser reclassificada aqui por
+  // não existir mais no código. Restaurada consultando `transactions` real
+  // (classificadas por categoria) — ver
+  // src/components/financeiro/FinanceTithesOfferings.tsx. A configuração de
+  // PIX agora persiste em finance_accounts (mesma tabela do PixCard).
+  { id: "finance.tithes", availability: "both", label: "Financeiro — Dízimos & Ofertas" },
 ] as const;
 
 /**
