@@ -75,7 +75,9 @@
     "20260720110000_internal_thread_hidden_for_user_update_grant.sql",
     "20260721090000_finance_budgets.sql",
     "20260722090000_finance_assets.sql",
-    "20260723090000_finance_accountability.sql"
+    "20260723090000_finance_accountability.sql",
+    "20260724090000_organizations_hierarchy_read.sql",
+    "20260725090000_internal_chat_realtime_hardening.sql"
   ],
   "staging_feature": [
     "20260526100000_staging_worship_tables.sql",

@@ -141,6 +141,7 @@ export function InternalChat({
     threads,
     loading: threadsLoading,
     refetch: refetchThreads,
+    removeThreadsLocally,
   } = useInternalThreads({
     organizationId,
     source,
@@ -190,7 +191,8 @@ export function InternalChat({
 
     const ids = Array.from(selectedThreadIds);
     const results = await Promise.all(ids.map((id) => hideInternalThreadForUser(id, user.id)));
-    const failed = results.filter((r) => !r.ok).length;
+    const succeededIds = ids.filter((_, i) => results[i].ok);
+    const failed = results.length - succeededIds.length;
 
     setDeletingThreads(false);
     setConfirmDeleteOpen(false);
@@ -199,8 +201,13 @@ export function InternalChat({
       setSelectedThread(null);
     }
 
+    // Remove imediatamente da UI as que o servidor confirmou — não depende
+    // só do refetch seguinte (que pode falhar silenciosamente ou não
+    // refletir a ocultação a tempo, fazendo a conversa "não sumir").
+    removeThreadsLocally(succeededIds);
+
     exitSelectionMode();
-    await refetchThreads();
+    void refetchThreads();
 
     if (failed > 0) {
       toast({
@@ -212,6 +219,17 @@ export function InternalChat({
       toast({ title: ids.length > 1 ? t("Conversas apagadas") : t("Conversa apagada") });
     }
   };
+
+  // Deriva da lista `threads` (sempre atualizada por tempo real/refetch) em
+  // vez de usar `selectedThread` diretamente — sem isso, dados que só mudam
+  // na lista (ex.: participantLastSeenAt vindo de profiles) ficavam
+  // "congelados" no momento em que a conversa foi aberta, exigindo sair e
+  // voltar para refletir uma atualização. Precisa vir antes do `return`
+  // condicional do modo "panel" (regra dos hooks).
+  const activeThread = useMemo(() => {
+    if (!selectedThread) return null;
+    return threads.find((t) => t.id === selectedThread.id) ?? selectedThread;
+  }, [selectedThread, threads]);
 
   // ── PANEL: thread única (campanha) ────────────────────────────────────────
   const [panelThread, setPanelThread] = useState<InternalThread | null>(null);
@@ -275,8 +293,6 @@ export function InternalChat({
   }
 
   // ── Render: INBOX mode ────────────────────────────────────────────────────
-  const activeThread = selectedThread;
-
   return (
     <div className={cn("flex flex-col h-full min-h-0 overflow-hidden", className)}>
       {headerSlot ? (

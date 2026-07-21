@@ -266,10 +266,22 @@ export async function fetchThreadsBySource(
     let threads = (data ?? []).map(mapDbThreadToUi);
 
     if (options.currentUserId) {
-      const { data: hidden } = await supabase
+      const { data: hidden, error: hiddenError } = await supabase
         .from("internal_thread_hidden_for_user")
         .select("thread_id")
         .eq("user_id", options.currentUserId);
+
+      if (hiddenError) {
+        // CORREÇÃO: uma falha real aqui (permissão, RLS, rede) NUNCA deve
+        // ser tratada como "nenhuma conversa oculta" — isso faria uma
+        // conversa apagada pelo usuário reaparecer na lista sempre que essa
+        // consulta falhasse. Falha fechado: propaga o erro para
+        // fetchThreadsBySource retornar `fromDatabase: false` (nunca uma
+        // lista "limpa" incorreta).
+        console.warn("[fetchThreadsBySource] falha ao buscar threads ocultas", hiddenError.message);
+        throw hiddenError;
+      }
+
       const hiddenIds = new Set((hidden ?? []).map((h) => h.thread_id));
       if (hiddenIds.size > 0) threads = threads.filter((t) => !hiddenIds.has(t.id));
     }

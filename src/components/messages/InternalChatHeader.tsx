@@ -81,12 +81,20 @@ export function InternalChatHeader({
 
       <div className="min-w-0 flex-1">
         <h3 className="font-semibold text-sm sm:text-base truncate">{displayTitle}</h3>
-        {subtitle ? (
-          <p className="text-[11px] text-muted-foreground truncate">{subtitle}</p>
-        ) : thread?.participantName && isStaff ? (
+        {/*
+          Conversa 1:1 com participante resolvido: online/último acesso é
+          mais útil que um subtítulo genérico de página (ex.: "Chat da
+          Secretaria") e por isso tem prioridade — antes, `subtitle` sempre
+          "ganhava" e a presença nunca era exibida, mesmo já calculada.
+          Também deixou de exigir `isStaff`: membros também devem ver o
+          status de quem estão conversando.
+        */}
+        {thread?.participantName ? (
           <p className={cn("text-[11px] truncate", online ? "text-emerald-600 font-medium" : "text-muted-foreground")}>
-            {presenceLabel ?? thread.participantName}
+            {presenceLabel ?? subtitle ?? thread.participantName}
           </p>
+        ) : subtitle ? (
+          <p className="text-[11px] text-muted-foreground truncate">{subtitle}</p>
         ) : null}
       </div>
 

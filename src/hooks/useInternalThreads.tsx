@@ -49,6 +49,16 @@ export function useInternalThreads({
     await load();
   }, [load]);
 
+  // Remoção otimista local (ex.: "apagar para mim" já confirmado pelo
+  // servidor) — evita depender só do refetch para o item sumir da lista, e
+  // garante que ele não volte a aparecer caso o refetch seguinte falhe
+  // silenciosamente ou demore.
+  const removeThreadsLocally = useCallback((threadIds: string[]) => {
+    if (threadIds.length === 0) return;
+    const idSet = new Set(threadIds);
+    setThreads((prev) => prev.filter((t) => !idSet.has(t.id)));
+  }, []);
+
   // Tempo real: qualquer INSERT/UPDATE em internal_threads ou
   // internal_messages desta organização re-sincroniza a lista (última
   // mensagem, ordenação, contador de não lidas). Debounced para evitar
@@ -90,5 +100,5 @@ export function useInternalThreads({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId, source, enabled]);
 
-  return { threads, loading, fromDatabase, refetch };
+  return { threads, loading, fromDatabase, refetch, removeThreadsLocally };
 }
