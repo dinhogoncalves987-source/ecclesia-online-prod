@@ -582,7 +582,7 @@ export default function Congregacoes() {
     if (!force && sectorCongregations[sectorId] !== undefined) return;
     setLoadingCongregations((prev) => ({ ...prev, [sectorId]: true }));
     const { data, error } = await supabase.from("organizations").select(ORG_SELECT)
-      .eq("parent_id", sectorId).eq("active", true).eq("organization_type", "congregacao").order("name");
+      .eq("parent_id", sectorId).eq("active", true).in("organization_type", ["subsede", "congregacao"]).order("name");
     setLoadingCongregations((prev) => ({ ...prev, [sectorId]: false }));
     if (!error && data) {
       const congs = (data as Record<string, unknown>[]).map(mapRow);
@@ -660,7 +660,7 @@ export default function Congregacoes() {
           if (_usesIntermediate) {
             const { data: congs } = await supabase.from("organizations")
               .select("id,parent_id").in("parent_id", units.map((u) => u.id))
-              .eq("active", true).eq("organization_type", "congregacao");
+              .eq("active", true).in("organization_type", ["subsede", "congregacao"]);
             if (congs) {
               const counts: Record<string, number> = {};
               for (const c of congs) { counts[c.parent_id!] = (counts[c.parent_id!] ?? 0) + 1; }
@@ -1603,7 +1603,7 @@ export default function Congregacoes() {
                               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold shrink-0 ${
                                 isCardsRenderProbe ? "bg-accent text-accent-foreground" : "bg-accent/15 text-accent"
                               }`}>
-                                {congregationCounts[c.id]} {localPlural.toLowerCase()}
+                                {congregationCounts[c.id]} unidades
                               </span>
                             )}
                           </div>
@@ -1795,7 +1795,7 @@ export default function Congregacoes() {
                           <div className="mt-3 pt-3 border-t border-border/30">
                             <div className="flex items-center justify-between mb-2">
                               <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                                <ChurchIcon size={11} /> {localPlural} vinculadas
+                                <ChurchIcon size={11} /> Subsedes e congregações vinculadas
                               </p>
                               {canManageChildUnits && (
                                 <button type="button" onClick={(e) => { e.stopPropagation(); openNewLocalUnit(c); }}
@@ -1816,7 +1816,7 @@ export default function Congregacoes() {
                               <div className="text-xs text-muted-foreground flex flex-col items-start gap-2">
                                 <span className="flex items-center gap-1.5 text-amber-600">
                                   <AlertCircle size={12} />
-                                  Nenhum(a) {localSingular.toLowerCase()} vinculado(a) a este {intermediateSingular.toLowerCase()}.
+                                  Nenhuma subsede ou congregação vinculada a este distrito.
                                 </span>
                                 {canManageChildUnits && (
                                   <button type="button" onClick={(e) => { e.stopPropagation(); openNewLocalUnit(c); }}
@@ -1836,6 +1836,9 @@ export default function Congregacoes() {
                                       <div className="flex-1 min-w-0">
                                         <div className="flex flex-wrap items-center gap-1.5">
                                           <p className="text-sm font-medium truncate">{cong.name}</p>
+                                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-semibold shrink-0">
+                                            {typeBadgeLabel(cong.organization_type)}
+                                          </span>
                                           {statusBadge(cong.unit_status)}
                                         </div>
                                         <div className="flex flex-wrap gap-x-3 mt-1">
