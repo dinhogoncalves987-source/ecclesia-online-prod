@@ -123,7 +123,21 @@ export function InternalChat({
     const result = await requestChatNotificationPermission();
     setNotifPermission(result);
     if (result === "granted" && user?.id) {
-      void subscribeToWebPush(user.id);
+      // subscribeToWebPush é best-effort por design (nunca lança), mas isso
+      // significa que uma falha (chave VAPID ausente no build, subscribe()
+      // rejeitado pelo navegador, upsert bloqueado, etc.) antes ficava
+      // completamente silenciosa — o usuário "autorizava" e nada acontecia,
+      // sem nenhum aviso de que a inscrição real no servidor não foi criada.
+      const subscribed = await subscribeToWebPush(user.id);
+      if (!subscribed) {
+        toast({
+          title: t("Não foi possível concluir as notificações"),
+          description: t(
+            "A permissão foi concedida, mas o dispositivo não conseguiu se inscrever para notificações. Tente novamente ou reinstale o app na tela inicial.",
+          ),
+          variant: "destructive",
+        });
+      }
     }
   };
 

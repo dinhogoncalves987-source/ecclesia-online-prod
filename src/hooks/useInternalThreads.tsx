@@ -97,8 +97,12 @@ export function useInternalThreads({
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("online", onOnline);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, source, enabled]);
+    // `load` já inclui organizationId/source/campaignId/currentUserId em suas
+    // próprias deps — incluí-lo aqui evita que scheduleRefetch capture um
+    // closure desatualizado (ex.: currentUserId ainda nulo no primeiro
+    // subscribe) enquanto ainda recria o canal quando algum desses valores
+    // realmente muda.
+  }, [organizationId, source, enabled, load]);
 
   return { threads, loading, fromDatabase, refetch, removeThreadsLocally };
 }

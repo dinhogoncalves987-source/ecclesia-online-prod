@@ -23,6 +23,16 @@ self.addEventListener("push", (event) => {
   const title = data.title || "Ecclesia Online";
   const threadId = data.threadId || null;
 
+  // Contador no ícone do app mesmo com o app/navegador totalmente fechado.
+  // `setAppBadge` também existe em `self.registration` dentro do Service
+  // Worker (não só em `navigator`, que só existe com uma aba aberta) — sem
+  // isto, o ícone nunca mostrava nada até o usuário abrir o app de novo.
+  // Sem contagem exata disponível aqui (o payload não traz o total de não
+  // lidas), usa um indicador genérico — melhor que nenhum indicador.
+  if (self.registration.setAppBadge) {
+    self.registration.setAppBadge().catch(() => { /* best-effort */ });
+  }
+
   event.waitUntil(
     self.registration.showNotification(title, {
       body: data.body || "Nova mensagem",

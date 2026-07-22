@@ -24,6 +24,18 @@ type Options = {
   enabled?: boolean;
 };
 
+// União por id preservando ordem cronológica — usado para reconciliar o
+// snapshot de um load() com mensagens que já chegaram via Realtime (ou
+// otimistas) enquanto a busca estava em andamento, em vez de simplesmente
+// substituir o estado (o que descartava mensagens recém-chegadas).
+function mergeMessagesById(prev: InternalMessage[], fresh: InternalMessage[]): InternalMessage[] {
+  const byId = new Map(prev.map((m) => [m.id, m]));
+  for (const m of fresh) byId.set(m.id, m);
+  return Array.from(byId.values()).sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+}
+
 /**
  * Mensagens de uma conversa aberta, com tempo real de verdade:
  *  - INSERT/UPDATE em internal_messages filtrados por thread_id via
@@ -50,6 +62,10 @@ export function useInternalMessages({
   const [deleting, setDeleting] = useState(false);
   const [fromDatabase, setFromDatabase] = useState(false);
   const knownIdsRef = useRef<Set<string>>(new Set());
+  // Thread cuja última carga (load) já foi refletida no estado local — usado
+  // para (a) limpar mensagens antigas ao trocar de conversa e (b) descartar
+  // um load() que resolve depois que a conversa já mudou de novo.
+  const loadedThreadIdRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     if (!organizationId || !threadId || !enabled) {
@@ -57,13 +73,36 @@ export function useInternalMessages({
       setFromDatabase(false);
       setLoading(false);
       knownIdsRef.current = new Set();
+      loadedThreadIdRef.current = null;
       return;
+    }
+
+    // Trocou de conversa: limpa o estado antes de buscar, para não misturar
+    // mensagens da conversa anterior com a nova durante o merge abaixo.
+    if (loadedThreadIdRef.current !== threadId) {
+      setMessages([]);
+      knownIdsRef.current = new Set();
+      loadedThreadIdRef.current = threadId;
     }
 
     setLoading(true);
     const result = await fetchThreadMessages(organizationId, threadId, currentUserId);
-    setMessages(result.messages);
-    knownIdsRef.current = new Set(result.messages.map((m) => m.id));
+
+    // A conversa mudou de novo enquanto esta busca estava em andamento —
+    // descarta o resultado (evita sobrescrever a conversa atual com dados
+    // de uma busca antiga/atrasada da conversa anterior).
+    if (loadedThreadIdRef.current !== threadId) return;
+
+    // Merge por id em vez de substituir — se uma mensagem chegou via
+    // Realtime (INSERT/UPDATE) enquanto este load() estava em andamento
+    // (corrida comum ao reconectar, focar a aba, ou no SUBSCRIBED inicial),
+    // ela não pode ser perdida quando o resultado desta busca (potencialmente
+    // mais antigo) chega depois. Isso é o que antes só se corrigia saindo e
+    // voltando à conversa (o que força um novo load() "limpo").
+    setMessages((prev) => mergeMessagesById(prev, result.messages));
+    // Mantém ids já conhecidos via Realtime (não só os desta busca), para o
+    // handler de INSERT abaixo continuar deduplicando corretamente.
+    for (const m of result.messages) knownIdsRef.current.add(m.id);
     setFromDatabase(result.fromDatabase);
     setLoading(false);
 

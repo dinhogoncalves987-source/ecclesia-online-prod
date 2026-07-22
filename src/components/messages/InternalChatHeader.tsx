@@ -2,6 +2,7 @@ import { ArrowLeft, Phone, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePresenceStatus } from "@/hooks/usePresence";
+import { useLiveLastSeen } from "@/hooks/useLiveLastSeen";
 import { formatLastSeen } from "@/lib/presenceFormat";
 import type { InternalThread } from "@/lib/internalMessages";
 import { cn } from "@/lib/utils";
@@ -37,10 +38,11 @@ export function InternalChatHeader({
   const displayTitle = title ?? thread?.subject ?? t("Conversa");
 
   const online = isOnline(thread?.participantUserId);
+  const liveLastSeen = useLiveLastSeen(thread?.participantUserId, thread?.participantLastSeenAt);
   const presenceLabel = online
     ? t("Online")
-    : thread?.participantLastSeenAt
-      ? formatLastSeen(thread.participantLastSeenAt, lang)
+    : liveLastSeen
+      ? formatLastSeen(liveLastSeen, lang)
       : null;
 
   return (
