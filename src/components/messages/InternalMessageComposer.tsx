@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { Loader2, Mic, Send, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InternalAttachmentButton } from "@/components/messages/InternalAttachmentButton";
@@ -51,6 +51,7 @@ export function InternalMessageComposer({
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const composerRootRef = useRef<HTMLDivElement>(null);
+  const selectionRef = useRef<{ start: number; end: number } | null>(null);
 
   const canSend = !disabled && !sending && (text.trim().length > 0 || Boolean(pendingFile));
   const showMic = !disabled && !pendingFile && text.trim().length === 0;
@@ -66,6 +67,27 @@ export function InternalMessageComposer({
   useEffect(() => {
     adjustHeight();
   }, [text, adjustHeight]);
+
+  // Alguns WebViews móveis reposicionam o cursor no início quando o textarea
+  // controlado troca o botão de microfone pelo de envio no primeiro caractere.
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    const selection = selectionRef.current;
+    if (!el || !selection || document.activeElement !== el) return;
+
+    const max = el.value.length;
+    el.setSelectionRange(
+      Math.min(selection.start, max),
+      Math.min(selection.end, max),
+    );
+  }, [text]);
+
+  const rememberSelection = useCallback((el: HTMLTextAreaElement) => {
+    selectionRef.current = {
+      start: el.selectionStart ?? el.value.length,
+      end: el.selectionEnd ?? el.value.length,
+    };
+  }, []);
 
   const handleSend = async () => {
     if (!canSend) return;
@@ -210,7 +232,11 @@ export function InternalMessageComposer({
                   <textarea
                     ref={textareaRef}
                     value={text}
-                    onChange={(e) => { setText(e.target.value); adjustHeight(); }}
+                    onChange={(e) => {
+                      rememberSelection(e.currentTarget);
+                      setText(e.currentTarget.value);
+                    }}
+                    onSelect={(e) => rememberSelection(e.currentTarget)}
                     placeholder={placeholder ?? t("Mensagem")}
                     rows={1}
                     disabled={disabled || sending}
@@ -222,6 +248,7 @@ export function InternalMessageComposer({
                     // na maioria dos navegadores/IMEs mobile modernos.
                     enterKeyHint="send"
                     inputMode="text"
+                    dir="ltr"
                     className="flex-1 min-w-0 resize-none bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 leading-5 overflow-y-auto touch-manipulation"
                     style={{ maxHeight: "128px" }}
                     onFocus={handleFocus}

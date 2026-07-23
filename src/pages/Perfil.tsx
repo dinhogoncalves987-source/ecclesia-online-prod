@@ -6,6 +6,7 @@ import { toast } from "@/hooks/use-toast";
 import { Loader2, Camera, Save } from "lucide-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useOwnProfile, useInvalidateOwnProfile } from "@/hooks/useOwnProfile";
+import { updateOwnProfile } from "@/lib/ownProfileMutations";
 
 export default function Perfil() {
   const { user } = useAuth();
@@ -50,20 +51,15 @@ export default function Perfil() {
     const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
     const url = urlData.publicUrl + "?t=" + Date.now();
 
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update({ avatar_url: url })
-      .eq("user_id", user.id)
-      .select("user_id")
-      .single();
+    const updateResult = await updateOwnProfile({ avatar_url: url });
 
     setUploading(false);
 
-    if (updateError) {
+    if (!updateResult.ok) {
       // Nunca mostrar sucesso sem persistência real confirmada.
       toast({
         title: t("Erro ao salvar foto"),
-        description: updateError.message,
+        description: updateResult.error,
         variant: "destructive",
       });
       return;
@@ -78,17 +74,16 @@ export default function Perfil() {
     if (!user) return;
     setSaving(true);
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({ full_name: fullName.trim(), phone: phone.trim(), role_title: roleTitle.trim() })
-      .eq("user_id", user.id)
-      .select("user_id")
-      .single();
+    const result = await updateOwnProfile({
+      full_name: fullName.trim(),
+      phone: phone.trim(),
+      role_title: roleTitle.trim(),
+    });
 
-    if (error) {
+    if (!result.ok) {
       toast({
         title: t("Erro ao salvar"),
-        description: error.message || t("Não foi possível salvar. Tente novamente."),
+        description: result.error || t("Não foi possível salvar. Tente novamente."),
         variant: "destructive",
       });
       setSaving(false);
@@ -98,6 +93,16 @@ export default function Perfil() {
     // Só mostra sucesso DEPOIS de confirmar a persistência real no banco —
     // e recarrega a fonte única (React Query), que também atualiza o
     // cabeçalho/avatar/menu do AdminLayout imediatamente, sem novo login.
+    const { error: metadataError } = await supabase.auth.updateUser({
+      data: {
+        ...(user.user_metadata ?? {}),
+        full_name: fullName.trim(),
+      },
+    });
+    if (metadataError) {
+      console.warn("[Perfil] perfil salvo; metadado Auth não sincronizado", metadataError.message);
+    }
+
     await invalidateOwnProfile(user.id);
     setSaving(false);
     toast({ title: t("Perfil atualizado com sucesso!") });
@@ -119,14 +124,14 @@ export default function Perfil() {
 
   return (
     <AdminLayout>
-      <div className="max-w-2xl mx-auto space-y-8">
+      <div className="max-w-2xl mx-auto space-y-5 sm:space-y-8">
         <div>
           <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">{t("Meu Perfil")}</h1>
           <p className="text-sm text-muted-foreground mt-1">{t("Gerencie suas informações pessoais")}</p>
         </div>
 
         {/* Avatar */}
-        <div className="bg-card rounded-xl shadow-executive p-6 flex flex-col items-center gap-4">
+        <div className="bg-card rounded-xl shadow-executive p-4 sm:p-6 flex flex-col items-center gap-4">
           <div className="relative">
             {avatarUrl ? (
               <img src={avatarUrl} alt={t("Avatar")} className="w-24 h-24 rounded-full object-cover border-4 border-accent/30" />
@@ -148,7 +153,7 @@ export default function Perfil() {
         </div>
 
         {/* Form */}
-        <div className="bg-card rounded-xl shadow-executive p-6 space-y-5">
+        <div className="bg-card rounded-xl shadow-executive p-4 sm:p-6 space-y-5">
           <div>
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{t("Nome Completo")}</label>
             <input

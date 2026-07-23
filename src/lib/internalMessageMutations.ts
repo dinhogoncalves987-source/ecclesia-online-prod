@@ -89,44 +89,127 @@ function inferMessageType(file: File): InternalMessageType {
   return "document";
 }
 
+type DirectMemberRow = {
+  id: string;
+  full_name: string;
+  user_id: string | null;
+};
+
+type DirectThreadOptions = {
+  sharedStaffInbox?: boolean;
+};
+
+async function findLatestDirectThread(
+  organizationId: string,
+  createdBy: string,
+  memberId: string,
+  conversationKind: "staff_member" | "member_direct",
+): Promise<{ row: DbInternalThreadRow | null; error?: string }> {
+  const { data, error } = await supabase
+    .from("internal_threads")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("source", "secretariat")
+    .eq("conversation_kind", conversationKind)
+    .eq("created_by", createdBy)
+    .eq("member_id", memberId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) return { row: null, error: String(error.message ?? error) };
+  return { row: (data as DbInternalThreadRow | null) ?? null };
+}
+
 /**
- * Busca conversa individual existente com um membro (deduplicação)
- * ou cria nova caso não exista. Garante no máximo 1 thread por par (org + member).
+ * Abre a conversa usando sempre a identidade autenticada atual.
+ * Membro ↔ membro é deduplicado pelo par; secretaria ↔ membro usa caixa
+ * institucional compartilhada.
  */
 export async function findOrCreateDirectThread(
   organizationId: string,
   userId: string,
   memberId: string,
   memberName: string,
+  options: DirectThreadOptions = {},
 ): Promise<{ ok: boolean; thread?: InternalThread; isNew?: boolean; error?: string }> {
-  // Buscar thread existente com esse membro nessa organização
-  const { data: existing, error: findError } = await supabase
-    .from("internal_threads")
-    .select("*")
+  const { data: targetData, error: targetError } = await supabase
+    .from("members")
+    .select("id, full_name, user_id")
     .eq("organization_id", organizationId)
-    .eq("source", "secretariat")
-    .eq("member_id", memberId)
-    .order("created_at", { ascending: false })
-    .limit(1)
+    .eq("id", memberId)
     .maybeSingle();
 
-  if (findError) {
-    return { ok: false, error: String(findError.message ?? findError) };
+  if (targetError) return { ok: false, error: String(targetError.message ?? targetError) };
+  const target = targetData as DirectMemberRow | null;
+  if (!target) return { ok: false, error: "member_not_found" };
+  if (!target.user_id) return { ok: false, error: "member_has_no_login" };
+  if (target.user_id === userId) return { ok: false, error: "cannot_message_self" };
+
+  let existing: DbInternalThreadRow | null = null;
+
+  if (options.sharedStaffInbox) {
+    const { data, error } = await supabase
+      .from("internal_threads")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .eq("source", "secretariat")
+      .eq("conversation_kind", "staff_member")
+      .eq("member_id", target.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) return { ok: false, error: String(error.message ?? error) };
+    existing = (data as DbInternalThreadRow | null) ?? null;
+  } else {
+    const { data: currentData, error: currentError } = await supabase
+      .from("members")
+      .select("id, full_name, user_id")
+      .eq("organization_id", organizationId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (currentError) return { ok: false, error: String(currentError.message ?? currentError) };
+    const currentMember = currentData as DirectMemberRow | null;
+    if (!currentMember) return { ok: false, error: "current_member_not_linked" };
+
+    const forward = await findLatestDirectThread(
+      organizationId,
+      userId,
+      target.id,
+      "member_direct",
+    );
+    if (forward.error) return { ok: false, error: forward.error };
+    existing = forward.row;
+
+    if (!existing) {
+      const reverse = await findLatestDirectThread(
+        organizationId,
+        target.user_id,
+        currentMember.id,
+        "member_direct",
+      );
+      if (reverse.error) return { ok: false, error: reverse.error };
+      existing = reverse.row;
+    }
   }
 
   if (existing) {
-    return { ok: true, thread: mapDbThreadToUi(existing as DbInternalThreadRow), isNew: false };
+    return { ok: true, thread: mapDbThreadToUi(existing), isNew: false };
   }
 
-  // Criar nova thread direta com o membro
+  const resolvedMemberName = target.full_name?.trim() || memberName.trim() || "Conversa";
+
   const { data, error } = await insertWithOrganizationScope<DbInternalThreadRow>(
     "internal_threads",
     organizationId,
     {
       created_by: userId,
-      member_id: memberId,
-      subject: memberName.trim() || "Conversa",
+      member_id: target.id,
+      subject: resolvedMemberName,
       source: "secretariat",
+      conversation_kind: options.sharedStaffInbox ? "staff_member" : "member_direct",
       status: "open",
       reply_enabled: true,
     },
@@ -143,6 +226,35 @@ export async function findOrCreateDirectThread(
   return { ok: true, thread: mapDbThreadToUi(row as DbInternalThreadRow), isNew: true };
 }
 
+export async function findOrCreateDirectThreadByUserId(
+  organizationId: string,
+  currentUserId: string,
+  targetUserId: string,
+  targetName: string,
+  options: DirectThreadOptions = {},
+): Promise<{ ok: boolean; thread?: InternalThread; isNew?: boolean; error?: string }> {
+  if (targetUserId === currentUserId) return { ok: false, error: "cannot_message_self" };
+
+  const { data: memberData, error: memberError } = await supabase
+    .from("members")
+    .select("id, full_name, user_id")
+    .eq("organization_id", organizationId)
+    .eq("user_id", targetUserId)
+    .maybeSingle();
+
+  if (memberError) return { ok: false, error: String(memberError.message ?? memberError) };
+  const member = memberData as DirectMemberRow | null;
+  if (!member) return { ok: false, error: "member_not_linked_to_user" };
+
+  return findOrCreateDirectThread(
+    organizationId,
+    currentUserId,
+    member.id,
+    member.full_name || targetName,
+    options,
+  );
+}
+
 /** Cria uma thread de secretaria com assunto/categoria fixos. */
 export async function createSecretariatThread(
   organizationId: string,
@@ -156,6 +268,7 @@ export async function createSecretariatThread(
       created_by: userId,
       subject: subject.trim() || "Secretaria",
       source: "secretariat",
+      conversation_kind: "institutional",
       status: "open",
       reply_enabled: true,
     },

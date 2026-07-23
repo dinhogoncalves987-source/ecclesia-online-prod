@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   createSecretariatThread,
   findOrCreateDirectThread,
+  findOrCreateDirectThreadByUserId,
   sendInternalMessage,
 } from "@/lib/internalMessageMutations";
 import { fetchThreadById } from "@/lib/internalMessages";
@@ -43,6 +44,7 @@ type MemberResult = {
   id: string;
   full_name: string;
   member_role: string | null;
+  user_id: string;
 };
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -68,6 +70,22 @@ const ROLE_LABEL: Record<string, string> = {
   church_admin: "Administrador",
 };
 
+function directThreadError(error: string | undefined, t: (key: string) => string): string {
+  switch (error) {
+    case "cannot_message_self":
+      return t("Você não pode iniciar uma conversa com a sua própria conta.");
+    case "member_has_no_login":
+    case "member_not_linked_to_user":
+      return t("Este membro ainda não ativou o acesso à plataforma.");
+    case "current_member_not_linked":
+      return t("Sua conta ainda não está vinculada ao cadastro de membro.");
+    case "member_not_found":
+      return t("O membro selecionado não foi encontrado.");
+    default:
+      return error || t("Não foi possível abrir esta conversa.");
+  }
+}
+
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export default function ChatSecretaria() {
@@ -75,7 +93,7 @@ export default function ChatSecretaria() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { church, loading: churchLoading } = useChurch();
-  const { isAdmin } = useRole();
+  const { isAdmin, loading: roleLoading } = useRole();
   const location    = useLocation();
   const navigate    = useNavigate();
   const { pathname } = location;
@@ -100,24 +118,34 @@ export default function ChatSecretaria() {
   useEffect(() => {
     if (processedNavState.current) return;
     const state = location.state as { openDm?: boolean; userId?: string; userName?: string } | null;
-    if (!state?.openDm || !state.userId || !church?.id || !user?.id) return;
+    if (roleLoading || !state?.openDm || !state.userId || !church?.id || !user?.id) return;
 
     processedNavState.current = true;
     // Clear nav state so back-navigation doesn't re-trigger
     navigate(pathname, { replace: true, state: {} });
 
-    void findOrCreateDirectThread(church.id, user.id, state.userId, state.userName || t("Usuário"))
+    void findOrCreateDirectThreadByUserId(
+      church.id,
+      user.id,
+      state.userId,
+      state.userName || t("Usuário"),
+      { sharedStaffInbox: isAdmin },
+    )
       .then((result) => {
         if (result.ok && result.thread) {
           setForcedThread(result.thread);
           setRefetchKey((k) => k + 1);
           toast({ title: `${t("Conversa com")} ${state.userName || t("usuário")} ${t("aberta")}` });
         } else {
-          toast({ title: t("Erro ao abrir conversa"), description: result.error, variant: "destructive" });
+          toast({
+            title: t("Erro ao abrir conversa"),
+            description: directThreadError(result.error, t),
+            variant: "destructive",
+          });
         }
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [church?.id, user?.id]);
+  }, [church?.id, user?.id, roleLoading]);
 
   // ── Abrir conversa correta ao clicar numa notificação (?thread=<id>) ────
   const processedNotifThread = useRef(false);
@@ -125,18 +153,18 @@ export default function ChatSecretaria() {
     if (processedNotifThread.current) return;
     const params = new URLSearchParams(location.search);
     const threadId = params.get("thread");
-    if (!threadId || !church?.id) return;
+    if (!threadId || !church?.id || !user?.id) return;
 
     processedNotifThread.current = true;
     navigate(pathname, { replace: true });
 
-    void fetchThreadById(church.id, threadId).then((thread) => {
+    void fetchThreadById(church.id, threadId, user.id).then((thread) => {
       if (thread) {
         setForcedThread(thread);
         setRefetchKey((k) => k + 1);
       }
     });
-  }, [location.search, church?.id, navigate, pathname]);
+  }, [location.search, church?.id, user?.id, navigate, pathname]);
 
   // tópico geral
   const [newSubject, setNewSubject] = useState("");
@@ -170,8 +198,10 @@ export default function ChatSecretaria() {
       setMemberSearching(true);
       const { data, error } = await supabase
         .from("members")
-        .select("id, full_name, member_role")
+        .select("id, full_name, member_role, user_id")
         .eq("organization_id", church.id)
+        .not("user_id", "is", null)
+        .neq("user_id", user?.id ?? "")
         .ilike("full_name", `%${memberSearch.trim()}%`)
         .order("full_name")
         .limit(10);
@@ -179,7 +209,7 @@ export default function ChatSecretaria() {
       if (!error && data) setMemberResults(data as MemberResult[]);
       setMemberSearching(false);
     }, 300);
-  }, [memberSearch, church?.id, dialogMode]);
+  }, [memberSearch, church?.id, dialogMode, user?.id]);
 
   // ── Ações ──────────────────────────────────────────────────────────────────
 
@@ -194,7 +224,7 @@ export default function ChatSecretaria() {
   };
 
   const handleCreateTopic = async () => {
-    if (!church?.id || !user?.id || !newSubject.trim()) return;
+    if (!isAdmin || !church?.id || !user?.id || !newSubject.trim()) return;
     setCreating(true);
 
     const result = await createSecretariatThread(church.id, user.id, newSubject.trim());
@@ -218,7 +248,7 @@ export default function ChatSecretaria() {
   };
 
   const handleSupportThread = async () => {
-    if (!church?.id || !user?.id) return;
+    if (!isAdmin || !church?.id || !user?.id) return;
     setCreating(true);
 
     const result = await createSecretariatThread(church.id, user.id, t("Suporte Ecclesia"));
@@ -249,10 +279,15 @@ export default function ChatSecretaria() {
       user.id,
       selectedMember.id,
       selectedMember.full_name,
+      { sharedStaffInbox: isAdmin },
     );
 
     if (!result.ok || !result.thread) {
-      toast({ title: t("Erro ao abrir conversa"), description: result.error, variant: "destructive" });
+      toast({
+        title: t("Erro ao abrir conversa"),
+        description: directThreadError(result.error, t),
+        variant: "destructive",
+      });
       setCreating(false);
       return;
     }
@@ -270,7 +305,7 @@ export default function ChatSecretaria() {
   };
 
   const handleCreateMeeting = async () => {
-    if (!church?.id || !user?.id || !meetingName.trim()) return;
+    if (!isAdmin || !church?.id || !user?.id || !meetingName.trim()) return;
     setCreating(true);
 
     const subject = meetingName.trim();
@@ -298,7 +333,7 @@ export default function ChatSecretaria() {
 
   // ── Carregando ─────────────────────────────────────────────────────────────
 
-  if (churchLoading) {
+  if (churchLoading || roleLoading) {
     return (
       <AdminLayout>
         <div className="flex items-center justify-center h-full py-20">
@@ -335,28 +370,32 @@ export default function ChatSecretaria() {
         <p className="text-xs text-muted-foreground mt-0.5">{pageSubtitle}</p>
       </div>
       <div className="flex items-center gap-2">
+        {isAdmin && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setDialogMode("meeting");
+              setDialogOpen(true);
+            }}
+          >
+            <Video size={15} className="mr-1.5" />
+            <span className="hidden sm:inline">{t("Nova Reunião")}</span>
+            <span className="sm:hidden">{t("Reunião")}</span>
+          </Button>
+        )}
         <Button
           size="sm"
-          variant="outline"
           onClick={() => {
-            setDialogMode("meeting");
-            setDialogOpen(true);
-          }}
-        >
-          <Video size={15} className="mr-1.5" />
-          <span className="hidden sm:inline">{t("Nova Reunião")}</span>
-          <span className="sm:hidden">{t("Reunião")}</span>
-        </Button>
-        <Button
-          size="sm"
-          onClick={() => {
-            setDialogMode("topic");
+            setDialogMode(isAdmin ? "topic" : "direct");
             setDialogOpen(true);
           }}
         >
           <MessageSquarePlus size={16} className="mr-1.5" />
-          <span className="hidden sm:inline">{t("Nova Conversa")}</span>
-          <span className="sm:hidden">{t("Novo")}</span>
+          <span className="hidden sm:inline">
+            {isAdmin ? t("Nova Conversa") : t("Nova Mensagem")}
+          </span>
+          <span className="sm:hidden">{isAdmin ? t("Novo") : t("Mensagem")}</span>
         </Button>
       </div>
     </div>
@@ -381,7 +420,7 @@ export default function ChatSecretaria() {
           mode="inbox"
           source="secretariat"
           organizationId={church?.id ?? ""}
-          isStaff
+          isStaff={isAdmin}
           allowReplies
           subtitle={pageTitle}
           headerSlot={headerSlot}
@@ -436,7 +475,7 @@ export default function ChatSecretaria() {
 
           {/* Tabs de modo */}
           <div className="flex gap-1 p-1 bg-muted rounded-lg text-xs mb-2">
-            {(["topic", "direct", "meeting"] as DialogMode[]).map((m) => (
+            {((isAdmin ? ["topic", "direct", "meeting"] : ["direct"]) as DialogMode[]).map((m) => (
               <button
                 key={m}
                 type="button"

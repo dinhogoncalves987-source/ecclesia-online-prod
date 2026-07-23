@@ -1279,10 +1279,10 @@ export default function Membros() {
       <AnimatePresence>
         {modalOpen && (
           <Dialog open={modalOpen} onOpenChange={open => { if (!open) closeModal(); }}>
-            <DialogContent className="max-w-2xl w-full p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
+            <DialogContent className="w-[calc(100vw-0.75rem)] sm:w-full max-w-2xl h-[calc(100dvh-0.75rem)] sm:h-auto p-0 gap-0 overflow-hidden max-h-[calc(100dvh-0.75rem)] sm:max-h-[90vh] flex flex-col">
 
               {/* Modal header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-border/50 flex-shrink-0">
+              <div className="flex items-center justify-between px-3 sm:px-5 py-3 sm:py-4 border-b border-border/50 flex-shrink-0">
                 <div>
                   <h2 className="font-serif text-lg">{isNewMember ? "Cadastrar Membro" : "Editar Membro"}</h2>
                   {!isNewMember && form.full_name && (
@@ -1321,7 +1321,7 @@ export default function Membros() {
               </div>
 
               {/* Tab content */}
-              <div className="overflow-y-auto flex-1 px-5 py-5">
+              <div className="overflow-y-auto overscroll-contain flex-1 px-3 sm:px-5 py-4 sm:py-5">
 
                 {/* ── Tab 1: Dados Pessoais ── */}
                 {activeTab === "pessoal" && (
@@ -1652,9 +1652,9 @@ export default function Membros() {
               </div>
 
               {/* Modal footer */}
-              <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-border/50 bg-background flex-shrink-0">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 px-3 sm:px-5 py-3 sm:py-4 border-t border-border/50 bg-background flex-shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 {/* Tab navigation arrows */}
-                <div className="flex items-center gap-1">
+                <div className="flex w-full sm:w-auto items-center justify-between sm:justify-start gap-1">
                   <button
                     type="button"
                     onClick={() => {
@@ -1685,7 +1685,7 @@ export default function Membros() {
                   </button>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex w-full sm:w-auto items-center justify-end gap-1.5 sm:gap-2">
                   {!isNewMember && (
                     <>
                       {canAccess("/admin/gerenciar-acessos") && (
@@ -1712,17 +1712,21 @@ export default function Membros() {
                               },
                             });
                           }}
-                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
+                          aria-label="Gerenciar acessos"
+                          title="Gerenciar acessos"
+                          className="inline-flex h-9 w-9 sm:h-auto sm:w-auto flex-shrink-0 items-center justify-center gap-1.5 sm:px-3 sm:py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
                         >
-                          <Shield size={14} /> Gerenciar acessos
+                          <Shield size={14} /> <span className="hidden sm:inline">Gerenciar acessos</span>
                         </button>
                       )}
                       <button
                         type="button"
                         onClick={() => { const m = members.find(x => x.id === editingId); if (m) { closeModal(); setWalletMember(m); } }}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
+                        aria-label="Abrir carteira"
+                        title="Carteira"
+                        className="inline-flex h-9 w-9 sm:h-auto sm:w-auto flex-shrink-0 items-center justify-center gap-1.5 sm:px-3 sm:py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
                       >
-                        <CreditCard size={14} /> Carteira
+                        <CreditCard size={14} /> <span className="hidden sm:inline">Carteira</span>
                       </button>
                       <button
                         type="button"
@@ -1736,14 +1740,16 @@ export default function Membros() {
                             email:      form.email?.trim() || null,
                           });
                         }}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
+                        aria-label="Enviar convite"
+                        title="Convite"
+                        className="inline-flex h-9 w-9 sm:h-auto sm:w-auto flex-shrink-0 items-center justify-center gap-1.5 sm:px-3 sm:py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
                       >
-                        <Send size={13} /> Convite
+                        <Send size={13} /> <span className="hidden sm:inline">Convite</span>
                       </button>
                     </>
                   )}
                   <button type="button" onClick={closeModal}
-                    className="px-4 py-2 text-sm rounded-lg hover:bg-secondary transition-colors text-muted-foreground">
+                    className="flex-shrink-0 px-2.5 sm:px-4 py-2 text-sm rounded-lg hover:bg-secondary transition-colors text-muted-foreground">
                     Cancelar
                   </button>
                   <button
@@ -1760,7 +1766,7 @@ export default function Membros() {
                       handleSave(false);
                     }}
                     disabled={saving || uploadingPhoto || uploadingCivilDocument}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                    className="inline-flex flex-shrink-0 items-center gap-2 px-3 sm:px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
                   >
                     {(saving || uploadingPhoto || uploadingCivilDocument) && <Loader2 size={14} className="animate-spin" />}
                     {activeTab === TABS[TABS.length - 1].id
@@ -1820,4 +1826,3 @@ export default function Membros() {
     </AdminLayout>
   );
 }
-
