@@ -67,7 +67,7 @@ export function useInternalMessages({
   // um load() que resolve depois que a conversa já mudou de novo.
   const loadedThreadIdRef = useRef<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
     if (!organizationId || !threadId || !enabled) {
       setMessages([]);
       setFromDatabase(false);
@@ -85,7 +85,7 @@ export function useInternalMessages({
       loadedThreadIdRef.current = threadId;
     }
 
-    setLoading(true);
+    if (!silent) setLoading(true);
     const result = await fetchThreadMessages(organizationId, threadId, currentUserId);
 
     // A conversa mudou de novo enquanto esta busca estava em andamento —
@@ -104,7 +104,7 @@ export function useInternalMessages({
     // handler de INSERT abaixo continuar deduplicando corretamente.
     for (const m of result.messages) knownIdsRef.current.add(m.id);
     setFromDatabase(result.fromDatabase);
-    setLoading(false);
+    if (!silent) setLoading(false);
 
     if (result.fromDatabase && result.messages.some((m) => !m.isOwn && !m.deliveredAt)) {
       void markInternalThreadDelivered(threadId);
@@ -122,7 +122,7 @@ export function useInternalMessages({
   }, [load]);
 
   const refetch = useCallback(async () => {
-    await load();
+    await load(false);
   }, [load]);
 
   // ── Tempo real ────────────────────────────────────────────────────────
@@ -202,15 +202,23 @@ export function useInternalMessages({
       )
       .subscribe((status) => {
         // Reconexão após queda: recupera mensagens perdidas durante o gap.
-        if (status === "SUBSCRIBED") void load();
+        if (status === "SUBSCRIBED") void load(true);
       });
 
-    const onVisible = () => { if (document.visibilityState === "visible") void load(); };
-    const onOnline = () => void load();
+    const onVisible = () => { if (document.visibilityState === "visible") void load(true); };
+    const onOnline = () => void load(true);
+    // Fallback silencioso para redes móveis/WebViews que bloqueiam ou
+    // derrubam o websocket do Realtime.
+    const fallbackPoll = window.setInterval(() => {
+      if (document.visibilityState === "visible" && navigator.onLine) {
+        void load(true);
+      }
+    }, 4_000);
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("online", onOnline);
 
     return () => {
+      window.clearInterval(fallbackPoll);
       void supabase.removeChannel(channel);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("online", onOnline);

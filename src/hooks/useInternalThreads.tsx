@@ -26,7 +26,7 @@ export function useInternalThreads({
   const [fromDatabase, setFromDatabase] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
     if (!organizationId || !enabled) {
       setThreads([]);
       setFromDatabase(false);
@@ -34,11 +34,11 @@ export function useInternalThreads({
       return;
     }
 
-    setLoading(true);
+    if (!silent) setLoading(true);
     const result = await fetchThreadsBySource({ organizationId, source, campaignId, currentUserId });
     setThreads(result.threads);
     setFromDatabase(result.fromDatabase);
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, [organizationId, source, campaignId, currentUserId, enabled]);
 
   useEffect(() => {
@@ -46,7 +46,7 @@ export function useInternalThreads({
   }, [load]);
 
   const refetch = useCallback(async () => {
-    await load();
+    await load(false);
   }, [load]);
 
   // Remoção otimista local (ex.: "apagar para mim" já confirmado pelo
@@ -68,7 +68,7 @@ export function useInternalThreads({
 
     const scheduleRefetch = () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => void load(), 250);
+      debounceRef.current = setTimeout(() => void load(true), 250);
     };
 
     const channel = supabase
@@ -86,12 +86,18 @@ export function useInternalThreads({
       .subscribe();
 
     // Recupera sincronização após queda de conexão/aba em segundo plano.
-    const onVisible = () => { if (document.visibilityState === "visible") void load(); };
-    const onOnline = () => void load();
+    const onVisible = () => { if (document.visibilityState === "visible") void load(true); };
+    const onOnline = () => void load(true);
+    const fallbackPoll = window.setInterval(() => {
+      if (document.visibilityState === "visible" && navigator.onLine) {
+        void load(true);
+      }
+    }, 5_000);
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("online", onOnline);
 
     return () => {
+      window.clearInterval(fallbackPoll);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       void supabase.removeChannel(channel);
       document.removeEventListener("visibilitychange", onVisible);

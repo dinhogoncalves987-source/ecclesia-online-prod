@@ -1736,6 +1736,7 @@ export type Database = {
           call_room_token: string
           campaign_id: string | null
           closed_at: string | null
+          conversation_kind: string
           created_at: string
           created_by: string | null
           id: string
@@ -1753,6 +1754,7 @@ export type Database = {
           call_room_token?: string
           campaign_id?: string | null
           closed_at?: string | null
+          conversation_kind?: string
           created_at?: string
           created_by?: string | null
           id?: string
@@ -1770,6 +1772,7 @@ export type Database = {
           call_room_token?: string
           campaign_id?: string | null
           closed_at?: string | null
+          conversation_kind?: string
           created_at?: string
           created_by?: string | null
           id?: string
@@ -2101,6 +2104,7 @@ export type Database = {
           status: string
           street: string | null
           updated_at: string | null
+          user_id: string | null
           whatsapp: string | null
           zip_code: string | null
         }
@@ -2149,6 +2153,7 @@ export type Database = {
           status?: string
           street?: string | null
           updated_at?: string | null
+          user_id?: string | null
           whatsapp?: string | null
           zip_code?: string | null
         }
@@ -2197,6 +2202,7 @@ export type Database = {
           status?: string
           street?: string | null
           updated_at?: string | null
+          user_id?: string | null
           whatsapp?: string | null
           zip_code?: string | null
         }
@@ -2524,6 +2530,10 @@ export type Database = {
       is_org_finance_writer: {
         Args: { _organization_id: string; _user_id: string }
         Returns: boolean
+      }
+      update_own_profile: {
+        Args: { _patch: Json }
+        Returns: Json
       }
       is_org_user: {
         Args: { _organization_id: string; _user_id: string }

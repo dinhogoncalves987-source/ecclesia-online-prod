@@ -31,6 +31,7 @@ export type DbInternalThreadRow = {
   created_at: string;
   updated_at: string;
   call_room_token: string | null;
+  conversation_kind: "contextual" | "institutional" | "staff_member" | "member_direct";
 };
 
 export type DbInternalMessageRow = {
@@ -84,12 +85,14 @@ export type InternalThread = {
   participantUserId?: string | null;
   participantAvatarUrl?: string | null;
   participantLastSeenAt?: string | null;
+  invalidDirectThread?: boolean;
   /** Prévia da última mensagem (texto ou rótulo do tipo, ex: "📷 Foto"). */
   lastMessagePreview?: string | null;
   /** Quantidade de mensagens não lidas nesta thread para o usuário atual. */
   unreadCount?: number;
   /** Token aleatório usado para compor o nome da sala Jitsi (evita salas previsíveis). */
   callRoomToken?: string | null;
+  conversationKind: "contextual" | "institutional" | "staff_member" | "member_direct";
 };
 
 export type InternalMessageAttachment = {
@@ -106,6 +109,43 @@ export type InternalMessageAttachment = {
   durationSeconds: number | null;
   createdAt: string;
 };
+
+type DirectThreadCounterpartInput = {
+  currentUserId?: string | null;
+  createdBy?: string | null;
+  targetUserId?: string | null;
+  isDirectThread: boolean;
+};
+
+export function resolveDirectThreadCounterpart({
+  currentUserId,
+  createdBy,
+  targetUserId,
+  isDirectThread,
+}: DirectThreadCounterpartInput): {
+  userId: string | null;
+  viewerIsTarget: boolean;
+  invalid: boolean;
+} {
+  const invalid = Boolean(
+    isDirectThread && targetUserId && createdBy && targetUserId === createdBy,
+  );
+  if (invalid) return { userId: null, viewerIsTarget: false, invalid: true };
+
+  const viewerIsTarget = Boolean(
+    currentUserId
+    && targetUserId
+    && currentUserId === targetUserId
+    && createdBy
+    && createdBy !== currentUserId,
+  );
+
+  return {
+    userId: viewerIsTarget ? (createdBy ?? null) : (targetUserId ?? createdBy ?? null),
+    viewerIsTarget,
+    invalid: false,
+  };
+}
 
 export type InternalMessageStatus = "pending" | "sent" | "delivered" | "read" | "failed";
 
@@ -190,6 +230,7 @@ export function mapDbThreadToUi(row: DbInternalThreadRow): InternalThread {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     callRoomToken: row.call_room_token,
+    conversationKind: row.conversation_kind ?? "contextual",
   };
 }
 
@@ -286,7 +327,8 @@ export async function fetchThreadsBySource(
       if (hiddenIds.size > 0) threads = threads.filter((t) => !hiddenIds.has(t.id));
     }
 
-    await enrichThreadParticipantNames(threads);
+    await enrichThreadParticipantNames(threads, options.currentUserId);
+    threads = threads.filter((thread) => !thread.invalidDirectThread);
     await enrichThreadPreviewsAndUnread(threads, options.currentUserId);
     return { threads, fromDatabase: true };
   } catch (err) {
@@ -366,7 +408,10 @@ export async function fetchThreadMessages(
  * código usava sempre created_by, o que fazia uma conversa direta iniciada
  * pela secretaria mostrar o próprio nome do atendente em vez do membro.
  */
-async function enrichThreadParticipantNames(threads: InternalThread[]): Promise<void> {
+async function enrichThreadParticipantNames(
+  threads: InternalThread[],
+  currentUserId?: string | null,
+): Promise<void> {
   const memberIds = [...new Set(threads.map((t) => t.memberId).filter(Boolean))] as string[];
   const memberByThreadId = new Map<string, { full_name: string; user_id: string | null }>();
 
@@ -408,13 +453,28 @@ async function enrichThreadParticipantNames(threads: InternalThread[]): Promise<
 
   for (const thread of threads) {
     const member = memberByThreadId.get(thread.id);
-    const resolvedUserId = member?.user_id ?? thread.createdBy ?? null;
+    const targetUserId = member?.user_id ?? null;
+    const counterpart = resolveDirectThreadCounterpart({
+      currentUserId,
+      createdBy: thread.createdBy,
+      targetUserId,
+      isDirectThread: thread.source === "secretariat" && Boolean(thread.memberId),
+    });
+
+    if (counterpart.invalid) {
+      thread.invalidDirectThread = true;
+      continue;
+    }
+
+    const { viewerIsTarget, userId: resolvedUserId } = counterpart;
     const profile = resolvedUserId ? profileById.get(resolvedUserId) : undefined;
 
-    if (member) {
+    if (profile?.full_name) {
+      thread.participantName = profile.full_name;
+    } else if (!viewerIsTarget && member) {
       thread.participantName = member.full_name;
     } else if (thread.createdBy) {
-      thread.participantName = profile?.full_name ?? "Membro";
+      thread.participantName = thread.subject || "Secretaria";
     }
     thread.participantUserId = resolvedUserId;
     thread.participantAvatarUrl = profile?.avatar_url ?? null;
@@ -505,6 +565,7 @@ export async function resolveMemberIdForUser(
 export async function fetchThreadById(
   organizationId: string,
   threadId: string,
+  currentUserId?: string | null,
 ): Promise<InternalThread | null> {
   try {
     const { data, error } = await supabase
@@ -516,7 +577,8 @@ export async function fetchThreadById(
 
     if (error || !data) return null;
     const thread = mapDbThreadToUi(data as DbInternalThreadRow);
-    await enrichThreadParticipantNames([thread]);
+    await enrichThreadParticipantNames([thread], currentUserId);
+    if (thread.invalidDirectThread) return null;
     return thread;
   } catch {
     return null;
@@ -527,6 +589,7 @@ export async function fetchThreadById(
 export async function fetchCampaignSharedThread(
   organizationId: string,
   campaignId: string,
+  currentUserId?: string | null,
 ): Promise<InternalThread | null> {
   try {
     const { data, error } = await supabase
@@ -539,7 +602,7 @@ export async function fetchCampaignSharedThread(
 
     if (error || !data) return null;
     const thread = mapDbThreadToUi(data as DbInternalThreadRow);
-    await enrichThreadParticipantNames([thread]);
+    await enrichThreadParticipantNames([thread], currentUserId);
     return thread;
   } catch {
     return null;
