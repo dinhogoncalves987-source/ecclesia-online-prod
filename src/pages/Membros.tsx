@@ -30,15 +30,26 @@ import {
   GENDER_OPTIONS,
   MARITAL_STATUS_OPTIONS,
   CIVIL_DOCUMENT_STATUS_OPTIONS,
+  EDUCATION_LEVELS,
+  ADMISSION_TYPES,
+  FAMILY_RELATIONS,
+  type FamilyRelation,
+  ADDRESS_TYPES,
   getCivilDocLabel,
 } from "@/lib/secretariaConstants";
+import { matchesMemberSearch } from "@/lib/memberSearch";
+import { checkCpfForManualSave, CPF_CHECK_MESSAGES } from "@/lib/memberFormValidation";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type Member = {
   id: string;
   full_name: string;
+  known_name: string | null;
   member_code: string | null;
+  legacy_code: string | null;
+  legacy_registration: string | null;
+  legacy_source: string | null;
   member_role: string | null;
   administrative_role: string | null;
   status: string;
@@ -47,12 +58,17 @@ type Member = {
   email: string | null;
   photo_url: string | null;
   birth_date: string | null;
+  birth_place: string | null;
   gender: string | null;
   marital_status: string | null;
   cpf: string | null;
+  cpf_pending: boolean;
   rg: string | null;
   rg_issuer: string | null;
   rg_issue_date: string | null;
+  nationality: string | null;
+  education_level: string | null;
+  profession: string | null;
   joined_at: string | null;
   address: string | null;
   zip_code: string | null;
@@ -63,13 +79,19 @@ type Member = {
   city: string | null;
   state: string | null;
   baptized_at: string | null;
+  baptism_place: string | null;
   conversion_date: string | null;
+  admission_type: string | null;
+  cgadb_number: string | null;
   congregation_id: string | null;
   sector_id: string | null;
   father_name: string | null;
   mother_name: string | null;
   spouse_name: string | null;
   notes: string | null;
+  incomplete_registration: boolean;
+  contact_pending: boolean;
+  requires_review: boolean;
   // Documentação civil
   civil_document_type: string | null;
   civil_document_status: string | null;
@@ -83,11 +105,112 @@ type Member = {
 
 type SubOrg = { id: string; name: string; organization_type: string };
 
+// ─── Família e Dependentes (public.member_family) ───────────────────────────
+
+type FamilyEntry = {
+  id: string;
+  relation: FamilyRelation | string;
+  full_name: string;
+  related_member_id: string | null;
+  birth_date: string | null;
+  gender: string | null;
+  cpf: string | null;
+  phone: string | null;
+  notes: string | null;
+};
+
+type FamilyDraft = {
+  id: string | null; // null = novo, ainda não salvo
+  relation: FamilyRelation | "";
+  full_name: string;
+  related_member_id: string | null;
+  birth_date: string;
+  gender: string;
+  cpf: string;
+  phone: string;
+  notes: string;
+};
+
+const EMPTY_FAMILY_DRAFT: FamilyDraft = {
+  id: null,
+  relation: "",
+  full_name: "",
+  related_member_id: null,
+  birth_date: "",
+  gender: "",
+  cpf: "",
+  phone: "",
+  notes: "",
+};
+
+const FAMILY_RELATION_LABELS: Record<string, string> = {
+  pai: "Pai", mae: "Mãe", esposo: "Esposo", esposa: "Esposa",
+  filho: "Filho", filha: "Filha", enteado: "Enteado", enteada: "Enteada",
+  dependente: "Dependente", responsavel: "Responsável", outro: "Outro",
+};
+
+// ─── Endereços (public.member_addresses) ────────────────────────────────────
+
+type AddressEntry = {
+  id: string;
+  address_type: string;
+  zip_code: string | null;
+  street: string | null;
+  number: string | null;
+  complement: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  is_primary: boolean;
+  is_active: boolean;
+  notes: string | null;
+};
+
+type AddressDraft = {
+  id: string | null;
+  address_type: string;
+  zip_code: string;
+  street: string;
+  number: string;
+  complement: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  country: string;
+  is_primary: boolean;
+  notes: string;
+};
+
+const EMPTY_ADDRESS_DRAFT: AddressDraft = {
+  id: null,
+  address_type: "comercial",
+  zip_code: "",
+  street: "",
+  number: "",
+  complement: "",
+  neighborhood: "",
+  city: "",
+  state: "",
+  country: "Brasil",
+  is_primary: false,
+  notes: "",
+};
+
+const ADDRESS_TYPE_LABELS: Record<string, string> = {
+  residencial: "Residencial", comercial: "Comercial",
+  correspondencia: "Correspondência", anterior: "Anterior", outro: "Outro",
+};
+
 type FilterStatus = "all" | MemberStatus;
 
 const EMPTY_FORM: Omit<Member, "id"> = {
   full_name: "",
+  known_name: "",
   member_code: "",
+  legacy_code: "",
+  legacy_registration: "",
+  legacy_source: "",
   member_role: "Membro",
   administrative_role: "Nenhum",
   status: "Ativo",
@@ -96,12 +219,17 @@ const EMPTY_FORM: Omit<Member, "id"> = {
   email: "",
   photo_url: null,
   birth_date: "",
+  birth_place: "",
   gender: "",
   marital_status: "",
   cpf: "",
+  cpf_pending: false,
   rg: "",
   rg_issuer: "",
   rg_issue_date: "",
+  nationality: "",
+  education_level: "",
+  profession: "",
   joined_at: "",
   address: null,
   zip_code: "",
@@ -112,13 +240,19 @@ const EMPTY_FORM: Omit<Member, "id"> = {
   city: "",
   state: "",
   baptized_at: "",
+  baptism_place: "",
   conversion_date: "",
+  admission_type: "",
+  cgadb_number: "",
   congregation_id: null,
   sector_id: null,
   father_name: "",
   mother_name: "",
   spouse_name: "",
   notes: "",
+  incomplete_registration: false,
+  contact_pending: false,
+  requires_review: false,
   civil_document_type: "",
   civil_document_status: "Pendente",
   civil_document_url: null,
@@ -322,6 +456,195 @@ export default function Membros() {
     email: string | null;
   } | null>(null);
 
+  // ── Família e dependentes (member_family) ────────────────────────────────
+  // Para membro já existente (editingId != null): CRUD imediato no banco.
+  // Para membro novo (ainda sem id): entradas ficam "pendentes" localmente e
+  // são inseridas em lote depois que o INSERT do membro tiver sucesso.
+  const [familyEntries, setFamilyEntries] = useState<FamilyEntry[]>([]);
+  const [pendingFamilyEntries, setPendingFamilyEntries] = useState<FamilyDraft[]>([]);
+  const [familyDraft, setFamilyDraft] = useState<FamilyDraft | null>(null);
+  const [loadingFamily, setLoadingFamily] = useState(false);
+  const [savingFamily, setSavingFamily] = useState(false);
+
+  // ── Endereços adicionais (member_addresses) ──────────────────────────────
+  // O endereço "principal" continua nos campos inline de members (compat com
+  // dados existentes). Esta lista é para endereços SECUNDÁRIOS (comercial,
+  // correspondência, anterior) — múltiplos por membro.
+  const [addressEntries, setAddressEntries] = useState<AddressEntry[]>([]);
+  const [pendingAddressEntries, setPendingAddressEntries] = useState<AddressDraft[]>([]);
+  const [addressDraft, setAddressDraft] = useState<AddressDraft | null>(null);
+  const [loadingAddresses, setLoadingAddresses] = useState(false);
+  const [savingAddress, setSavingAddress] = useState(false);
+
+  const loadFamilyEntries = useCallback(async (memberId: string) => {
+    setLoadingFamily(true);
+    const { data, error } = await supabase
+      .from("member_family")
+      .select("id, relation, full_name, related_member_id, birth_date, gender, cpf, phone, notes")
+      .eq("member_id", memberId)
+      .eq("is_active", true)
+      .order("relation", { ascending: true });
+    setLoadingFamily(false);
+    if (error) {
+      if (isMissingColumnError(error) || error.code === "42P01") {
+        // Tabela member_family ainda não existe neste ambiente (migration
+        // não aplicada) — não é um erro do usuário, apenas indisponibilidade
+        // temporária da funcionalidade.
+        console.warn("[Membros] member_family indisponível:", error.message);
+        setFamilyEntries([]);
+        return;
+      }
+      toast.error(t("Erro ao carregar família"), { description: error.message });
+      return;
+    }
+    setFamilyEntries((data ?? []) as FamilyEntry[]);
+  }, [t]);
+
+  const loadAddressEntries = useCallback(async (memberId: string) => {
+    setLoadingAddresses(true);
+    const { data, error } = await supabase
+      .from("member_addresses")
+      .select("id, address_type, zip_code, street, number, complement, neighborhood, city, state, country, is_primary, is_active, notes")
+      .eq("member_id", memberId)
+      .eq("is_active", true)
+      .order("address_type", { ascending: true });
+    setLoadingAddresses(false);
+    if (error) {
+      if (isMissingColumnError(error) || error.code === "42P01") {
+        console.warn("[Membros] member_addresses indisponível:", error.message);
+        setAddressEntries([]);
+        return;
+      }
+      toast.error(t("Erro ao carregar endereços"), { description: error.message });
+      return;
+    }
+    setAddressEntries((data ?? []) as AddressEntry[]);
+  }, [t]);
+
+  const saveFamilyDraft = async () => {
+    if (!familyDraft) return;
+    if (!familyDraft.relation) { toast.error(t("Selecione o tipo de relação.")); return; }
+    if (!familyDraft.full_name.trim()) { toast.error(t("Informe o nome do familiar.")); return; }
+
+    if (!editingId) {
+      // Membro novo ainda não salvo — enfileira localmente.
+      setPendingFamilyEntries(prev => [...prev, familyDraft]);
+      setFamilyDraft(null);
+      return;
+    }
+
+    if (!church) return;
+    setSavingFamily(true);
+    try {
+      const payload = {
+        member_id: editingId,
+        organization_id: church.id,
+        relation: familyDraft.relation,
+        full_name: familyDraft.full_name.trim(),
+        related_member_id: familyDraft.related_member_id || null,
+        birth_date: familyDraft.birth_date || null,
+        gender: familyDraft.gender || null,
+        cpf: familyDraft.cpf?.trim() || null,
+        phone: familyDraft.phone?.trim() || null,
+        notes: familyDraft.notes?.trim() || null,
+      };
+      const { error } = familyDraft.id
+        ? await supabase.from("member_family").update(payload).eq("id", familyDraft.id)
+        : await supabase.from("member_family").insert(payload);
+      if (error) {
+        if (error.code === "23505") {
+          toast.error(t("Este familiar já está cadastrado com essa relação."));
+        } else if (isMissingColumnError(error) || error.code === "42P01") {
+          toast.error(t("Funcionalidade de família ainda não disponível neste ambiente (migration pendente)."));
+        } else {
+          toast.error(t("Erro ao salvar familiar"), { description: error.message });
+        }
+        return;
+      }
+      toast.success(t("Familiar salvo"));
+      setFamilyDraft(null);
+      await loadFamilyEntries(editingId);
+    } finally {
+      setSavingFamily(false);
+    }
+  };
+
+  const removeFamilyEntry = async (entry: FamilyEntry) => {
+    if (!confirm(`${t("Remover")} ${entry.full_name}?`)) return;
+    // Soft delete (is_active = false) preserva histórico, conforme regra de
+    // produto ("remover/desativar").
+    const { error } = await supabase.from("member_family").update({ is_active: false }).eq("id", entry.id);
+    if (error) { toast.error(t("Erro ao remover familiar"), { description: error.message }); return; }
+    if (editingId) await loadFamilyEntries(editingId);
+  };
+
+  const removePendingFamilyEntry = (index: number) => {
+    setPendingFamilyEntries(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const saveAddressDraft = async () => {
+    if (!addressDraft) return;
+    if (!addressDraft.street.trim() && !addressDraft.zip_code.trim()) {
+      toast.error(t("Informe ao menos o CEP ou o logradouro."));
+      return;
+    }
+
+    if (!editingId) {
+      setPendingAddressEntries(prev => [...prev, addressDraft]);
+      setAddressDraft(null);
+      return;
+    }
+
+    if (!church) return;
+    setSavingAddress(true);
+    try {
+      const payload = {
+        member_id: editingId,
+        organization_id: church.id,
+        address_type: addressDraft.address_type,
+        zip_code: addressDraft.zip_code?.trim() || null,
+        street: addressDraft.street?.trim() || null,
+        number: addressDraft.number?.trim() || null,
+        complement: addressDraft.complement?.trim() || null,
+        neighborhood: addressDraft.neighborhood?.trim() || null,
+        city: addressDraft.city?.trim() || null,
+        state: addressDraft.state?.trim() || null,
+        country: addressDraft.country?.trim() || "Brasil",
+        is_primary: addressDraft.is_primary,
+        notes: addressDraft.notes?.trim() || null,
+      };
+      const { error } = addressDraft.id
+        ? await supabase.from("member_addresses").update(payload).eq("id", addressDraft.id)
+        : await supabase.from("member_addresses").insert(payload);
+      if (error) {
+        if (error.code === "23505") {
+          toast.error(t("Já existe um endereço principal ativo para este membro."));
+        } else if (isMissingColumnError(error) || error.code === "42P01") {
+          toast.error(t("Funcionalidade de endereços adicionais ainda não disponível neste ambiente (migration pendente)."));
+        } else {
+          toast.error(t("Erro ao salvar endereço"), { description: error.message });
+        }
+        return;
+      }
+      toast.success(t("Endereço salvo"));
+      setAddressDraft(null);
+      await loadAddressEntries(editingId);
+    } finally {
+      setSavingAddress(false);
+    }
+  };
+
+  const removeAddressEntry = async (entry: AddressEntry) => {
+    if (!confirm(t("Remover este endereço?"))) return;
+    const { error } = await supabase.from("member_addresses").update({ is_active: false }).eq("id", entry.id);
+    if (error) { toast.error(t("Erro ao remover endereço"), { description: error.message }); return; }
+    if (editingId) await loadAddressEntries(editingId);
+  };
+
+  const removePendingAddressEntry = (index: number) => {
+    setPendingAddressEntries(prev => prev.filter((_, i) => i !== index));
+  };
+
   const setField = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm(prev => ({ ...prev, [key]: value }));
 
@@ -404,20 +727,14 @@ export default function Membros() {
         )
     : members;
 
+  // Busca textual (nome, nome conhecido, CPF, WhatsApp, código legado e
+  // matrícula antiga) — lógica extraída para src/lib/memberSearch.ts para
+  // ser testável isoladamente. Filtra sobre os membros já carregados no
+  // cliente (mesmo comportamento client-side de antes da Parte 1; ver
+  // comentário no módulo memberSearch.ts sobre risco de escala).
   const filtered = scopedMembers.filter(m => {
     if (filterStatus !== "all" && m.status !== filterStatus) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return (
-        m.full_name.toLowerCase().includes(q) ||
-        (m.member_code || "").toLowerCase().includes(q) ||
-        (m.member_role || "").toLowerCase().includes(q) ||
-        (m.administrative_role || "").toLowerCase().includes(q) ||
-        (m.email || "").toLowerCase().includes(q) ||
-        (m.phone || "").includes(q)
-      );
-    }
-    return true;
+    return matchesMemberSearch(m, searchQuery);
   });
 
   // ── Photo upload ─────────────────────────────────────────────────────────────
@@ -443,13 +760,13 @@ export default function Membros() {
         .upload(path, photoFile, { upsert: true, contentType: photoFile.type });
       if (error) {
         toast.warning(`${t("Foto não salva:")} ${error.message}`);
-        return null;
+        return form.photo_url;
       }
       const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
       return urlData?.publicUrl ?? null;
     } catch (e) {
       toast.warning(t("Erro inesperado no upload da foto."));
-      return null;
+      return form.photo_url;
     } finally {
       setUploadingPhoto(false);
     }
@@ -490,13 +807,13 @@ export default function Membros() {
 
       if (error) {
         toast.error(t("Erro ao enviar documento civil"), { description: error.message });
-        return null;
+        return form.civil_document_url || null;
       }
 
       return path;
     } catch {
       toast.error(t("Erro inesperado no upload do documento civil."));
-      return null;
+      return form.civil_document_url || null;
     } finally {
       setUploadingCivilDocument(false);
     }
@@ -547,6 +864,12 @@ export default function Membros() {
     setPhotoFile(null);
     setCivilDocumentFile(null);
     setActiveTab("pessoal");
+    setFamilyEntries([]);
+    setPendingFamilyEntries([]);
+    setFamilyDraft(null);
+    setAddressEntries([]);
+    setPendingAddressEntries([]);
+    setAddressDraft(null);
     setModalOpen(true);
   };
 
@@ -555,7 +878,11 @@ export default function Membros() {
     setEditingId(m.id);
     setForm({
       full_name:         m.full_name,
+      known_name:        m.known_name || "",
       member_code:       m.member_code || "",
+      legacy_code:       m.legacy_code || "",
+      legacy_registration: m.legacy_registration || "",
+      legacy_source:     m.legacy_source || "",
       member_role:       m.member_role || "Membro",
       administrative_role: m.administrative_role || "Nenhum",
       status:            isMemberStatus(m.status) ? m.status : "Ativo",
@@ -564,12 +891,17 @@ export default function Membros() {
       email:             m.email || "",
       photo_url:         m.photo_url || null,
       birth_date:        m.birth_date || "",
+      birth_place:       m.birth_place || "",
       gender:            m.gender || "",
       marital_status:    m.marital_status || "",
       cpf:               m.cpf || "",
+      cpf_pending:       m.cpf_pending ?? false,
       rg:                m.rg || "",
       rg_issuer:         m.rg_issuer || "",
       rg_issue_date:     m.rg_issue_date || "",
+      nationality:       m.nationality || "",
+      education_level:   m.education_level || "",
+      profession:        m.profession || "",
       joined_at:         m.joined_at || "",
       address:           m.address || null,
       zip_code:          m.zip_code || "",
@@ -580,13 +912,19 @@ export default function Membros() {
       city:              m.city || "",
       state:             m.state || "",
       baptized_at:       m.baptized_at || "",
+      baptism_place:     m.baptism_place || "",
       conversion_date:   m.conversion_date || "",
+      admission_type:    m.admission_type || "",
+      cgadb_number:      m.cgadb_number || "",
       congregation_id:   m.congregation_id || null,
       sector_id:         m.sector_id || null,
       father_name:       m.father_name || "",
       mother_name:       m.mother_name || "",
       spouse_name:       m.spouse_name || "",
       notes:             m.notes || "",
+      incomplete_registration: m.incomplete_registration ?? false,
+      contact_pending:   m.contact_pending ?? false,
+      requires_review:   m.requires_review ?? false,
       civil_document_type:   m.civil_document_type || getCivilDocLabel(m.marital_status || "") || "",
       civil_document_status: m.civil_document_status || "Pendente",
       civil_document_url:    m.civil_document_url || null,
@@ -599,6 +937,12 @@ export default function Membros() {
     setPhotoFile(null);
     setCivilDocumentFile(null);
     setActiveTab("pessoal");
+    setPendingFamilyEntries([]);
+    setFamilyDraft(null);
+    setPendingAddressEntries([]);
+    setAddressDraft(null);
+    void loadFamilyEntries(m.id);
+    void loadAddressEntries(m.id);
     setModalOpen(true);
   };
 
@@ -608,6 +952,12 @@ export default function Membros() {
     setPhotoPreview(null);
     setPhotoFile(null);
     setCivilDocumentFile(null);
+    setFamilyEntries([]);
+    setPendingFamilyEntries([]);
+    setFamilyDraft(null);
+    setAddressEntries([]);
+    setPendingAddressEntries([]);
+    setAddressDraft(null);
   };
 
   // ── Schema / RLS error detection ─────────────────────────────────────────────
@@ -631,13 +981,8 @@ export default function Membros() {
   const isDuplicateMemberCodeError = (err: { message?: string; code?: string } | null): boolean =>
     !!err && err.code === "23505" && !!err.message?.includes("members_org_member_code_unique_idx");
 
-  /**
-   * PGRST116 — the UPDATE found 0 matching rows.
-   * This is PostgREST's response when the USING clause of an RLS policy
-   * blocks the row, or when no row with that ID exists.
-   */
-  const isNoRowsError = (err: { message?: string; code?: string } | null): boolean =>
-    !!err && err.code === "PGRST116";
+  const isDuplicateCpfError = (err: { message?: string; code?: string } | null): boolean =>
+    !!err && err.code === "23505" && !!err.message?.includes("members_org_cpf_unique_idx");
 
   /**
    * Core payload — ONLY columns that existed before migration 20260617120000.
@@ -670,11 +1015,20 @@ export default function Membros() {
     return {
       photo_url:          photoUrl,
       member_code:        form.member_code?.trim() || null,
+      legacy_code:        form.legacy_code?.trim() || null,
+      legacy_registration: form.legacy_registration?.trim() || null,
+      legacy_source:      form.legacy_source || null,
+      known_name:         form.known_name?.trim() || null,
+      birth_place:        form.birth_place?.trim() || null,
+      nationality:        form.nationality?.trim() || null,
+      education_level:    form.education_level || null,
+      profession:         form.profession?.trim() || null,
       whatsapp:           form.whatsapp?.trim() || null,
       gender:             form.gender || null,
       marital_status:     form.marital_status || null,
       cpf:                form.cpf?.trim() || null,
-      // RG fields kept for backward compat — not exposed in UI anymore
+      cpf_pending:        form.cpf_pending,
+      // RG fields kept for backward compat
       rg:                 form.rg?.trim() || null,
       rg_issuer:          form.rg_issuer?.trim() || null,
       rg_issue_date:      form.rg_issue_date || null,
@@ -683,14 +1037,19 @@ export default function Membros() {
       address_number:     form.address_number?.trim() || null,
       address_complement: form.address_complement?.trim() || null,
       neighborhood:       form.neighborhood?.trim() || null,
-      // conversion_date kept for backward compat — not exposed in UI anymore
       conversion_date:    form.conversion_date || null,
+      baptism_place:      form.baptism_place?.trim() || null,
+      admission_type:     form.admission_type || null,
+      cgadb_number:       form.cgadb_number?.trim() || null,
       administrative_role: form.administrative_role === "Nenhum" ? null : (form.administrative_role || null),
       father_name:        form.father_name?.trim() || null,
       mother_name:        form.mother_name?.trim() || null,
       spouse_name:        form.spouse_name?.trim() || null,
       sector_id:          form.sector_id || null,
       congregation_id:    form.congregation_id || null,
+      incomplete_registration: form.incomplete_registration,
+      contact_pending:    form.contact_pending,
+      requires_review:    form.requires_review,
       // Documentação civil
       civil_document_type:   civilDocType,
       civil_document_status: form.civil_document_status || "Pendente",
@@ -744,11 +1103,6 @@ export default function Membros() {
       setActiveTab("pessoal");
       return;
     }
-    if (!form.cpf?.trim()) {
-      toast.error(t("Informe o CPF antes de salvar."));
-      setActiveTab("pessoal");
-      return;
-    }
     if (!form.phone?.trim()) {
       toast.error(t("Informe o telefone antes de salvar."));
       setActiveTab("contato");
@@ -761,13 +1115,66 @@ export default function Membros() {
     }
     if (!user || !church) return;
 
+    // ── Validação de CPF (obrigatório, dígito verificador válido, sem
+    // duplicidade na organização) — cadastro manual NUNCA usa a exceção de
+    // cpf_pending, reservada à futura importação do legado.
+    let cpfLookup = await supabase
+      .from("members")
+      .select("id, cpf")
+      .eq("organization_id", church.id)
+      .eq("cpf_pending", false)
+      .not("cpf", "is", null);
+    if (cpfLookup.error && isMissingColumnError(cpfLookup.error)) {
+      // cpf_pending ainda não existe neste ambiente (migration não aplicada)
+      // — degrada para checar duplicidade sem distinguir pendentes, em vez
+      // de bloquear o cadastro por completo.
+      console.warn("[Membros] cpf_pending column missing, degrading duplicate check:", cpfLookup.error.message);
+      cpfLookup = await supabase.from("members").select("id, cpf").eq("organization_id", church.id).not("cpf", "is", null);
+    }
+    if (cpfLookup.error) {
+      toast.error(t("Erro ao validar CPF"), { description: cpfLookup.error.message });
+      return;
+    }
+    const existingCpfs = new Set(
+      (cpfLookup.data ?? [])
+        .filter(row => row.id !== editingId)
+        .map(row => (row.cpf ?? "").replace(/\D/g, ""))
+        .filter(Boolean),
+    );
+    const cpfCheck = checkCpfForManualSave(form.cpf, existingCpfs);
+    if (!cpfCheck.ok) {
+      toast.error(t(CPF_CHECK_MESSAGES[cpfCheck.reason]));
+      setActiveTab("pessoal");
+      return;
+    }
+    // Normaliza para 11 dígitos antes de gravar — mantém consistência para a
+    // unicidade no banco (members_org_cpf_unique_idx) e para exibição via
+    // formatCpf() em outros pontos do app. NÃO usamos setField() aqui: o
+    // state do React só atualiza no próximo render, então buildExtendedPayload
+    // (chamado logo abaixo, ainda síncrono nesta mesma execução) leria o CPF
+    // antigo — por isso o valor normalizado é injetado diretamente no payload.
+    const normalizedCpf = cpfCheck.normalized;
+    setField("cpf", normalizedCpf);
+
     setSaving(true);
     try {
-      // ── Helpers ───────────────────────────────────────────────────────────
-      const tryExtended = async (memberId: string, photoUrl: string | null, civilDocumentUrl: string | null) => {
+      // Salva a ficha inteira em uma única operação. A versão anterior fazia
+      // primeiro um UPDATE "básico" e depois outro com CPF/endereço/dados
+      // eclesiásticos; se o segundo falhasse, a UI dizia que parte havia sido
+      // salva e deixava um cadastro incoerente. Agora o banco aceita tudo ou
+      // rejeita tudo.
+      const saveFullMember = async (
+        memberId: string,
+        photoUrl: string | null,
+        civilDocumentUrl: string | null,
+      ) => {
         const { error } = await supabase
           .from("members")
-          .update(buildExtendedPayload(photoUrl, civilDocumentUrl))
+          .update({
+            ...buildCorePayload(),
+            ...buildExtendedPayload(photoUrl, civilDocumentUrl),
+            cpf: normalizedCpf,
+          })
           .eq("id", memberId)
           .select("id")
           .single();
@@ -777,32 +1184,46 @@ export default function Membros() {
           });
           return false;
         }
-        if (error && isMissingColumnError(error)) {
-          console.warn("[Membros] extended fields need migration:", error.message);
-          toast.warning(
-            t("Dados básicos salvos. Para salvar foto, endereço, CPF e outros campos, aplique as migrations no Supabase Dashboard → SQL Editor:\n• 20260617120000_members_extended_fields.sql\n• 20260617130000_members_status_constraint_fix.sql"),
-            { duration: 8000 }
-          );
+        if (error && isDuplicateCpfError(error)) {
+          toast.error(t("Já existe um membro com este CPF nesta igreja."));
           return false;
         }
-        if (error && !isNoRowsError(error)) {
-          console.warn("[Membros] extended fields unexpected error:", error.message);
+        if (error && isMissingColumnError(error)) {
+          console.warn("[Membros] member schema needs migrations:", error.message);
+          toast.error(t("Não foi possível salvar a ficha completa porque há migrations pendentes no banco."));
+          return false;
         }
-        return !error;
+        if (error) {
+          toast.error(t("Erro ao salvar"), { description: error.message });
+          return false;
+        }
+        return true;
       };
 
       if (isNewMember) {
-        // ── INSERT: include all core fields directly ─────────────────────────
-        const core = buildCorePayload();
+        // INSERT atômico da ficha completa. Foto/documento são atualizados
+        // depois do upload porque o path depende do id gerado.
         const { data: inserted, error: insErr } = await supabase
           .from("members")
-          .insert({ ...core, created_by: user.id, organization_id: church.id })
+          .insert({
+            ...buildCorePayload(),
+            ...buildExtendedPayload(null, null),
+            cpf: normalizedCpf,
+            created_by: user.id,
+            organization_id: church.id,
+          })
           .select("id")
           .single();
 
         if (insErr || !inserted) {
           console.error("[Membros] insert error:", insErr);
-          toast.error(t("Erro ao criar membro"), { description: insErr?.message ?? t("Falha ao inserir") });
+          if (isDuplicateCpfError(insErr)) {
+            toast.error(t("Já existe um membro com este CPF nesta igreja."));
+          } else if (isDuplicateMemberCodeError(insErr)) {
+            toast.error(t("Este código de membro já está em uso por outro membro desta igreja."));
+          } else {
+            toast.error(t("Erro ao criar membro"), { description: insErr?.message ?? t("Falha ao inserir") });
+          }
           return;
         }
 
@@ -811,8 +1232,60 @@ export default function Membros() {
 
         const photoUrl  = await uploadPhotoIfNeeded(newId);
         const civilDocumentUrl = await uploadCivilDocumentIfNeeded(newId);
-        const allSaved  = await tryExtended(newId, photoUrl, civilDocumentUrl);
-        if (allSaved) toast.success(t("Membro cadastrado com sucesso!"));
+        const allSaved = await saveFullMember(newId, photoUrl, civilDocumentUrl);
+        if (allSaved) {
+          toast.success(t("Membro cadastrado com sucesso!"));
+        } else {
+          toast.warning(t("O membro foi criado, mas os arquivos enviados precisam ser conferidos na edição."));
+        }
+
+        // Família e endereços adicionados antes do membro existir ficaram em
+        // fila local (pendingFamilyEntries/pendingAddressEntries) — agora que
+        // o membro tem id, gravamos em lote. Falhas aqui não desfazem a
+        // criação do membro (best-effort, com aviso claro ao usuário).
+        if (pendingFamilyEntries.length > 0) {
+          const { error: familyErr } = await supabase.from("member_family").insert(
+            pendingFamilyEntries.map(entry => ({
+              member_id: newId,
+              organization_id: church.id,
+              relation: entry.relation,
+              full_name: entry.full_name.trim(),
+              related_member_id: entry.related_member_id || null,
+              birth_date: entry.birth_date || null,
+              gender: entry.gender || null,
+              cpf: entry.cpf?.trim() || null,
+              phone: entry.phone?.trim() || null,
+              notes: entry.notes?.trim() || null,
+            })),
+          );
+          if (familyErr) {
+            console.warn("[Membros] pending family insert failed:", familyErr.message);
+            toast.warning(t("Membro criado, mas houve erro ao salvar os familiares. Adicione-os novamente editando o membro."));
+          }
+        }
+        if (pendingAddressEntries.length > 0) {
+          const { error: addressErr } = await supabase.from("member_addresses").insert(
+            pendingAddressEntries.map(entry => ({
+              member_id: newId,
+              organization_id: church.id,
+              address_type: entry.address_type,
+              zip_code: entry.zip_code?.trim() || null,
+              street: entry.street?.trim() || null,
+              number: entry.number?.trim() || null,
+              complement: entry.complement?.trim() || null,
+              neighborhood: entry.neighborhood?.trim() || null,
+              city: entry.city?.trim() || null,
+              state: entry.state?.trim() || null,
+              country: entry.country?.trim() || "Brasil",
+              is_primary: entry.is_primary,
+              notes: entry.notes?.trim() || null,
+            })),
+          );
+          if (addressErr) {
+            console.warn("[Membros] pending address insert failed:", addressErr.message);
+            toast.warning(t("Membro criado, mas houve erro ao salvar endereços adicionais. Adicione-os novamente editando o membro."));
+          }
+        }
 
         await reloadMembers();
         if (openWallet) {
@@ -840,32 +1313,11 @@ export default function Membros() {
 
         console.log("[Membros][EDIT] id=", editingId);
 
-        // Step 1 — core fields (columns that always exist)
-        const { data: coreRow, error: coreErr } = await supabase
-          .from("members")
-          .update(buildCorePayload())
-          .eq("id", editingId)
-          .select("id")
-          .single();
-
-        console.log("[Membros][EDIT core]:", { saved: coreRow?.id, error: coreErr?.code, msg: coreErr?.message });
-
-        if (coreErr) {
-          if (isNoRowsError(coreErr)) {
-            toast.error(t("Permissão negada."), {
-              description: t("Nenhuma linha atualizada. Verifique se você tem acesso para editar este membro (RLS)."),
-            });
-          } else {
-            toast.error(t("Erro ao salvar"), { description: coreErr.message });
-          }
-          return;
-        }
-
-        // Step 2 — photo upload + extended columns (best-effort)
         const photoUrl = await uploadPhotoIfNeeded(editingId);
         const civilDocumentUrl = await uploadCivilDocumentIfNeeded(editingId);
-        const allSaved = await tryExtended(editingId, photoUrl, civilDocumentUrl);
-        if (allSaved) toast.success(t("Membro atualizado com sucesso!"));
+        const allSaved = await saveFullMember(editingId, photoUrl, civilDocumentUrl);
+        if (!allSaved) return;
+        toast.success(t("Membro atualizado com sucesso!"));
 
         await reloadMembers();
         closeModal();
@@ -879,11 +1331,11 @@ export default function Membros() {
 
   const removeMember = async (m: Member) => {
     if (!church) return;
-    if (!confirm(`${t("Remover")} ${m.full_name}? ${t("Esta ação não pode ser desfeita.")}`)) return;
-    const { error } = await supabase.from("members").delete()
+    if (!confirm(`${t("Desativar")} ${m.full_name}? ${t("O histórico será preservado.")}`)) return;
+    const { error } = await supabase.from("members").update({ status: "Inativo" })
       .eq("id", m.id).eq("organization_id", church.id);
-    if (error) { toast.error(t("Erro ao remover"), { description: error.message }); return; }
-    toast.success(t("Membro removido"));
+    if (error) { toast.error(t("Erro ao desativar"), { description: error.message }); return; }
+    toast.success(t("Membro desativado"));
     await reloadMembers();
   };
 
@@ -948,8 +1400,10 @@ export default function Membros() {
   const falecidoCount   = scopedMembers.filter(m => m.status === "Falecido").length;
   const transferidoCount = scopedMembers.filter(m => m.status === "Transferido").length;
 
-  const canDeleteMember = (m: Member) =>
-    canWrite && !MEMBER_STATUSES_NO_DELETE.includes(m.status as MemberStatus);
+  const canDeactivateMember = (m: Member) =>
+    canWrite
+    && m.status !== "Inativo"
+    && !MEMBER_STATUSES_NO_DELETE.includes(m.status as MemberStatus);
 
   // ── Sub-org label helper ─────────────────────────────────────────────────────
 
@@ -1064,7 +1518,7 @@ export default function Membros() {
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
-              placeholder={t("Buscar por nome, função ou contato...")}
+              placeholder={t("Buscar por nome, CPF, código ou contato...")}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2.5 bg-card rounded-lg shadow-[var(--shadow-sm)] text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
@@ -1170,6 +1624,10 @@ export default function Membros() {
                       </td>
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5">
+                          <button type="button" onClick={() => navigate(`/admin/membros/${m.id}`)}
+                            className="p-1 rounded hover:bg-secondary transition-colors" title={t("Ver perfil")}>
+                            <User size={14} className="text-muted-foreground" />
+                          </button>
                           <button type="button" onClick={() => setWalletMember(m)}
                             className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-accent/10 hover:bg-accent/20 text-accent text-[11px] font-medium transition-colors"
                             title={t("Carteira de Membro")}>
@@ -1181,9 +1639,9 @@ export default function Membros() {
                                 className="p-1 rounded hover:bg-secondary transition-colors" title={t("Editar")}>
                                 <Pencil size={14} className="text-muted-foreground" />
                               </button>
-                              {canDeleteMember(m) ? (
+                              {canDeactivateMember(m) ? (
                                 <button type="button" onClick={() => removeMember(m)}
-                                  className="p-1 rounded hover:bg-destructive/10 transition-colors" title={t("Remover")}>
+                                  className="p-1 rounded hover:bg-destructive/10 transition-colors" title={t("Desativar")}>
                                   <Trash2 size={14} className="text-muted-foreground" />
                                 </button>
                               ) : (
@@ -1250,13 +1708,17 @@ export default function Membros() {
                       )}
                     </div>
                     <div className="flex flex-col gap-1.5 flex-shrink-0">
+                      <button type="button" onClick={e => { e.stopPropagation(); navigate(`/admin/membros/${m.id}`); }}
+                        className="p-1.5 rounded-lg hover:bg-secondary transition-colors" title={t("Ver perfil")}>
+                        <User size={14} className="text-muted-foreground" />
+                      </button>
                       <button type="button" onClick={e => { e.stopPropagation(); setWalletMember(m); }}
                         className="p-1.5 rounded-lg bg-accent/10 hover:bg-accent/20 transition-colors" title={t("Carteira")}>
                         <CreditCard size={14} className="text-accent" />
                       </button>
-                      {canWrite && canDeleteMember(m) && (
+                      {canDeactivateMember(m) && (
                         <button type="button" onClick={e => { e.stopPropagation(); removeMember(m); }}
-                          className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors" title={t("Remover")}>
+                          className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors" title={t("Desativar")}>
                           <Trash2 size={14} className="text-muted-foreground" />
                         </button>
                       )}
@@ -1281,18 +1743,15 @@ export default function Membros() {
           <Dialog open={modalOpen} onOpenChange={open => { if (!open) closeModal(); }}>
             <DialogContent className="max-w-2xl w-full p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
 
-              {/* Modal header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-border/50 flex-shrink-0">
-                <div>
-                  <h2 className="font-serif text-lg">{isNewMember ? "Cadastrar Membro" : "Editar Membro"}</h2>
-                  {!isNewMember && form.full_name && (
-                    <p className="text-xs text-muted-foreground">{form.full_name}</p>
-                  )}
-                </div>
-                <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
-                  <X size={18} strokeWidth={1.5} />
-                </button>
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border/50 flex-shrink-0 pr-12">
+              <div>
+                <h2 className="font-serif text-lg">{isNewMember ? "Cadastrar Membro" : "Editar Membro"}</h2>
+                {!isNewMember && form.full_name && (
+                  <p className="text-xs text-muted-foreground">{form.full_name}</p>
+                )}
               </div>
+            </div>
 
               {/* Tabs nav */}
               <div className="flex border-b border-border/50 overflow-x-auto flex-shrink-0 bg-background">
@@ -1368,18 +1827,41 @@ export default function Membros() {
                       <div className="sm:col-span-2">
                         <FormInput label="Nome completo" value={form.full_name} onChange={v => setField("full_name", v)} required placeholder="Nome e sobrenome completos" />
                       </div>
-                      <div className="sm:col-span-2">
-                        <FormInput
-                          label="Código do Membro"
-                          value={form.member_code || ""}
-                          onChange={v => setField("member_code", v)}
-                          placeholder={t("Opcional — use o código do sistema anterior, se houver")}
-                        />
-                      </div>
+                      <FormInput label="Nome conhecido" value={form.known_name || ""} onChange={v => setField("known_name", v)} placeholder="Como a pessoa é chamada no dia a dia" />
+                      <FormInput
+                        label="Código do Membro"
+                        value={form.member_code || ""}
+                        onChange={v => setField("member_code", v)}
+                        placeholder={t("Opcional — use o código do sistema anterior, se houver")}
+                      />
                       <FormInput label="Data de nascimento" value={form.birth_date || ""} onChange={v => setField("birth_date", v)} type="date" />
                       <FormSelect label="Sexo" value={form.gender || ""} onChange={v => setField("gender", v)} options={GENDER_OPTIONS} />
                       <FormSelect label="Estado civil" value={form.marital_status || ""} onChange={v => setField("marital_status", v)} options={MARITAL_STATUS_OPTIONS} />
                       <FormInput label="CPF" value={form.cpf || ""} onChange={v => setField("cpf", v)} required placeholder="000.000.000-00" />
+                      <FormInput label="RG" value={form.rg || ""} onChange={v => setField("rg", v)} placeholder="Número do RG" />
+                      <FormInput label="Naturalidade" value={form.birth_place || ""} onChange={v => setField("birth_place", v)} placeholder="Cidade / estado de nascimento" />
+                      <FormInput label="Nacionalidade" value={form.nationality || ""} onChange={v => setField("nationality", v)} placeholder="Ex.: Brasileiro(a)" />
+                      <FormSelect label="Escolaridade" value={form.education_level || ""} onChange={v => setField("education_level", v)} options={EDUCATION_LEVELS} />
+                      <FormInput label="Profissão" value={form.profession || ""} onChange={v => setField("profession", v)} placeholder="Profissão" />
+                    </div>
+
+                    {/* Identificadores de sistema legado — só aparecem para quem for
+                        importar/corrigir um cadastro vindo de outro sistema (Wintechi
+                        etc). Continuam opcionais no cadastro manual comum. */}
+                    <div className="border-t border-border/50 pt-4 space-y-3">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Identificadores de sistema anterior (opcional)
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <FormInput label="Código legado (ex.: Wintechi)" value={form.legacy_code || ""} onChange={v => setField("legacy_code", v)} placeholder="Código no sistema anterior" />
+                        <FormInput label="Matrícula antiga" value={form.legacy_registration || ""} onChange={v => setField("legacy_registration", v)} placeholder="Matrícula no sistema anterior" />
+                        <FormInput label="Origem do registro" value={form.legacy_source || ""} onChange={v => setField("legacy_source", v)} placeholder="Ex.: wintechi" />
+                      </div>
+                      {(form.incomplete_registration || form.cpf_pending || form.contact_pending || form.requires_review) && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                          ⚠️ Este cadastro veio de uma importação de legado com pendências. Essas marcações não podem ser alteradas manualmente.
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1520,29 +2002,167 @@ export default function Membros() {
                 )}
 
                 {/* ── Tab 4: Endereço ── */}
-                {activeTab === "endereco" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <FormInput label="CEP" value={form.zip_code || ""} onChange={v => setField("zip_code", v)} placeholder="00000-000" />
-                    <div className="sm:col-span-2">
-                      <FormInput label="Rua / Logradouro" value={form.street || ""} onChange={v => setField("street", v)} placeholder="Nome da rua" />
+                {activeTab === "endereco" && (() => {
+                  const allAddressRows: Array<{ kind: "saved"; entry: AddressEntry } | { kind: "pending"; index: number; entry: AddressDraft }> = [
+                    ...addressEntries.map(entry => ({ kind: "saved" as const, entry })),
+                    ...pendingAddressEntries.map((entry, index) => ({ kind: "pending" as const, index, entry })),
+                  ];
+                  return (
+                    <div className="space-y-5">
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Endereço principal (residencial)</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <FormInput label="CEP" value={form.zip_code || ""} onChange={v => setField("zip_code", v)} placeholder="00000-000" />
+                          <div className="sm:col-span-2">
+                            <FormInput label="Rua / Logradouro" value={form.street || ""} onChange={v => setField("street", v)} placeholder="Nome da rua" />
+                          </div>
+                          <FormInput label="Número" value={form.address_number || ""} onChange={v => setField("address_number", v)} placeholder="Nº" />
+                          <FormInput label="Complemento" value={form.address_complement || ""} onChange={v => setField("address_complement", v)} placeholder="Apto, casa, bloco..." />
+                          <FormInput label="Bairro" value={form.neighborhood || ""} onChange={v => setField("neighborhood", v)} placeholder="Bairro" />
+                          <FormInput label="Cidade" value={form.city || ""} onChange={v => setField("city", v)} placeholder="Cidade" />
+                          <FormInput label="Estado (UF)" value={form.state || ""} onChange={v => setField("state", v)} placeholder="RS" />
+                        </div>
+                      </div>
+
+                      {/* Endereços adicionais (member_addresses) — comercial,
+                          correspondência, anterior. O residencial acima continua
+                          sendo a fonte principal, por compatibilidade com dados
+                          já existentes. */}
+                      <div className="border-t border-border/50 pt-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            Outros endereços {loadingAddresses && <Loader2 size={11} className="inline animate-spin ml-1" />}
+                          </p>
+                          {!addressDraft && (
+                            <button type="button" onClick={() => setAddressDraft({ ...EMPTY_ADDRESS_DRAFT })}
+                              className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
+                              <Plus size={12} /> Adicionar endereço
+                            </button>
+                          )}
+                        </div>
+
+                        {allAddressRows.length === 0 && !addressDraft && (
+                          <p className="text-sm text-muted-foreground">Nenhum endereço adicional cadastrado.</p>
+                        )}
+
+                        <div className="space-y-2">
+                          {allAddressRows.map(row => (
+                            <div key={row.kind === "saved" ? row.entry.id : `pending-addr-${row.index}`}
+                              className="flex items-center justify-between gap-3 rounded-lg border border-border/60 px-3 py-2">
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">
+                                  {[row.entry.street, row.entry.number].filter(Boolean).join(", ") || "(sem logradouro)"}
+                                  {row.kind === "pending" && <span className="ml-1.5 text-[10px] text-amber-600 dark:text-amber-400">(não salvo)</span>}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {ADDRESS_TYPE_LABELS[row.entry.address_type] || row.entry.address_type}
+                                  {[row.entry.city, row.entry.state].filter(Boolean).length > 0 && ` · ${[row.entry.city, row.entry.state].filter(Boolean).join("/")}`}
+                                  {row.kind === "saved" && row.entry.is_primary && " · principal"}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                {row.kind === "saved" ? (
+                                  <>
+                                    <button type="button" onClick={() => setAddressDraft({
+                                      id: row.entry.id,
+                                      address_type: row.entry.address_type,
+                                      zip_code: row.entry.zip_code ?? "",
+                                      street: row.entry.street ?? "",
+                                      number: row.entry.number ?? "",
+                                      complement: row.entry.complement ?? "",
+                                      neighborhood: row.entry.neighborhood ?? "",
+                                      city: row.entry.city ?? "",
+                                      state: row.entry.state ?? "",
+                                      country: row.entry.country ?? "Brasil",
+                                      is_primary: row.entry.is_primary,
+                                      notes: row.entry.notes ?? "",
+                                    })}
+                                      className="p-1.5 rounded hover:bg-secondary" title={t("Editar")}>
+                                      <Pencil size={13} className="text-muted-foreground" />
+                                    </button>
+                                    <button type="button" onClick={() => removeAddressEntry(row.entry)}
+                                      className="p-1.5 rounded hover:bg-destructive/10" title={t("Remover")}>
+                                      <Trash2 size={13} className="text-muted-foreground" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button type="button" onClick={() => removePendingAddressEntry(row.index)}
+                                    className="p-1.5 rounded hover:bg-destructive/10" title={t("Remover")}>
+                                    <Trash2 size={13} className="text-muted-foreground" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {addressDraft && (
+                          <div className="rounded-lg border border-border/60 bg-muted/30 p-4 space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div className="flex flex-col gap-1">
+                                <label className="text-xs font-medium text-muted-foreground">
+                                  Tipo de endereço<span className="text-destructive ml-0.5">*</span>
+                                </label>
+                                <select
+                                  value={addressDraft.address_type}
+                                  onChange={e => setAddressDraft(prev => prev && { ...prev, address_type: e.target.value })}
+                                  className="px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                                >
+                                  {ADDRESS_TYPES.map(a => (
+                                    <option key={a} value={a}>{ADDRESS_TYPE_LABELS[a] ?? a}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <FormInput label="CEP" value={addressDraft.zip_code} onChange={v => setAddressDraft(prev => prev && { ...prev, zip_code: v })} placeholder="00000-000" />
+                              <div className="sm:col-span-2">
+                                <FormInput label="Rua / Logradouro" value={addressDraft.street} onChange={v => setAddressDraft(prev => prev && { ...prev, street: v })} placeholder="Nome da rua" />
+                              </div>
+                              <FormInput label="Número" value={addressDraft.number} onChange={v => setAddressDraft(prev => prev && { ...prev, number: v })} placeholder="Nº" />
+                              <FormInput label="Complemento" value={addressDraft.complement} onChange={v => setAddressDraft(prev => prev && { ...prev, complement: v })} placeholder="Apto, casa, bloco..." />
+                              <FormInput label="Bairro" value={addressDraft.neighborhood} onChange={v => setAddressDraft(prev => prev && { ...prev, neighborhood: v })} placeholder="Bairro" />
+                              <FormInput label="Cidade" value={addressDraft.city} onChange={v => setAddressDraft(prev => prev && { ...prev, city: v })} placeholder="Cidade" />
+                              <FormInput label="Estado (UF)" value={addressDraft.state} onChange={v => setAddressDraft(prev => prev && { ...prev, state: v })} placeholder="RS" />
+                              <FormInput label="País" value={addressDraft.country} onChange={v => setAddressDraft(prev => prev && { ...prev, country: v })} placeholder="Brasil" />
+                              <div className="flex items-center gap-2 pt-5">
+                                <input
+                                  type="checkbox"
+                                  id="address-is-primary"
+                                  checked={addressDraft.is_primary}
+                                  onChange={e => setAddressDraft(prev => prev && { ...prev, is_primary: e.target.checked })}
+                                  className="rounded border-input"
+                                />
+                                <label htmlFor="address-is-primary" className="text-xs text-muted-foreground">Marcar como principal (ativo)</label>
+                              </div>
+                            </div>
+                            <div className="flex justify-end gap-2">
+                              <button type="button" onClick={() => setAddressDraft(null)}
+                                className="px-3 py-1.5 text-xs rounded-lg hover:bg-secondary transition-colors text-muted-foreground">
+                                Cancelar
+                              </button>
+                              <button type="button" onClick={saveAddressDraft} disabled={savingAddress}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50">
+                                {savingAddress && <Loader2 size={12} className="animate-spin" />} Salvar endereço
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <FormInput label="Número" value={form.address_number || ""} onChange={v => setField("address_number", v)} placeholder="Nº" />
-                    <FormInput label="Complemento" value={form.address_complement || ""} onChange={v => setField("address_complement", v)} placeholder="Apto, casa, bloco..." />
-                    <FormInput label="Bairro" value={form.neighborhood || ""} onChange={v => setField("neighborhood", v)} placeholder="Bairro" />
-                    <FormInput label="Cidade" value={form.city || ""} onChange={v => setField("city", v)} placeholder="Cidade" />
-                    <FormInput label="Estado (UF)" value={form.state || ""} onChange={v => setField("state", v)} placeholder="RS" />
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* ── Tab 5: Dados Eclesiásticos ── */}
                 {activeTab === "eclesiastico" && (
                   <div className="space-y-5">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormInput label="Batismo nas águas" value={form.baptized_at || ""} onChange={v => setField("baptized_at", v)} type="date" />
+                      <FormInput label="Local do batismo" value={form.baptism_place || ""} onChange={v => setField("baptism_place", v)} placeholder="Ex.: Templo sede" />
                       <FormInput label="Batismo com o Espírito Santo" value={form.holy_spirit_baptism_date || ""} onChange={v => setField("holy_spirit_baptism_date", v)} type="date" />
                       <FormInput label="Data de admissão" value={form.joined_at || ""} onChange={v => setField("joined_at", v)} type="date" />
+                      <FormSelect label="Forma de admissão" value={form.admission_type || ""} onChange={v => setField("admission_type", v)} options={ADMISSION_TYPES} />
                       <FormInput label="Data de consagração" value={form.consecration_date || ""} onChange={v => setField("consecration_date", v)} type="date" />
                       <FormSelect label="Situação do membro" value={form.status} onChange={v => setField("status", v as MemberStatus)} options={MEMBER_STATUSES} required />
+                      <FormInput label="Número CGADB" value={form.cgadb_number || ""} onChange={v => setField("cgadb_number", v)} placeholder="Número de cadastro na CGADB" />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1625,13 +2245,171 @@ export default function Membros() {
                 )}
 
                 {/* ── Tab 7: Família ── */}
-                {activeTab === "familia" && (
-                  <div className="grid grid-cols-1 gap-4">
-                    <FormInput label="Nome do pai" value={form.father_name || ""} onChange={v => setField("father_name", v)} placeholder="Nome completo do pai" />
-                    <FormInput label="Nome da mãe" value={form.mother_name || ""} onChange={v => setField("mother_name", v)} placeholder="Nome completo da mãe" />
-                    <FormInput label="Cônjuge" value={form.spouse_name || ""} onChange={v => setField("spouse_name", v)} placeholder="Nome do cônjuge" />
-                  </div>
-                )}
+                {activeTab === "familia" && (() => {
+                  const allFamilyRows: Array<{ kind: "saved"; entry: FamilyEntry } | { kind: "pending"; index: number; entry: FamilyDraft }> = [
+                    ...familyEntries.map(entry => ({ kind: "saved" as const, entry })),
+                    ...pendingFamilyEntries.map((entry, index) => ({ kind: "pending" as const, index, entry })),
+                  ];
+                  return (
+                    <div className="space-y-5">
+                      {/* Campos legados — preservados para compatibilidade com dados
+                          já existentes e outros módulos que ainda os leem. */}
+                      <div className="grid grid-cols-1 gap-4">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Campos rápidos (compatibilidade)</p>
+                        <FormInput label="Nome do pai" value={form.father_name || ""} onChange={v => setField("father_name", v)} placeholder="Nome completo do pai" />
+                        <FormInput label="Nome da mãe" value={form.mother_name || ""} onChange={v => setField("mother_name", v)} placeholder="Nome completo da mãe" />
+                        <FormInput label="Cônjuge" value={form.spouse_name || ""} onChange={v => setField("spouse_name", v)} placeholder="Nome do cônjuge" />
+                      </div>
+
+                      {/* Família e dependentes estruturados */}
+                      <div className="border-t border-border/50 pt-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            Família e dependentes {loadingFamily && <Loader2 size={11} className="inline animate-spin ml-1" />}
+                          </p>
+                          {!familyDraft && (
+                            <button type="button" onClick={() => setFamilyDraft({ ...EMPTY_FAMILY_DRAFT })}
+                              className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
+                              <Plus size={12} /> Adicionar familiar
+                            </button>
+                          )}
+                        </div>
+
+                        {isNewMember && pendingFamilyEntries.length > 0 && (
+                          <p className="text-[11px] text-muted-foreground">
+                            Estes familiares serão salvos quando o membro for cadastrado.
+                          </p>
+                        )}
+
+                        {allFamilyRows.length === 0 && !familyDraft && (
+                          <p className="text-sm text-muted-foreground">Nenhum familiar ou dependente cadastrado.</p>
+                        )}
+
+                        <div className="space-y-2">
+                          {allFamilyRows.map(row => (
+                            <div key={row.kind === "saved" ? row.entry.id : `pending-${row.index}`}
+                              className="flex items-center justify-between gap-3 rounded-lg border border-border/60 px-3 py-2">
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">
+                                  {row.entry.full_name}
+                                  {row.kind === "pending" && <span className="ml-1.5 text-[10px] text-amber-600 dark:text-amber-400">(não salvo)</span>}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {FAMILY_RELATION_LABELS[row.entry.relation] || row.entry.relation}
+                                  {row.entry.related_member_id && " · vinculado a membro existente"}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                {row.kind === "saved" ? (
+                                  <>
+                                    <button type="button" onClick={() => setFamilyDraft({
+                                      id: row.entry.id,
+                                      relation: row.entry.relation,
+                                      full_name: row.entry.full_name,
+                                      related_member_id: row.entry.related_member_id,
+                                      birth_date: row.entry.birth_date ?? "",
+                                      gender: row.entry.gender ?? "",
+                                      cpf: row.entry.cpf ?? "",
+                                      phone: row.entry.phone ?? "",
+                                      notes: row.entry.notes ?? "",
+                                    })}
+                                      className="p-1.5 rounded hover:bg-secondary" title={t("Editar")}>
+                                      <Pencil size={13} className="text-muted-foreground" />
+                                    </button>
+                                    <button type="button" onClick={() => removeFamilyEntry(row.entry)}
+                                      className="p-1.5 rounded hover:bg-destructive/10" title={t("Remover")}>
+                                      <Trash2 size={13} className="text-muted-foreground" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button type="button" onClick={() => removePendingFamilyEntry(row.index)}
+                                    className="p-1.5 rounded hover:bg-destructive/10" title={t("Remover")}>
+                                    <Trash2 size={13} className="text-muted-foreground" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Draft form (adicionar novo familiar) */}
+                        {familyDraft && (
+                          <div className="rounded-lg border border-border/60 bg-muted/30 p-4 space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div className="flex flex-col gap-1">
+                                <label className="text-xs font-medium text-muted-foreground">
+                                  Tipo de relação<span className="text-destructive ml-0.5">*</span>
+                                </label>
+                                <select
+                                  value={familyDraft.relation}
+                                  onChange={e => setFamilyDraft(prev => prev && { ...prev, relation: e.target.value as FamilyRelation })}
+                                  className="px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                                >
+                                  <option value="">— Selecionar —</option>
+                                  {FAMILY_RELATIONS.map(r => (
+                                    <option key={r} value={r}>{FAMILY_RELATION_LABELS[r] ?? r}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <label className="text-xs font-medium text-muted-foreground">Vincular a membro existente (opcional)</label>
+                                <select
+                                  value={familyDraft.related_member_id || ""}
+                                  onChange={e => {
+                                    const relatedId = e.target.value || null;
+                                    const related = members.find(m => m.id === relatedId);
+                                    setFamilyDraft(prev => prev && {
+                                      ...prev,
+                                      related_member_id: relatedId,
+                                      full_name: related ? related.full_name : prev.full_name,
+                                    });
+                                  }}
+                                  className="px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                                >
+                                  <option value="">— Não é membro —</option>
+                                  {members.filter(m => m.id !== editingId).map(m => (
+                                    <option key={m.id} value={m.id}>{m.full_name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="sm:col-span-2">
+                                <FormInput
+                                  label="Nome completo do familiar"
+                                  value={familyDraft.full_name}
+                                  onChange={v => setFamilyDraft(prev => prev && { ...prev, full_name: v })}
+                                  required
+                                  disabled={!!familyDraft.related_member_id}
+                                  placeholder="Nome completo"
+                                />
+                              </div>
+                              <FormInput label="Data de nascimento" value={familyDraft.birth_date} onChange={v => setFamilyDraft(prev => prev && { ...prev, birth_date: v })} type="date" />
+                              <FormSelect label="Sexo" value={familyDraft.gender} onChange={v => setFamilyDraft(prev => prev && { ...prev, gender: v })} options={GENDER_OPTIONS} />
+                              <FormInput label="CPF (opcional)" value={familyDraft.cpf} onChange={v => setFamilyDraft(prev => prev && { ...prev, cpf: v })} placeholder="Opcional para crianças/dependentes" />
+                              <FormInput label="Telefone" value={familyDraft.phone} onChange={v => setFamilyDraft(prev => prev && { ...prev, phone: v })} placeholder="Pode ser o telefone do responsável" />
+                              <div className="sm:col-span-2">
+                                <FormInput label="Observações" value={familyDraft.notes} onChange={v => setFamilyDraft(prev => prev && { ...prev, notes: v })} placeholder="Observações (opcional)" />
+                              </div>
+                            </div>
+                            <div className="flex justify-end gap-2">
+                              <button type="button" onClick={() => setFamilyDraft(null)}
+                                className="px-3 py-1.5 text-xs rounded-lg hover:bg-secondary transition-colors text-muted-foreground">
+                                Cancelar
+                              </button>
+                              <button type="button" onClick={saveFamilyDraft} disabled={savingFamily}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50">
+                                {savingFamily && <Loader2 size={12} className="animate-spin" />} Salvar familiar
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        <p className="text-[11px] text-muted-foreground">
+                          Dependentes e crianças cadastrados aqui não aparecem na lista principal de membros e não contam como membros ativos.
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* ── Tab 8: Observações ── */}
                 {activeTab === "observacoes" && (
@@ -1820,4 +2598,3 @@ export default function Membros() {
     </AdminLayout>
   );
 }
-

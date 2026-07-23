@@ -16,6 +16,11 @@ export const ACCESS_PERMISSION_KEYS = [
   "members.read",
   "members.write",
   "members.invite",
+  // Acesso a ocorrências/histórico pastoral marcados como confidenciais
+  // (ver 20260728090000_shared_institutional_history_foundation.sql).
+  // NÃO é concedida automaticamente a quem só tem members.read/write —
+  // apenas a quem já possui todas as permissões de governança.
+  "members.confidential",
   "finance.read",
   "finance.write",
   "finance.approve",
