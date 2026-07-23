@@ -23,6 +23,7 @@ import { FormInputLabeled, FormSelectLabeled, FormTextareaLabeled, FormCheckboxL
 export function TeologiaSettings({ organizationId }: { organizationId: string }) {
   const [loading, setLoading] = useState(true);
   const [moduleUnavailable, setModuleUnavailable] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [models, setModels] = useState<TheologyAssessmentModelRow[]>([]);
   const [programs, setPrograms] = useState<TheologyProgramRow[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
@@ -36,9 +37,12 @@ export function TeologiaSettings({ organizationId }: { organizationId: string })
     ]);
     if (modelsRes.error?.code === "42P01") {
       setModuleUnavailable(true);
+      setLoadError(null);
       setLoading(false);
       return;
     }
+    const firstError = [modelsRes.error, programsRes.error].find(Boolean);
+    setLoadError(firstError?.message ?? null);
     setModels(modelsRes.rows);
     setPrograms(programsRes.rows);
     setModuleUnavailable(false);
@@ -52,6 +56,13 @@ export function TeologiaSettings({ organizationId }: { organizationId: string })
   }
   if (moduleUnavailable) {
     return <EmptyState title="Teologia aguardando aplicação das migrations" description="A tabela theology_assessment_models ainda não existe neste ambiente." />;
+  }
+  if (loadError) {
+    return (
+      <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+        Não foi possível carregar as configurações de avaliação. {loadError}
+      </div>
+    );
   }
 
   const programNameById = new Map(programs.map((p) => [p.id, p.name]));

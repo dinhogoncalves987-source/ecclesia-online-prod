@@ -106,6 +106,44 @@ FOR EACH ROW EXECUTE FUNCTION public._theology_curriculum_items_validate_scope()
 REVOKE ALL ON FUNCTION public._theology_curriculum_items_validate_scope()
   FROM PUBLIC, anon, authenticated;
 
+-- A matriz é a versão acadêmica efetivamente contratada pelos alunos. Depois
+-- que o programa sai de rascunho ela fica imutável; uma nova grade deve ser
+-- criada como outro programa/versão, sem alterar o histórico de turmas.
+CREATE OR REPLACE FUNCTION public._theology_curriculum_items_validate_lifecycle()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_program_id uuid := COALESCE(NEW.program_id, OLD.program_id);
+  v_program_status text;
+BEGIN
+  SELECT status INTO v_program_status
+  FROM public.theology_programs
+  WHERE id = v_program_id;
+
+  IF v_program_status IS NULL THEN
+    RAISE EXCEPTION 'program not found';
+  END IF;
+
+  IF v_program_status <> 'rascunho' THEN
+    RAISE EXCEPTION 'curriculum is locked after program activation; create a new program version instead';
+  END IF;
+
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+DROP TRIGGER IF EXISTS theology_curriculum_items_validate_lifecycle
+  ON public.theology_curriculum_items;
+CREATE TRIGGER theology_curriculum_items_validate_lifecycle
+BEFORE INSERT OR UPDATE OR DELETE ON public.theology_curriculum_items
+FOR EACH ROW EXECUTE FUNCTION public._theology_curriculum_items_validate_lifecycle();
+
+REVOKE ALL ON FUNCTION public._theology_curriculum_items_validate_lifecycle()
+  FROM PUBLIC, anon, authenticated;
+
 ALTER TABLE public.theology_curriculum_items ENABLE ROW LEVEL SECURITY;
 
 -- Organização resolvida via JOIN ao programa — nunca duplicada como coluna
@@ -184,9 +222,11 @@ BEGIN
     RAISE EXCEPTION 'authentication required';
   END IF;
 
-  SELECT organization_id INTO v_org_id FROM public.theology_programs WHERE id = p_program_id;
+  SELECT organization_id INTO v_org_id
+  FROM public.theology_programs
+  WHERE id = p_program_id AND status = 'rascunho';
   IF v_org_id IS NULL THEN
-    RAISE EXCEPTION 'program not found';
+    RAISE EXCEPTION 'program not found or curriculum is already locked';
   END IF;
 
   IF NOT public.has_org_access_permission(auth.uid(), v_org_id, 'theology.manage') THEN
@@ -246,14 +286,48 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 BEGIN
+  IF OLD.status = 'arquivado' AND NEW.status IS DISTINCT FROM OLD.status THEN
+    RAISE EXCEPTION 'archived program is terminal';
+  END IF;
+
+  IF NOT (
+    NEW.status = OLD.status
+    OR (OLD.status = 'rascunho' AND NEW.status IN ('ativo', 'arquivado'))
+    OR (OLD.status = 'ativo' AND NEW.status = 'arquivado')
+  ) THEN
+    RAISE EXCEPTION 'invalid program status transition: % -> %', OLD.status, NEW.status;
+  END IF;
+
   IF TG_OP = 'UPDATE'
      AND NEW.status = 'ativo'
      AND OLD.status IS DISTINCT FROM NEW.status
      AND NOT EXISTS (
        SELECT 1 FROM public.theology_curriculum_items ci
-       WHERE ci.program_id = NEW.id AND ci.status = 'ativo'
+       WHERE ci.program_id = NEW.id
+         AND ci.status = 'ativo'
+         AND ci.is_mandatory
      ) THEN
-    RAISE EXCEPTION 'program must have at least one active curriculum item before activation';
+    RAISE EXCEPTION 'program must have at least one active mandatory curriculum item before activation';
+  END IF;
+
+  -- Depois da ativação os critérios e a identidade acadêmica viram snapshot
+  -- histórico. Só a transição ativo -> arquivado continua permitida.
+  IF OLD.status IN ('ativo', 'arquivado') AND (
+    NEW.organization_id IS DISTINCT FROM OLD.organization_id
+    OR NEW.institute_id IS DISTINCT FROM OLD.institute_id
+    OR NEW.code IS DISTINCT FROM OLD.code
+    OR NEW.name IS DISTINCT FROM OLD.name
+    OR NEW.short_name IS DISTINCT FROM OLD.short_name
+    OR NEW.description IS DISTINCT FROM OLD.description
+    OR NEW.objectives IS DISTINCT FROM OLD.objectives
+    OR NEW.workload_hours IS DISTINCT FROM OLD.workload_hours
+    OR NEW.requires_attendance IS DISTINCT FROM OLD.requires_attendance
+    OR NEW.minimum_attendance_percentage IS DISTINCT FROM OLD.minimum_attendance_percentage
+    OR NEW.requires_assessment IS DISTINCT FROM OLD.requires_assessment
+    OR NEW.minimum_passing_score IS DISTINCT FROM OLD.minimum_passing_score
+    OR NEW.completion_criteria IS DISTINCT FROM OLD.completion_criteria
+  ) THEN
+    RAISE EXCEPTION 'active or archived program is immutable; create a new program version instead';
   END IF;
 
   RETURN NEW;
@@ -267,6 +341,41 @@ FOR EACH ROW EXECUTE FUNCTION public._theology_programs_validate_activation();
 
 REVOKE ALL ON FUNCTION public._theology_programs_validate_activation()
   FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.update_theology_program_status(
+  p_program_id uuid,
+  p_status text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_row public.theology_programs%ROWTYPE;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
+
+  SELECT * INTO v_row
+  FROM public.theology_programs
+  WHERE id = p_program_id
+  FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'program not found'; END IF;
+
+  IF NOT public.has_org_access_permission(auth.uid(), v_row.organization_id, 'theology.manage') THEN
+    RAISE EXCEPTION 'access denied to update program status';
+  END IF;
+
+  UPDATE public.theology_programs
+  SET status = p_status
+  WHERE id = p_program_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.update_theology_program_status(uuid, text)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.update_theology_program_status(uuid, text)
+  TO authenticated;
 
 -- ── Verificação final ────────────────────────────────────────────────────
 DO $$

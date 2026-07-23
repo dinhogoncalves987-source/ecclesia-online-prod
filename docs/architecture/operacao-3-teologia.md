@@ -1,11 +1,12 @@
 # Operação 3 — Teologia completa sobre a fundação revisada do Ecclesia
 
-Documento de passagem (entrega Sonnet, ainda **não revisada pelo Codex**). Ver também
+Documento de passagem da entrega Sonnet **revisada e corrigida pelo Codex**. Ver também
 `docs/architecture/contrato-dominios-institucionais.md` (contrato entre os quatro domínios) e
 `docs/architecture/operacao-2-discipulado.md` (Operação 2, já revisada). Entrega estrutural
 construída na branch `handoff/sonnet-operacao-3-teologia-20260723`, criada a partir de
 `review/operacao-2-discipulado` (Operações 1 e 2 já revisadas presentes integralmente). Nenhuma
-migration foi aplicada, nenhum commit/push/PR/deploy foi executado por este agente.
+migration foi aplicada e nenhum push, PR ou deploy foi executado durante a construção do Sonnet.
+A revisão Codex é consolidada apenas em commit local para gerar o patch de passagem.
 
 ## 1. Estado encontrado antes da operação (auditoria)
 
@@ -108,9 +109,9 @@ migration foi aplicada, nenhum commit/push/PR/deploy foi executado por este agen
 | Migration | Tabelas/objetos |
 |---|---|
 | `20260730090000_theology_foundation.sql` | Capabilities novas + 3 responsabilidades operacionais + `theology_institutes` + `theology_study_centers` + `theology_subjects` + `theology_programs` |
-| `20260730100000_theology_curriculum.sql` | `theology_curriculum_items` (matriz curricular) + RPC `reorder_theology_curriculum_items` + trigger de ativação de programa (`_theology_programs_validate_activation`) |
-| `20260730110000_theology_periods_classes_enrollments.sql` | `theology_periods` + RPC `update_theology_period_status` + `theology_classes` + RPC `update_theology_class_status` + `theology_class_offerings` + RPC `update_theology_class_offering_status` + `theology_staff_assignments` + RPCs `assign_theology_staff`/`end_theology_staff_assignment` + helpers `_is_theology_class_staff`/`_is_theology_offering_staff`/`can_operate_theology_class`/`can_operate_theology_offering` + `theology_enrollments` + RPCs `enroll_member_in_theology_class`/`update_theology_enrollment_status` + `theology_offering_enrollments` + RPCs `enroll_member_in_theology_offering`/`update_theology_offering_enrollment_status` |
-| `20260730120000_theology_attendance_and_assessments.sql` | `theology_sessions` + RPC `update_theology_session_status` + `theology_attendance` + RPC `record_theology_attendance` + `theology_assessment_models` + `theology_assessment_model_components` + `theology_assessments` + RPC `update_theology_assessment_status` + `theology_assessment_results` + RPC `record_theology_assessment_result` + `theology_grade_audit_log` + RPC `amend_theology_assessment_result` |
+| `20260730100000_theology_curriculum.sql` | `theology_curriculum_items` + reordenação atômica + trava da matriz publicada + máquina de estados `update_theology_program_status` |
+| `20260730110000_theology_periods_classes_enrollments.sql` | Períodos/turmas/ofertas/equipe/matrículas/tentativas, validação de árvore institucional, RPCs administrativas e fechamento da tentativa com resultado acadêmico derivado |
+| `20260730120000_theology_attendance_and_assessments.sql` | Sessões/frequência/modelos/componentes/avaliações/resultados/auditoria + cálculo interno `_calculate_theology_offering_enrollment_outcome` |
 | `20260730130000_theology_results_history_and_documents.sql` | Helper interno `_register_theology_member_history` + trigger `_theology_enrollments_register_history` + `search_theology_members`/`get_theology_member_labels` (diretório mínimo) + colunas `certificate_document_id`/`certificate_issued_at` em `theology_enrollments` + RPC `mark_theology_certificate_issued` + RPCs de leitura derivada `get_theology_student_transcript`/`list_theology_period_graduates` |
 | `20260730140000_theology_finance_links_and_permissions.sql` | `theology_transaction_links` + RPCs `link_theology_transaction`/`list_theology_linked_transactions` |
 
@@ -293,9 +294,9 @@ concedem apenas colunas operacionais (nunca `status`/`organization_id`) via
 
 ## 11. RPCs e funções internas
 
-**22 RPCs públicas** (`GRANT EXECUTE ... TO authenticated`, todas com
+**23 RPCs públicas** (`GRANT EXECUTE ... TO authenticated`, todas com
 `REVOKE ALL ... FROM PUBLIC, anon`): `reorder_theology_curriculum_items`,
-`update_theology_period_status`, `update_theology_class_status`,
+`update_theology_program_status`, `update_theology_period_status`, `update_theology_class_status`,
 `update_theology_class_offering_status`, `assign_theology_staff`, `end_theology_staff_assignment`,
 `enroll_member_in_theology_class`, `update_theology_enrollment_status`,
 `enroll_member_in_theology_offering`, `update_theology_offering_enrollment_status`,
@@ -306,29 +307,32 @@ concedem apenas colunas operacionais (nunca `status`/`organization_id`) via
 `list_theology_period_graduates`, `link_theology_transaction`,
 `list_theology_linked_transactions`.
 
-**16 funções internas** (`REVOKE ALL FROM PUBLIC, anon, authenticated` — nunca chamáveis
+**19 funções internas** (`REVOKE ALL FROM PUBLIC, anon, authenticated` — nunca chamáveis
 diretamente pelo navegador, só por trigger ou por outra função `SECURITY DEFINER`):
 `_theology_study_centers_validate_scope`, `_theology_programs_validate_scope`,
-`_theology_curriculum_items_validate_scope`, `_theology_programs_validate_activation`,
+`_theology_curriculum_items_validate_scope`, `_theology_curriculum_items_validate_lifecycle`,
+`_theology_programs_validate_activation`, `_theology_periods_validate_scope`,
 `_theology_classes_validate_scope`, `_theology_class_offerings_validate_scope`,
 `_is_theology_class_staff`, `_is_theology_offering_staff`, `can_operate_theology_class`,
 `can_operate_theology_offering`, `_theology_sessions_validate_scope`,
 `_theology_assessment_models_validate_lock`, `_theology_assessment_model_components_validate_lock`,
-`_theology_assessments_validate_scope`, `_register_theology_member_history`,
+`_theology_assessments_validate_scope`, `_calculate_theology_offering_enrollment_outcome`,
+`_register_theology_member_history`,
 `_theology_enrollments_register_history`.
 
 ## 12. Integração financeira (sem duplicar Financeiro)
 
 - `theology_transaction_links` **não tem coluna de valor monetário** — apenas `transaction_id`
   (FK única para `public.transactions`), `organization_id` (snapshot validado), `enrollment_id`/
-  `period_id` (contexto acadêmico, ao menos um obrigatório), `link_type`
+  `period_id` (contexto acadêmico, exatamente um dos dois obrigatório), `link_type`
   (`matricula`/`mensalidade`/`contribuicao`/`material`/`outro`).
-- `link_theology_transaction()` exige **ambas** `finance.write` **e** `theology.manage` na
-  organização real da transação — nunca `theology.manage` isolado. Valida que a transação existe,
-  que a matrícula/período está na mesma árvore organizacional da transação, e que a transação ainda
-  não tem vínculo (uma transação só pode ser vinculada uma vez).
-- `list_theology_linked_transactions()` exige **ambas** `theology.read` **e** `finance.read`, e lê o
-  valor/tipo/data/descrição/status sempre via `JOIN public.transactions` — nunca uma cópia do valor.
+- `link_theology_transaction()` exige `finance.write` na organização real da transação e
+  `theology.manage` na organização real da turma/período — nunca uma capability substituindo a
+  outra. Caixa central pode vincular contexto descendente; caixa local não vincula contexto
+  acadêmico superior. Uma transação só pode ser vinculada uma vez.
+- `list_theology_linked_transactions()` exige `theology.read` e `finance.read` e revalida cada linha
+  contra a organização real do contexto acadêmico e da transação, apesar de ser
+  `SECURITY DEFINER`. Valor/tipo/data/descrição/status vêm sempre de `JOIN public.transactions`.
 - Recibo, lançamento de contribuição, movimentação de pagamento e fechamento diário/período
   **continuam exclusivamente no motor financeiro existente** — o frontend de Teologia (aba
   "Financeiro Acadêmico") é uma **visão filtrada** sobre transações já lançadas no Financeiro real,
@@ -405,14 +409,14 @@ desabilitação exibido via mensagem de erro/estado (nunca um botão silenciosam
 
 ## 17. Testes executados e resultados reais
 
-- **`src/config/theologyMigrations.test.ts` (novo, 132 testes)**: mirror byte a byte (`sha256`)
+- **`src/config/theologyMigrations.test.ts` (novo, 138 testes após revisão Codex)**: mirror byte a byte (`sha256`)
   staging/produção das 6 migrations, presença no manifest, dependência cronológica declarada,
   ausência de `DROP TABLE`/`TRUNCATE`, transação `BEGIN`/`COMMIT` + verificação pós-DDL em todas,
   nenhuma migration de Operação 1/2 reaberta, regra central de identidade (nenhuma tabela de
   pessoa/organização/documento/storage paralela), RLS habilitado nas 19 tabelas, ausência de
   `USING/WITH CHECK (true)`, toda policy usando capability real, revogação de escrita direta nas 7
   tabelas de máquina de estado + `GRANT UPDATE (colunas)` restrito nas 5 tabelas com edição parcial,
-  `REVOKE ALL`/`GRANT EXECUTE` das 22 RPCs públicas e das 16 funções internas, índices únicos de
+  `REVOKE ALL`/`GRANT EXECUTE` das 23 RPCs públicas e das 19 funções internas, índices únicos de
   concorrência/duplicidade, máquinas de estado protegidas contra lançamento em contexto fechado,
   auditoria de alteração de nota (ordem INSERT-antes-de-UPDATE verificada), invariantes de escopo
   organizacional em cada trigger de validação, professor limitado à própria atribuição,
@@ -432,7 +436,7 @@ desabilitação exibido via mensagem de erro/estado (nunca um botão silenciosam
   padrão já usado por Discipulado.
 
 **Resultado real da suíte completa** (`npx vitest run`, executado neste ambiente):
-**49 arquivos e 761 testes aprovados, 0 falhas**. `npx tsc --noEmit`: 0 erros. `npx eslint` nos
+**49 arquivos e 767 testes aprovados, 0 falhas**. `npx tsc --noEmit`: 0 erros. `npx eslint` nos
 arquivos novos/alterados: 0 problemas. `git diff --check` (incluindo os arquivos novos, via
 `git add -N .` seguido de reset): 0 erros de espaço em branco. `npm run build:staging`: build
 concluído, chunk `Teologia-*.js` gerado como entrada lazy separada (confirmando tree-shaking
@@ -444,6 +448,38 @@ staging-only encontrado no build de produção"**.
 
 ## 18. Problemas encontrados e corrigidos durante a construção
 
+### Revisão Codex
+
+- A conclusão de uma tentativa aceitava `final_grade`/`final_result` enviados pelo navegador e a
+  própria UI concluía sem nota, criando um beco sem saída acadêmico. Agora a RPC calcula o resultado
+  exclusivamente de frequência lançada e avaliações publicadas; ausência de dados bloqueia o
+  fechamento. Dispensa continua possível só por gestor, com justificativa e sem nota.
+- Professor atribuído conseguia alterar o estado administrativo da matrícula e abrir tentativas de
+  unidade. Essas duas operações agora exigem `theology.manage`; `theology.teach` permanece restrita
+  a aulas, frequência e avaliações das próprias atribuições.
+- Programa ativo e matriz publicada eram editáveis. A ativação/arquivamento agora usa RPC com
+  máquina de estados e lock; identidade, critérios e matriz ficam imutáveis após a publicação.
+- Período, turma e modelo de avaliação aceitavam combinações de organizações aparentadas, mas fora
+  do escopo operacional correto. Triggers agora validam instituto/programa/período/turma pela
+  direção real da árvore e exigem programa ativo.
+- Lançamento de frequência/nota concorria com fechamento/publicação sem lock suficiente. As RPCs
+  agora serializam sessão, avaliação e tentativa com `FOR UPDATE`; correção de nota publicada
+  exige status publicado, registra auditoria e recalcula tentativa já concluída.
+- RPCs `SECURITY DEFINER` de boletim e Financeiro podiam consultar linhas fora do escopo real usado
+  na autorização inicial. A leitura foi fechada por linha, revalidando a organização da turma, do
+  contexto acadêmico e da transação; vínculo financeiro exige exatamente matrícula **ou** período.
+- A tela Financeiro confundia leitura com escrita e exigia `finance.write`/`finance.approve` até
+  para visualizar. Agora `finance.read` permite leitura e somente
+  `finance.write + theology.manage` habilita vínculo.
+- A interface pulava avaliação de `rascunho` diretamente para `aplicada`, transição rejeitada pelo
+  banco. O fluxo visual passou a seguir `rascunho → agendada → aplicada → publicada`; notas
+  publicadas são somente leitura para professor e correção auditada para gestor.
+- Telas de currículo, períodos/turmas e configurações escondiam falhas de consulta como listas
+  vazias. Erros reais agora aparecem em estado de erro, mantendo o estado especial `42P01` apenas
+  para migrations ainda não aplicadas.
+
+### Correções da construção Sonnet
+
 - Lookup incorreto de nome de matéria em `TeologiaClassDetail.tsx` (usava `item.notes` em vez do
   `subject_id` do item de currículo) — corrigido carregando `theology_subjects` e construindo um
   mapa `subjectNameById`.
@@ -453,8 +489,8 @@ staging-only encontrado no build de produção"**.
   `studentNameByEnrollmentId`.
 - `FormInputLabeled` (componente genérico compartilhado com Discipulado) não aceitava `max` —
   adicionada a prop opcional de forma retrocompatível em vez de duplicar o componente para Teologia.
-- `TeologiaFinance.tsx` checava a capability inexistente `finance.manage` — corrigido para
-  `finance.write`/`finance.approve` (capabilities financeiras reais).
+- `TeologiaFinance.tsx` checava a capability inexistente `finance.manage`; a revisão final separou
+  corretamente `finance.read` para visualizar de `finance.write + theology.manage` para vincular.
 - `FormandosView` (`TeologiaStudents.tsx`) exibia apenas turma/programa sem identificar o aluno —
   corrigido buscando nomes via `get_theology_member_labels`.
 - `hierarchicalAccessResponsibilities.test.ts` falhava por não reconhecer `theology_coordinator`
@@ -492,8 +528,8 @@ staging-only encontrado no build de produção"**.
    para todas as organizações.
 4. Decidir produto sobre a lacuna financeira da seção 12 (recibo/fechamento por módulo) antes de
    apresentar a Teologia como substituição completa do legado nesse ponto.
-5. Nenhum push, PR, deploy ou aplicação de migration deve ocorrer antes da homologação manual e da
-   revisão Codex deste patch.
+5. Nenhum push, PR, deploy ou aplicação de migration deve ocorrer antes da homologação manual em
+   staging; a revisão Codex deste patch foi concluída.
 
 ## 21. Pontos de extensão para Missões
 
@@ -537,14 +573,13 @@ staging-only encontrado no build de produção"**.
 4. **Lacuna financeira não resolvida** (seção 12/19) — se a Operação 4 (Missões) também precisar de
    "recibo"/"fechamento por módulo", vale desenhar essa capacidade uma única vez no Financeiro real
    em vez de cada domínio documentar a mesma lacuna isoladamente.
-5. **Esta entrega ainda não passou pela revisão Codex** (diferente do que os documentos das
-   Operações 1/2 registram após revisão) — os testes/builds da seção 17 foram executados pelo agente
-   construtor (Sonnet) neste mesmo turno; a revisão deve repetir a validação de forma independente
-   antes de qualquer aplicação de migration.
+5. **A revisão Codex foi concluída**, mas o SQL ainda precisa ser homologado com dados descartáveis
+   em staging antes de qualquer promoção para produção.
 
 ## 23. Confirmação final
 
-- Nenhum `git commit` foi executado.
+- A revisão Codex é empacotada em um commit local apenas para gerar o patch de passagem; nenhum
+  commit foi enviado ao remoto por este agente.
 - Nenhum `git push` foi executado.
 - Nenhum PR foi aberto.
 - Nenhum merge foi executado.

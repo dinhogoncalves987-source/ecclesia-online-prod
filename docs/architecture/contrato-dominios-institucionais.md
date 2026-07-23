@@ -209,8 +209,8 @@ apenas os pontos de extensão acima, já testados e em uso real pela Secretaria.
 
 > Esta seção só registra o que a Operação 3 efetivamente criou sobre o contrato acima. As decisões
 > das Operações 1 e 2 (seções 1–10) não foram alteradas nem reabertas. Detalhe completo em
-> `docs/architecture/operacao-3-teologia.md`. Entrega ainda não revisada pelo Codex no momento em
-> que esta seção foi escrita.
+> `docs/architecture/operacao-3-teologia.md`. A entrega foi revisada pelo Codex; os ajustes de
+> integridade acadêmica, escopo organizacional e autorização estão registrados naquele documento.
 
 - **Nenhuma extensão do catálogo `member_history.history_type` foi necessária.** Os 5 marcos
   genéricos criados na Operação 2 (`matricula`, `inicio_formacao`, `conclusao_formacao`,

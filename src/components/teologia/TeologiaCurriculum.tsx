@@ -35,6 +35,7 @@ const PROGRAM_STATUS_TONE: Record<TheologyProgramStatus, "neutral" | "success" |
 export function TeologiaCurriculum({ organizationId }: { organizationId: string }) {
   const [loading, setLoading] = useState(true);
   const [moduleUnavailable, setModuleUnavailable] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [institutes, setInstitutes] = useState<TheologyInstituteRow[]>([]);
   const [studyCenters, setStudyCenters] = useState<TheologyStudyCenterRow[]>([]);
   const [subjects, setSubjects] = useState<TheologySubjectRow[]>([]);
@@ -56,9 +57,13 @@ export function TeologiaCurriculum({ organizationId }: { organizationId: string 
     ]);
     if (institutesRes.error?.code === "42P01") {
       setModuleUnavailable(true);
+      setLoadError(null);
       setLoading(false);
       return;
     }
+    const firstError = [institutesRes.error, centersRes.error, subjectsRes.error, programsRes.error]
+      .find(Boolean);
+    setLoadError(firstError?.message ?? null);
     setInstitutes(institutesRes.rows);
     setStudyCenters(centersRes.rows);
     setSubjects(subjectsRes.rows);
@@ -74,6 +79,13 @@ export function TeologiaCurriculum({ organizationId }: { organizationId: string 
   }
   if (moduleUnavailable) {
     return <EmptyState title="Teologia aguardando aplicação das migrations" description="A tabela theology_institutes ainda não existe neste ambiente." />;
+  }
+  if (loadError) {
+    return (
+      <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+        Não foi possível carregar o currículo de Teologia. {loadError}
+      </div>
+    );
   }
 
   const institute = institutes[0] ?? null;
@@ -446,6 +458,7 @@ function ProgramCurriculumDialog({ program, subjects, onClose, onProgramUpdated 
   const subjectNameById = new Map(subjects.map((s) => [s.id, s.name]));
   const usedSubjectIds = new Set(items.map((i) => i.subject_id));
   const availableSubjects = subjects.filter((s) => !usedSubjectIds.has(s.id) && s.status === "ativa");
+  const curriculumLocked = program.status !== "rascunho";
 
   const handleAddItem = async () => {
     if (!subjectId) return;
@@ -487,7 +500,7 @@ function ProgramCurriculumDialog({ program, subjects, onClose, onProgramUpdated 
       <DialogContent className="max-h-[90vh] overflow-y-auto max-w-lg">
         <DialogHeader><DialogTitle className="flex items-center gap-2"><BookOpen size={18} /> {program.name} — matriz curricular</DialogTitle></DialogHeader>
         <div className="space-y-4">
-          {program.status !== "ativo" && (
+          {program.status === "rascunho" && (
             <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-secondary/50">
               <p className="text-sm text-muted-foreground">
                 Programa em {THEOLOGY_PROGRAM_STATUS_LABELS[program.status as TheologyProgramStatus].toLowerCase()}. Ative-o para poder criar turmas.
@@ -511,8 +524,8 @@ function ProgramCurriculumDialog({ program, subjects, onClose, onProgramUpdated 
                     <span className="text-sm flex-1 truncate">{subjectNameById.get(item.subject_id) ?? "Matéria"}</span>
                     {item.is_mandatory && <StatusPill label="Obrigatória" tone="info" />}
                     <div className="flex gap-1 shrink-0">
-                      <button type="button" aria-label="Mover para cima" disabled={index === 0} onClick={() => moveItem(index, -1)} className="p-1 rounded hover:bg-secondary disabled:opacity-30 text-xs">↑</button>
-                      <button type="button" aria-label="Mover para baixo" disabled={index === items.length - 1} onClick={() => moveItem(index, 1)} className="p-1 rounded hover:bg-secondary disabled:opacity-30 text-xs">↓</button>
+                      <button type="button" aria-label="Mover para cima" disabled={curriculumLocked || index === 0} onClick={() => moveItem(index, -1)} className="p-1 rounded hover:bg-secondary disabled:opacity-30 text-xs">↑</button>
+                      <button type="button" aria-label="Mover para baixo" disabled={curriculumLocked || index === items.length - 1} onClick={() => moveItem(index, 1)} className="p-1 rounded hover:bg-secondary disabled:opacity-30 text-xs">↓</button>
                     </div>
                   </div>
                 ))}
@@ -520,7 +533,11 @@ function ProgramCurriculumDialog({ program, subjects, onClose, onProgramUpdated 
             )}
           </div>
 
-          {availableSubjects.length === 0 ? (
+          {curriculumLocked ? (
+            <p className="text-xs text-muted-foreground">
+              Matriz publicada e bloqueada para preservar o histórico acadêmico. Para uma nova grade, crie uma nova versão do programa.
+            </p>
+          ) : availableSubjects.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               {subjects.length === 0 ? "Cadastre matérias na aba Currículo antes de montar a matriz." : "Todas as matérias ativas já estão na matriz."}
             </p>

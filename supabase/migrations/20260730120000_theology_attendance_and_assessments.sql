@@ -183,6 +183,10 @@ BEGIN
     RAISE EXCEPTION 'invalid session status transition: % -> %', v_session.status, p_status;
   END IF;
 
+  IF p_status = 'realizada' AND v_offering.status <> 'em_andamento' THEN
+    RAISE EXCEPTION 'session can only be completed while its offering is in progress';
+  END IF;
+
   UPDATE public.theology_sessions SET status = p_status WHERE id = p_session_id;
 END;
 $$;
@@ -251,7 +255,10 @@ DECLARE
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
 
-  SELECT * INTO v_session FROM public.theology_sessions WHERE id = p_session_id;
+  SELECT * INTO v_session
+  FROM public.theology_sessions
+  WHERE id = p_session_id
+  FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'session not found'; END IF;
 
   SELECT * INTO v_offering FROM public.theology_class_offerings WHERE id = v_session.offering_id;
@@ -277,10 +284,14 @@ BEGIN
       RAISE EXCEPTION 'invalid attendance status: %', v_status;
     END IF;
 
-    IF NOT EXISTS (
-      SELECT 1 FROM public.theology_offering_enrollments
-      WHERE id = v_oe_id AND offering_id = v_offering.id
-    ) THEN
+    PERFORM 1
+    FROM public.theology_offering_enrollments
+    WHERE id = v_oe_id
+      AND offering_id = v_offering.id
+      AND status IN ('planejada', 'em_andamento')
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
       RAISE EXCEPTION 'offering enrollment % does not belong to this offering', v_oe_id;
     END IF;
 
@@ -347,7 +358,27 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
+DECLARE
+  v_program_org uuid;
+  v_program_status text;
 BEGIN
+  IF NEW.program_id IS NOT NULL THEN
+    SELECT organization_id, status
+      INTO v_program_org, v_program_status
+    FROM public.theology_programs
+    WHERE id = NEW.program_id;
+
+    IF v_program_org IS NULL THEN
+      RAISE EXCEPTION 'assessment model program not found';
+    END IF;
+    IF v_program_status <> 'ativo' THEN
+      RAISE EXCEPTION 'assessment models can only reference an active program';
+    END IF;
+    IF NOT public.is_organization_descendant_or_self(v_program_org, NEW.organization_id) THEN
+      RAISE EXCEPTION 'assessment model organization must be inside the program organization scope';
+    END IF;
+  END IF;
+
   IF TG_OP = 'UPDATE'
      AND (
        NEW.scale_max_score IS DISTINCT FROM OLD.scale_max_score
@@ -367,7 +398,7 @@ $$;
 
 DROP TRIGGER IF EXISTS theology_assessment_models_validate_lock ON public.theology_assessment_models;
 CREATE TRIGGER theology_assessment_models_validate_lock
-BEFORE UPDATE ON public.theology_assessment_models
+BEFORE INSERT OR UPDATE ON public.theology_assessment_models
 FOR EACH ROW EXECUTE FUNCTION public._theology_assessment_models_validate_lock();
 
 REVOKE ALL ON FUNCTION public._theology_assessment_models_validate_lock() FROM PUBLIC, anon, authenticated;
@@ -559,6 +590,9 @@ BEGIN
   SELECT * INTO v_class FROM public.theology_classes WHERE id = v_offering.class_id;
   SELECT * INTO v_model FROM public.theology_assessment_models WHERE id = NEW.model_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'assessment model not found'; END IF;
+  IF NOT v_model.is_active THEN
+    RAISE EXCEPTION 'assessment model is inactive';
+  END IF;
 
   IF NOT public.is_organization_descendant_or_self(v_model.organization_id, v_class.organization_id)
      AND NOT public.is_organization_descendant_or_self(v_class.organization_id, v_model.organization_id) THEN
@@ -666,6 +700,18 @@ BEGIN
     RAISE EXCEPTION 'invalid assessment status transition: % -> %', v_assessment.status, p_status;
   END IF;
 
+  IF p_status = 'agendada' AND NOT EXISTS (
+    SELECT 1
+    FROM public.theology_assessment_model_components
+    WHERE model_id = v_assessment.model_id
+  ) THEN
+    RAISE EXCEPTION 'assessment model must have at least one component before scheduling';
+  END IF;
+
+  IF p_status IN ('aplicada', 'publicada') AND v_offering.status <> 'em_andamento' THEN
+    RAISE EXCEPTION 'assessment can only advance while its offering is in progress';
+  END IF;
+
   -- Publicar exige que todos os componentes obrigatórios tenham nota
   -- lançada para toda tentativa aberta desta oferta — "nota obrigatória"
   -- antes do fechamento (§9.1/§9.3 do prompt da operação).
@@ -758,7 +804,10 @@ DECLARE
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
 
-  SELECT * INTO v_assessment FROM public.theology_assessments WHERE id = p_assessment_id;
+  SELECT * INTO v_assessment
+  FROM public.theology_assessments
+  WHERE id = p_assessment_id
+  FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'assessment not found'; END IF;
 
   SELECT * INTO v_offering FROM public.theology_class_offerings WHERE id = v_assessment.offering_id;
@@ -780,11 +829,14 @@ BEGIN
     RAISE EXCEPTION 'component does not belong to this assessment model';
   END IF;
 
-  IF NOT EXISTS (
-    SELECT 1 FROM public.theology_offering_enrollments
-    WHERE id = p_offering_enrollment_id AND offering_id = v_offering.id
-      AND status IN ('planejada', 'em_andamento')
-  ) THEN
+  PERFORM 1
+  FROM public.theology_offering_enrollments
+  WHERE id = p_offering_enrollment_id
+    AND offering_id = v_offering.id
+    AND status IN ('planejada', 'em_andamento')
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'offering enrollment is not open in this offering';
   END IF;
 
@@ -808,6 +860,178 @@ $$;
 
 REVOKE ALL ON FUNCTION public.record_theology_assessment_result(uuid, uuid, uuid, numeric, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.record_theology_assessment_result(uuid, uuid, uuid, numeric, text) TO authenticated;
+
+-- Resultado oficial de uma tentativa: frequência e notas vêm exclusivamente
+-- dos registros acadêmicos publicados. A função é interna e também serializa
+-- o fechamento com novos lançamentos por meio do lock da tentativa.
+CREATE OR REPLACE FUNCTION public._calculate_theology_offering_enrollment_outcome(
+  p_offering_enrollment_id uuid
+)
+RETURNS TABLE (
+  final_grade numeric,
+  final_result text,
+  attendance_percentage numeric
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_oe public.theology_offering_enrollments%ROWTYPE;
+  v_program public.theology_programs%ROWTYPE;
+  v_total_sessions integer := 0;
+  v_recorded_sessions integer := 0;
+  v_present_sessions integer := 0;
+  v_published_assessments integer := 0;
+  v_pending_assessments integer := 0;
+  v_assessment record;
+  v_weighted_component_score numeric;
+  v_component_weight numeric;
+  v_assessment_score numeric;
+  v_weighted_assessment_score numeric := 0;
+  v_assessment_weight numeric := 0;
+  v_attendance_ok boolean := true;
+  v_assessments_ok boolean := true;
+BEGIN
+  SELECT * INTO v_oe
+  FROM public.theology_offering_enrollments
+  WHERE id = p_offering_enrollment_id
+  FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'offering enrollment not found'; END IF;
+
+  SELECT p.* INTO v_program
+  FROM public.theology_class_offerings o
+  JOIN public.theology_classes c ON c.id = o.class_id
+  JOIN public.theology_programs p ON p.id = c.program_id
+  WHERE o.id = v_oe.offering_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'program for offering enrollment not found'; END IF;
+
+  SELECT count(*) INTO v_total_sessions
+  FROM public.theology_sessions
+  WHERE offering_id = v_oe.offering_id
+    AND status = 'realizada';
+
+  SELECT
+    count(*) FILTER (WHERE a.status <> 'nao_lancado'),
+    count(*) FILTER (WHERE a.status IN ('presente', 'justificado'))
+  INTO v_recorded_sessions, v_present_sessions
+  FROM public.theology_sessions s
+  LEFT JOIN public.theology_attendance a
+    ON a.session_id = s.id
+   AND a.offering_enrollment_id = v_oe.id
+  WHERE s.offering_id = v_oe.offering_id
+    AND s.status = 'realizada';
+
+  IF v_program.requires_attendance THEN
+    IF v_total_sessions = 0 THEN
+      RAISE EXCEPTION 'cannot conclude attempt before at least one session is completed';
+    END IF;
+    IF v_recorded_sessions <> v_total_sessions THEN
+      RAISE EXCEPTION 'cannot conclude attempt: attendance is missing for % completed session(s)',
+        v_total_sessions - v_recorded_sessions;
+    END IF;
+
+    attendance_percentage := round((v_present_sessions::numeric * 100) / v_total_sessions, 2);
+    v_attendance_ok := attendance_percentage >= v_program.minimum_attendance_percentage;
+  ELSE
+    attendance_percentage := CASE
+      WHEN v_total_sessions > 0
+        THEN round((v_present_sessions::numeric * 100) / v_total_sessions, 2)
+      ELSE NULL
+    END;
+  END IF;
+
+  IF v_program.requires_assessment THEN
+    SELECT
+      count(*) FILTER (WHERE status = 'publicada'),
+      count(*) FILTER (WHERE status IN ('rascunho', 'agendada', 'aplicada'))
+    INTO v_published_assessments, v_pending_assessments
+    FROM public.theology_assessments
+    WHERE offering_id = v_oe.offering_id
+      AND status <> 'cancelada';
+
+    IF v_pending_assessments > 0 THEN
+      RAISE EXCEPTION 'cannot conclude attempt while assessments are still pending';
+    END IF;
+    IF v_published_assessments = 0 THEN
+      RAISE EXCEPTION 'cannot conclude attempt without a published assessment';
+    END IF;
+
+    FOR v_assessment IN
+      SELECT a.*, m.scale_max_score, m.minimum_passing_score, m.rounding_rule
+      FROM public.theology_assessments a
+      JOIN public.theology_assessment_models m ON m.id = a.model_id
+      WHERE a.offering_id = v_oe.offering_id
+        AND a.status = 'publicada'
+    LOOP
+      IF EXISTS (
+        SELECT 1
+        FROM public.theology_assessment_model_components comp
+        WHERE comp.model_id = v_assessment.model_id
+          AND comp.is_mandatory
+          AND NOT EXISTS (
+            SELECT 1
+            FROM public.theology_assessment_results r
+            WHERE r.assessment_id = v_assessment.id
+              AND r.component_id = comp.id
+              AND r.offering_enrollment_id = v_oe.id
+          )
+      ) THEN
+        RAISE EXCEPTION 'cannot conclude attempt: mandatory assessment results are missing';
+      END IF;
+
+      SELECT
+        sum((r.score / comp.max_score) * comp.weight),
+        sum(comp.weight)
+      INTO v_weighted_component_score, v_component_weight
+      FROM public.theology_assessment_model_components comp
+      JOIN public.theology_assessment_results r
+        ON r.component_id = comp.id
+       AND r.assessment_id = v_assessment.id
+       AND r.offering_enrollment_id = v_oe.id
+      WHERE comp.model_id = v_assessment.model_id;
+
+      IF COALESCE(v_component_weight, 0) = 0 THEN
+        RAISE EXCEPTION 'cannot conclude attempt: assessment has no recorded component result';
+      END IF;
+
+      v_assessment_score :=
+        (v_weighted_component_score / v_component_weight) * v_assessment.scale_max_score;
+
+      v_assessment_score := CASE v_assessment.rounding_rule
+        WHEN 'para_cima' THEN ceil(v_assessment_score)
+        WHEN 'para_baixo' THEN floor(v_assessment_score)
+        WHEN 'padrao' THEN round(v_assessment_score)
+        ELSE v_assessment_score
+      END;
+
+      IF v_assessment_score < v_assessment.minimum_passing_score THEN
+        v_assessments_ok := false;
+      END IF;
+
+      v_weighted_assessment_score := v_weighted_assessment_score
+        + ((v_assessment_score / v_assessment.scale_max_score) * 10 * v_assessment.weight);
+      v_assessment_weight := v_assessment_weight + v_assessment.weight;
+    END LOOP;
+
+    final_grade := round(v_weighted_assessment_score / v_assessment_weight, 2);
+    v_assessments_ok := v_assessments_ok
+      AND final_grade >= v_program.minimum_passing_score;
+  ELSE
+    final_grade := NULL;
+  END IF;
+
+  final_result := CASE
+    WHEN v_attendance_ok AND v_assessments_ok THEN 'aprovado'
+    ELSE 'reprovado'
+  END;
+
+  RETURN NEXT;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public._calculate_theology_offering_enrollment_outcome(uuid)
+  FROM PUBLIC, anon, authenticated;
 
 -- ── theology_grade_audit_log (auditoria de alteração de nota publicada) ──
 CREATE TABLE IF NOT EXISTS public.theology_grade_audit_log (
@@ -860,15 +1084,26 @@ DECLARE
   v_assessment public.theology_assessments%ROWTYPE;
   v_offering public.theology_class_offerings%ROWTYPE;
   v_class public.theology_classes%ROWTYPE;
+  v_oe public.theology_offering_enrollments%ROWTYPE;
+  v_recalculated_grade numeric;
+  v_recalculated_result text;
+  v_attendance_percentage numeric;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
 
   SELECT * INTO v_result FROM public.theology_assessment_results WHERE id = p_result_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'result not found'; END IF;
 
-  SELECT * INTO v_assessment FROM public.theology_assessments WHERE id = v_result.assessment_id;
+  SELECT * INTO v_assessment
+  FROM public.theology_assessments
+  WHERE id = v_result.assessment_id
+  FOR UPDATE;
   SELECT * INTO v_offering FROM public.theology_class_offerings WHERE id = v_assessment.offering_id;
   SELECT * INTO v_class FROM public.theology_classes WHERE id = v_offering.class_id;
+  SELECT * INTO v_oe
+  FROM public.theology_offering_enrollments
+  WHERE id = v_result.offering_enrollment_id
+  FOR UPDATE;
 
   -- Alterar nota já publicada exige capability de gestão (nunca apenas
   -- theology.teach) e justificativa obrigatória — nunca um UPDATE silencioso.
@@ -878,6 +1113,10 @@ BEGIN
 
   IF NULLIF(btrim(p_justification), '') IS NULL THEN
     RAISE EXCEPTION 'justification is required to amend a grade';
+  END IF;
+
+  IF v_assessment.status <> 'publicada' THEN
+    RAISE EXCEPTION 'only a published grade can be amended through this audited operation';
   END IF;
 
   SELECT * INTO v_component FROM public.theology_assessment_model_components WHERE id = v_result.component_id;
@@ -890,6 +1129,17 @@ BEGIN
   VALUES (p_result_id, v_result.score, p_new_score, btrim(p_justification), auth.uid());
 
   UPDATE public.theology_assessment_results SET score = p_new_score WHERE id = p_result_id;
+
+  IF v_oe.status = 'concluida' AND v_oe.final_result <> 'dispensado' THEN
+    SELECT outcome.final_grade, outcome.final_result, outcome.attendance_percentage
+      INTO v_recalculated_grade, v_recalculated_result, v_attendance_percentage
+    FROM public._calculate_theology_offering_enrollment_outcome(v_oe.id) outcome;
+
+    UPDATE public.theology_offering_enrollments
+    SET final_grade = v_recalculated_grade,
+        final_result = v_recalculated_result
+    WHERE id = v_oe.id;
+  END IF;
 END;
 $$;
 

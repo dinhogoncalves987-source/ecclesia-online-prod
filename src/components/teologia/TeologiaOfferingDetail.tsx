@@ -11,17 +11,18 @@ import { toast } from "sonner";
 import { Loader2, X, Plus, UserPlus, ClipboardCheck, CalendarPlus, BookOpen } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useRole } from "@/hooks/useRole";
 import {
   loadTheologyOfferingEnrollments, enrollMemberInTheologyOffering, updateTheologyOfferingEnrollmentStatus,
   loadTheologySessions, createTheologySession, updateTheologySessionStatus,
   loadTheologyAttendance, recordTheologyAttendance,
   loadTheologyAssessmentModels, loadTheologyAssessmentModelComponents,
   loadTheologyAssessments, createTheologyAssessment, updateTheologyAssessmentStatus,
-  loadTheologyAssessmentResults, recordTheologyAssessmentResult,
+  loadTheologyAssessmentResults, recordTheologyAssessmentResult, amendTheologyAssessmentResult,
   getTheologyMemberLabels, loadTheologyStaffAssignments, loadTheologyEnrollments,
   type TheologyClassRow, type TheologyClassOfferingRow, type TheologyOfferingEnrollmentRow,
   type TheologySessionRow, type TheologyAssessmentModelRow, type TheologyAssessmentModelComponentRow,
-  type TheologyAssessmentRow, type TheologyStaffAssignmentRow,
+  type TheologyAssessmentRow, type TheologyAssessmentResultRow, type TheologyStaffAssignmentRow,
 } from "@/lib/theology/service";
 import {
   THEOLOGY_OFFERING_ENROLLMENT_STATUS_LABELS, THEOLOGY_ATTENDANCE_STATUSES, THEOLOGY_ATTENDANCE_STATUS_LABELS,
@@ -188,6 +189,8 @@ function AlunosOfertaTab({ offering, organizationId, offeringEnrollments, member
   closed: boolean;
   onChanged: () => void;
 }) {
+  const { hasCapability } = useRole();
+  const canManage = hasCapability("theology.manage");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -228,7 +231,7 @@ function AlunosOfertaTab({ offering, organizationId, offeringEnrollments, member
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium">Alunos nesta matéria ({offeringEnrollments.length}{offering.capacity ? ` / ${offering.capacity}` : ""})</p>
-        <Button size="sm" variant="outline" onClick={() => setPickerOpen((v) => !v)} disabled={closed}>
+        <Button size="sm" variant="outline" onClick={() => setPickerOpen((v) => !v)} disabled={closed || !canManage}>
           <UserPlus size={14} className="mr-1.5" /> Matricular
         </Button>
       </div>
@@ -259,13 +262,13 @@ function AlunosOfertaTab({ offering, organizationId, offeringEnrollments, member
                   </p>
                 </div>
                 <StatusPill label={THEOLOGY_OFFERING_ENROLLMENT_STATUS_LABELS[oe.status as TheologyOfferingEnrollmentStatus]} tone="info" />
-                <div className="flex gap-1">
+                {canManage && <div className="flex gap-1">
                   {nextOptions.map((s) => (
                     <Button key={s} size="sm" variant="ghost" disabled={saving} onClick={() => handleTransition(oe, s)}>
-                      {THEOLOGY_OFFERING_ENROLLMENT_STATUS_LABELS[s]}
+                      {s === "concluida" ? "Calcular e concluir" : THEOLOGY_OFFERING_ENROLLMENT_STATUS_LABELS[s]}
                     </Button>
                   ))}
-                </div>
+                </div>}
               </div>
             );
           })}
@@ -499,7 +502,10 @@ function AvaliacoesOfertaTab({ offering, organizationId, assessments, offeringEn
     return () => { cancelled = true; };
   }, [organizationId]);
 
-  const handleStatus = async (assessmentId: string, status: "aplicada" | "publicada" | "cancelada") => {
+  const handleStatus = async (
+    assessmentId: string,
+    status: "agendada" | "aplicada" | "publicada" | "cancelada",
+  ) => {
     setSavingId(assessmentId);
     const { error } = await updateTheologyAssessmentStatus(assessmentId, status);
     setSavingId(null);
@@ -534,7 +540,10 @@ function AvaliacoesOfertaTab({ offering, organizationId, assessments, offeringEn
                 </p>
               </div>
               <div className="flex flex-wrap justify-end gap-1">
-                {(a.status === "rascunho" || a.status === "agendada") && !closed && (
+                {a.status === "rascunho" && !closed && (
+                  <Button size="sm" variant="outline" disabled={savingId === a.id} onClick={() => handleStatus(a.id, "agendada")}>Agendar</Button>
+                )}
+                {a.status === "agendada" && !closed && (
                   <Button size="sm" variant="outline" disabled={savingId === a.id} onClick={() => handleStatus(a.id, "aplicada")}>Marcar aplicada</Button>
                 )}
                 {a.status === "aplicada" && (
@@ -627,9 +636,18 @@ function AssessmentResultsDialog({ assessment, offeringEnrollments, studentNameB
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const relevant = offeringEnrollments.filter((oe) => oe.status === "em_andamento" || oe.status === "concluida");
+  const { hasCapability } = useRole();
+  const canManage = hasCapability("theology.manage");
+  const published = assessment.status === "publicada";
+  const editable = assessment.status === "aplicada" || (published && canManage);
+  const relevant = offeringEnrollments.filter((oe) => (
+    oe.status === "em_andamento" || (published && oe.status === "concluida")
+  ));
   const [components, setComponents] = useState<TheologyAssessmentModelComponentRow[]>([]);
   const [scores, setScores] = useState<Record<string, string>>({}); // key: `${componentId}:${offeringEnrollmentId}`
+  const [initialScores, setInitialScores] = useState<Record<string, string>>({});
+  const [resultsByKey, setResultsByKey] = useState<Record<string, TheologyAssessmentResultRow>>({});
+  const [justification, setJustification] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -644,8 +662,15 @@ function AssessmentResultsDialog({ assessment, offeringEnrollments, studentNameB
       if (!cancelled) {
         setComponents(componentsRes.rows);
         const initial: Record<string, string> = {};
-        for (const r of resultsRes.rows) initial[`${r.component_id}:${r.offering_enrollment_id}`] = String(r.score);
+        const indexed: Record<string, TheologyAssessmentResultRow> = {};
+        for (const r of resultsRes.rows) {
+          const key = `${r.component_id}:${r.offering_enrollment_id}`;
+          initial[key] = String(r.score);
+          indexed[key] = r;
+        }
         setScores(initial);
+        setInitialScores(initial);
+        setResultsByKey(indexed);
         setLoading(false);
       }
     }
@@ -654,14 +679,35 @@ function AssessmentResultsDialog({ assessment, offeringEnrollments, studentNameB
   }, [assessment.id, assessment.model_id]);
 
   const handleSave = async () => {
+    if (!editable) return;
+    if (published && !justification.trim()) {
+      toast.error("Informe a justificativa para alterar uma nota publicada.");
+      return;
+    }
+
     setSaving(true);
     const failures: string[] = [];
     for (const [key, value] of Object.entries(scores)) {
       if (value.trim() === "") continue;
+      if (published && value === initialScores[key]) continue;
       const [componentId, offeringEnrollmentId] = key.split(":");
       const score = Number(value);
       if (!Number.isFinite(score) || score < 0) { failures.push("nota inválida"); continue; }
-      const { error } = await recordTheologyAssessmentResult({ assessment_id: assessment.id, component_id: componentId, offering_enrollment_id: offeringEnrollmentId, score });
+      const existingResult = resultsByKey[key];
+      const { error } = published
+        ? existingResult
+          ? await amendTheologyAssessmentResult({
+              result_id: existingResult.id,
+              new_score: score,
+              justification: justification.trim(),
+            })
+          : { error: "não é possível acrescentar uma nota depois da publicação" }
+        : await recordTheologyAssessmentResult({
+            assessment_id: assessment.id,
+            component_id: componentId,
+            offering_enrollment_id: offeringEnrollmentId,
+            score,
+          });
       if (error) failures.push(error);
     }
     setSaving(false);
@@ -674,7 +720,9 @@ function AssessmentResultsDialog({ assessment, offeringEnrollments, studentNameB
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto max-w-lg">
-        <DialogHeader><DialogTitle>Lançar notas — {assessment.title}</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{published ? "Notas publicadas" : "Lançar notas"} — {assessment.title}</DialogTitle>
+        </DialogHeader>
         {loading ? (
           <div className="flex items-center gap-2 text-muted-foreground text-sm py-6"><Loader2 className="animate-spin" size={14} /> Carregando…</div>
         ) : relevant.length === 0 ? (
@@ -697,17 +745,38 @@ function AssessmentResultsDialog({ assessment, offeringEnrollments, studentNameB
                       aria-label={`Nota de ${c.name}`}
                       value={scores[`${c.id}:${oe.id}`] ?? ""}
                       onChange={(ev) => setScores((prev) => ({ ...prev, [`${c.id}:${oe.id}`]: ev.target.value }))}
+                      disabled={!editable || (published && !resultsByKey[`${c.id}:${oe.id}`])}
                       className="w-20 px-2 py-1 rounded-lg border border-input bg-background text-sm"
                     />
                   </div>
                 ))}
               </div>
             ))}
+            {published && canManage && (
+              <FormTextareaLabeled
+                label="Justificativa obrigatória para alterar nota publicada"
+                value={justification}
+                onChange={setJustification}
+                required
+              />
+            )}
+            {published && !canManage && (
+              <p className="text-xs text-muted-foreground">
+                Notas publicadas são somente leitura. Apenas a gestão de Teologia pode corrigi-las, sempre com justificativa e auditoria.
+              </p>
+            )}
           </div>
         )}
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving || loading || relevant.length === 0 || components.length === 0}>{saving ? "Salvando…" : "Salvar notas"}</Button>
+          <Button variant="ghost" onClick={onClose}>{editable ? "Cancelar" : "Fechar"}</Button>
+          {editable && (
+            <Button
+              onClick={handleSave}
+              disabled={saving || loading || relevant.length === 0 || components.length === 0}
+            >
+              {saving ? "Salvando…" : published ? "Salvar correção auditada" : "Salvar notas"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

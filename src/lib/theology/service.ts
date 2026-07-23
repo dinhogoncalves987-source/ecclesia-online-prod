@@ -250,18 +250,23 @@ export async function updateTheologyProgram(
   return { row: data ?? null, error: error?.message ?? null };
 }
 
-/** Ativação/arquivamento — mesma tabela, sem RPC dedicada (trigger valida "matriz obrigatória" na própria migration). */
+/** Ativação/arquivamento passa pela máquina de estados transacional. */
 export async function updateTheologyProgramStatus(
   id: string,
   status: TheologyProgramStatus,
 ): Promise<{ row: TheologyProgramRow | null; error: string | null }> {
-  const { data, error } = await supabase
+  const { error } = await supabase.rpc("update_theology_program_status", {
+    p_program_id: id,
+    p_status: status,
+  });
+  if (error) return { row: null, error: error.message };
+
+  const { data, error: loadError } = await supabase
     .from("theology_programs")
-    .update({ status })
-    .eq("id", id)
     .select("*")
+    .eq("id", id)
     .single();
-  return { row: data ?? null, error: error?.message ?? null };
+  return { row: data ?? null, error: loadError?.message ?? null };
 }
 
 // ── Matriz curricular ─────────────────────────────────────────────────────

@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS public.theology_transaction_links (
   created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
 
-  CHECK (enrollment_id IS NOT NULL OR period_id IS NOT NULL)
+  CHECK ((enrollment_id IS NOT NULL) <> (period_id IS NOT NULL))
 );
 
 -- Uma transação só pode ter UM vínculo acadêmico (evita contar a mesma
@@ -79,8 +79,28 @@ DROP POLICY IF EXISTS "theology_transaction_links capability select" ON public.t
 CREATE POLICY "theology_transaction_links capability select" ON public.theology_transaction_links
 FOR SELECT TO authenticated
 USING (
-  public.has_org_access_permission(auth.uid(), organization_id, 'theology.read')
-  AND public.has_org_access_permission(auth.uid(), organization_id, 'finance.read')
+  public.has_org_access_permission(auth.uid(), organization_id, 'finance.read')
+  AND (
+    (
+      enrollment_id IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM public.theology_enrollments e
+        JOIN public.theology_classes c ON c.id = e.class_id
+        WHERE e.id = theology_transaction_links.enrollment_id
+          AND public.has_org_access_permission(auth.uid(), c.organization_id, 'theology.read')
+      )
+    )
+    OR (
+      period_id IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+        FROM public.theology_periods p
+        WHERE p.id = theology_transaction_links.period_id
+          AND public.has_org_access_permission(auth.uid(), p.organization_id, 'theology.read')
+      )
+    )
+  )
 );
 
 -- Escrita somente por RPC (valida transação real, escopo e ambas as
@@ -102,8 +122,7 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_transaction public.transactions%ROWTYPE;
-  v_enrollment_org uuid;
-  v_period_org uuid;
+  v_context_org uuid;
   v_id uuid;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
@@ -111,39 +130,43 @@ BEGIN
   SELECT * INTO v_transaction FROM public.transactions WHERE id = p_transaction_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'transaction not found'; END IF;
 
-  -- Vínculo financeiro exige as capabilities financeiras reais — nunca
-  -- apenas theology.manage (contrato §6.5).
+  -- O escopo financeiro é sempre a organização REAL da transação.
   IF NOT public.has_org_access_permission(auth.uid(), v_transaction.organization_id, 'finance.write') THEN
     RAISE EXCEPTION 'access denied: finance.write is required to link a transaction';
-  END IF;
-  IF NOT public.has_org_access_permission(auth.uid(), v_transaction.organization_id, 'theology.manage') THEN
-    RAISE EXCEPTION 'access denied: theology.manage is required to link a transaction to an academic context';
   END IF;
 
   IF p_link_type NOT IN ('matricula', 'mensalidade', 'contribuicao', 'material', 'outro') THEN
     RAISE EXCEPTION 'invalid link type: %', p_link_type;
   END IF;
 
-  IF p_enrollment_id IS NULL AND p_period_id IS NULL THEN
-    RAISE EXCEPTION 'either enrollment_id or period_id must be informed';
+  IF (p_enrollment_id IS NULL) = (p_period_id IS NULL) THEN
+    RAISE EXCEPTION 'exactly one of enrollment_id or period_id must be informed';
   END IF;
 
   IF p_enrollment_id IS NOT NULL THEN
-    SELECT organization_id INTO v_enrollment_org FROM public.theology_enrollments WHERE id = p_enrollment_id;
-    IF v_enrollment_org IS NULL THEN RAISE EXCEPTION 'enrollment not found'; END IF;
-    IF NOT public.is_organization_descendant_or_self(v_transaction.organization_id, v_enrollment_org)
-       AND NOT public.is_organization_descendant_or_self(v_enrollment_org, v_transaction.organization_id) THEN
-      RAISE EXCEPTION 'enrollment is outside the transaction organization scope';
-    END IF;
+    SELECT c.organization_id INTO v_context_org
+    FROM public.theology_enrollments e
+    JOIN public.theology_classes c ON c.id = e.class_id
+    WHERE e.id = p_enrollment_id;
+    IF v_context_org IS NULL THEN RAISE EXCEPTION 'enrollment not found'; END IF;
+  ELSE
+    SELECT organization_id INTO v_context_org
+    FROM public.theology_periods
+    WHERE id = p_period_id;
+    IF v_context_org IS NULL THEN RAISE EXCEPTION 'period not found'; END IF;
   END IF;
 
-  IF p_period_id IS NOT NULL THEN
-    SELECT organization_id INTO v_period_org FROM public.theology_periods WHERE id = p_period_id;
-    IF v_period_org IS NULL THEN RAISE EXCEPTION 'period not found'; END IF;
-    IF NOT public.is_organization_descendant_or_self(v_transaction.organization_id, v_period_org)
-       AND NOT public.is_organization_descendant_or_self(v_period_org, v_transaction.organization_id) THEN
-      RAISE EXCEPTION 'period is outside the transaction organization scope';
-    END IF;
+  IF NOT public.has_org_access_permission(auth.uid(), v_context_org, 'theology.manage') THEN
+    RAISE EXCEPTION 'access denied: theology.manage is required in the academic context';
+  END IF;
+
+  -- Caixa central pode receber por uma unidade descendente; uma unidade
+  -- local nunca deve anexar sua transação a um contexto acadêmico superior.
+  IF NOT public.is_organization_descendant_or_self(
+    v_transaction.organization_id,
+    v_context_org
+  ) THEN
+    RAISE EXCEPTION 'academic context is outside the transaction organization scope';
   END IF;
 
   IF EXISTS (SELECT 1 FROM public.theology_transaction_links WHERE transaction_id = p_transaction_id) THEN
@@ -193,12 +216,15 @@ DECLARE
   v_org_id uuid;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
-  IF p_enrollment_id IS NULL AND p_period_id IS NULL THEN
-    RAISE EXCEPTION 'either enrollment_id or period_id must be informed';
+  IF (p_enrollment_id IS NULL) = (p_period_id IS NULL) THEN
+    RAISE EXCEPTION 'exactly one of enrollment_id or period_id must be informed';
   END IF;
 
   IF p_enrollment_id IS NOT NULL THEN
-    SELECT organization_id INTO v_org_id FROM public.theology_enrollments WHERE id = p_enrollment_id;
+    SELECT c.organization_id INTO v_org_id
+    FROM public.theology_enrollments e
+    JOIN public.theology_classes c ON c.id = e.class_id
+    WHERE e.id = p_enrollment_id;
   ELSE
     SELECT organization_id INTO v_org_id FROM public.theology_periods WHERE id = p_period_id;
   END IF;
@@ -215,6 +241,29 @@ BEGIN
   JOIN public.transactions t ON t.id = l.transaction_id
   WHERE (p_enrollment_id IS NULL OR l.enrollment_id = p_enrollment_id)
     AND (p_period_id IS NULL OR l.period_id = p_period_id)
+    AND public.has_org_access_permission(auth.uid(), l.organization_id, 'finance.read')
+    AND public.has_org_access_permission(auth.uid(), t.organization_id, 'finance.read')
+    AND (
+      (
+        l.enrollment_id IS NOT NULL
+        AND EXISTS (
+          SELECT 1
+          FROM public.theology_enrollments e
+          JOIN public.theology_classes c ON c.id = e.class_id
+          WHERE e.id = l.enrollment_id
+            AND public.has_org_access_permission(auth.uid(), c.organization_id, 'theology.read')
+        )
+      )
+      OR (
+        l.period_id IS NOT NULL
+        AND EXISTS (
+          SELECT 1
+          FROM public.theology_periods p
+          WHERE p.id = l.period_id
+            AND public.has_org_access_permission(auth.uid(), p.organization_id, 'theology.read')
+        )
+      )
+    )
   ORDER BY t.date DESC;
 END;
 $$;

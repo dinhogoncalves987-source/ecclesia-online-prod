@@ -5457,6 +5457,10 @@ export type Database = {
         Args: { p_item_ids: string[]; p_program_id: string }
         Returns: undefined
       }
+      update_theology_program_status: {
+        Args: { p_program_id: string; p_status: string }
+        Returns: undefined
+      }
       update_theology_period_status: {
         Args: { p_period_id: string; p_status: string }
         Returns: undefined

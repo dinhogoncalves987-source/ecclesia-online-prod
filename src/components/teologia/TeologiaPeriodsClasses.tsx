@@ -45,6 +45,7 @@ const CLASS_STATUS_TONE: Record<TheologyClassStatus, "neutral" | "success" | "wa
 export function TeologiaPeriodsClasses({ organizationId }: { organizationId: string }) {
   const [loading, setLoading] = useState(true);
   const [moduleUnavailable, setModuleUnavailable] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [periods, setPeriods] = useState<TheologyPeriodRow[]>([]);
   const [classes, setClasses] = useState<TheologyClassRow[]>([]);
   const [programs, setPrograms] = useState<TheologyProgramRow[]>([]);
@@ -64,9 +65,13 @@ export function TeologiaPeriodsClasses({ organizationId }: { organizationId: str
     ]);
     if (periodsRes.error?.code === "42P01") {
       setModuleUnavailable(true);
+      setLoadError(null);
       setLoading(false);
       return;
     }
+    const firstError = [periodsRes.error, classesRes.error, programsRes.error, centersRes.error]
+      .find(Boolean);
+    setLoadError(firstError?.message ?? null);
     setPeriods(periodsRes.rows);
     setClasses(classesRes.rows);
     setPrograms(programsRes.rows);
@@ -82,6 +87,13 @@ export function TeologiaPeriodsClasses({ organizationId }: { organizationId: str
   }
   if (moduleUnavailable) {
     return <EmptyState title="Teologia aguardando aplicação das migrations" description="A tabela theology_periods ainda não existe neste ambiente." />;
+  }
+  if (loadError) {
+    return (
+      <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+        Não foi possível carregar períodos e turmas. {loadError}
+      </div>
+    );
   }
 
   const activePrograms = programs.filter((p) => p.status === "ativo");

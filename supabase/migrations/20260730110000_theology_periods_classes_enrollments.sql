@@ -78,6 +78,38 @@ CREATE TRIGGER update_theology_periods_updated_at
 BEFORE UPDATE ON public.theology_periods
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+CREATE OR REPLACE FUNCTION public._theology_periods_validate_scope()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_institute_org uuid;
+BEGIN
+  IF NEW.institute_id IS NOT NULL THEN
+    SELECT organization_id INTO v_institute_org
+    FROM public.theology_institutes
+    WHERE id = NEW.institute_id;
+
+    IF v_institute_org IS NULL
+       OR NOT public.is_organization_descendant_or_self(v_institute_org, NEW.organization_id) THEN
+      RAISE EXCEPTION 'period institute must belong to the period organization tree';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS theology_periods_validate_scope ON public.theology_periods;
+CREATE TRIGGER theology_periods_validate_scope
+BEFORE INSERT OR UPDATE ON public.theology_periods
+FOR EACH ROW EXECUTE FUNCTION public._theology_periods_validate_scope();
+
+REVOKE ALL ON FUNCTION public._theology_periods_validate_scope()
+  FROM PUBLIC, anon, authenticated;
+
 ALTER TABLE public.theology_periods ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "theology_periods capability select" ON public.theology_periods;
@@ -205,12 +237,18 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_program_org uuid;
+  v_program_status text;
   v_period_org uuid;
   v_period_status text;
   v_center_org uuid;
 BEGIN
-  SELECT organization_id INTO v_program_org FROM public.theology_programs WHERE id = NEW.program_id;
+  SELECT organization_id, status INTO v_program_org, v_program_status
+  FROM public.theology_programs
+  WHERE id = NEW.program_id;
   IF v_program_org IS NULL THEN RAISE EXCEPTION 'program not found'; END IF;
+  IF v_program_status <> 'ativo' THEN
+    RAISE EXCEPTION 'classes can only use an active program';
+  END IF;
 
   SELECT organization_id, status INTO v_period_org, v_period_status
   FROM public.theology_periods WHERE id = NEW.period_id;
@@ -220,9 +258,8 @@ BEGIN
     RAISE EXCEPTION 'class organization must be the program organization or one of its descendants';
   END IF;
 
-  IF NOT public.is_organization_descendant_or_self(v_program_org, v_period_org)
-     AND NOT public.is_organization_descendant_or_self(v_period_org, v_program_org) THEN
-    RAISE EXCEPTION 'class period must belong to the same organization tree as the program';
+  IF NOT public.is_organization_descendant_or_self(v_period_org, NEW.organization_id) THEN
+    RAISE EXCEPTION 'class organization must be inside the period organization scope';
   END IF;
 
   IF TG_OP = 'INSERT' AND v_period_status IN ('encerrado', 'cancelado', 'arquivado') THEN
@@ -328,6 +365,15 @@ BEGIN
       WHERE o.class_id = p_class_id AND s.status = 'agendada'
     ) THEN
       RAISE EXCEPTION 'class cannot be concluded while sessions are still scheduled';
+    END IF;
+
+    IF to_regclass('public.theology_assessments') IS NOT NULL AND EXISTS (
+      SELECT 1 FROM public.theology_assessments a
+      JOIN public.theology_class_offerings o ON o.id = a.offering_id
+      WHERE o.class_id = p_class_id
+        AND a.status IN ('rascunho', 'agendada', 'aplicada')
+    ) THEN
+      RAISE EXCEPTION 'class cannot be concluded while assessments are still pending';
     END IF;
   END IF;
 
@@ -485,6 +531,25 @@ BEGIN
     WHERE oe.offering_id = p_offering_id AND oe.status IN ('planejada', 'em_andamento')
   ) THEN
     RAISE EXCEPTION 'offering cannot be concluded while student attempts are still open';
+  END IF;
+
+  IF p_status = 'concluida'
+     AND to_regclass('public.theology_sessions') IS NOT NULL
+     AND EXISTS (
+       SELECT 1 FROM public.theology_sessions
+       WHERE offering_id = p_offering_id AND status = 'agendada'
+     ) THEN
+    RAISE EXCEPTION 'offering cannot be concluded while sessions are still scheduled';
+  END IF;
+
+  IF p_status = 'concluida'
+     AND to_regclass('public.theology_assessments') IS NOT NULL
+     AND EXISTS (
+       SELECT 1 FROM public.theology_assessments
+       WHERE offering_id = p_offering_id
+         AND status IN ('rascunho', 'agendada', 'aplicada')
+     ) THEN
+    RAISE EXCEPTION 'offering cannot be concluded while assessments are still pending';
   END IF;
 
   UPDATE public.theology_class_offerings SET status = p_status WHERE id = p_offering_id;
@@ -908,7 +973,7 @@ BEGIN
 
   SELECT * INTO v_class FROM public.theology_classes WHERE id = v_row.class_id FOR UPDATE;
 
-  IF NOT public.can_operate_theology_class(auth.uid(), v_row.class_id, v_class.organization_id) THEN
+  IF NOT public.has_org_access_permission(auth.uid(), v_class.organization_id, 'theology.manage') THEN
     RAISE EXCEPTION 'access denied to update enrollment status';
   END IF;
 
@@ -960,6 +1025,10 @@ BEGIN
 
   IF p_final_result IS NOT NULL AND p_final_result NOT IN ('aprovado', 'reprovado', 'sem_avaliacao') THEN
     RAISE EXCEPTION 'invalid final_result: %', p_final_result;
+  END IF;
+
+  IF p_final_result IS NOT NULL AND NOT p_override_eligibility THEN
+    RAISE EXCEPTION 'final_result is derived from completed curriculum units';
   END IF;
 
   UPDATE public.theology_enrollments
@@ -1058,7 +1127,10 @@ DECLARE
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
 
-  SELECT * INTO v_enrollment FROM public.theology_enrollments WHERE id = p_enrollment_id;
+  SELECT * INTO v_enrollment
+  FROM public.theology_enrollments
+  WHERE id = p_enrollment_id
+  FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'enrollment not found'; END IF;
 
   SELECT * INTO v_offering FROM public.theology_class_offerings WHERE id = p_offering_id FOR UPDATE;
@@ -1070,8 +1142,16 @@ BEGIN
 
   SELECT * INTO v_class FROM public.theology_classes WHERE id = v_offering.class_id;
 
-  IF NOT public.can_operate_theology_class(auth.uid(), v_class.id, v_class.organization_id) THEN
+  IF NOT public.has_org_access_permission(auth.uid(), v_class.organization_id, 'theology.manage') THEN
     RAISE EXCEPTION 'access denied to enroll in this offering';
+  END IF;
+
+  IF v_enrollment.status NOT IN ('matriculado', 'ativo') THEN
+    RAISE EXCEPTION 'theology enrollment must be matriculado or ativo before opening a unit attempt';
+  END IF;
+
+  IF v_class.status NOT IN ('inscricoes_abertas', 'em_andamento') THEN
+    RAISE EXCEPTION 'class must be open or in progress before opening a unit attempt';
   END IF;
 
   IF v_offering.status IN ('concluida', 'cancelada') THEN
@@ -1126,6 +1206,9 @@ DECLARE
   v_row public.theology_offering_enrollments%ROWTYPE;
   v_offering public.theology_class_offerings%ROWTYPE;
   v_class public.theology_classes%ROWTYPE;
+  v_derived_grade numeric;
+  v_derived_result text;
+  v_attendance_percentage numeric;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
 
@@ -1147,18 +1230,50 @@ BEGIN
     RAISE EXCEPTION 'invalid offering enrollment status transition: % -> %', v_row.status, p_status;
   END IF;
 
-  IF p_final_result IS NOT NULL AND p_final_result NOT IN ('aprovado', 'reprovado', 'dispensado') THEN
-    RAISE EXCEPTION 'invalid final_result: %', p_final_result;
+  IF v_row.status = p_status THEN
+    IF p_final_grade IS NOT NULL OR p_final_result IS NOT NULL THEN
+      RAISE EXCEPTION 'a closed academic result cannot be changed through a repeated status transition';
+    END IF;
+    RETURN;
   END IF;
 
-  IF p_final_grade IS NOT NULL AND (p_final_grade < 0 OR p_final_grade > 10) THEN
-    RAISE EXCEPTION 'final grade must be between 0 and 10';
+  IF p_status = 'em_andamento' THEN
+    IF v_offering.status <> 'em_andamento' OR v_class.status <> 'em_andamento' THEN
+      RAISE EXCEPTION 'class and offering must be in progress before starting a student attempt';
+    END IF;
+    IF p_final_grade IS NOT NULL OR p_final_result IS NOT NULL THEN
+      RAISE EXCEPTION 'final academic result is only defined when the attempt is concluded';
+    END IF;
+  ELSIF p_status = 'concluida' AND p_final_result = 'dispensado' THEN
+    IF NOT public.has_org_access_permission(auth.uid(), v_class.organization_id, 'theology.manage') THEN
+      RAISE EXCEPTION 'only theology managers can waive a curriculum unit';
+    END IF;
+    IF NULLIF(btrim(p_notes), '') IS NULL THEN
+      RAISE EXCEPTION 'waiver justification is required';
+    END IF;
+    IF p_final_grade IS NOT NULL THEN
+      RAISE EXCEPTION 'a waived unit cannot receive a final grade';
+    END IF;
+    v_derived_grade := NULL;
+    v_derived_result := 'dispensado';
+  ELSIF p_status = 'concluida' THEN
+    IF p_final_grade IS NOT NULL OR p_final_result IS NOT NULL THEN
+      RAISE EXCEPTION 'final grade and result are calculated from published assessments and attendance';
+    END IF;
+
+    SELECT outcome.final_grade, outcome.final_result, outcome.attendance_percentage
+      INTO v_derived_grade, v_derived_result, v_attendance_percentage
+    FROM public._calculate_theology_offering_enrollment_outcome(p_offering_enrollment_id) outcome;
+  ELSIF p_status = 'cancelada' THEN
+    IF p_final_grade IS NOT NULL OR p_final_result IS NOT NULL THEN
+      RAISE EXCEPTION 'a cancelled attempt cannot receive a final academic result';
+    END IF;
   END IF;
 
   UPDATE public.theology_offering_enrollments
   SET status = p_status,
-      final_grade = COALESCE(p_final_grade, final_grade),
-      final_result = COALESCE(p_final_result, final_result),
+      final_grade = CASE WHEN p_status = 'concluida' THEN v_derived_grade ELSE final_grade END,
+      final_result = CASE WHEN p_status = 'concluida' THEN v_derived_result ELSE final_result END,
       notes = COALESCE(NULLIF(btrim(p_notes), ''), notes),
       completed_at = CASE WHEN p_status IN ('concluida', 'cancelada') AND completed_at IS NULL THEN CURRENT_DATE ELSE completed_at END,
       closed_by = CASE WHEN p_status IN ('concluida', 'cancelada') AND closed_at IS NULL THEN auth.uid() ELSE closed_by END,

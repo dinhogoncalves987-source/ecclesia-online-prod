@@ -382,6 +382,7 @@ BEGIN
   LEFT JOIN public.theology_curriculum_items ci ON ci.id = o.curriculum_item_id
   LEFT JOIN public.theology_subjects s ON s.id = ci.subject_id
   WHERE e.member_id = p_member_id
+    AND public.has_org_access_permission(auth.uid(), c.organization_id, 'theology.read')
   ORDER BY e.enrolled_at DESC, oe.attempt_number ASC NULLS LAST;
 END;
 $$;

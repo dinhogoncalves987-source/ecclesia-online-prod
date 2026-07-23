@@ -178,10 +178,11 @@ describe("Teologia — RLS habilitado em todas as 19 tabelas novas", () => {
   });
 
   it("theology_transaction_links exige AMBAS theology.read/manage e finance.read/write (nunca uma sozinha)", () => {
-    expect(financeSql).toContain("public.has_org_access_permission(auth.uid(), organization_id, 'theology.read')");
     expect(financeSql).toContain("public.has_org_access_permission(auth.uid(), organization_id, 'finance.read')");
+    expect(financeSql).toContain("public.has_org_access_permission(auth.uid(), c.organization_id, 'theology.read')");
+    expect(financeSql).toContain("public.has_org_access_permission(auth.uid(), p.organization_id, 'theology.read')");
     expect(financeSql).toContain("finance.write is required to link a transaction");
-    expect(financeSql).toContain("theology.manage is required to link a transaction to an academic context");
+    expect(financeSql).toContain("theology.manage is required in the academic context");
   });
 });
 
@@ -227,6 +228,7 @@ describe("Teologia — escrita crítica somente por RPC (nunca burlável por UPD
   it("todas as RPCs SECURITY DEFINER expostas revogam PUBLIC/anon e concedem apenas a authenticated", () => {
     const PUBLIC_RPCS = [
       "reorder_theology_curriculum_items(uuid, uuid[])",
+      "update_theology_program_status(uuid, text)",
       "update_theology_period_status(uuid, text)",
       "update_theology_class_status(uuid, text)",
       "update_theology_class_offering_status(uuid, text)",
@@ -278,6 +280,9 @@ describe("Teologia — escrita crítica somente por RPC (nunca burlável por UPD
     );
     expect(resultsHistorySql).toContain(
       "REVOKE ALL ON FUNCTION public._theology_enrollments_register_history() FROM PUBLIC, anon, authenticated",
+    );
+    expect(attendanceAssessmentsSql).toContain(
+      "REVOKE ALL ON FUNCTION public._calculate_theology_offering_enrollment_outcome(uuid)",
     );
   });
 
@@ -346,6 +351,15 @@ describe("Teologia — regras de negócio garantidas por índice único (concorr
 });
 
 describe("Teologia — máquinas de estado protegidas contra lançamento em contexto fechado", () => {
+  it("programa é ativado/arquivado somente por RPC e a matriz publicada fica imutável", () => {
+    expect(foundationSql).toContain("REVOKE UPDATE, DELETE ON public.theology_programs FROM authenticated");
+    expect(curriculumSql).toContain("CREATE OR REPLACE FUNCTION public.update_theology_program_status");
+    expect(curriculumSql).toContain("curriculum is locked after program activation");
+    expect(curriculumSql).toContain(
+      "active or archived program is immutable; create a new program version instead",
+    );
+  });
+
   it("período não pode ser encerrado com turmas ainda abertas/em andamento", () => {
     expect(periodsClassesSql).toContain("period cannot be closed while classes are still open or in progress");
   });
@@ -354,10 +368,13 @@ describe("Teologia — máquinas de estado protegidas contra lançamento em cont
     expect(periodsClassesSql).toContain("class cannot be concluded while enrollments are still open");
     expect(periodsClassesSql).toContain("class cannot be concluded while unit offerings are still open");
     expect(periodsClassesSql).toContain("class cannot be concluded while sessions are still scheduled");
+    expect(periodsClassesSql).toContain("class cannot be concluded while assessments are still pending");
   });
 
   it("oferta não pode ser concluída com tentativas de aluno ainda abertas", () => {
     expect(periodsClassesSql).toContain("offering cannot be concluded while student attempts are still open");
+    expect(periodsClassesSql).toContain("offering cannot be concluded while sessions are still scheduled");
+    expect(periodsClassesSql).toContain("offering cannot be concluded while assessments are still pending");
   });
 
   it("turma/oferta fechada não aceita novos lançamentos comuns (matrícula/oferta/sessão/avaliação)", () => {
@@ -381,6 +398,9 @@ describe("Teologia — máquinas de estado protegidas contra lançamento em cont
 
   it("frequência só é lançada em aula realizada", () => {
     expect(attendanceAssessmentsSql).toContain("attendance can only be recorded for a completed session");
+    expect(attendanceAssessmentsSql).toMatch(
+      /FROM public\.theology_offering_enrollments[\s\S]*?status IN \('planejada', 'em_andamento'\)[\s\S]*?FOR UPDATE/,
+    );
   });
 
   it("notas comuns só são lançadas em avaliação aplicada (nunca depois de publicada, sem auditoria)", () => {
@@ -399,6 +419,35 @@ describe("Teologia — máquinas de estado protegidas contra lançamento em cont
       "assessment model components are locked once the model is used by a scheduled/applied assessment",
     );
   });
+
+  it("resultado final da unidade é derivado de frequência e avaliações publicadas, nunca aceito do navegador", () => {
+    expect(periodsClassesSql).toContain(
+      "final grade and result are calculated from published assessments and attendance",
+    );
+    expect(periodsClassesSql).toContain(
+      "public._calculate_theology_offering_enrollment_outcome(p_offering_enrollment_id)",
+    );
+    expect(attendanceAssessmentsSql).toContain(
+      "CREATE OR REPLACE FUNCTION public._calculate_theology_offering_enrollment_outcome",
+    );
+    expect(attendanceAssessmentsSql).toContain("attendance is missing for % completed session(s)");
+    expect(attendanceAssessmentsSql).toContain("cannot conclude attempt without a published assessment");
+  });
+
+  it("professor não altera matrícula administrativa nem abre tentativa de unidade", () => {
+    const enrollmentStatusFn = periodsClassesSql.slice(
+      periodsClassesSql.indexOf("CREATE OR REPLACE FUNCTION public.update_theology_enrollment_status"),
+      periodsClassesSql.indexOf("REVOKE ALL ON FUNCTION public.update_theology_enrollment_status"),
+    );
+    const offeringEnrollmentFn = periodsClassesSql.slice(
+      periodsClassesSql.indexOf("CREATE OR REPLACE FUNCTION public.enroll_member_in_theology_offering"),
+      periodsClassesSql.indexOf("REVOKE ALL ON FUNCTION public.enroll_member_in_theology_offering"),
+    );
+    expect(enrollmentStatusFn).toContain("'theology.manage'");
+    expect(enrollmentStatusFn).not.toContain("can_operate_theology_class");
+    expect(offeringEnrollmentFn).toContain("'theology.manage'");
+    expect(offeringEnrollmentFn).not.toContain("can_operate_theology_class");
+  });
 });
 
 describe("Teologia — auditoria de alteração de nota (integridade acadêmica)", () => {
@@ -407,6 +456,9 @@ describe("Teologia — auditoria de alteração de nota (integridade acadêmica)
     expect(attendanceAssessmentsSql).toContain("justification is required to amend a grade");
     expect(attendanceAssessmentsSql).toMatch(
       /has_org_access_permission\(auth\.uid\(\), v_class\.organization_id, 'theology\.manage'\)/,
+    );
+    expect(attendanceAssessmentsSql).toContain(
+      "only a published grade can be amended through this audited operation",
     );
   });
 
@@ -444,8 +496,15 @@ describe("Teologia — invariantes de escopo organizacional (nunca confia apenas
 
   it("turma valida organização do programa/período/núcleo — nunca outra denominação", () => {
     expect(periodsClassesSql).toContain("class organization must be the program organization or one of its descendants");
-    expect(periodsClassesSql).toContain("class period must belong to the same organization tree as the program");
+    expect(periodsClassesSql).toContain("class organization must be inside the period organization scope");
     expect(periodsClassesSql).toContain("class study center must belong to the class organization tree");
+  });
+
+  it("período e modelo de avaliação validam programa/instituto dentro da árvore real", () => {
+    expect(periodsClassesSql).toContain("period institute must belong to the period organization tree");
+    expect(attendanceAssessmentsSql).toContain(
+      "assessment model organization must be inside the program organization scope",
+    );
   });
 
   it("oferta valida que a matéria pertence à matriz do programa da turma", () => {
@@ -466,8 +525,12 @@ describe("Teologia — invariantes de escopo organizacional (nunca confia apenas
   });
 
   it("vínculo financeiro valida escopo organizacional da matrícula/período contra a transação", () => {
-    expect(financeSql).toContain("enrollment is outside the transaction organization scope");
-    expect(financeSql).toContain("period is outside the transaction organization scope");
+    expect(financeSql).toContain("exactly one of enrollment_id or period_id must be informed");
+    expect(financeSql).toContain("academic context is outside the transaction organization scope");
+    expect(financeSql).toContain("JOIN public.theology_classes c ON c.id = e.class_id");
+    expect(financeSql).toContain(
+      "public.has_org_access_permission(auth.uid(), t.organization_id, 'finance.read')",
+    );
   });
 });
 
@@ -616,6 +679,34 @@ describe("Teologia — integração com member_history (timeline institucional c
 
   it("certificado emitido registra o marco certificado_emitido vinculado ao documento", () => {
     expect(resultsHistorySql).toContain("'certificado_emitido', 'Certificado emitido: '");
+  });
+});
+
+describe("Teologia — leituras SECURITY DEFINER preservam o escopo real por linha", () => {
+  it("boletim só devolve turmas nas quais o usuário ainda possui theology.read", () => {
+    const transcriptFn = resultsHistorySql.slice(
+      resultsHistorySql.indexOf("CREATE OR REPLACE FUNCTION public.get_theology_student_transcript"),
+      resultsHistorySql.indexOf("REVOKE ALL ON FUNCTION public.get_theology_student_transcript"),
+    );
+    expect(transcriptFn).toContain(
+      "public.has_org_access_permission(auth.uid(), c.organization_id, 'theology.read')",
+    );
+  });
+
+  it("listagem financeira revalida a organização real da transação e do contexto acadêmico", () => {
+    const listFn = financeSql.slice(
+      financeSql.indexOf("CREATE OR REPLACE FUNCTION public.list_theology_linked_transactions"),
+      financeSql.indexOf("REVOKE ALL ON FUNCTION public.list_theology_linked_transactions"),
+    );
+    expect(listFn).toContain(
+      "public.has_org_access_permission(auth.uid(), t.organization_id, 'finance.read')",
+    );
+    expect(listFn).toContain(
+      "public.has_org_access_permission(auth.uid(), c.organization_id, 'theology.read')",
+    );
+    expect(listFn).toContain(
+      "public.has_org_access_permission(auth.uid(), p.organization_id, 'theology.read')",
+    );
   });
 });
 

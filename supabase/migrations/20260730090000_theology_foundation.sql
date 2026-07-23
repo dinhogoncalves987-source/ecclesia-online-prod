@@ -149,6 +149,12 @@ CREATE TABLE IF NOT EXISTS public.theology_institutes (
 CREATE UNIQUE INDEX IF NOT EXISTS theology_institutes_org_name_idx
   ON public.theology_institutes (organization_id, lower(btrim(name)));
 
+-- A UI e o domínio tratam o Instituto Teológico como configuração única da
+-- organização. O índice por nome não impedia dois institutos com nomes
+-- diferentes na mesma igreja.
+CREATE UNIQUE INDEX IF NOT EXISTS theology_institutes_organization_idx
+  ON public.theology_institutes (organization_id);
+
 CREATE UNIQUE INDEX IF NOT EXISTS theology_institutes_legacy_unique_idx
   ON public.theology_institutes (organization_id, legacy_source, COALESCE(legacy_module, ''), legacy_code)
   WHERE legacy_code IS NOT NULL AND legacy_source IS NOT NULL;
@@ -182,6 +188,9 @@ DROP POLICY IF EXISTS "theology_institutes capability delete" ON public.theology
 CREATE POLICY "theology_institutes capability delete" ON public.theology_institutes
 FOR DELETE TO authenticated
 USING (public.has_org_access_permission(auth.uid(), organization_id, 'theology.manage'));
+
+-- Registros institucionais são desativados, nunca apagados fisicamente.
+REVOKE DELETE ON public.theology_institutes FROM authenticated;
 
 -- ── theology_study_centers (Núcleos de Estudos) ──────────────────────────
 -- Ponto operacional/acadêmico (sala, polo, sede, on-line) ligado a uma
@@ -279,6 +288,8 @@ CREATE POLICY "theology_study_centers capability delete" ON public.theology_stud
 FOR DELETE TO authenticated
 USING (public.has_org_access_permission(auth.uid(), organization_id, 'theology.manage'));
 
+REVOKE DELETE ON public.theology_study_centers FROM authenticated;
+
 -- ── theology_subjects (Unidades curriculares/matérias/livros/materiais) ──
 -- Catálogo reutilizável entre programas (uma matéria pode compor a matriz
 -- curricular de mais de um programa) — a ligação com sequência/obrigatorie-
@@ -344,6 +355,8 @@ DROP POLICY IF EXISTS "theology_subjects capability delete" ON public.theology_s
 CREATE POLICY "theology_subjects capability delete" ON public.theology_subjects
 FOR DELETE TO authenticated
 USING (public.has_org_access_permission(auth.uid(), organization_id, 'theology.manage'));
+
+REVOKE DELETE ON public.theology_subjects FROM authenticated;
 
 -- ── theology_programs (Programas/Tipos de Curso) ─────────────────────────
 CREATE TABLE IF NOT EXISTS public.theology_programs (
@@ -465,6 +478,15 @@ DROP POLICY IF EXISTS "theology_programs capability delete" ON public.theology_p
 CREATE POLICY "theology_programs capability delete" ON public.theology_programs
 FOR DELETE TO authenticated
 USING (public.has_org_access_permission(auth.uid(), organization_id, 'theology.manage'));
+
+-- O status é uma máquina de estados criada na migration de currículo. Dados
+-- acadêmicos publicados são arquivados, nunca removidos.
+REVOKE UPDATE, DELETE ON public.theology_programs FROM authenticated;
+GRANT UPDATE (
+  institute_id, code, name, short_name, description, objectives,
+  workload_hours, requires_attendance, minimum_attendance_percentage,
+  requires_assessment, minimum_passing_score, completion_criteria
+) ON public.theology_programs TO authenticated;
 
 -- ── Verificação final ────────────────────────────────────────────────────
 DO $$

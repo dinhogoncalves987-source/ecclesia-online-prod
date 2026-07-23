@@ -31,7 +31,8 @@ import { TeologiaMemberPicker } from "./TeologiaMemberPicker";
 
 export function TeologiaFinance({ organizationId }: { organizationId: string }) {
   const { hasCapability } = useRole();
-  const canOperateFinance = hasCapability("finance.write") || hasCapability("finance.approve");
+  const canViewFinance = hasCapability("finance.read");
+  const canLinkFinance = hasCapability("finance.write") && hasCapability("theology.manage");
   const [loading, setLoading] = useState(true);
   const [moduleUnavailable, setModuleUnavailable] = useState(false);
   const [periods, setPeriods] = useState<TheologyPeriodRow[]>([]);
@@ -89,11 +90,11 @@ export function TeologiaFinance({ organizationId }: { organizationId: string }) 
   if (moduleUnavailable) {
     return <EmptyState title="Teologia aguardando aplicação das migrations" description="A tabela theology_periods ainda não existe neste ambiente." />;
   }
-  if (!canOperateFinance) {
+  if (!canViewFinance) {
     return (
       <EmptyState
         title="Sem acesso ao Financeiro"
-        description="Vincular ou visualizar transações exige uma capability financeira real (finance.manage/finance.write) — theology.manage sozinho não concede acesso financeiro."
+        description="Visualizar vínculos acadêmicos exige finance.read. A gestão de Teologia, sozinha, não concede acesso a dados financeiros."
       />
     );
   }
@@ -145,7 +146,13 @@ export function TeologiaFinance({ organizationId }: { organizationId: string }) 
 
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium">Transações vinculadas</p>
-        <Button size="sm" variant="outline" onClick={() => setLinkDialogOpen(true)} disabled={!selectedEnrollmentId && !selectedPeriodId}>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setLinkDialogOpen(true)}
+          disabled={!canLinkFinance || (!selectedEnrollmentId && !selectedPeriodId)}
+          title={!canLinkFinance ? "Exige finance.write e theology.manage" : undefined}
+        >
           <Link2 size={14} className="mr-1.5" /> Vincular transação
         </Button>
       </div>
