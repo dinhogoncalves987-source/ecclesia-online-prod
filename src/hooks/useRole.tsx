@@ -28,6 +28,11 @@ const MODULE_ACCESS: Record<string, AppRole[]> = {
   "/admin/campanhas": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
   "/admin/financeiro": ["super_admin", "church_admin", "tesoureiro", "contador"],
   "/admin/membros": ["super_admin", "church_admin", "pastor", "secretary"],
+  // "/admin/membros/:memberId" (perfil individual do membro) NÃO tem uma
+  // entrada literal aqui — rotas dinâmicas nunca combinam por igualdade de
+  // string com o pathname real (que contém um UUID). Ver normalizeRoutePath()
+  // abaixo, que reescreve "/admin/membros/<uuid>" para "/admin/membros"
+  // antes de qualquer lookup nestes mapas.
   "/admin/agenda": ["super_admin", "church_admin", "pastor", "secretary", "leader", "member"],
   // Institutional modules - every authenticated user must see these in the menu
   "/admin/biblia": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
@@ -206,8 +211,15 @@ export function useRole() {
     markBoot("role resolved");
   }, [user, activeChurchId, churchLoading, bootstrap, bootstrapLoading, bootstrapIsError]);
 
-  const canAccess = (path: string): boolean => {
+  const canAccess = (rawPath: string): boolean => {
     if (!canonicalRole) return false;
+    // Rotas dinâmicas (ex.: /admin/membros/<uuid>, o perfil individual do
+    // membro) nunca aparecem literalmente em ROUTE_ACCESS_PERMISSIONS ou
+    // MODULE_ACCESS — normalizamos para a rota "pai" estática antes do
+    // lookup, senão a checagem sempre falha (bug real encontrado na
+    // implementação original: a rota ficava inacessível para todos os
+    // perfis, inclusive super_admin).
+    const path = /^\/admin\/membros\/[^/]+$/.test(rawPath) ? "/admin/membros" : rawPath;
     const requiredCapability = ROUTE_ACCESS_PERMISSIONS[path];
     if (
       requiredCapability

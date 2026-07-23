@@ -209,8 +209,9 @@ export function InternalMessageComposer({
                 >
                   <textarea
                     ref={textareaRef}
+                    dir="ltr"
                     value={text}
-                    onChange={(e) => { setText(e.target.value); adjustHeight(); }}
+                    onChange={(e) => setText(e.currentTarget.value)}
                     placeholder={placeholder ?? t("Mensagem")}
                     rows={1}
                     disabled={disabled || sending}

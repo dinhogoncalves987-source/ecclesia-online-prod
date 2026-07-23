@@ -77,7 +77,9 @@
     "20260722090000_finance_assets.sql",
     "20260723090000_finance_accountability.sql",
     "20260724090000_organizations_hierarchy_read.sql",
-    "20260725090000_internal_chat_realtime_hardening.sql"
+    "20260725090000_internal_chat_realtime_hardening.sql",
+    "20260726090000_assembleia_de_deus_finance_template.sql",
+    "20260726100000_finance_import_transactions_bulk_rpc.sql"
   ],
   "staging_feature": [
     "20260526100000_staging_worship_tables.sql",
@@ -85,7 +87,16 @@
     "20260608160000_staging_campaigns_crud_fields.sql",
     "20260615120000_staging_recommendation_letters.sql",
     "20260615130000_recommendation_letters_public_token.sql",
-    "20260617150000_fix_campaign_writer_rls.sql"
+    "20260617150000_fix_campaign_writer_rls.sql",
+    "20260727000000_members_legacy_identifiers_and_extra_fields.sql",
+    "20260727010000_member_addresses.sql",
+    "20260727020000_member_family.sql",
+    "20260727030000_members_cpf_validation.sql",
+    "20260728090000_shared_institutional_history_foundation.sql",
+    "20260728100000_member_occurrences.sql",
+    "20260728110000_member_ordinations.sql",
+    "20260728120000_member_transfers.sql",
+    "20260728130000_member_organization_history.sql"
   ],
   "staging_only": [
     "20260519200000_demo_seed.sql",

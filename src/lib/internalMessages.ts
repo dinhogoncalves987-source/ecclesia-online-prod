@@ -286,7 +286,7 @@ export async function fetchThreadsBySource(
       if (hiddenIds.size > 0) threads = threads.filter((t) => !hiddenIds.has(t.id));
     }
 
-    await enrichThreadParticipantNames(threads);
+    await enrichThreadParticipantNames(threads, options.currentUserId);
     await enrichThreadPreviewsAndUnread(threads, options.currentUserId);
     return { threads, fromDatabase: true };
   } catch (err) {
@@ -366,7 +366,10 @@ export async function fetchThreadMessages(
  * código usava sempre created_by, o que fazia uma conversa direta iniciada
  * pela secretaria mostrar o próprio nome do atendente em vez do membro.
  */
-async function enrichThreadParticipantNames(threads: InternalThread[]): Promise<void> {
+async function enrichThreadParticipantNames(
+  threads: InternalThread[],
+  currentUserId?: string | null,
+): Promise<void> {
   const memberIds = [...new Set(threads.map((t) => t.memberId).filter(Boolean))] as string[];
   const memberByThreadId = new Map<string, { full_name: string; user_id: string | null }>();
 
@@ -389,7 +392,8 @@ async function enrichThreadParticipantNames(threads: InternalThread[]): Promise<
 
   const resolvedUserIds = [...new Set([...memberByThreadId.values()].map((m) => m.user_id).filter(Boolean))] as string[];
   const createdByIds = [...new Set(threads.map((t) => t.createdBy).filter(Boolean))] as string[];
-  const allProfileIds = [...new Set([...resolvedUserIds, ...createdByIds])];
+  const assignedToIds = [...new Set(threads.map((t) => t.assignedTo).filter(Boolean))] as string[];
+  const allProfileIds = [...new Set([...resolvedUserIds, ...createdByIds, ...assignedToIds])];
 
   const profileById = new Map<string, { full_name: string; avatar_url: string | null; last_seen_at: string | null }>();
   if (allProfileIds.length > 0) {
@@ -408,14 +412,27 @@ async function enrichThreadParticipantNames(threads: InternalThread[]): Promise<
 
   for (const thread of threads) {
     const member = memberByThreadId.get(thread.id);
-    const resolvedUserId = member?.user_id ?? thread.createdBy ?? null;
-    const profile = resolvedUserId ? profileById.get(resolvedUserId) : undefined;
 
-    if (member) {
+    const candidateUserIds = [
+      member?.user_id,
+      thread.assignedTo,
+      thread.createdBy,
+    ].filter(Boolean) as string[];
+
+    const resolvedUserId =
+      candidateUserIds.find((candidateUserId) => candidateUserId !== currentUserId) ??
+      null;
+
+    const profile = resolvedUserId
+      ? profileById.get(resolvedUserId)
+      : undefined;
+
+    if (member?.user_id && resolvedUserId === member.user_id) {
       thread.participantName = member.full_name;
-    } else if (thread.createdBy) {
-      thread.participantName = profile?.full_name ?? "Membro";
+    } else if (resolvedUserId) {
+      thread.participantName = profile?.full_name ?? "Usuário";
     }
+
     thread.participantUserId = resolvedUserId;
     thread.participantAvatarUrl = profile?.avatar_url ?? null;
     thread.participantLastSeenAt = profile?.last_seen_at ?? null;
@@ -505,6 +522,7 @@ export async function resolveMemberIdForUser(
 export async function fetchThreadById(
   organizationId: string,
   threadId: string,
+  currentUserId?: string | null,
 ): Promise<InternalThread | null> {
   try {
     const { data, error } = await supabase
@@ -516,7 +534,7 @@ export async function fetchThreadById(
 
     if (error || !data) return null;
     const thread = mapDbThreadToUi(data as DbInternalThreadRow);
-    await enrichThreadParticipantNames([thread]);
+    await enrichThreadParticipantNames([thread], currentUserId);
     return thread;
   } catch {
     return null;
@@ -527,6 +545,7 @@ export async function fetchThreadById(
 export async function fetchCampaignSharedThread(
   organizationId: string,
   campaignId: string,
+  currentUserId?: string | null,
 ): Promise<InternalThread | null> {
   try {
     const { data, error } = await supabase
@@ -539,7 +558,7 @@ export async function fetchCampaignSharedThread(
 
     if (error || !data) return null;
     const thread = mapDbThreadToUi(data as DbInternalThreadRow);
-    await enrichThreadParticipantNames([thread]);
+    await enrichThreadParticipantNames([thread], currentUserId);
     return thread;
   } catch {
     return null;

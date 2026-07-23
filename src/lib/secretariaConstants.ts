@@ -76,6 +76,70 @@ export const CIVIL_DOCUMENT_STATUS_OPTIONS = [
 
 export type CivilDocumentStatus = (typeof CIVIL_DOCUMENT_STATUS_OPTIONS)[number];
 
+/** Tipos de endereço para member_addresses. */
+export const ADDRESS_TYPES = [
+  "residencial",
+  "comercial",
+  "correspondencia",
+  "anterior",
+  "outro",
+] as const;
+
+export type AddressType = (typeof ADDRESS_TYPES)[number];
+
+/** Tipos de relacionamento familiar. */
+export const FAMILY_RELATIONS = [
+  "pai",
+  "mae",
+  "esposo",
+  "esposa",
+  "filho",
+  "filha",
+  "enteado",
+  "enteada",
+  "dependente",
+  "responsavel",
+  "outro",
+] as const;
+
+export type FamilyRelation = (typeof FAMILY_RELATIONS)[number];
+
+/** Relações que representam dependentes (não são membros). */
+export const DEPENDENT_RELATIONS: FamilyRelation[] = ["filho", "filha", "enteado", "enteada", "dependente"];
+
+/** Grau de instrução / escolaridade. */
+export const EDUCATION_LEVELS = [
+  "Não alfabetizado",
+  "Fundamental incompleto",
+  "Fundamental completo",
+  "Médio incompleto",
+  "Médio completo",
+  "Superior incompleto",
+  "Superior completo",
+  "Pós-graduação",
+  "Mestrado",
+  "Doutorado",
+] as const;
+
+export type EducationLevel = (typeof EDUCATION_LEVELS)[number];
+
+/** Formas de admissão. */
+export const ADMISSION_TYPES = [
+  "Batismo",
+  "Aclamação",
+  "Carta de transferência",
+  "Restauração",
+] as const;
+
+export type AdmissionType = (typeof ADMISSION_TYPES)[number];
+
+/** Origens de registro legado. */
+export const LEGACY_SOURCES = [
+  "wintechi",
+] as const;
+
+export type LegacySource = (typeof LEGACY_SOURCES)[number];
+
 /**
  * Retorna o documento civil exigido com base no estado civil.
  * Solteiro(a) → Certidão de nascimento

@@ -133,9 +133,10 @@ export function useInternalMessages({
       .channel(`internal-messages-thread-${threadId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "internal_messages", filter: `thread_id=eq.${threadId}` },
+        { event: "INSERT", schema: "public", table: "internal_messages", filter: `organization_id=eq.${organizationId}` },
         (payload) => {
           const row = payload.new as DbInternalMessageRow;
+          if (row.thread_id !== threadId) return;
           if (knownIdsRef.current.has(row.id)) return;
           knownIdsRef.current.add(row.id);
 
@@ -166,9 +167,10 @@ export function useInternalMessages({
       )
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "internal_messages", filter: `thread_id=eq.${threadId}` },
+        { event: "UPDATE", schema: "public", table: "internal_messages", filter: `organization_id=eq.${organizationId}` },
         (payload) => {
           const row = payload.new as DbInternalMessageRow;
+          if (row.thread_id !== threadId) return;
           setMessages((prev) =>
             prev.map((m) =>
               m.id === row.id

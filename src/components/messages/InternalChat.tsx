@@ -254,11 +254,11 @@ export function InternalChat({
     if (!campaignId) { setPanelLoading(false); return; }
     let cancelled = false;
     setPanelLoading(true);
-    fetchCampaignSharedThread(organizationId, campaignId).then((t) => {
+    fetchCampaignSharedThread(organizationId, campaignId, user?.id ?? null).then((t) => {
       if (!cancelled) { setPanelThread(t); setPanelLoading(false); }
     });
     return () => { cancelled = true; };
-  }, [mode, organizationId, campaignId]);
+  }, [mode, organizationId, campaignId, user?.id]);
 
   // ── Render: PANEL mode ────────────────────────────────────────────────────
   if (mode === "panel") {
@@ -291,7 +291,7 @@ export function InternalChat({
           onThreadCreated={(t) => setPanelThread(t)}
           onThreadUpdated={() => {
             if (campaignId) {
-              fetchCampaignSharedThread(organizationId, campaignId).then(setPanelThread);
+              fetchCampaignSharedThread(organizationId, campaignId, user?.id ?? null).then(setPanelThread);
             }
           }}
         />

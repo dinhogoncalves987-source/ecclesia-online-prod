@@ -10,7 +10,7 @@
 import { buildColumnMap, normalizeHeader } from "./headerNormalizer";
 
 export interface AuxLookup {
-  accountingGroups: { id: string; name: string }[];
+  accountingGroups: { id: string; name: string; code?: string }[];
   accountCategories: { id: string; name: string; code?: string }[];
   documentTypes: { id: string; name: string; code?: string }[];
   financialAccounts: { id: string; name: string }[];
@@ -126,20 +126,57 @@ function parseType(raw: string): "Entrada" | "Saida" | null {
   return null;
 }
 
+const normalizeLookupValue = (s: string): string => s.trim().toLowerCase().replace(/\s+/g, " ");
+
+// Extrai um código inicial + o restante da descrição de valores no formato
+// "CÓDIGO DESCRIÇÃO" ou "CÓDIGO - DESCRIÇÃO" (ex.: planilhas CONFIADCS usam
+// "20101 DÍZIMOS E OFERTAS" para conta contábil, "20 - RECEITAS" para grupo
+// contábil e "01 - SANTA FÉ" para setor/distrito, sendo que o código do
+// distrito na planilha não corresponde ao código interno do banco — só a
+// descrição é confiável para casar contra o nome cadastrado).
+const LEADING_CODE_RE = /^([a-z0-9º]+)[\s.\-\u2013\u2014]+(.*)$/;
+
 function findById(
   list: { id: string; name: string; code?: string }[],
   value: string,
 ): string | null {
   if (!value.trim()) return null;
-  const v = value.trim().toLowerCase();
-  return (
-    list.find(
-      i =>
-        i.name.toLowerCase() === v ||
-        i.code?.toLowerCase() === v ||
-        i.name.toLowerCase().includes(v),
-    )?.id ?? null
+  const v = normalizeLookupValue(value);
+
+  // 1) Correspondência exata por nome ou código — sempre tem prioridade,
+  //    evitando falsos positivos de substring (ex.: "NC" não deve casar com
+  //    "Comprovante de Transferência", que contém "nc" dentro de "transferência").
+  const exact = list.find(
+    i => normalizeLookupValue(i.name) === v || (i.code && normalizeLookupValue(i.code) === v),
   );
+  if (exact) return exact.id;
+
+  const leadingCodeMatch = v.match(LEADING_CODE_RE);
+  const remainder = leadingCodeMatch?.[2]?.trim() || null;
+
+  // 2) Valor combina código + descrição em uma única célula: extrai o código
+  //    inicial e casa exatamente contra o campo code da lista (grupos/contas).
+  if (leadingCodeMatch) {
+    const leadingCode = leadingCodeMatch[1];
+    const byCode = list.find(i => i.code && normalizeLookupValue(i.code) === leadingCode);
+    if (byCode) return byCode.id;
+  }
+
+  // 3) Substring apenas como último recurso, e só para valores específicos o
+  //    bastante (evita que códigos curtos deem match em qualquer nome).
+  //    Tenta o valor completo e, se houver, também só a descrição sem o
+  //    código (útil quando o código da planilha não é o code cadastrado,
+  //    como no caso de setor/distrito e congregação).
+  if (v.length >= 4) {
+    const bySubstring = list.find(i => normalizeLookupValue(i.name).includes(v));
+    if (bySubstring) return bySubstring.id;
+  }
+  if (remainder && remainder.length >= 3) {
+    const byRemainder = list.find(i => normalizeLookupValue(i.name).includes(remainder));
+    if (byRemainder) return byRemainder.id;
+  }
+
+  return null;
 }
 
 // ── Mapper principal ───────────────────────────────────────────────────────────

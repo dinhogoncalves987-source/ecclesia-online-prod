@@ -88,8 +88,13 @@ const CANONICAL: Record<string, string> = {
   "sede setor distrito": "district",
   "distrito": "district",
   "setor": "district",
+  // Cabeçalho real da planilha CONFIADCS: "SETOR/DISTRITO - ORIGEM 1"
+  "setor/distrito origem 1": "district",
+  "setor distrito origem 1": "district",
   // ── Congregação ─────────────────────────────────────────────────────────────
   "congregacao": "congregation",
+  // Cabeçalho real da planilha CONFIADCS: "CONGREGAÇÃO - ORIGEM 2"
+  "congregacao origem 2": "congregation",
   // ── Beneficiário ────────────────────────────────────────────────────────────
   "beneficiario": "supplier_beneficiary_name",
   "fornecedor/beneficiario": "supplier_beneficiary_name",

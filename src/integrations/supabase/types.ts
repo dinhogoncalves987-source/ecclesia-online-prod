@@ -239,6 +239,7 @@ export type Database = {
       }
       finance_account_categories: {
         Row: {
+          accounting_group_id: string | null
           code: string
           created_at: string
           id: string
@@ -250,6 +251,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          accounting_group_id?: string | null
           code: string
           created_at?: string
           id?: string
@@ -261,6 +263,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          accounting_group_id?: string | null
           code?: string
           created_at?: string
           id?: string
@@ -274,6 +277,145 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "finance_account_categories_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_fac_accounting_group"
+            columns: ["accounting_group_id"]
+            isOneToOne: false
+            referencedRelation: "finance_accounting_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_accounting_groups: {
+        Row: {
+          code: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          organization_id: string | null
+          type: string | null
+          updated_at: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          organization_id?: string | null
+          type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          organization_id?: string | null
+          type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_accounting_groups_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_document_types: {
+        Row: {
+          code: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          organization_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          organization_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          organization_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_document_types_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_import_batches: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          error_report: Json | null
+          failed_rows: number
+          finished_at: string | null
+          id: string
+          imported_rows: number
+          organization_id: string
+          source_file_name: string | null
+          source_type: string
+          status: string
+          total_rows: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          error_report?: Json | null
+          failed_rows?: number
+          finished_at?: string | null
+          id?: string
+          imported_rows?: number
+          organization_id: string
+          source_file_name?: string | null
+          source_type?: string
+          status?: string
+          total_rows?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          error_report?: Json | null
+          failed_rows?: number
+          finished_at?: string | null
+          id?: string
+          imported_rows?: number
+          organization_id?: string
+          source_file_name?: string | null
+          source_type?: string
+          status?: string
+          total_rows?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_import_batches_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -1016,23 +1158,43 @@ export type Database = {
       transactions: {
         Row: {
           account_category_id: string | null
+          accounting_date: string | null
+          accounting_group_id: string | null
           amount: number
+          asaas_customer_id: string | null
+          asaas_payment_id: string | null
           campaign_id: string | null
           category: string
+          collector_name: string | null
+          congregation_id: string | null
+          contributor_document: string | null
+          contributor_name: string | null
           cost_center_id: string | null
           created_at: string
           created_by: string | null
           date: string
           description: string
+          district_id: string | null
+          document_number: string | null
+          document_type_id: string | null
+          external_reference: string | null
           financial_account_id: string | null
           id: string
+          import_batch_id: string | null
+          issue_date: string | null
+          legacy_record_number: string | null
           notes: string | null
           organization_id: string
+          origin: string
           payment_method: string | null
+          period_label: string | null
           receipt_url: string | null
           responsible_id: string | null
           source_module: string | null
           status: string
+          supplier_beneficiary_document: string | null
+          supplier_beneficiary_name: string | null
+          treasurer_name: string | null
           type: string
           updated_at: string
           updated_by: string | null
@@ -1040,23 +1202,43 @@ export type Database = {
         }
         Insert: {
           account_category_id?: string | null
+          accounting_date?: string | null
+          accounting_group_id?: string | null
           amount: number
+          asaas_customer_id?: string | null
+          asaas_payment_id?: string | null
           campaign_id?: string | null
           category: string
+          collector_name?: string | null
+          congregation_id?: string | null
+          contributor_document?: string | null
+          contributor_name?: string | null
           cost_center_id?: string | null
           created_at?: string
           created_by?: string | null
           date?: string
           description: string
+          district_id?: string | null
+          document_number?: string | null
+          document_type_id?: string | null
+          external_reference?: string | null
           financial_account_id?: string | null
           id?: string
+          import_batch_id?: string | null
+          issue_date?: string | null
+          legacy_record_number?: string | null
           notes?: string | null
           organization_id: string
+          origin?: string
           payment_method?: string | null
+          period_label?: string | null
           receipt_url?: string | null
           responsible_id?: string | null
           source_module?: string | null
           status?: string
+          supplier_beneficiary_document?: string | null
+          supplier_beneficiary_name?: string | null
+          treasurer_name?: string | null
           type: string
           updated_at?: string
           updated_by?: string | null
@@ -1064,23 +1246,43 @@ export type Database = {
         }
         Update: {
           account_category_id?: string | null
+          accounting_date?: string | null
+          accounting_group_id?: string | null
           amount?: number
+          asaas_customer_id?: string | null
+          asaas_payment_id?: string | null
           campaign_id?: string | null
           category?: string
+          collector_name?: string | null
+          congregation_id?: string | null
+          contributor_document?: string | null
+          contributor_name?: string | null
           cost_center_id?: string | null
           created_at?: string
           created_by?: string | null
           date?: string
           description?: string
+          district_id?: string | null
+          document_number?: string | null
+          document_type_id?: string | null
+          external_reference?: string | null
           financial_account_id?: string | null
           id?: string
+          import_batch_id?: string | null
+          issue_date?: string | null
+          legacy_record_number?: string | null
           notes?: string | null
           organization_id?: string
+          origin?: string
           payment_method?: string | null
+          period_label?: string | null
           receipt_url?: string | null
           responsible_id?: string | null
           source_module?: string | null
           status?: string
+          supplier_beneficiary_document?: string | null
+          supplier_beneficiary_name?: string | null
+          treasurer_name?: string | null
           type?: string
           updated_at?: string
           updated_by?: string | null
@@ -1111,6 +1313,41 @@ export type Database = {
           {
             foreignKeyName: "transactions_organization_id_fkey"
             columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_transactions_document_type"
+            columns: ["document_type_id"]
+            isOneToOne: false
+            referencedRelation: "finance_document_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_transactions_accounting_group"
+            columns: ["accounting_group_id"]
+            isOneToOne: false
+            referencedRelation: "finance_accounting_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_transactions_import_batch"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "finance_import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_transactions_congregation"
+            columns: ["congregation_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_transactions_district"
+            columns: ["district_id"]
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
@@ -2009,34 +2246,70 @@ export type Database = {
       }
       member_history: {
         Row: {
-          created_at: string | null
+          attachment_path: string | null
+          created_at: string
           created_by: string | null
           description: string | null
+          document_id: string | null
           history_type: string
           id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
           member_id: string
+          occurred_at: string
           organization_id: string
+          recorded_at: string
+          source_id: string | null
+          source_module: string
+          source_table: string | null
           title: string
+          updated_at: string
+          visibility: string
         }
         Insert: {
-          created_at?: string | null
+          attachment_path?: string | null
+          created_at?: string
           created_by?: string | null
           description?: string | null
+          document_id?: string | null
           history_type: string
           id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
           member_id: string
+          occurred_at?: string
           organization_id: string
+          recorded_at?: string
+          source_id?: string | null
+          source_module?: string
+          source_table?: string | null
           title: string
+          updated_at?: string
+          visibility?: string
         }
         Update: {
-          created_at?: string | null
+          attachment_path?: string | null
+          created_at?: string
           created_by?: string | null
           description?: string | null
+          document_id?: string | null
           history_type?: string
           id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
           member_id?: string
+          occurred_at?: string
           organization_id?: string
+          recorded_at?: string
+          source_id?: string | null
+          source_module?: string
+          source_table?: string | null
           title?: string
+          updated_at?: string
+          visibility?: string
         }
         Relationships: [
           {
@@ -2053,6 +2326,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "member_history_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
         ]
       }
       members: {
@@ -2060,9 +2340,13 @@ export type Database = {
           address: string | null
           address_complement: string | null
           address_number: string | null
+          admission_type: string | null
           administrative_role: string | null
+          baptism_place: string | null
           baptized_at: string | null
           birth_date: string | null
+          birth_place: string | null
+          cgadb_number: string | null
           city: string | null
           civil_document_notes: string | null
           civil_document_status: string
@@ -2072,26 +2356,37 @@ export type Database = {
           congregation_id: string | null
           consecration_date: string | null
           conversion_date: string | null
+          contact_pending: boolean
           country_code: string | null
           cpf: string | null
+          cpf_pending: boolean
           created_at: string | null
           created_by: string | null
+          education_level: string | null
           email: string | null
           father_name: string | null
           full_name: string
           gender: string | null
           holy_spirit_baptism_date: string | null
           id: string
+          incomplete_registration: boolean
           joined_at: string | null
+          known_name: string | null
+          legacy_code: string | null
+          legacy_registration: string | null
+          legacy_source: string | null
           marital_status: string | null
           member_code: string | null
           member_role: string | null
           mother_name: string | null
+          nationality: string | null
           neighborhood: string | null
           notes: string | null
           organization_id: string
           phone: string | null
           photo_url: string | null
+          profession: string | null
+          requires_review: boolean
           rg: string | null
           rg_issue_date: string | null
           rg_issuer: string | null
@@ -2108,9 +2403,13 @@ export type Database = {
           address?: string | null
           address_complement?: string | null
           address_number?: string | null
+          admission_type?: string | null
           administrative_role?: string | null
+          baptism_place?: string | null
           baptized_at?: string | null
           birth_date?: string | null
+          birth_place?: string | null
+          cgadb_number?: string | null
           city?: string | null
           civil_document_notes?: string | null
           civil_document_status?: string
@@ -2119,27 +2418,38 @@ export type Database = {
           civil_document_url?: string | null
           congregation_id?: string | null
           consecration_date?: string | null
+          contact_pending?: boolean
           conversion_date?: string | null
           country_code?: string | null
           cpf?: string | null
+          cpf_pending?: boolean
           created_at?: string | null
           created_by?: string | null
+          education_level?: string | null
           email?: string | null
           father_name?: string | null
           full_name: string
           gender?: string | null
           holy_spirit_baptism_date?: string | null
           id?: string
+          incomplete_registration?: boolean
           joined_at?: string | null
+          known_name?: string | null
+          legacy_code?: string | null
+          legacy_registration?: string | null
+          legacy_source?: string | null
           marital_status?: string | null
           member_code?: string | null
           member_role?: string | null
           mother_name?: string | null
+          nationality?: string | null
           neighborhood?: string | null
           notes?: string | null
           organization_id: string
           phone?: string | null
           photo_url?: string | null
+          profession?: string | null
+          requires_review?: boolean
           rg?: string | null
           rg_issue_date?: string | null
           rg_issuer?: string | null
@@ -2156,9 +2466,13 @@ export type Database = {
           address?: string | null
           address_complement?: string | null
           address_number?: string | null
+          admission_type?: string | null
           administrative_role?: string | null
+          baptism_place?: string | null
           baptized_at?: string | null
           birth_date?: string | null
+          birth_place?: string | null
+          cgadb_number?: string | null
           city?: string | null
           civil_document_notes?: string | null
           civil_document_status?: string
@@ -2167,27 +2481,38 @@ export type Database = {
           civil_document_url?: string | null
           congregation_id?: string | null
           consecration_date?: string | null
+          contact_pending?: boolean
           conversion_date?: string | null
           country_code?: string | null
           cpf?: string | null
+          cpf_pending?: boolean
           created_at?: string | null
           created_by?: string | null
+          education_level?: string | null
           email?: string | null
           father_name?: string | null
           full_name?: string
           gender?: string | null
           holy_spirit_baptism_date?: string | null
           id?: string
+          incomplete_registration?: boolean
           joined_at?: string | null
+          known_name?: string | null
+          legacy_code?: string | null
+          legacy_registration?: string | null
+          legacy_source?: string | null
           marital_status?: string | null
           member_code?: string | null
           member_role?: string | null
           mother_name?: string | null
+          nationality?: string | null
           neighborhood?: string | null
           notes?: string | null
           organization_id?: string
           phone?: string | null
           photo_url?: string | null
+          profession?: string | null
+          requires_review?: boolean
           rg?: string | null
           rg_issue_date?: string | null
           rg_issuer?: string | null
@@ -2203,6 +2528,521 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_addresses: {
+        Row: {
+          address_type: string
+          city: string | null
+          complement: string | null
+          country: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean
+          is_primary: boolean
+          member_id: string
+          neighborhood: string | null
+          notes: string | null
+          number: string | null
+          organization_id: string
+          reference_point: string | null
+          state: string | null
+          street: string | null
+          street_type: string | null
+          updated_at: string | null
+          zip_code: string | null
+        }
+        Insert: {
+          address_type?: string
+          city?: string | null
+          complement?: string | null
+          country?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean
+          is_primary?: boolean
+          member_id: string
+          neighborhood?: string | null
+          notes?: string | null
+          number?: string | null
+          organization_id: string
+          reference_point?: string | null
+          state?: string | null
+          street?: string | null
+          street_type?: string | null
+          updated_at?: string | null
+          zip_code?: string | null
+        }
+        Update: {
+          address_type?: string
+          city?: string | null
+          complement?: string | null
+          country?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean
+          is_primary?: boolean
+          member_id?: string
+          neighborhood?: string | null
+          notes?: string | null
+          number?: string | null
+          organization_id?: string
+          reference_point?: string | null
+          state?: string | null
+          street?: string | null
+          street_type?: string | null
+          updated_at?: string | null
+          zip_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_addresses_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_addresses_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_family: {
+        Row: {
+          birth_date: string | null
+          cpf: string | null
+          created_at: string | null
+          full_name: string
+          gender: string | null
+          id: string
+          is_active: boolean
+          member_id: string
+          notes: string | null
+          organization_id: string
+          phone: string | null
+          related_member_id: string | null
+          relation: string
+          updated_at: string | null
+        }
+        Insert: {
+          birth_date?: string | null
+          cpf?: string | null
+          created_at?: string | null
+          full_name: string
+          gender?: string | null
+          id?: string
+          is_active?: boolean
+          member_id: string
+          notes?: string | null
+          organization_id: string
+          phone?: string | null
+          related_member_id?: string | null
+          relation: string
+          updated_at?: string | null
+        }
+        Update: {
+          birth_date?: string | null
+          cpf?: string | null
+          created_at?: string | null
+          full_name?: string
+          gender?: string | null
+          id?: string
+          is_active?: boolean
+          member_id?: string
+          notes?: string | null
+          organization_id?: string
+          phone?: string | null
+          related_member_id?: string | null
+          relation?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_family_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_family_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_family_related_member_id_fkey"
+            columns: ["related_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_occurrences: {
+        Row: {
+          attachment_path: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          document_id: string | null
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          member_id: string
+          occurred_at: string
+          occurred_time: string | null
+          occurrence_type: string
+          organization_id: string
+          status: string
+          updated_at: string
+          valid_until: string | null
+          visibility: string
+        }
+        Insert: {
+          attachment_path?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          document_id?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          member_id: string
+          occurred_at?: string
+          occurred_time?: string | null
+          occurrence_type: string
+          organization_id: string
+          status?: string
+          updated_at?: string
+          valid_until?: string | null
+          visibility?: string
+        }
+        Update: {
+          attachment_path?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          document_id?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          member_id?: string
+          occurred_at?: string
+          occurred_time?: string | null
+          occurrence_type?: string
+          organization_id?: string
+          status?: string
+          updated_at?: string
+          valid_until?: string | null
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_occurrences_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_occurrences_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_occurrences_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_ordinations: {
+        Row: {
+          attachment_path: string | null
+          authority_member_id: string | null
+          authority_name: string | null
+          created_at: string
+          created_by: string | null
+          document_id: string | null
+          end_date: string | null
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          member_id: string
+          notes: string | null
+          ordination_date: string | null
+          ordination_type: string
+          organization_id: string
+          role_or_function: string
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attachment_path?: string | null
+          authority_member_id?: string | null
+          authority_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_id?: string | null
+          end_date?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          member_id: string
+          notes?: string | null
+          ordination_date?: string | null
+          ordination_type?: string
+          organization_id: string
+          role_or_function: string
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attachment_path?: string | null
+          authority_member_id?: string | null
+          authority_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_id?: string | null
+          end_date?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          member_id?: string
+          notes?: string | null
+          ordination_date?: string | null
+          ordination_type?: string
+          organization_id?: string
+          role_or_function?: string
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_ordinations_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_ordinations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_ordinations_authority_member_id_fkey"
+            columns: ["authority_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_ordinations_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_transfers: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          attachment_path: string | null
+          completed_at: string | null
+          created_at: string
+          destination_church_name: string | null
+          destination_organization_id: string | null
+          destination_type: string
+          direction: string
+          document_id: string | null
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          member_id: string
+          organization_id: string
+          origin_church_name: string | null
+          origin_organization_id: string | null
+          origin_type: string
+          reason: string | null
+          recommendation_letter_id: string | null
+          requested_at: string | null
+          requested_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          attachment_path?: string | null
+          completed_at?: string | null
+          created_at?: string
+          destination_church_name?: string | null
+          destination_organization_id?: string | null
+          destination_type?: string
+          direction: string
+          document_id?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          member_id: string
+          organization_id: string
+          origin_church_name?: string | null
+          origin_organization_id?: string | null
+          origin_type?: string
+          reason?: string | null
+          recommendation_letter_id?: string | null
+          requested_at?: string | null
+          requested_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          attachment_path?: string | null
+          completed_at?: string | null
+          created_at?: string
+          destination_church_name?: string | null
+          destination_organization_id?: string | null
+          destination_type?: string
+          direction?: string
+          document_id?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          member_id?: string
+          organization_id?: string
+          origin_church_name?: string | null
+          origin_organization_id?: string | null
+          origin_type?: string
+          reason?: string | null
+          recommendation_letter_id?: string | null
+          requested_at?: string | null
+          requested_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_transfers_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_transfers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_transfers_origin_organization_id_fkey"
+            columns: ["origin_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_transfers_destination_organization_id_fkey"
+            columns: ["destination_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_transfers_recommendation_letter_id_fkey"
+            columns: ["recommendation_letter_id"]
+            isOneToOne: false
+            referencedRelation: "recommendation_letters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_transfers_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_organization_history: {
+        Row: {
+          change_reason: string | null
+          changed_by: string | null
+          created_at: string
+          ended_at: string | null
+          id: string
+          link_type: string
+          member_id: string
+          organization_id: string
+          started_at: string
+        }
+        Insert: {
+          change_reason?: string | null
+          changed_by?: string | null
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          link_type: string
+          member_id: string
+          organization_id: string
+          started_at?: string
+        }
+        Update: {
+          change_reason?: string | null
+          changed_by?: string | null
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          link_type?: string
+          member_id?: string
+          organization_id?: string
+          started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_organization_history_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_organization_history_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -2492,6 +3332,33 @@ export type Database = {
           responsibility_type: string
           source_organization_id: string
         }[]
+      }
+      import_finance_transactions_bulk: {
+        Args: { p_rows: Json }
+        Returns: Json
+      }
+      register_member_history_event: {
+        Args: {
+          p_attachment_path?: string
+          p_description?: string
+          p_document_id?: string
+          p_history_type: string
+          p_legacy_code?: string
+          p_legacy_module?: string
+          p_legacy_source?: string
+          p_member_id: string
+          p_occurred_at?: string
+          p_source_id?: string
+          p_source_module?: string
+          p_source_table?: string
+          p_title: string
+          p_visibility?: string
+        }
+        Returns: string
+      }
+      seed_assembleia_de_deus_finance_template: {
+        Args: { p_organization_id: string }
+        Returns: undefined
       }
       get_my_managed_group_ids: {
         Args: { _organization_id: string }

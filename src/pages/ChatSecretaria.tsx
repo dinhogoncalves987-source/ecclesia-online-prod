@@ -125,18 +125,18 @@ export default function ChatSecretaria() {
     if (processedNotifThread.current) return;
     const params = new URLSearchParams(location.search);
     const threadId = params.get("thread");
-    if (!threadId || !church?.id) return;
+    if (!threadId || !church?.id || !user?.id) return;
 
     processedNotifThread.current = true;
     navigate(pathname, { replace: true });
 
-    void fetchThreadById(church.id, threadId).then((thread) => {
+    void fetchThreadById(church.id, threadId, user.id).then((thread) => {
       if (thread) {
         setForcedThread(thread);
         setRefetchKey((k) => k + 1);
       }
     });
-  }, [location.search, church?.id, navigate, pathname]);
+  }, [location.search, church?.id, user?.id, navigate, pathname]);
 
   // tópico geral
   const [newSubject, setNewSubject] = useState("");

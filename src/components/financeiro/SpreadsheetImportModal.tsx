@@ -45,6 +45,25 @@ function buildTxPayload(
     notes: tx.notes ?? null,
     account_category_id: tx.account_category_id ?? null,
     financial_account_id: tx.financial_account_id ?? null,
+    // Campos ricos do CONFIADCS — antes eram calculados pelo mapper e
+    // descartados aqui, perdendo grupo contábil, congregação/distrito de
+    // origem, tipo de documento, beneficiário/contribuinte, coletor e
+    // tesoureiro de cada lançamento importado.
+    accounting_group_id: tx.accounting_group_id ?? null,
+    document_type_id: tx.document_type_id ?? null,
+    document_number: tx.document_number ?? null,
+    congregation_id: tx.congregation_id ?? null,
+    district_id: tx.district_id ?? null,
+    supplier_beneficiary_name: tx.supplier_beneficiary_name ?? null,
+    supplier_beneficiary_document: tx.supplier_beneficiary_document ?? null,
+    contributor_name: tx.contributor_name ?? null,
+    contributor_document: tx.contributor_document ?? null,
+    collector_name: tx.collector_name ?? null,
+    treasurer_name: tx.treasurer_name ?? null,
+    period_label: tx.period_label ?? null,
+    legacy_record_number: tx.legacy_record_number ?? null,
+    issue_date: tx.issue_date ?? null,
+    origin: tx.origin ?? "confiadcs",
   };
   // Remove campos undefined
   return Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined));
@@ -60,16 +79,27 @@ async function loadAuxData(orgId: string): Promise<AuxLookup> {
 
   const [accountingGroups, accountCategories, documentTypes, financialAccounts, orgs] =
     await Promise.all([
-      safe(() => supabase.from("finance_accounting_groups" as never).select("id, name").eq("organization_id", orgId) as never),
+      safe(() => supabase.from("finance_accounting_groups" as never).select("id, name, code").eq("organization_id", orgId) as never),
       safe(() => supabase.from("finance_account_categories" as never).select("id, name, code").eq("organization_id", orgId) as never),
       safe(() => supabase.from("finance_document_types" as never).select("id, name, code").eq("organization_id", orgId) as never),
-      safe(() => supabase.from("finance_accounts" as never).select("id, name") as never),
+      safe(() => supabase.from("finance_accounts" as never).select("id, name").eq("organization_id", orgId) as never),
       safe(() => supabase.from("organizations").select("id, name, organization_type").eq("active", true) as never),
     ]);
 
   const orgsArr = orgs as { id: string; name: string; organization_type: string | null }[];
-  const congregations = orgsArr.filter(o => o.organization_type === "congregacao" || o.organization_type === "congregação");
-  const districts = orgsArr.filter(o => o.organization_type === "setor" || o.organization_type === "distrito");
+  // "subsede" funciona como congregação/sub-distrito na hierarquia real da AD
+  // (ex.: "Subsede Distrital Ana Rech") e precisa ser resolvível nos dois
+  // sentidos; "matriz" cobre lançamentos lançados como "SEDE"/"MATRIZ"/"TODAS".
+  const congregations = orgsArr.filter(
+    o => o.organization_type === "congregacao" || o.organization_type === "congregação" || o.organization_type === "subsede",
+  );
+  const districts = orgsArr.filter(
+    o =>
+      o.organization_type === "setor" ||
+      o.organization_type === "distrito" ||
+      o.organization_type === "subsede" ||
+      o.organization_type === "matriz",
+  );
 
   return {
     accountingGroups: accountingGroups as AuxLookup["accountingGroups"],

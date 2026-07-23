@@ -76,6 +76,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Financeiro = lazy(() => import("./pages/Financeiro"));
 
 const Membros = lazy(() => import("./pages/Membros"));
+const MemberProfile = lazy(() => import("./pages/MemberProfile"));
 
 const Agenda = lazy(() => import("./pages/Agenda"));
 
@@ -217,6 +218,7 @@ const App = () => (
               <Route path="/admin/financeiro" element={<ProtectedRoute><Financeiro /></ProtectedRoute>} />
 
               <Route path="/admin/membros" element={<ProtectedRoute><Membros /></ProtectedRoute>} />
+              <Route path="/admin/membros/:memberId" element={<ProtectedRoute><MemberProfile /></ProtectedRoute>} />
 
               <Route path="/admin/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
 

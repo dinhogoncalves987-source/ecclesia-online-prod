@@ -42,10 +42,10 @@ export function InternalChatShell({
       return;
     }
     setThreadLoading(true);
-    const existing = await fetchCampaignSharedThread(organizationId, campaignId);
+    const existing = await fetchCampaignSharedThread(organizationId, campaignId, user?.id ?? null);
     setThread(existing);
     setThreadLoading(false);
-  }, [organizationId, campaignId]);
+  }, [organizationId, campaignId, user?.id]);
 
   useEffect(() => {
     void loadThread();
