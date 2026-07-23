@@ -5,12 +5,12 @@
  * componente nunca decide autorização ou estado — apenas mostra o
  * resultado e trata o erro retornado pela RPC.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, X, Plus, UserPlus, ClipboardCheck, CalendarPlus, GraduationCap } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { useRole } from "@/hooks/useRole";
 import {
   loadDiscipleshipClass, loadDiscipleshipCourseById, loadDiscipleshipStaffAssignments,
   assignDiscipleshipStaff, endDiscipleshipStaffAssignment, loadDiscipleshipEnrollments,
@@ -18,11 +18,12 @@ import {
   loadDiscipleshipSessions, createDiscipleshipSession, loadDiscipleshipAttendance,
   recordDiscipleshipAttendance, loadDiscipleshipAssessments, createDiscipleshipAssessment,
   loadDiscipleshipAssessmentResults, recordDiscipleshipAssessmentResult, loadDiscipleshipLessons,
-  loadDiscipleshipLocations, loadDiscipleshipAttendanceForEnrollment, loadDiscipleshipAssessmentResultsForEnrollment,
-  updateDiscipleshipClassStatus,
+  loadDiscipleshipLocations, updateDiscipleshipClassStatus, getDiscipleshipMemberLabels,
+  updateDiscipleshipSessionStatus, updateDiscipleshipAssessmentStatus,
+  loadDiscipleshipFollowups, createDiscipleshipFollowup,
   type DiscipleshipClassRow, type DiscipleshipCourseRow, type DiscipleshipStaffAssignmentRow,
   type DiscipleshipEnrollmentRow, type DiscipleshipSessionRow, type DiscipleshipAssessmentRow,
-  type DiscipleshipLessonRow, type DiscipleshipLocationRow,
+  type DiscipleshipLessonRow, type DiscipleshipLocationRow, type DiscipleshipFollowupRow,
 } from "@/lib/discipleship/service";
 import {
   DISCIPLESHIP_CLASS_STATUSES, DISCIPLESHIP_CLASS_STATUS_LABELS, DISCIPLESHIP_STAFF_ROLES,
@@ -31,7 +32,7 @@ import {
   type DiscipleshipClassStatus, type DiscipleshipStaffRole, type DiscipleshipEnrollmentStatus,
   type DiscipleshipAttendanceStatus, type DiscipleshipAssessmentType,
 } from "@/lib/discipleship/constants";
-import { isValidClassStatusTransition, isValidEnrollmentStatusTransition, checkCompletionEligibility } from "@/lib/discipleship/rules";
+import { isValidClassStatusTransition, isValidEnrollmentStatusTransition } from "@/lib/discipleship/rules";
 import { FormInputLabeled, FormSelectLabeled, FormTextareaLabeled, StatusPill, EmptyState } from "./discipuladoFormHelpers";
 import { DiscipuladoMemberPicker } from "./DiscipuladoMemberPicker";
 
@@ -44,10 +45,10 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "avaliacoes", label: "Avaliações" },
 ];
 
-async function loadMemberNames(ids: string[]): Promise<Map<string, string>> {
+async function loadMemberNames(organizationId: string, ids: string[]): Promise<Map<string, string>> {
   if (ids.length === 0) return new Map();
-  const { data } = await supabase.from("members").select("id, full_name, known_name").in("id", ids);
-  return new Map((data ?? []).map((m) => [m.id, m.known_name || m.full_name]));
+  const { rows } = await getDiscipleshipMemberLabels(organizationId, ids);
+  return new Map(rows.map((m) => [m.id, m.known_name || m.full_name]));
 }
 
 export function DiscipuladoClassDetail({ classId, organizationId, onClose, onChanged }: {
@@ -67,11 +68,18 @@ export function DiscipuladoClassDetail({ classId, organizationId, onClose, onCha
   const [lessons, setLessons] = useState<DiscipleshipLessonRow[]>([]);
   const [locations, setLocations] = useState<DiscipleshipLocationRow[]>([]);
   const [memberNames, setMemberNames] = useState<Map<string, string>>(new Map());
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const reloadAll = async () => {
+  const reloadAll = useCallback(async () => {
     setLoading(true);
-    const { row: cls } = await loadDiscipleshipClass(classId);
-    if (!cls) { setLoading(false); return; }
+    setLoadError(null);
+    const { row: cls, error: classError } = await loadDiscipleshipClass(classId);
+    if (!cls) {
+      setClassRow(null);
+      setLoadError(classError ?? "Turma não encontrada.");
+      setLoading(false);
+      return;
+    }
     setClassRow(cls);
     const [{ row: courseRow }, staffRes, enrollmentsRes, sessionsRes, assessmentsRes, lessonsRes, locationsRes] = await Promise.all([
       loadDiscipleshipCourseById(cls.course_id),
@@ -91,11 +99,16 @@ export function DiscipuladoClassDetail({ classId, organizationId, onClose, onCha
     setLocations(locationsRes.rows);
 
     const ids = [...new Set([...staffRes.rows.map((s) => s.member_id), ...enrollmentsRes.rows.map((e) => e.member_id)])];
-    setMemberNames(await loadMemberNames(ids));
+    setMemberNames(await loadMemberNames(organizationId, ids));
+    const firstError = [
+      staffRes.error, enrollmentsRes.error, sessionsRes.error,
+      assessmentsRes.error, lessonsRes.error, locationsRes.error,
+    ].find(Boolean);
+    if (firstError) setLoadError(firstError.message);
     setLoading(false);
-  };
+  }, [classId, organizationId]);
 
-  useEffect(() => { reloadAll(); }, [classId]);
+  useEffect(() => { void reloadAll(); }, [reloadAll]);
 
   const notifyChanged = () => { reloadAll(); onChanged(); };
 
@@ -108,8 +121,12 @@ export function DiscipuladoClassDetail({ classId, organizationId, onClose, onCha
           </DialogTitle>
         </DialogHeader>
 
-        {loading || !classRow ? (
+        {loading ? (
           <div className="flex items-center justify-center py-16 text-muted-foreground gap-2"><Loader2 className="animate-spin" size={18} /> Carregando turma…</div>
+        ) : loadError || !classRow ? (
+          <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+            Não foi possível carregar esta turma. {loadError}
+          </div>
         ) : (
           <div className="space-y-4">
             {/* Abas — botões nativos, navegáveis por teclado, sem scroll horizontal obrigatório */}
@@ -359,9 +376,14 @@ function EnrollmentDetailDialog({ enrollment, course, memberName, onClose, onCha
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const { hasCapability } = useRole();
+  const canOverride = hasCapability("discipleship.manage");
   const [loading, setLoading] = useState(true);
-  const [attendanceStatuses, setAttendanceStatuses] = useState<DiscipleshipAttendanceStatus[]>([]);
-  const [scoreEntries, setScoreEntries] = useState<{ score: number; weight: number }[]>([]);
+  const [progress, setProgress] = useState<Awaited<ReturnType<typeof getDiscipleshipEnrollmentProgress>>["data"]>(null);
+  const [followups, setFollowups] = useState<DiscipleshipFollowupRow[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [followupObservation, setFollowupObservation] = useState("");
+  const [followupVisibility, setFollowupVisibility] = useState<"normal" | "confidential">("normal");
   const [overrideJustification, setOverrideJustification] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -369,13 +391,15 @@ function EnrollmentDetailDialog({ enrollment, course, memberName, onClose, onCha
     let cancelled = false;
     async function load() {
       setLoading(true);
-      const [attendanceRes, resultsRes] = await Promise.all([
-        loadDiscipleshipAttendanceForEnrollment(enrollment.id),
-        loadDiscipleshipAssessmentResultsForEnrollment(enrollment.id),
+      setLoadError(null);
+      const [progressRes, followupsRes] = await Promise.all([
+        getDiscipleshipEnrollmentProgress(enrollment.id),
+        loadDiscipleshipFollowups(enrollment.id),
       ]);
       if (!cancelled) {
-        setAttendanceStatuses(attendanceRes.rows.map((a) => a.status as DiscipleshipAttendanceStatus));
-        setScoreEntries(resultsRes.rows.map((r) => ({ score: r.score, weight: 1 })));
+        setProgress(progressRes.data);
+        setFollowups(followupsRes.rows);
+        setLoadError(progressRes.error ?? followupsRes.error?.message ?? null);
         setLoading(false);
       }
     }
@@ -383,16 +407,21 @@ function EnrollmentDetailDialog({ enrollment, course, memberName, onClose, onCha
     return () => { cancelled = true; };
   }, [enrollment.id]);
 
-  const eligibility = useMemo(() => checkCompletionEligibility({
-    course: {
-      requiresAttendance: course.requires_attendance,
-      minimumAttendancePercentage: course.minimum_attendance_percentage,
-      requiresAssessment: course.requires_assessment,
-      minimumPassingScore: course.minimum_passing_score,
-    },
-    attendanceStatuses,
-    assessmentResults: scoreEntries,
-  }), [course, attendanceStatuses, scoreEntries]);
+  const attendanceEligible = !course.requires_attendance || (
+    progress !== null
+    && progress.total_completed_sessions > 0
+    && progress.missing_attendance_records === 0
+    && (progress.attendance_percentage ?? 0) >= course.minimum_attendance_percentage
+  );
+  const assessmentEligible = !course.requires_assessment || (
+    progress !== null
+    && progress.required_assessments > 0
+    && progress.missing_assessment_results === 0
+    && progress.average_score !== null
+    && course.minimum_passing_score !== null
+    && progress.average_score >= course.minimum_passing_score
+  );
+  const eligible = attendanceEligible && assessmentEligible;
 
   const currentStatus = enrollment.status as DiscipleshipEnrollmentStatus;
   const nextOptions = (["ativo", "concluido", "desistente", "transferido", "cancelado"] as DiscipleshipEnrollmentStatus[])
@@ -413,42 +442,79 @@ function EnrollmentDetailDialog({ enrollment, course, memberName, onClose, onCha
     onClose();
   };
 
+  const handleFollowup = async () => {
+    if (!followupObservation.trim()) {
+      toast.error("Escreva a observação do acompanhamento.");
+      return;
+    }
+    setSaving(true);
+    const { error } = await createDiscipleshipFollowup({
+      enrollment_id: enrollment.id,
+      observation: followupObservation.trim(),
+      visibility: followupVisibility,
+    });
+    setSaving(false);
+    if (error) {
+      toast.error(`Não foi possível registrar o acompanhamento: ${error}`);
+      return;
+    }
+    toast.success("Acompanhamento registrado.");
+    setFollowupObservation("");
+    const refreshed = await loadDiscipleshipFollowups(enrollment.id);
+    setFollowups(refreshed.rows);
+  };
+
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{memberName} — progresso</DialogTitle></DialogHeader>
         {loading ? (
           <div className="flex items-center gap-2 text-muted-foreground text-sm py-6"><Loader2 className="animate-spin" size={14} /> Carregando…</div>
+        ) : loadError ? (
+          <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+            Não foi possível carregar o progresso: {loadError}
+          </p>
         ) : (
           <div className="space-y-3">
             <StatusPill label={DISCIPLESHIP_ENROLLMENT_STATUS_LABELS[currentStatus]} tone="info" />
             {course.requires_attendance && (
               <p className="text-sm">
-                Frequência: {eligibility.attendancePercentage !== null ? `${eligibility.attendancePercentage.toFixed(1)}%` : "sem aulas lançadas ainda"}
+                Frequência: {progress?.attendance_percentage !== null && progress?.attendance_percentage !== undefined ? `${progress.attendance_percentage.toFixed(1)}%` : "sem aulas realizadas ainda"}
                 {" "}(mínimo exigido: {course.minimum_attendance_percentage}%)
+              </p>
+            )}
+            {course.requires_attendance && (progress?.missing_attendance_records ?? 0) > 0 && (
+              <p className="text-xs text-amber-600">
+                Há {progress?.missing_attendance_records} frequência(s) pendente(s) de lançamento.
               </p>
             )}
             {course.requires_assessment && (
               <p className="text-sm">
-                Nota média: {eligibility.averageScore !== null ? eligibility.averageScore.toFixed(2) : "sem avaliações lançadas ainda"}
+                Nota média normalizada (0–10): {progress?.average_score !== null && progress?.average_score !== undefined ? progress.average_score.toFixed(2) : "sem avaliações lançadas ainda"}
                 {course.minimum_passing_score !== null ? ` (mínimo exigido: ${course.minimum_passing_score})` : ""}
+              </p>
+            )}
+            {course.requires_assessment && (progress?.missing_assessment_results ?? 0) > 0 && (
+              <p className="text-xs text-amber-600">
+                Há {progress?.missing_assessment_results} avaliação(ões) sem nota.
               </p>
             )}
 
             {nextOptions.includes("concluido") && (
               <div className="p-3 rounded-lg border border-border/60 space-y-2">
                 <p className="text-sm font-medium">Conclusão</p>
-                {eligibility.eligible ? (
+                {eligible ? (
                   <p className="text-sm text-emerald-600">Elegível para conclusão — cumpre as regras do curso.</p>
                 ) : (
                   <div className="space-y-1.5">
-                    {eligibility.reasons.map((r, i) => <p key={i} className="text-xs text-amber-600">{r}</p>)}
+                    {!attendanceEligible && <p className="text-xs text-amber-600">Frequência incompleta ou abaixo do mínimo.</p>}
+                    {!assessmentEligible && <p className="text-xs text-amber-600">Avaliações incompletas ou nota abaixo do mínimo.</p>}
                   </div>
                 )}
                 <div className="flex gap-2">
-                  <Button size="sm" disabled={saving || !eligibility.eligible} onClick={() => handleTransition("concluido")}>Concluir</Button>
+                  <Button size="sm" disabled={saving || !eligible} onClick={() => handleTransition("concluido")}>Concluir</Button>
                 </div>
-                {!eligibility.eligible && (
+                {!eligible && canOverride && (
                   <div className="space-y-1.5 pt-1">
                     <FormTextareaLabeled label="Justificativa da exceção (obrigatória para concluir fora da regra)" value={overrideJustification} onChange={setOverrideJustification} rows={2} />
                     <Button size="sm" variant="outline" disabled={saving || !overrideJustification.trim()} onClick={() => handleTransition("concluido", true)}>
@@ -458,6 +524,43 @@ function EnrollmentDetailDialog({ enrollment, course, memberName, onClose, onCha
                 )}
               </div>
             )}
+
+            <div className="space-y-2 rounded-lg border border-border/60 p-3">
+              <p className="text-sm font-medium">Acompanhamento individual</p>
+              <FormTextareaLabeled
+                label="Nova observação"
+                value={followupObservation}
+                onChange={setFollowupObservation}
+                rows={3}
+              />
+              {hasCapability("discipleship.confidential") && (
+                <FormSelectLabeled
+                  label="Visibilidade"
+                  value={followupVisibility}
+                  onChange={(value) => setFollowupVisibility(value as "normal" | "confidential")}
+                  options={[
+                    { value: "normal", label: "Normal" },
+                    { value: "confidential", label: "Confidencial" },
+                  ]}
+                />
+              )}
+              <Button size="sm" variant="outline" disabled={saving || !followupObservation.trim()} onClick={handleFollowup}>
+                Registrar acompanhamento
+              </Button>
+              {followups.length > 0 && (
+                <div className="space-y-1.5 border-t border-border/60 pt-2">
+                  {followups.map((followup) => (
+                    <div key={followup.id} className="rounded-md bg-secondary/40 p-2 text-sm">
+                      <p>{followup.observation}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {new Date(`${followup.occurred_at}T00:00:00`).toLocaleDateString("pt-BR")}
+                        {followup.visibility === "confidential" ? " · Confidencial" : ""}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="flex flex-wrap gap-2">
               {nextOptions.filter((s) => s !== "concluido").map((status) => (
@@ -490,8 +593,21 @@ function EncontrosTab({ classRow, lessons, locations, staff, memberNames, enroll
 }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [attendanceSessionId, setAttendanceSessionId] = useState<string | null>(null);
+  const [savingSessionId, setSavingSessionId] = useState<string | null>(null);
   const closed = classRow.status === "concluida" || classRow.status === "cancelada" || classRow.status === "arquivada";
   const lessonTitleById = new Map(lessons.map((l) => [l.id, l.title]));
+
+  const handleSessionStatus = async (sessionId: string, status: "realizada" | "cancelada") => {
+    setSavingSessionId(sessionId);
+    const { error } = await updateDiscipleshipSessionStatus(sessionId, status);
+    setSavingSessionId(null);
+    if (error) {
+      toast.error(`Não foi possível atualizar o encontro: ${error}`);
+      return;
+    }
+    toast.success(status === "realizada" ? "Encontro marcado como realizado." : "Encontro cancelado.");
+    onChanged();
+  };
 
   return (
     <div className="space-y-3">
@@ -514,10 +630,37 @@ function EncontrosTab({ classRow, lessons, locations, staff, memberNames, enroll
                   {new Date(s.session_date + "T00:00:00").toLocaleDateString("pt-BR")}
                   {s.lesson_id ? ` — ${lessonTitleById.get(s.lesson_id) ?? "Lição"}` : ""}
                 </p>
+                <p className="text-xs text-muted-foreground">
+                  {s.status === "agendada" ? "Agendado" : s.status === "realizada" ? "Realizado" : "Cancelado"}
+                </p>
               </div>
-              <Button size="sm" variant="ghost" onClick={() => setAttendanceSessionId(s.id)}>
-                <ClipboardCheck size={14} className="mr-1.5" /> Frequência
-              </Button>
+              <div className="flex flex-wrap justify-end gap-1">
+                {s.status === "agendada" && !closed && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={savingSessionId === s.id}
+                      onClick={() => handleSessionStatus(s.id, "realizada")}
+                    >
+                      Marcar realizado
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={savingSessionId === s.id}
+                      onClick={() => handleSessionStatus(s.id, "cancelada")}
+                    >
+                      Cancelar
+                    </Button>
+                  </>
+                )}
+                {s.status === "realizada" && (
+                  <Button size="sm" variant="ghost" onClick={() => setAttendanceSessionId(s.id)}>
+                    <ClipboardCheck size={14} className="mr-1.5" /> Frequência
+                  </Button>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -615,7 +758,10 @@ function AttendanceDialog({ sessionId, enrollments, memberNames, onClose, onSave
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const relevantEnrollments = enrollments.filter((e) => e.status === "ativo" || e.status === "matriculado");
+  const relevantEnrollments = useMemo(
+    () => enrollments.filter((e) => e.status === "ativo" || e.status === "matriculado"),
+    [enrollments],
+  );
   const [statuses, setStatuses] = useState<Record<string, DiscipleshipAttendanceStatus>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -629,7 +775,7 @@ function AttendanceDialog({ sessionId, enrollments, memberNames, onClose, onSave
         const initial: Record<string, DiscipleshipAttendanceStatus> = {};
         for (const e of relevantEnrollments) {
           const existing = rows.find((r) => r.enrollment_id === e.id);
-          initial[e.id] = (existing?.status as DiscipleshipAttendanceStatus) ?? "presente";
+          initial[e.id] = (existing?.status as DiscipleshipAttendanceStatus) ?? "nao_lancado";
         }
         setStatuses(initial);
         setLoading(false);
@@ -637,11 +783,11 @@ function AttendanceDialog({ sessionId, enrollments, memberNames, onClose, onSave
     }
     load();
     return () => { cancelled = true; };
-  }, [sessionId]);
+  }, [sessionId, relevantEnrollments]);
 
   const handleSave = async () => {
     setSaving(true);
-    const entries = relevantEnrollments.map((e) => ({ enrollment_id: e.id, status: statuses[e.id] ?? "presente" }));
+    const entries = relevantEnrollments.map((e) => ({ enrollment_id: e.id, status: statuses[e.id] ?? "nao_lancado" }));
     const { error } = await recordDiscipleshipAttendance(sessionId, entries);
     setSaving(false);
     if (error) { toast.error(`Não foi possível salvar a frequência: ${error}`); return; }
@@ -660,12 +806,20 @@ function AttendanceDialog({ sessionId, enrollments, memberNames, onClose, onSave
           <EmptyState title="Nenhum aluno ativo nesta turma" description="Matricule alunos antes de lançar frequência." />
         ) : (
           <div className="space-y-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setStatuses(Object.fromEntries(relevantEnrollments.map((e) => [e.id, "presente"])))}
+            >
+              Marcar todos como presentes
+            </Button>
             {relevantEnrollments.map((e) => (
               <div key={e.id} className="flex items-center justify-between gap-2 p-2 rounded-lg border border-border/60">
                 <span className="text-sm truncate">{memberNames.get(e.member_id) ?? "Membro"}</span>
                 <select
                   aria-label={`Frequência de ${memberNames.get(e.member_id) ?? "membro"}`}
-                  value={statuses[e.id] ?? "presente"}
+                  value={statuses[e.id] ?? "nao_lancado"}
                   onChange={(ev) => setStatuses((prev) => ({ ...prev, [e.id]: ev.target.value as DiscipleshipAttendanceStatus }))}
                   className="px-2 py-1 rounded-lg border border-input bg-background text-sm"
                 >
@@ -697,7 +851,20 @@ function AvaliacoesTab({ classRow, assessments, enrollments, memberNames, onChan
 }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [resultsAssessmentId, setResultsAssessmentId] = useState<string | null>(null);
+  const [savingAssessmentId, setSavingAssessmentId] = useState<string | null>(null);
   const closed = classRow.status === "concluida" || classRow.status === "cancelada" || classRow.status === "arquivada";
+
+  const handleAssessmentStatus = async (assessmentId: string, status: "aplicada" | "cancelada") => {
+    setSavingAssessmentId(assessmentId);
+    const { error } = await updateDiscipleshipAssessmentStatus(assessmentId, status);
+    setSavingAssessmentId(null);
+    if (error) {
+      toast.error(`Não foi possível atualizar a avaliação: ${error}`);
+      return;
+    }
+    toast.success(status === "aplicada" ? "Avaliação marcada como aplicada." : "Avaliação cancelada.");
+    onChanged();
+  };
 
   return (
     <div className="space-y-3">
@@ -716,9 +883,39 @@ function AvaliacoesTab({ classRow, assessments, enrollments, memberNames, onChan
             <div key={a.id} className="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-border/60">
               <div className="min-w-0">
                 <p className="text-sm truncate">{a.title}</p>
-                <p className="text-xs text-muted-foreground">{DISCIPLESHIP_ASSESSMENT_TYPE_LABELS[a.assessment_type as DiscipleshipAssessmentType]} · nota máx. {a.max_score}</p>
+                <p className="text-xs text-muted-foreground">
+                  {DISCIPLESHIP_ASSESSMENT_TYPE_LABELS[a.assessment_type as DiscipleshipAssessmentType]}
+                  {" · "}nota máx. {a.max_score}
+                  {" · "}{a.status === "planejada" ? "Planejada" : a.status === "aplicada" ? "Aplicada" : "Cancelada"}
+                </p>
               </div>
-              <Button size="sm" variant="ghost" onClick={() => setResultsAssessmentId(a.id)}>Lançar notas</Button>
+              <div className="flex flex-wrap justify-end gap-1">
+                {a.status === "planejada" && !closed && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={savingAssessmentId === a.id}
+                      onClick={() => handleAssessmentStatus(a.id, "aplicada")}
+                    >
+                      Marcar aplicada
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={savingAssessmentId === a.id}
+                      onClick={() => handleAssessmentStatus(a.id, "cancelada")}
+                    >
+                      Cancelar
+                    </Button>
+                  </>
+                )}
+                {a.status === "aplicada" && (
+                  <Button size="sm" variant="ghost" onClick={() => setResultsAssessmentId(a.id)}>
+                    Lançar notas
+                  </Button>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -773,7 +970,7 @@ function CreateAssessmentDialog({ classId, onClose, onCreated }: { classId: stri
         <div className="space-y-3">
           <FormInputLabeled label="Título" value={title} onChange={setTitle} required placeholder="Ex.: Avaliação da Lição 5" />
           <FormSelectLabeled label="Tipo" value={assessmentType} onChange={(v) => setAssessmentType(v as DiscipleshipAssessmentType)} options={DISCIPLESHIP_ASSESSMENT_TYPES.map((t) => ({ value: t, label: DISCIPLESHIP_ASSESSMENT_TYPE_LABELS[t] }))} />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <FormInputLabeled label="Nota máxima" type="number" min={0.01} step="0.01" value={maxScore} onChange={setMaxScore} />
             <FormInputLabeled label="Peso" type="number" min={0.01} step="0.01" value={weight} onChange={setWeight} />
           </div>
@@ -817,18 +1014,29 @@ function AssessmentResultsDialog({ assessment, enrollments, memberNames, onClose
   }, [assessment.id]);
 
   const handleSave = async () => {
-    setSaving(true);
     const entries = Object.entries(scores).filter(([, v]) => v.trim() !== "");
+    const invalidEntry = entries.find(([, value]) => {
+      const score = Number(value);
+      return !Number.isFinite(score) || score < 0 || score > assessment.max_score;
+    });
+    if (invalidEntry) {
+      const [enrollmentId] = invalidEntry;
+      toast.error(`Nota inválida para ${memberNames.get(enrollments.find((e) => e.id === enrollmentId)?.member_id ?? "") ?? "aluno"} (deve estar entre 0 e ${assessment.max_score})`);
+      return;
+    }
+
+    setSaving(true);
+    const failures: string[] = [];
     for (const [enrollmentId, value] of entries) {
       const score = Number(value);
-      if (!Number.isFinite(score) || score < 0 || score > assessment.max_score) {
-        toast.error(`Nota inválida para ${memberNames.get(enrollments.find((e) => e.id === enrollmentId)?.member_id ?? "") ?? "aluno"} (deve estar entre 0 e ${assessment.max_score})`);
-        continue;
-      }
       const { error } = await recordDiscipleshipAssessmentResult({ assessment_id: assessment.id, enrollment_id: enrollmentId, score });
-      if (error) toast.error(`Não foi possível salvar a nota: ${error}`);
+      if (error) failures.push(error);
     }
     setSaving(false);
+    if (failures.length > 0) {
+      toast.error(`Não foi possível salvar ${failures.length} nota(s): ${failures[0]}`);
+      return;
+    }
     toast.success("Notas salvas.");
     onSaved();
     onClose();

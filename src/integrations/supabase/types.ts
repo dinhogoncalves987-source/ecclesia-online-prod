@@ -4022,6 +4022,14 @@ export type Database = {
         Args: { p_class_id: string; p_status: string }
         Returns: undefined
       }
+      update_discipleship_session_status: {
+        Args: { p_session_id: string; p_status: string }
+        Returns: undefined
+      }
+      update_discipleship_assessment_status: {
+        Args: { p_assessment_id: string; p_status: string }
+        Returns: undefined
+      }
       assign_discipleship_staff: {
         Args: {
           p_class_id: string
@@ -4085,6 +4093,31 @@ export type Database = {
       mark_discipleship_certificate_issued: {
         Args: { p_document_id: string; p_enrollment_id: string }
         Returns: undefined
+      }
+      search_discipleship_members: {
+        Args: {
+          p_limit?: number
+          p_organization_id: string
+          p_query?: string
+        }
+        Returns: {
+          full_name: string
+          id: string
+          known_name: string | null
+          member_code: string | null
+        }[]
+      }
+      get_discipleship_member_labels: {
+        Args: {
+          p_member_ids: string[]
+          p_organization_id: string
+        }
+        Returns: {
+          full_name: string
+          id: string
+          known_name: string | null
+          member_code: string | null
+        }[]
       }
       has_org_access_permission: {
         Args: {

@@ -14,7 +14,7 @@ import {
   type DiscipleshipSessionRow,
 } from "@/lib/discipleship/service";
 import { calculateAttendancePercentage } from "@/lib/discipleship/rules";
-import { DISCIPLESHIP_ATTENDANCE_COUNTED_STATUSES, type DiscipleshipAttendanceStatus } from "@/lib/discipleship/constants";
+import { type DiscipleshipAttendanceStatus } from "@/lib/discipleship/constants";
 import { EmptyState } from "./discipuladoFormHelpers";
 
 type OverviewData = {
@@ -29,12 +29,14 @@ type OverviewData = {
 export function DiscipuladoOverview({ organizationId }: { organizationId: string }) {
   const [loading, setLoading] = useState(true);
   const [moduleUnavailable, setModuleUnavailable] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [data, setData] = useState<OverviewData | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoading(true);
+      setLoadError(null);
       const [coursesRes, classesRes] = await Promise.all([
         loadDiscipleshipCourses(organizationId),
         loadDiscipleshipClasses(organizationId),
@@ -46,14 +48,35 @@ export function DiscipuladoOverview({ organizationId }: { organizationId: string
         if (!cancelled) { setModuleUnavailable(true); setLoading(false); }
         return;
       }
+      if (coursesRes.error || classesRes.error) {
+        if (!cancelled) {
+          setLoadError(coursesRes.error?.message ?? classesRes.error?.message ?? "Não foi possível carregar o Discipulado.");
+          setLoading(false);
+        }
+        return;
+      }
 
       const classIds = classesRes.rows.map((c) => c.id);
       const [enrollmentsRes, sessionsRes] = await Promise.all([
         loadDiscipleshipEnrollmentsForClasses(classIds),
         loadDiscipleshipSessionsForClasses(classIds),
       ]);
+      if (enrollmentsRes.error || sessionsRes.error) {
+        if (!cancelled) {
+          setLoadError(enrollmentsRes.error?.message ?? sessionsRes.error?.message ?? "Não foi possível carregar os registros acadêmicos.");
+          setLoading(false);
+        }
+        return;
+      }
       const sessionIds = sessionsRes.rows.map((s) => s.id);
       const attendanceRes = await loadDiscipleshipAttendanceForSessions(sessionIds);
+      if (attendanceRes.error) {
+        if (!cancelled) {
+          setLoadError(attendanceRes.error.message);
+          setLoading(false);
+        }
+        return;
+      }
 
       const classById = new Map(classesRes.rows.map((c) => [c.id, c]));
       const courseById = new Map(coursesRes.rows.map((c) => [c.id, c]));
@@ -68,29 +91,42 @@ export function DiscipuladoOverview({ organizationId }: { organizationId: string
           return { ...s, className: cls?.name ?? "Turma", courseName: course?.name ?? "Curso" };
         });
 
-      const attendancePercentage = calculateAttendancePercentage(
-        attendanceRes.rows
-          .filter((a) => (DISCIPLESHIP_ATTENDANCE_COUNTED_STATUSES as readonly string[]).includes(a.status))
-          .map((a) => a.status as DiscipleshipAttendanceStatus),
-      );
-
-      // Pendência simples: matrícula ativa numa turma cujo curso exige
-      // frequência e cuja frequência lançada já está abaixo do mínimo.
-      const attendanceByEnrollment = new Map<string, DiscipleshipAttendanceStatus[]>();
+      const attendanceByEnrollmentAndSession = new Map<string, DiscipleshipAttendanceStatus>();
       for (const a of attendanceRes.rows) {
-        const list = attendanceByEnrollment.get(a.enrollment_id) ?? [];
-        list.push(a.status as DiscipleshipAttendanceStatus);
-        attendanceByEnrollment.set(a.enrollment_id, list);
+        attendanceByEnrollmentAndSession.set(
+          `${a.enrollment_id}:${a.session_id}`,
+          a.status as DiscipleshipAttendanceStatus,
+        );
       }
+
+      const completedSessionsByClass = new Map<string, DiscipleshipSessionRow[]>();
+      for (const session of sessionsRes.rows) {
+        if (session.status !== "realizada") continue;
+        const list = completedSessionsByClass.get(session.class_id) ?? [];
+        list.push(session);
+        completedSessionsByClass.set(session.class_id, list);
+      }
+
+      const allExpectedStatuses: DiscipleshipAttendanceStatus[] = [];
       let pendingCount = 0;
       for (const enrollment of enrollmentsRes.rows) {
-        if (enrollment.status !== "ativo") continue;
         const cls = classById.get(enrollment.class_id);
         const course = cls ? courseById.get(cls.course_id) : undefined;
-        if (!course?.requires_attendance) continue;
-        const pct = calculateAttendancePercentage(attendanceByEnrollment.get(enrollment.id) ?? []);
-        if (pct !== null && pct < course.minimum_attendance_percentage) pendingCount += 1;
+        const enrolledDate = enrollment.enrolled_at.slice(0, 10);
+        const completedDate = enrollment.completed_at?.slice(0, 10) ?? null;
+        const expectedStatuses = (completedSessionsByClass.get(enrollment.class_id) ?? [])
+          .filter((session) => session.session_date >= enrolledDate && (!completedDate || session.session_date <= completedDate))
+          .map((session) => (
+            attendanceByEnrollmentAndSession.get(`${enrollment.id}:${session.id}`) ?? "nao_lancado"
+          ) as DiscipleshipAttendanceStatus);
+        allExpectedStatuses.push(...expectedStatuses);
+
+        if (enrollment.status !== "ativo" || !course?.requires_attendance) continue;
+        const pct = calculateAttendancePercentage(expectedStatuses);
+        const hasMissingAttendance = expectedStatuses.includes("nao_lancado");
+        if (hasMissingAttendance || pct === null || pct < course.minimum_attendance_percentage) pendingCount += 1;
       }
+      const attendancePercentage = calculateAttendancePercentage(allExpectedStatuses);
 
       if (!cancelled) {
         setData({
@@ -134,6 +170,10 @@ export function DiscipuladoOverview({ organizationId }: { organizationId: string
         description="As estruturas de banco deste módulo (discipleship_courses, discipleship_classes, etc.) ainda não foram aplicadas neste ambiente. Nenhum dado será exibido até a aplicação e validação das migrations em staging."
       />
     );
+  }
+
+  if (loadError) {
+    return <EmptyState title="Não foi possível carregar o Discipulado" description={loadError} />;
   }
 
   return (

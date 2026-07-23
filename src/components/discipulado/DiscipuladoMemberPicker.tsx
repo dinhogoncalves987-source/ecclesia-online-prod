@@ -1,29 +1,18 @@
 /**
- * Seletor de pessoa reaproveitando public.members + matchesMemberSearch
- * (mesmo predicado usado em src/pages/Membros.tsx) — nunca uma nova busca
- * paralela de pessoas. Usado para matricular um membro numa turma ou
- * atribuir um membro como equipe (coordenador/secretário/discipulador/
+ * Seletor de pessoa sobre public.members, via RPC mínima e escopada. A busca
+ * acontece no servidor e devolve apenas nome/código — nunca CPF, telefone ou
+ * milhares de perfis para o navegador. Usado para matricular ou atribuir
+ * um membro como equipe (coordenador/secretário/discipulador/
  * professor/auxiliar).
  */
 import { useEffect, useState } from "react";
 import { Search, Loader2, User } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { matchesMemberSearch } from "@/lib/memberSearch";
+import {
+  searchDiscipleshipMembers,
+  type DiscipleshipMemberLabel,
+} from "@/lib/discipleship/service";
 
-type PickableMember = {
-  id: string;
-  full_name: string;
-  known_name: string | null;
-  member_code: string | null;
-  legacy_code: string | null;
-  legacy_registration: string | null;
-  cpf: string | null;
-  member_role: string | null;
-  administrative_role: string | null;
-  email: string | null;
-  phone: string | null;
-  whatsapp: string | null;
-};
+type PickableMember = DiscipleshipMemberLabel;
 
 export function DiscipuladoMemberPicker({ organizationId, onSelect, excludeIds = [] }: {
   organizationId: string;
@@ -33,29 +22,27 @@ export function DiscipuladoMemberPicker({ organizationId, onSelect, excludeIds =
   const [query, setQuery] = useState("");
   const [members, setMembers] = useState<PickableMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    async function load() {
+    const timeout = window.setTimeout(async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("members")
-        .select("id, full_name, known_name, member_code, legacy_code, legacy_registration, cpf, member_role, administrative_role, email, phone, whatsapp")
-        .eq("organization_id", organizationId)
-        .order("full_name", { ascending: true });
+      setError(null);
+      const result = await searchDiscipleshipMembers(organizationId, query);
       if (!cancelled) {
-        if (!error) setMembers((data as PickableMember[]) ?? []);
+        setMembers(result.rows);
+        setError(result.error?.message ?? null);
         setLoading(false);
       }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [organizationId]);
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [organizationId, query]);
 
-  const filtered = members
-    .filter((m) => !excludeIds.includes(m.id))
-    .filter((m) => matchesMemberSearch(m, query))
-    .slice(0, 30);
+  const filtered = members.filter((m) => !excludeIds.includes(m.id));
 
   return (
     <div className="space-y-2">
@@ -64,13 +51,17 @@ export function DiscipuladoMemberPicker({ organizationId, onSelect, excludeIds =
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por nome, código, CPF ou telefone…"
+          placeholder="Buscar por nome ou código…"
           aria-label="Buscar membro"
           className="w-full pl-9 pr-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
         />
       </div>
       {loading ? (
         <div className="flex items-center gap-2 text-muted-foreground text-sm py-3"><Loader2 className="animate-spin" size={14} /> Carregando membros…</div>
+      ) : error ? (
+        <p role="alert" className="text-sm text-destructive py-3 text-center">
+          Não foi possível buscar os membros. Tente novamente.
+        </p>
       ) : filtered.length === 0 ? (
         <p className="text-sm text-muted-foreground py-3 text-center">Nenhum membro encontrado.</p>
       ) : (

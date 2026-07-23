@@ -20,7 +20,7 @@ BEGIN
   IF to_regclass('public.discipleship_enrollments') IS NULL THEN
     RAISE EXCEPTION 'discipleship_learning_records preflight failed: discipleship_enrollments nao existe';
   END IF;
-  IF to_regproc('public.can_operate_discipleship_class(uuid,uuid,uuid)') IS NULL THEN
+  IF to_regprocedure('public.can_operate_discipleship_class(uuid,uuid,uuid)') IS NULL THEN
     RAISE EXCEPTION 'discipleship_learning_records preflight failed: can_operate_discipleship_class() nao existe';
   END IF;
 END;
@@ -61,6 +61,71 @@ DROP TRIGGER IF EXISTS update_discipleship_sessions_updated_at ON public.discipl
 CREATE TRIGGER update_discipleship_sessions_updated_at
 BEFORE UPDATE ON public.discipleship_sessions
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE OR REPLACE FUNCTION public._discipleship_sessions_validate_scope()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_class public.discipleship_classes%ROWTYPE;
+  v_lesson_course uuid;
+  v_location_org uuid;
+BEGIN
+  SELECT * INTO v_class
+  FROM public.discipleship_classes
+  WHERE id = NEW.class_id;
+
+  IF NOT FOUND THEN RAISE EXCEPTION 'class not found'; END IF;
+  IF v_class.status IN ('concluida', 'cancelada', 'arquivada') THEN
+    RAISE EXCEPTION 'class is closed and does not accept session changes';
+  END IF;
+
+  IF NEW.lesson_id IS NOT NULL THEN
+    SELECT course_id INTO v_lesson_course
+    FROM public.discipleship_lessons
+    WHERE id = NEW.lesson_id;
+    IF v_lesson_course IS DISTINCT FROM v_class.course_id THEN
+      RAISE EXCEPTION 'session lesson must belong to the class course';
+    END IF;
+  END IF;
+
+  IF NEW.location_id IS NOT NULL THEN
+    SELECT organization_id INTO v_location_org
+    FROM public.discipleship_locations
+    WHERE id = NEW.location_id;
+    IF v_location_org IS NULL
+       OR NOT public.is_organization_descendant_or_self(v_location_org, v_class.organization_id) THEN
+      RAISE EXCEPTION 'session location must belong to the class organization tree';
+    END IF;
+  END IF;
+
+  IF NEW.instructor_member_id IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1
+       FROM public.discipleship_staff_assignments dsa
+       WHERE dsa.class_id = NEW.class_id
+         AND dsa.member_id = NEW.instructor_member_id
+         AND dsa.status = 'ativo'
+         AND dsa.role IN ('coordenador', 'discipulador', 'professor', 'auxiliar')
+     ) THEN
+    RAISE EXCEPTION 'session instructor must be active staff in this class';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS discipleship_sessions_validate_scope
+  ON public.discipleship_sessions;
+CREATE TRIGGER discipleship_sessions_validate_scope
+BEFORE INSERT OR UPDATE
+ON public.discipleship_sessions
+FOR EACH ROW EXECUTE FUNCTION public._discipleship_sessions_validate_scope();
+
+REVOKE ALL ON FUNCTION public._discipleship_sessions_validate_scope()
+  FROM PUBLIC, anon, authenticated;
 
 ALTER TABLE public.discipleship_sessions ENABLE ROW LEVEL SECURITY;
 
@@ -108,6 +173,61 @@ WITH CHECK (
       AND public.can_operate_discipleship_class(auth.uid(), c.id, c.organization_id)
   )
 );
+
+-- O status é uma máquina de estados e não pode ser alterado por UPDATE livre.
+REVOKE UPDATE ON public.discipleship_sessions FROM authenticated;
+GRANT SELECT, INSERT ON public.discipleship_sessions TO authenticated;
+GRANT UPDATE (
+  lesson_id, location_id, instructor_member_id, session_date, session_time,
+  modality, content_covered, notes
+) ON public.discipleship_sessions TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.update_discipleship_session_status(
+  p_session_id uuid,
+  p_status text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_session public.discipleship_sessions%ROWTYPE;
+  v_class public.discipleship_classes%ROWTYPE;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
+
+  SELECT * INTO v_session
+  FROM public.discipleship_sessions
+  WHERE id = p_session_id
+  FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'session not found'; END IF;
+
+  SELECT * INTO v_class
+  FROM public.discipleship_classes
+  WHERE id = v_session.class_id;
+
+  IF NOT public.can_operate_discipleship_class(auth.uid(), v_class.id, v_class.organization_id) THEN
+    RAISE EXCEPTION 'access denied to update session status';
+  END IF;
+  IF v_class.status IN ('concluida', 'cancelada', 'arquivada') THEN
+    RAISE EXCEPTION 'class is closed';
+  END IF;
+  IF NOT (
+    (v_session.status = 'agendada' AND p_status IN ('realizada', 'cancelada'))
+    OR v_session.status = p_status
+  ) THEN
+    RAISE EXCEPTION 'invalid session status transition: % -> %', v_session.status, p_status;
+  END IF;
+
+  UPDATE public.discipleship_sessions SET status = p_status WHERE id = p_session_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.update_discipleship_session_status(uuid, text)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.update_discipleship_session_status(uuid, text)
+  TO authenticated;
 
 -- ── discipleship_attendance (frequência por sessão + matrícula) ─────────
 CREATE TABLE IF NOT EXISTS public.discipleship_attendance (
@@ -187,6 +307,10 @@ BEGIN
     RAISE EXCEPTION 'class is closed and does not accept new attendance records';
   END IF;
 
+  IF v_session.status <> 'realizada' THEN
+    RAISE EXCEPTION 'attendance can only be recorded for a completed session';
+  END IF;
+
   IF jsonb_typeof(p_entries) <> 'array' THEN
     RAISE EXCEPTION 'p_entries must be a JSON array';
   END IF;
@@ -248,6 +372,36 @@ CREATE TRIGGER update_discipleship_assessments_updated_at
 BEFORE UPDATE ON public.discipleship_assessments
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+CREATE OR REPLACE FUNCTION public._discipleship_assessments_validate_class()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_class_status text;
+BEGIN
+  SELECT status INTO v_class_status
+  FROM public.discipleship_classes
+  WHERE id = NEW.class_id;
+  IF v_class_status IS NULL THEN RAISE EXCEPTION 'class not found'; END IF;
+  IF v_class_status IN ('concluida', 'cancelada', 'arquivada') THEN
+    RAISE EXCEPTION 'class is closed and does not accept assessment changes';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS discipleship_assessments_validate_class
+  ON public.discipleship_assessments;
+CREATE TRIGGER discipleship_assessments_validate_class
+BEFORE INSERT OR UPDATE
+ON public.discipleship_assessments
+FOR EACH ROW EXECUTE FUNCTION public._discipleship_assessments_validate_class();
+
+REVOKE ALL ON FUNCTION public._discipleship_assessments_validate_class()
+  FROM PUBLIC, anon, authenticated;
+
 ALTER TABLE public.discipleship_assessments ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "discipleship_assessments capability select" ON public.discipleship_assessments;
@@ -289,6 +443,61 @@ WITH CHECK (
       AND public.can_operate_discipleship_class(auth.uid(), c.id, c.organization_id)
   )
 );
+
+REVOKE UPDATE ON public.discipleship_assessments FROM authenticated;
+GRANT SELECT, INSERT ON public.discipleship_assessments TO authenticated;
+GRANT UPDATE (
+  title, description, assessment_type, max_score, weight, scheduled_at
+) ON public.discipleship_assessments TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.update_discipleship_assessment_status(
+  p_assessment_id uuid,
+  p_status text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_assessment public.discipleship_assessments%ROWTYPE;
+  v_class public.discipleship_classes%ROWTYPE;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
+
+  SELECT * INTO v_assessment
+  FROM public.discipleship_assessments
+  WHERE id = p_assessment_id
+  FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'assessment not found'; END IF;
+
+  SELECT * INTO v_class
+  FROM public.discipleship_classes
+  WHERE id = v_assessment.class_id;
+
+  IF NOT public.can_operate_discipleship_class(auth.uid(), v_class.id, v_class.organization_id) THEN
+    RAISE EXCEPTION 'access denied to update assessment status';
+  END IF;
+  IF v_class.status IN ('concluida', 'cancelada', 'arquivada') THEN
+    RAISE EXCEPTION 'class is closed';
+  END IF;
+  IF NOT (
+    (v_assessment.status = 'planejada' AND p_status IN ('aplicada', 'cancelada'))
+    OR v_assessment.status = p_status
+  ) THEN
+    RAISE EXCEPTION 'invalid assessment status transition: % -> %', v_assessment.status, p_status;
+  END IF;
+
+  UPDATE public.discipleship_assessments
+  SET status = p_status
+  WHERE id = p_assessment_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.update_discipleship_assessment_status(uuid, text)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.update_discipleship_assessment_status(uuid, text)
+  TO authenticated;
 
 -- ── discipleship_assessment_results (nota por matrícula) ─────────────────
 CREATE TABLE IF NOT EXISTS public.discipleship_assessment_results (
@@ -363,10 +572,22 @@ BEGIN
     RAISE EXCEPTION 'access denied to record assessment result';
   END IF;
 
+  IF v_class.status IN ('concluida', 'cancelada', 'arquivada') THEN
+    RAISE EXCEPTION 'class is closed and does not accept assessment results';
+  END IF;
+
+  IF v_assessment.status <> 'aplicada' THEN
+    RAISE EXCEPTION 'results can only be recorded for an applied assessment';
+  END IF;
+
   IF NOT EXISTS (
-    SELECT 1 FROM public.discipleship_enrollments WHERE id = p_enrollment_id AND class_id = v_class.id
+    SELECT 1
+    FROM public.discipleship_enrollments
+    WHERE id = p_enrollment_id
+      AND class_id = v_class.id
+      AND status IN ('matriculado', 'ativo')
   ) THEN
-    RAISE EXCEPTION 'enrollment does not belong to this class';
+    RAISE EXCEPTION 'enrollment is not active in this class';
   END IF;
 
   IF p_score IS NULL OR p_score < 0 OR p_score > v_assessment.max_score THEN
@@ -451,6 +672,7 @@ DECLARE
   v_class public.discipleship_classes%ROWTYPE;
   v_member_id uuid;
   v_base_org_id uuid;
+  v_document_org_id uuid;
   v_visibility text := COALESCE(p_visibility, 'normal');
   v_id uuid;
 BEGIN
@@ -458,7 +680,7 @@ BEGIN
     RAISE EXCEPTION 'authentication required';
   END IF;
 
-  SELECT c.* , e.member_id INTO v_class, v_member_id
+  SELECT c.* INTO v_class
   FROM public.discipleship_enrollments e
   JOIN public.discipleship_classes c ON c.id = e.class_id
   WHERE e.id = p_enrollment_id;
@@ -466,6 +688,10 @@ BEGIN
   IF v_class.id IS NULL THEN
     RAISE EXCEPTION 'enrollment not found';
   END IF;
+
+  SELECT member_id INTO v_member_id
+  FROM public.discipleship_enrollments
+  WHERE id = p_enrollment_id;
 
   IF NOT public.can_operate_discipleship_class(auth.uid(), v_class.id, v_class.organization_id) THEN
     RAISE EXCEPTION 'access denied to register followup';
@@ -484,8 +710,21 @@ BEGIN
     RAISE EXCEPTION 'followup observation is required';
   END IF;
 
+  IF p_document_id IS NOT NULL THEN
+    SELECT organization_id INTO v_document_org_id
+    FROM public.documents
+    WHERE id = p_document_id;
+    IF v_document_org_id IS NULL
+       OR NOT public.is_organization_descendant_or_self(v_document_org_id, v_class.organization_id) THEN
+      RAISE EXCEPTION 'followup document must belong to the class organization tree';
+    END IF;
+  END IF;
+
   IF p_attachment_path IS NOT NULL THEN
-    SELECT organization_id INTO v_base_org_id FROM public.members WHERE id = v_member_id;
+    SELECT COALESCE(congregation_id, sector_id, organization_id)
+      INTO v_base_org_id
+    FROM public.members
+    WHERE id = v_member_id;
     IF p_attachment_path NOT LIKE (v_base_org_id::text || '/' || v_member_id::text || '/%') THEN
       RAISE EXCEPTION 'invalid member attachment path';
     END IF;
@@ -518,10 +757,14 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_class public.discipleship_classes%ROWTYPE;
+  v_enrolled_at timestamptz;
   v_total_sessions integer;
+  v_launched_sessions integer;
   v_present_sessions integer;
   v_avg_score numeric;
   v_total_weight numeric;
+  v_required_assessments integer;
+  v_recorded_assessments integer;
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'authentication required';
@@ -536,28 +779,60 @@ BEGIN
     RAISE EXCEPTION 'enrollment not found';
   END IF;
 
+  SELECT enrolled_at INTO v_enrolled_at
+  FROM public.discipleship_enrollments
+  WHERE id = p_enrollment_id;
+
   IF NOT public.has_org_access_permission(auth.uid(), v_class.organization_id, 'discipleship.read') THEN
     RAISE EXCEPTION 'access denied';
   END IF;
 
   SELECT count(*) INTO v_total_sessions
-  FROM public.discipleship_attendance WHERE enrollment_id = p_enrollment_id AND status IN ('presente', 'ausente', 'justificado');
+  FROM public.discipleship_sessions s
+  WHERE s.class_id = v_class.id
+    AND s.status = 'realizada'
+    AND s.session_date >= v_enrolled_at::date;
 
-  SELECT count(*) INTO v_present_sessions
-  FROM public.discipleship_attendance WHERE enrollment_id = p_enrollment_id AND status IN ('presente', 'justificado');
+  SELECT
+    count(*) FILTER (WHERE a.status IN ('presente', 'ausente', 'justificado')),
+    count(*) FILTER (WHERE a.status IN ('presente', 'justificado'))
+    INTO v_launched_sessions, v_present_sessions
+  FROM public.discipleship_sessions s
+  LEFT JOIN public.discipleship_attendance a
+    ON a.session_id = s.id AND a.enrollment_id = p_enrollment_id
+  WHERE s.class_id = v_class.id
+    AND s.status = 'realizada'
+    AND s.session_date >= v_enrolled_at::date;
 
-  SELECT sum(r.score * a.weight) / NULLIF(sum(a.weight), 0), sum(a.weight)
+  SELECT sum(((r.score / a.max_score) * 10) * a.weight) / NULLIF(sum(a.weight), 0), sum(a.weight)
     INTO v_avg_score, v_total_weight
   FROM public.discipleship_assessment_results r
   JOIN public.discipleship_assessments a ON a.id = r.assessment_id
-  WHERE r.enrollment_id = p_enrollment_id;
+  WHERE r.enrollment_id = p_enrollment_id
+    AND a.class_id = v_class.id
+    AND a.status = 'aplicada';
+
+  SELECT count(*) INTO v_required_assessments
+  FROM public.discipleship_assessments a
+  WHERE a.class_id = v_class.id AND a.status <> 'cancelada';
+
+  SELECT count(*) INTO v_recorded_assessments
+  FROM public.discipleship_assessments a
+  JOIN public.discipleship_assessment_results r
+    ON r.assessment_id = a.id AND r.enrollment_id = p_enrollment_id
+  WHERE a.class_id = v_class.id AND a.status = 'aplicada';
 
   RETURN jsonb_build_object(
-    'total_sessions_launched', v_total_sessions,
+    'total_completed_sessions', v_total_sessions,
+    'total_sessions_launched', v_launched_sessions,
+    'missing_attendance_records', GREATEST(v_total_sessions - v_launched_sessions, 0),
     'present_sessions', v_present_sessions,
     'attendance_percentage', CASE WHEN v_total_sessions > 0 THEN round((v_present_sessions::numeric / v_total_sessions) * 100, 2) ELSE NULL END,
     'average_score', round(v_avg_score, 2),
-    'assessments_weighted', v_total_weight
+    'assessments_weighted', v_total_weight,
+    'required_assessments', v_required_assessments,
+    'recorded_assessments', v_recorded_assessments,
+    'missing_assessment_results', GREATEST(v_required_assessments - v_recorded_assessments, 0)
   );
 END;
 $$;

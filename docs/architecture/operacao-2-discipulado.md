@@ -1,11 +1,11 @@
 # Operação 2 — Discipulado completo sobre a fundação revisada do Ecclesia
 
-Documento de passagem. Ver também `docs/architecture/contrato-dominios-institucionais.md` (contrato
+Documento de passagem e revisão. Ver também `docs/architecture/contrato-dominios-institucionais.md` (contrato
 entre os quatro domínios) e `docs/architecture/operacao-1-secretaria.md` (Operação 1, já revisada).
 
-Branch de entrega: `handoff/sonnet-operacao-2-discipulado-20260723`, criada a partir de
-`review/operacao-1-secretaria` (worktree limpo confirmado por checkpoint manual). Nenhuma migration
-foi aplicada; nenhum commit, push, PR ou deploy foi executado.
+Entrega estrutural recebida na branch `handoff/sonnet-operacao-2-discipulado-20260723`, criada a
+partir de `review/operacao-1-secretaria`. Revisão Codex executada na branch
+`review/operacao-2-discipulado`. Nenhuma migration foi aplicada e nenhum deploy foi executado.
 
 ## 1. Estado encontrado antes da operação (auditoria)
 
@@ -94,8 +94,8 @@ ver prompt da operação para a lista completa de campos observados em cada tela
 |---|---|
 | `20260729090000_discipleship_foundation.sql` | Capabilities novas + 3 responsabilidades operacionais + `discipleship_locations` + `discipleship_departments` + `discipleship_courses` + `discipleship_lessons` + RPC `reorder_discipleship_lessons` |
 | `20260729100000_discipleship_classes_and_enrollments.sql` | `discipleship_classes` + RPC `update_discipleship_class_status` + `discipleship_staff_assignments` + RPCs `assign_discipleship_staff`/`end_discipleship_staff_assignment` + helpers `_is_discipleship_class_staff`/`can_operate_discipleship_class` + `discipleship_enrollments` + RPCs `enroll_member_in_class`/`update_discipleship_enrollment_status` |
-| `20260729110000_discipleship_learning_records.sql` | `discipleship_sessions` + `discipleship_attendance` + RPC `record_discipleship_attendance` + `discipleship_assessments` + `discipleship_assessment_results` + RPC `record_discipleship_assessment_result` + `discipleship_followups` + RPC `create_discipleship_followup` + RPC `get_discipleship_enrollment_progress` |
-| `20260729120000_discipleship_permissions_and_history.sql` | Extensão da `CHECK` de `member_history.history_type` + `CREATE OR REPLACE` de `register_member_history_event()` + contrato de certificado (`certificate_document_id`/`certificate_issued_at` + RPC `mark_discipleship_certificate_issued`) + trigger `_discipleship_enrollments_register_history` |
+| `20260729110000_discipleship_learning_records.sql` | `discipleship_sessions` + RPC de estado `update_discipleship_session_status` + `discipleship_attendance` + RPC `record_discipleship_attendance` + `discipleship_assessments` + RPC de estado `update_discipleship_assessment_status` + `discipleship_assessment_results` + RPC `record_discipleship_assessment_result` + `discipleship_followups` + RPC `create_discipleship_followup` + RPC `get_discipleship_enrollment_progress` |
+| `20260729120000_discipleship_permissions_and_history.sql` | Extensão da `CHECK` de `member_history.history_type` + helper interno de histórico com escopo validado + diretório mínimo de membros (`search_discipleship_members`/`get_discipleship_member_labels`) + contrato idempotente de certificado (`certificate_document_id`/`certificate_issued_at` + RPC `mark_discipleship_certificate_issued`) + trigger `_discipleship_enrollments_register_history` |
 
 Todas as 4 migrations foram espelhadas byte a byte em `supabase-production/supabase/migrations/` e
 listadas em `supabase/migration-manifest.json` na categoria `staging_feature` (ver teste
@@ -129,8 +129,10 @@ Reaproveita 100% `public.member_history` — nenhuma timeline própria. Catálog
 com 5 marcos genéricos, reutilizáveis por Teologia sem nova migration de catálogo:
 `matricula`, `inicio_formacao`, `conclusao_formacao`, `desligamento_formacao`, `transferencia_turma`.
 Um trigger (`_discipleship_enrollments_register_history`, AFTER INSERT/UPDATE OF status) registra
-esses marcos automaticamente via `register_member_history_event(..., source_module='discipulado',
-source_table='discipleship_enrollments', source_id=...)`. Presenças, aulas e notas **não** entram na
+esses marcos automaticamente via helper interno próprio, que deriva e valida o escopo da organização
+antes de chamar o registro institucional com `source_module='discipulado'`,
+`source_table='discipleship_enrollments'` e `source_id`. Assim, professor e operador de Discipulado
+não recebem implicitamente `members.write`. Presenças, aulas e notas **não** entram na
 timeline (ficam em `discipleship_attendance`/`discipleship_assessment_results`, evitando poluição).
 `certificado_emitido` (tipo já existente da Operação 1) é reaproveitado por
 `mark_discipleship_certificate_issued()`.
@@ -181,14 +183,17 @@ RPC (`discipleship_staff_assignments`, `discipleship_enrollments`, `discipleship
 
 ## 12. RPCs e máquinas de estado
 
-11 RPCs públicas (`GRANT EXECUTE ... TO authenticated`, todas com `REVOKE ALL FROM PUBLIC, anon`):
+15 RPCs públicas (`GRANT EXECUTE ... TO authenticated`, todas com `REVOKE ALL FROM PUBLIC, anon`):
 `reorder_discipleship_lessons`, `update_discipleship_class_status`, `assign_discipleship_staff`,
 `end_discipleship_staff_assignment`, `enroll_member_in_class`, `update_discipleship_enrollment_status`,
-`record_discipleship_attendance`, `record_discipleship_assessment_result`,
+`update_discipleship_session_status`, `record_discipleship_attendance`,
+`update_discipleship_assessment_status`, `record_discipleship_assessment_result`,
 `create_discipleship_followup`, `get_discipleship_enrollment_progress`,
+`search_discipleship_members`, `get_discipleship_member_labels`,
 `mark_discipleship_certificate_issued`. Mais 3 funções internas (revogadas também de
-`authenticated`): `_is_discipleship_class_staff`, `can_operate_discipleship_class`,
-`_discipleship_enrollments_register_history`.
+`authenticated`) diretamente ligadas à operação, além dos triggers internos de validação:
+`_is_discipleship_class_staff`, `can_operate_discipleship_class` e
+`_register_discipleship_member_history`.
 
 Máquinas de estado (espelhadas em `src/lib/discipleship/rules.ts` só para UX, autoridade real na RPC):
 
@@ -211,7 +216,8 @@ foi aplicada em nenhum banco. Espelhadas byte a byte em `supabase-production/` e
   Participantes, Relatórios), mesmo padrão visual de abas roláveis de `src/pages/Financeiro.tsx`.
 - `src/components/discipulado/*` — `DiscipuladoOverview`, `DiscipuladoCourses`, `DiscipuladoClasses`,
   `DiscipuladoClassDetail` (resumo/equipe/alunos/encontros/avaliações), `DiscipuladoParticipants`,
-  `DiscipuladoReports`, `DiscipuladoMemberPicker` (reaproveita `memberSearch.ts`),
+  `DiscipuladoReports`, `DiscipuladoMemberPicker` (busca server-side por RPC com retorno mínimo,
+  sem baixar CPF, contato ou toda a base de membros),
   `discipuladoFormHelpers.tsx` (inputs nativos, no mesmo padrão de `MemberProfile.tsx`).
 - `src/lib/discipleship/{constants,rules,service}.ts` — catálogos espelhando os `CHECK`s do banco,
   regras puras testáveis, e camada de serviço sobre o Supabase client.
@@ -222,9 +228,11 @@ foi aplicada em nenhum banco. Espelhadas byte a byte em `supabase-production/` e
 
 ## 15. Relatórios
 
-Aba "Relatórios" (`DiscipuladoReports.tsx`) agrega por turma: alunos ativos, conclusões e frequência
-média — calculados a partir de `discipleship_enrollments`/`discipleship_attendance` reais (mesma
-função pura `calculateAttendancePercentage`), nunca número fictício.
+Aba "Relatórios" (`DiscipuladoReports.tsx`) agrega por turma: alunos ativos, conclusões, frequência
+média e lançamentos de presença pendentes. O denominador esperado considera apenas aulas realizadas
+dentro do período de cada matrícula; ausências de lançamento são exibidas como pendência em vez de
+serem escondidas. Tudo é calculado sobre `discipleship_enrollments`,
+`discipleship_sessions` e `discipleship_attendance` reais, nunca número fictício.
 
 ## 16. Metadados legados
 
@@ -234,7 +242,7 @@ natural própria (`locations`, `departments`, `courses`, `lessons`, `classes`, `
 para idempotência de importação futura. A importação em lote do WinTechi **não foi implementada**
 nesta operação.
 
-## 17. Testes executados
+## 17. Testes executados após a revisão Codex
 
 - `src/config/discipleshipMigrations.test.ts` (novo): mirror byte a byte staging/produção,
   manifest, regra central de identidade, RLS habilitado nas 12 tabelas, ausência de
@@ -252,6 +260,11 @@ nesta operação.
   `production_management`, não pode ser reescrita); passou a somar o texto de
   `20260729090000_discipleship_foundation.sql` — mesmo padrão que Teologia/Missões deverão seguir.
 
+Resultado final local da suíte completa: **47 arquivos e 545 testes aprovados, 0 falhas**.
+Também foram executados `tsc --noEmit`, ESLint dos arquivos alterados, build de staging, build de
+produção, verificação do bundle de produção e `git diff --check`; os resultados finais devem
+acompanhar o patch de revisão.
+
 ## 18. Limitações reais
 
 - Emissão **visual** do certificado (PDF/layout) não implementada — só o contrato de elegibilidade e
@@ -259,7 +272,7 @@ nesta operação.
 - Importação em lote do WinTechi não implementada — apenas metadados legados prontos.
 - Nenhuma migration foi aplicada — o módulo não funciona em nenhum ambiente real ainda; é
   staging-only e staging não tem as tabelas até a aplicação manual.
-- `DiscipuladoParticipants`/`DiscipuladoReports` fazem N chamadas de leitura client-side em vez de
+- `DiscipuladoParticipants`/`DiscipuladoReports` fazem leituras agregadas client-side em vez de
   RPCs agregadoras dedicadas — aceitável no volume esperado de um módulo novo, mas candidato a RPC
   de relatório se o volume crescer.
 
@@ -271,7 +284,8 @@ nesta operação.
 3. Só então promover `discipleship` de `"staging"` para `"both"` em `src/config/modules.ts` (e
    remover a condicional `IS_STAGING_BUILD` em `App.tsx`), aplicar em produção, e então liberar o
    item de menu para todas as organizações.
-4. Nenhum commit, push, PR ou deploy foi realizado por este agente.
+4. Nenhum push, PR, deploy ou aplicação de migration deve ocorrer antes da homologação manual do
+   patch de revisão.
 
 ## 20. Pontos de extensão para Teologia
 
@@ -322,41 +336,30 @@ nesta operação.
    decisão consciente desta operação (a unicidade natural da tabela, título+turma, não foi
    modelada como legado); revisar se a importação real do WinTechi precisar de idempotência aqui.
 
-## 23. `git status --short --branch` (ao final desta operação)
+## 23. Principais correções da revisão Codex
 
-```
-## handoff/sonnet-operacao-2-discipulado-20260723
- M scripts/verify-production-bundle.mjs
- M src/App.tsx
- M src/components/AdminLayout.tsx
- M src/config/hierarchicalAccessResponsibilities.test.ts
- M src/config/modules.test.ts
- M src/config/modules.ts
- M src/hooks/useRole.tsx
- M src/integrations/supabase/types.ts
- M src/lib/accessControl.ts
- M src/lib/memberHistoryConstants.ts
- M supabase/migration-manifest.json
-?? docs/architecture/operacao-2-discipulado.md
-?? src/components/discipulado/
-?? src/config/discipleshipMigrations.test.ts
-?? src/lib/discipleship/
-?? src/pages/Discipulado.tsx
-?? supabase-production/supabase/migrations/20260729090000_discipleship_foundation.sql
-?? supabase-production/supabase/migrations/20260729100000_discipleship_classes_and_enrollments.sql
-?? supabase-production/supabase/migrations/20260729110000_discipleship_learning_records.sql
-?? supabase-production/supabase/migrations/20260729120000_discipleship_permissions_and_history.sql
-?? supabase/migrations/20260729090000_discipleship_foundation.sql
-?? supabase/migrations/20260729100000_discipleship_classes_and_enrollments.sql
-?? supabase/migrations/20260729110000_discipleship_learning_records.sql
-?? supabase/migrations/20260729120000_discipleship_permissions_and_history.sql
-```
+- Fechadas as brechas de escopo entre árvores organizacionais em curso, turma, local, professor,
+  matrícula, documento e acompanhamento.
+- Corrigidas reordenação atômica de lições, corrida de capacidade e promoção de lista de espera.
+- Conclusão de turma/matrícula agora bloqueia pendências acadêmicas reais; override exige
+  `discipleship.manage` e justificativa explícita.
+- Frequência só pode ser lançada em aula realizada; avaliação só recebe nota quando aplicada; notas
+  são normalizadas para a escala 0–10.
+- Estados de aula e avaliação ganharam RPCs próprias, sem alteração direta do campo `status`.
+- Histórico institucional não concede `members.write` a professor por efeito colateral.
+- Certificado ficou idempotente e valida o escopo organizacional do documento.
+- Busca de aluno passou a ser server-side e mínima, sem exposição de PII desnecessária.
+- Rota por capability passou a falhar fechada; responsabilidades de módulo staging-only não aparecem
+  no Gerenciador de Acessos de produção.
+- Interface ganhou cadastros de local/departamento, acompanhamento confidencial, feedback explícito
+  de erros, estados operacionais e layouts móveis corrigidos.
 
-## 24. Confirmação final
+## 24. Confirmação final da revisão
 
-- Nenhum `commit` foi executado.
-- Nenhum `push` foi executado.
-- Nenhum PR foi aberto.
+- A entrega Sonnet já existe como commit/push na branch de handoff; a revisão Codex é preparada como
+  patch separado sobre esse commit.
+- Nenhum push da revisão foi executado.
+- Nenhum PR foi aberto pela revisão.
 - Nenhuma migration foi aplicada (`supabase db push` nunca executado; nenhum SQL executado contra
   staging ou produção).
 - Nenhum deploy foi realizado.

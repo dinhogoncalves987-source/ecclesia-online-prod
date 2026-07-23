@@ -58,10 +58,10 @@ BEGIN
   IF to_regclass('public.member_history') IS NULL THEN
     v_missing := array_append(v_missing, 'public.member_history (Operação 1)');
   END IF;
-  IF to_regproc('public.has_org_access_permission(uuid,uuid,text)') IS NULL THEN
+  IF to_regprocedure('public.has_org_access_permission(uuid,uuid,text)') IS NULL THEN
     v_missing := array_append(v_missing, 'public.has_org_access_permission()');
   END IF;
-  IF to_regproc('public.update_updated_at_column()') IS NULL THEN
+  IF to_regprocedure('public.update_updated_at_column()') IS NULL THEN
     v_missing := array_append(v_missing, 'public.update_updated_at_column()');
   END IF;
   IF cardinality(v_missing) > 0 THEN
@@ -255,7 +255,10 @@ CREATE TABLE IF NOT EXISTS public.discipleship_courses (
   minimum_attendance_percentage numeric(5,2) NOT NULL DEFAULT 75
     CHECK (minimum_attendance_percentage >= 0 AND minimum_attendance_percentage <= 100),
   requires_assessment boolean NOT NULL DEFAULT false,
-  minimum_passing_score numeric(5,2) CHECK (minimum_passing_score IS NULL OR minimum_passing_score >= 0),
+  -- A nota final é normalizada para a escala 0–10, mesmo quando cada
+  -- avaliação usa uma nota máxima diferente.
+  minimum_passing_score numeric(5,2)
+    CHECK (minimum_passing_score IS NULL OR minimum_passing_score BETWEEN 0 AND 10),
   completion_criteria text,
 
   status text NOT NULL DEFAULT 'rascunho' CHECK (status IN ('rascunho', 'ativo', 'arquivado')),
@@ -266,7 +269,9 @@ CREATE TABLE IF NOT EXISTS public.discipleship_courses (
 
   created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+
+  CHECK (NOT requires_assessment OR minimum_passing_score IS NOT NULL)
 );
 
 CREATE INDEX IF NOT EXISTS idx_discipleship_courses_org_status
@@ -284,6 +289,61 @@ DROP TRIGGER IF EXISTS update_discipleship_courses_updated_at ON public.disciple
 CREATE TRIGGER update_discipleship_courses_updated_at
 BEFORE UPDATE ON public.discipleship_courses
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+-- Impede associação de departamento de outro tenant e garante que um curso
+-- só seja ativado depois de possuir currículo. Curso novo sempre começa em
+-- rascunho; a ativação é uma transição explícita posterior.
+CREATE OR REPLACE FUNCTION public._discipleship_courses_validate_scope_and_activation()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_department_org uuid;
+BEGIN
+  IF NEW.department_id IS NOT NULL THEN
+    SELECT organization_id INTO v_department_org
+    FROM public.discipleship_departments
+    WHERE id = NEW.department_id;
+
+    IF v_department_org IS NULL THEN
+      RAISE EXCEPTION 'discipleship department not found';
+    END IF;
+
+    IF NOT public.is_organization_descendant_or_self(v_department_org, NEW.organization_id) THEN
+      RAISE EXCEPTION 'course department must belong to the course organization tree';
+    END IF;
+  END IF;
+
+  IF TG_OP = 'INSERT' AND NEW.status <> 'rascunho' THEN
+    RAISE EXCEPTION 'new courses must start as rascunho';
+  END IF;
+
+  IF TG_OP = 'UPDATE'
+     AND NEW.status = 'ativo'
+     AND OLD.status IS DISTINCT FROM NEW.status
+     AND NOT EXISTS (
+       SELECT 1
+       FROM public.discipleship_lessons l
+       WHERE l.course_id = NEW.id AND l.status = 'ativa'
+     ) THEN
+    RAISE EXCEPTION 'course must have at least one active lesson before activation';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS discipleship_courses_validate_scope_and_activation
+  ON public.discipleship_courses;
+CREATE TRIGGER discipleship_courses_validate_scope_and_activation
+BEFORE INSERT OR UPDATE
+ON public.discipleship_courses
+FOR EACH ROW EXECUTE FUNCTION public._discipleship_courses_validate_scope_and_activation();
+
+REVOKE ALL ON FUNCTION public._discipleship_courses_validate_scope_and_activation()
+  FROM PUBLIC, anon, authenticated;
 
 ALTER TABLE public.discipleship_courses ENABLE ROW LEVEL SECURITY;
 
@@ -416,6 +476,8 @@ AS $$
 DECLARE
   v_org_id uuid;
   v_count integer;
+  v_unique_count integer;
+  v_offset integer;
   v_id uuid;
   v_seq integer := 1;
 BEGIN
@@ -432,15 +494,37 @@ BEGIN
     RAISE EXCEPTION 'access denied to reorder lessons';
   END IF;
 
-  SELECT count(*) INTO v_count FROM public.discipleship_lessons WHERE course_id = p_course_id;
+  IF p_lesson_ids IS NULL OR array_position(p_lesson_ids, NULL) IS NOT NULL THEN
+    RAISE EXCEPTION 'lesson id list is required and cannot contain null values';
+  END IF;
+
+  SELECT count(DISTINCT lesson_id)
+    INTO v_unique_count
+  FROM unnest(p_lesson_ids) AS lesson_ids(lesson_id);
+
+  IF v_unique_count <> cardinality(p_lesson_ids) THEN
+    RAISE EXCEPTION 'lesson id list cannot contain duplicates';
+  END IF;
+
+  -- Serializa reordenações concorrentes do mesmo currículo.
+  PERFORM 1
+  FROM public.discipleship_lessons
+  WHERE course_id = p_course_id
+  FOR UPDATE;
+
+  SELECT count(*), COALESCE(max(sequence_number), 0) + count(*) + 1
+    INTO v_count, v_offset
+  FROM public.discipleship_lessons
+  WHERE course_id = p_course_id;
+
   IF v_count <> cardinality(p_lesson_ids) THEN
     RAISE EXCEPTION 'lesson id list does not match course lessons (expected %, received %)', v_count, cardinality(p_lesson_ids);
   END IF;
 
-  -- Estado intermediário temporário (sequência negativa) evita colisão do
-  -- índice único enquanto a nova ordem é aplicada.
+  -- Usa uma faixa POSITIVA acima da maior sequência atual. A versão bruta
+  -- usava números negativos, mas a própria tabela exige sequence_number > 0.
   UPDATE public.discipleship_lessons
-  SET sequence_number = -sequence_number
+  SET sequence_number = sequence_number + v_offset
   WHERE course_id = p_course_id;
 
   FOREACH v_id IN ARRAY p_lesson_ids LOOP

@@ -34,6 +34,7 @@ import {
 } from "@/lib/accessControl";
 import { buildAccessInviteUrl } from "@/lib/accessInvites";
 import { buildInviteUrl } from "@/lib/memberInvites";
+import { isModuleEnabled } from "@/config/modules";
 
 type HierarchyNavigationState = {
   openNewAccess?: boolean;
@@ -160,7 +161,14 @@ function ResponsibilityPicker({
   return (
     <div className="space-y-4">
       {CATEGORY_ORDER.map((category) => {
-        const definitions = ACCESS_RESPONSIBILITIES.filter((item) => item.category === category);
+        const definitions = ACCESS_RESPONSIBILITIES.filter(
+          (item) =>
+            item.category === category
+            && (
+              isModuleEnabled("discipleship")
+              || !item.key.startsWith("discipleship_")
+            ),
+        );
         return (
           <section key={category}>
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

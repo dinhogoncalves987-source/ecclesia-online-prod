@@ -10,6 +10,7 @@ import {
   loadDiscipleshipClasses, loadDiscipleshipCourses, loadDiscipleshipEnrollmentsForClasses,
   loadDiscipleshipSessionsForClasses, loadDiscipleshipAttendanceForSessions,
   type DiscipleshipClassRow, type DiscipleshipCourseRow, type DiscipleshipEnrollmentRow,
+  type DiscipleshipSessionRow,
 } from "@/lib/discipleship/service";
 import { calculateAttendancePercentage } from "@/lib/discipleship/rules";
 import { DISCIPLESHIP_CLASS_STATUS_LABELS, type DiscipleshipClassStatus, type DiscipleshipAttendanceStatus } from "@/lib/discipleship/constants";
@@ -21,17 +22,20 @@ type ClassReportRow = {
   activeStudents: number;
   completed: number;
   attendancePercentage: number | null;
+  missingAttendance: number;
 };
 
 export function DiscipuladoReports({ organizationId }: { organizationId: string }) {
   const [loading, setLoading] = useState(true);
   const [moduleUnavailable, setModuleUnavailable] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [rows, setRows] = useState<ClassReportRow[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoading(true);
+      setLoadError(null);
       const [classesRes, coursesRes] = await Promise.all([
         loadDiscipleshipClasses(organizationId),
         loadDiscipleshipCourses(organizationId),
@@ -40,24 +44,46 @@ export function DiscipuladoReports({ organizationId }: { organizationId: string 
         if (!cancelled) { setModuleUnavailable(true); setLoading(false); }
         return;
       }
+      if (classesRes.error || coursesRes.error) {
+        if (!cancelled) {
+          setLoadError(classesRes.error?.message ?? coursesRes.error?.message ?? "Não foi possível carregar os relatórios.");
+          setLoading(false);
+        }
+        return;
+      }
       const classIds = classesRes.rows.map((c) => c.id);
       const [enrollmentsRes, sessionsRes] = await Promise.all([
         loadDiscipleshipEnrollmentsForClasses(classIds),
         loadDiscipleshipSessionsForClasses(classIds),
       ]);
-      const sessionsByClass = new Map<string, string[]>();
+      if (enrollmentsRes.error || sessionsRes.error) {
+        if (!cancelled) {
+          setLoadError(enrollmentsRes.error?.message ?? sessionsRes.error?.message ?? "Não foi possível carregar os registros acadêmicos.");
+          setLoading(false);
+        }
+        return;
+      }
+      const sessionsByClass = new Map<string, DiscipleshipSessionRow[]>();
       for (const s of sessionsRes.rows) {
         const list = sessionsByClass.get(s.class_id) ?? [];
-        list.push(s.id);
+        list.push(s);
         sessionsByClass.set(s.class_id, list);
       }
       const allSessionIds = sessionsRes.rows.map((s) => s.id);
       const attendanceRes = await loadDiscipleshipAttendanceForSessions(allSessionIds);
-      const attendanceBySession = new Map<string, DiscipleshipAttendanceStatus[]>();
+      if (attendanceRes.error) {
+        if (!cancelled) {
+          setLoadError(attendanceRes.error.message);
+          setLoading(false);
+        }
+        return;
+      }
+      const attendanceByEnrollmentAndSession = new Map<string, DiscipleshipAttendanceStatus>();
       for (const a of attendanceRes.rows) {
-        const list = attendanceBySession.get(a.session_id) ?? [];
-        list.push(a.status as DiscipleshipAttendanceStatus);
-        attendanceBySession.set(a.session_id, list);
+        attendanceByEnrollmentAndSession.set(
+          `${a.enrollment_id}:${a.session_id}`,
+          a.status as DiscipleshipAttendanceStatus,
+        );
       }
       const courseNameById = new Map(coursesRes.rows.map((c: DiscipleshipCourseRow) => [c.id, c.name]));
       const enrollmentsByClass = new Map<string, DiscipleshipEnrollmentRow[]>();
@@ -69,14 +95,26 @@ export function DiscipuladoReports({ organizationId }: { organizationId: string 
 
       const reportRows: ClassReportRow[] = classesRes.rows.map((cls) => {
         const enrollments = enrollmentsByClass.get(cls.id) ?? [];
-        const sessionIds = sessionsByClass.get(cls.id) ?? [];
-        const attendanceStatuses = sessionIds.flatMap((id) => attendanceBySession.get(id) ?? []);
+        const completedSessions = (sessionsByClass.get(cls.id) ?? []).filter((session) => session.status === "realizada");
+        const expectedStatuses: DiscipleshipAttendanceStatus[] = [];
+        let missingAttendance = 0;
+        for (const enrollment of enrollments) {
+          const enrolledDate = enrollment.enrolled_at.slice(0, 10);
+          const completedDate = enrollment.completed_at?.slice(0, 10) ?? null;
+          for (const session of completedSessions) {
+            if (session.session_date < enrolledDate || (completedDate && session.session_date > completedDate)) continue;
+            const status = attendanceByEnrollmentAndSession.get(`${enrollment.id}:${session.id}`) ?? "nao_lancado";
+            expectedStatuses.push(status);
+            if (status === "nao_lancado") missingAttendance += 1;
+          }
+        }
         return {
           cls,
           courseName: courseNameById.get(cls.course_id) ?? "Curso",
           activeStudents: enrollments.filter((e) => e.status === "ativo" || e.status === "matriculado").length,
           completed: enrollments.filter((e) => e.status === "concluido").length,
-          attendancePercentage: calculateAttendancePercentage(attendanceStatuses),
+          attendancePercentage: calculateAttendancePercentage(expectedStatuses),
+          missingAttendance,
         };
       });
 
@@ -104,6 +142,10 @@ export function DiscipuladoReports({ organizationId }: { organizationId: string 
     return <EmptyState title="Discipulado aguardando aplicação das migrations" description="Nenhum dado disponível até a aplicação das migrations neste ambiente." />;
   }
 
+  if (loadError) {
+    return <EmptyState title="Não foi possível carregar os relatórios" description={loadError} />;
+  }
+
   if (rows.length === 0) {
     return <EmptyState title="Nenhuma turma para relatar ainda" description="Crie cursos e turmas para começar a acompanhar indicadores aqui." />;
   }
@@ -116,7 +158,7 @@ export function DiscipuladoReports({ organizationId }: { organizationId: string 
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {rows.map(({ cls, courseName, activeStudents, completed, attendancePercentage }) => (
+        {rows.map(({ cls, courseName, activeStudents, completed, attendancePercentage, missingAttendance }) => (
           <Card key={cls.id}>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center justify-between gap-2">
@@ -128,7 +170,11 @@ export function DiscipuladoReports({ organizationId }: { organizationId: string 
             <CardContent className="grid grid-cols-3 gap-2 text-center">
               <div><p className="text-lg font-serif">{activeStudents}</p><p className="text-[10px] text-muted-foreground uppercase">Ativos</p></div>
               <div><p className="text-lg font-serif">{completed}</p><p className="text-[10px] text-muted-foreground uppercase">Concluídos</p></div>
-              <div><p className="text-lg font-serif">{attendancePercentage !== null ? `${attendancePercentage.toFixed(0)}%` : "—"}</p><p className="text-[10px] text-muted-foreground uppercase">Frequência</p></div>
+              <div>
+                <p className="text-lg font-serif">{attendancePercentage !== null ? `${attendancePercentage.toFixed(0)}%` : "—"}</p>
+                <p className="text-[10px] text-muted-foreground uppercase">Frequência</p>
+                {missingAttendance > 0 && <p className="text-[10px] text-amber-600">{missingAttendance} pendente(s)</p>}
+              </div>
             </CardContent>
           </Card>
         ))}

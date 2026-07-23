@@ -4,7 +4,7 @@
  * (regras de frequência/avaliação/conclusão) + discipleship_lessons
  * (currículo ordenado, reordenável).
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Plus, BookOpen, GripVertical, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import {
   loadDiscipleshipCourses, createDiscipleshipCourse, updateDiscipleshipCourse,
   loadDiscipleshipLessons, createDiscipleshipLesson, reorderDiscipleshipLessons,
-  loadDiscipleshipDepartments,
+  loadDiscipleshipDepartments, createDiscipleshipDepartment,
   type DiscipleshipCourseRow, type DiscipleshipLessonRow, type DiscipleshipDepartmentRow,
 } from "@/lib/discipleship/service";
 import {
@@ -33,9 +33,10 @@ export function DiscipuladoCourses({ organizationId }: { organizationId: string 
   const [courses, setCourses] = useState<DiscipleshipCourseRow[]>([]);
   const [departments, setDepartments] = useState<DiscipleshipDepartmentRow[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
+  const [departmentOpen, setDepartmentOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<DiscipleshipCourseRow | null>(null);
 
-  const reload = async () => {
+  const reload = useCallback(async () => {
     setLoading(true);
     const [coursesRes, deptRes] = await Promise.all([
       loadDiscipleshipCourses(organizationId),
@@ -50,9 +51,9 @@ export function DiscipuladoCourses({ organizationId }: { organizationId: string 
     setDepartments(deptRes.rows);
     setModuleUnavailable(false);
     setLoading(false);
-  };
+  }, [organizationId]);
 
-  useEffect(() => { reload(); }, [organizationId]);
+  useEffect(() => { void reload(); }, [reload]);
 
   if (loading) {
     return <div className="flex items-center justify-center py-16 text-muted-foreground gap-2"><Loader2 className="animate-spin" size={18} /> Carregando cursos…</div>;
@@ -64,12 +65,17 @@ export function DiscipuladoCourses({ organizationId }: { organizationId: string 
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-serif">Cursos e Lições</h2>
           <p className="text-sm text-muted-foreground">Monte o catálogo de programas do Discipulado e ordene as lições de cada um.</p>
         </div>
-        <Button size="sm" onClick={() => setCreateOpen(true)}><Plus size={16} className="mr-1.5" /> Novo curso</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => setDepartmentOpen(true)}>
+            <Plus size={16} className="mr-1.5" /> Novo departamento
+          </Button>
+          <Button size="sm" onClick={() => setCreateOpen(true)}><Plus size={16} className="mr-1.5" /> Novo curso</Button>
+        </div>
       </div>
 
       {courses.length === 0 ? (
@@ -108,6 +114,12 @@ export function DiscipuladoCourses({ organizationId }: { organizationId: string 
         departments={departments}
         onCreated={reload}
       />
+      <CreateDepartmentDialog
+        open={departmentOpen}
+        onOpenChange={setDepartmentOpen}
+        organizationId={organizationId}
+        onCreated={reload}
+      />
 
       {selectedCourse && (
         <CourseLessonsDialog
@@ -120,6 +132,56 @@ export function DiscipuladoCourses({ organizationId }: { organizationId: string 
         />
       )}
     </div>
+  );
+}
+
+function CreateDepartmentDialog({ open, onOpenChange, organizationId, onCreated }: {
+  open: boolean;
+  onOpenChange: (value: boolean) => void;
+  organizationId: string;
+  onCreated: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      toast.error("Informe o nome do departamento.");
+      return;
+    }
+    setSaving(true);
+    const { error } = await createDiscipleshipDepartment({
+      organization_id: organizationId,
+      name: name.trim(),
+      description: description.trim() || null,
+    });
+    setSaving(false);
+    if (error) {
+      toast.error(`Não foi possível criar o departamento: ${error}`);
+      return;
+    }
+    toast.success("Departamento criado.");
+    setName("");
+    setDescription("");
+    onOpenChange(false);
+    onCreated();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Novo departamento</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <FormInputLabeled label="Nome" value={name} onChange={setName} required placeholder="Ex.: Discipulado de novos convertidos" />
+          <FormTextareaLabeled label="Descrição (opcional)" value={description} onChange={setDescription} />
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button disabled={saving} onClick={handleSave}>{saving ? "Salvando…" : "Criar departamento"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -147,6 +209,11 @@ function CreateCourseDialog({ open, onOpenChange, organizationId, departments, o
 
   const handleSave = async () => {
     if (!name.trim()) { toast.error("Informe o nome do curso"); return; }
+    const parsedMinimumScore = Number(minScore);
+    if (requiresAssessment && (!minScore.trim() || !Number.isFinite(parsedMinimumScore) || parsedMinimumScore < 0 || parsedMinimumScore > 10)) {
+      toast.error("Informe a nota mínima entre 0 e 10.");
+      return;
+    }
     setSaving(true);
     const { error } = await createDiscipleshipCourse({
       organization_id: organizationId,
@@ -157,7 +224,7 @@ function CreateCourseDialog({ open, onOpenChange, organizationId, departments, o
       requires_attendance: requiresAttendance,
       minimum_attendance_percentage: requiresAttendance ? Number(minAttendance) || 75 : 75,
       requires_assessment: requiresAssessment,
-      minimum_passing_score: requiresAssessment && minScore ? Number(minScore) : null,
+      minimum_passing_score: requiresAssessment ? parsedMinimumScore : null,
       status: "rascunho",
     });
     setSaving(false);
@@ -174,7 +241,7 @@ function CreateCourseDialog({ open, onOpenChange, organizationId, departments, o
         <DialogHeader><DialogTitle>Novo curso de Discipulado</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <FormInputLabeled label="Nome do curso" value={name} onChange={setName} required placeholder="Ex.: Curso Básico de Discipulado" />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <FormInputLabeled label="Código (opcional)" value={code} onChange={setCode} />
             <FormSelectLabeled
               label="Departamento (opcional)"
@@ -184,16 +251,16 @@ function CreateCourseDialog({ open, onOpenChange, organizationId, departments, o
             />
           </div>
           <FormTextareaLabeled label="Descrição / objetivos" value={description} onChange={setDescription} />
-          <div className="grid grid-cols-2 gap-3 items-end">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-end">
             <FormCheckboxLabeled label="Exige frequência mínima" checked={requiresAttendance} onChange={setRequiresAttendance} />
             {requiresAttendance && (
               <FormInputLabeled label="% mínimo de frequência" type="number" min={0} value={minAttendance} onChange={setMinAttendance} />
             )}
           </div>
-          <div className="grid grid-cols-2 gap-3 items-end">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-end">
             <FormCheckboxLabeled label="Exige avaliação" checked={requiresAssessment} onChange={setRequiresAssessment} />
             {requiresAssessment && (
-              <FormInputLabeled label="Nota mínima" type="number" min={0} value={minScore} onChange={setMinScore} />
+              <FormInputLabeled label="Nota mínima (escala 0–10)" type="number" min={0} max={10} step="0.01" value={minScore} onChange={setMinScore} required />
             )}
           </div>
         </div>
@@ -216,14 +283,14 @@ function CourseLessonsDialog({ course, onClose, onCourseUpdated }: {
   const [newTitle, setNewTitle] = useState("");
   const [adding, setAdding] = useState(false);
 
-  const reloadLessons = async () => {
+  const reloadLessons = useCallback(async () => {
     setLoading(true);
     const { rows } = await loadDiscipleshipLessons(course.id);
     setLessons(rows);
     setLoading(false);
-  };
+  }, [course.id]);
 
-  useEffect(() => { reloadLessons(); }, [course.id]);
+  useEffect(() => { void reloadLessons(); }, [reloadLessons]);
 
   const handleAddLesson = async () => {
     if (!newTitle.trim()) return;

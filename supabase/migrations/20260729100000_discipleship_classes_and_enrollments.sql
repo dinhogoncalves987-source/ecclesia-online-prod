@@ -24,7 +24,7 @@ BEGIN
   IF to_regclass('public.discipleship_courses') IS NULL THEN
     RAISE EXCEPTION 'discipleship_classes_and_enrollments preflight failed: discipleship_courses nao existe (aplique 20260729090000 primeiro)';
   END IF;
-  IF to_regproc('public.is_organization_descendant_or_self(uuid,uuid)') IS NULL THEN
+  IF to_regprocedure('public.is_organization_descendant_or_self(uuid,uuid)') IS NULL THEN
     RAISE EXCEPTION 'discipleship_classes_and_enrollments preflight failed: is_organization_descendant_or_self() nao existe';
   END IF;
 END;
@@ -95,6 +95,7 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_course_org uuid;
+  v_location_org uuid;
 BEGIN
   SELECT organization_id INTO v_course_org FROM public.discipleship_courses WHERE id = NEW.course_id;
   IF v_course_org IS NULL THEN
@@ -105,14 +106,31 @@ BEGIN
     RAISE EXCEPTION 'class organization must be the course organization or one of its descendants';
   END IF;
 
+  IF NEW.location_id IS NOT NULL THEN
+    SELECT organization_id INTO v_location_org
+    FROM public.discipleship_locations
+    WHERE id = NEW.location_id;
+
+    IF v_location_org IS NULL THEN
+      RAISE EXCEPTION 'discipleship location not found';
+    END IF;
+
+    IF NOT public.is_organization_descendant_or_self(v_location_org, NEW.organization_id) THEN
+      RAISE EXCEPTION 'class location must belong to the class organization tree';
+    END IF;
+  END IF;
+
   RETURN NEW;
 END;
 $$;
 
 DROP TRIGGER IF EXISTS discipleship_classes_validate_org_scope ON public.discipleship_classes;
 CREATE TRIGGER discipleship_classes_validate_org_scope
-BEFORE INSERT OR UPDATE OF course_id, organization_id ON public.discipleship_classes
+BEFORE INSERT OR UPDATE ON public.discipleship_classes
 FOR EACH ROW EXECUTE FUNCTION public._discipleship_classes_validate_org_scope();
+
+REVOKE ALL ON FUNCTION public._discipleship_classes_validate_org_scope()
+  FROM PUBLIC, anon, authenticated;
 
 ALTER TABLE public.discipleship_classes ENABLE ROW LEVEL SECURITY;
 
@@ -184,6 +202,33 @@ BEGIN
     OR v_row.status = p_status
   ) THEN
     RAISE EXCEPTION 'invalid class status transition: % -> %', v_row.status, p_status;
+  END IF;
+
+  IF p_status = 'concluida' THEN
+    IF EXISTS (
+      SELECT 1
+      FROM public.discipleship_enrollments e
+      WHERE e.class_id = p_class_id
+        AND e.status IN ('lista_espera', 'matriculado', 'ativo')
+    ) THEN
+      RAISE EXCEPTION 'class cannot be concluded while enrollments are still open';
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+      FROM public.discipleship_sessions s
+      WHERE s.class_id = p_class_id AND s.status = 'agendada'
+    ) THEN
+      RAISE EXCEPTION 'class cannot be concluded while sessions are still scheduled';
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+      FROM public.discipleship_assessments a
+      WHERE a.class_id = p_class_id AND a.status = 'planejada'
+    ) THEN
+      RAISE EXCEPTION 'class cannot be concluded while assessments are still planned';
+    END IF;
   END IF;
 
   UPDATE public.discipleship_classes SET status = p_status WHERE id = p_class_id;
@@ -264,6 +309,7 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_org_id uuid;
+  v_member_org uuid;
   v_id uuid;
 BEGIN
   IF auth.uid() IS NULL THEN
@@ -279,8 +325,15 @@ BEGIN
     RAISE EXCEPTION 'access denied to assign staff';
   END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM public.members WHERE id = p_member_id) THEN
-    RAISE EXCEPTION 'member not found';
+  SELECT COALESCE(congregation_id, sector_id, organization_id)
+    INTO v_member_org
+  FROM public.members
+  WHERE id = p_member_id;
+
+  IF v_member_org IS NULL THEN RAISE EXCEPTION 'member not found'; END IF;
+
+  IF NOT public.is_organization_descendant_or_self(v_org_id, v_member_org) THEN
+    RAISE EXCEPTION 'staff member is outside the class organization scope';
   END IF;
 
   IF p_role NOT IN ('coordenador', 'secretario', 'discipulador', 'professor', 'auxiliar') THEN
@@ -485,7 +538,12 @@ BEGIN
     RAISE EXCEPTION 'authentication required';
   END IF;
 
-  SELECT * INTO v_class FROM public.discipleship_classes WHERE id = p_class_id;
+  -- O lock serializa a verificação de capacidade com outras matrículas da
+  -- mesma turma, impedindo ultrapassar o limite em requisições concorrentes.
+  SELECT * INTO v_class
+  FROM public.discipleship_classes
+  WHERE id = p_class_id
+  FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'class not found';
   END IF;
@@ -502,6 +560,10 @@ BEGIN
   FROM public.members WHERE id = p_member_id;
   IF v_member_org IS NULL THEN
     RAISE EXCEPTION 'member not found';
+  END IF;
+
+  IF NOT public.is_organization_descendant_or_self(v_class.organization_id, v_member_org) THEN
+    RAISE EXCEPTION 'member is outside the class organization scope';
   END IF;
 
   IF p_status NOT IN ('lista_espera', 'matriculado') THEN
@@ -553,10 +615,13 @@ DECLARE
   v_course public.discipleship_courses%ROWTYPE;
   v_class public.discipleship_classes%ROWTYPE;
   v_total_sessions integer;
+  v_launched_sessions integer;
   v_present_sessions integer;
   v_attendance_pct numeric;
   v_avg_score numeric;
   v_total_weight numeric;
+  v_required_assessments integer;
+  v_recorded_assessments integer;
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'authentication required';
@@ -567,11 +632,26 @@ BEGIN
     RAISE EXCEPTION 'enrollment not found';
   END IF;
 
-  SELECT * INTO v_class FROM public.discipleship_classes WHERE id = v_row.class_id;
+  SELECT * INTO v_class
+  FROM public.discipleship_classes
+  WHERE id = v_row.class_id
+  FOR UPDATE;
   SELECT * INTO v_course FROM public.discipleship_courses WHERE id = v_class.course_id;
 
   IF NOT public.can_operate_discipleship_class(auth.uid(), v_row.class_id, v_class.organization_id) THEN
     RAISE EXCEPTION 'access denied to update enrollment status';
+  END IF;
+
+  IF p_override_eligibility THEN
+    IF p_status <> 'concluido' THEN
+      RAISE EXCEPTION 'eligibility override is only valid for conclusion';
+    END IF;
+    IF NOT public.has_org_access_permission(auth.uid(), v_class.organization_id, 'discipleship.manage') THEN
+      RAISE EXCEPTION 'only discipleship managers can override completion eligibility';
+    END IF;
+    IF NULLIF(btrim(p_notes), '') IS NULL THEN
+      RAISE EXCEPTION 'override justification is required';
+    END IF;
   END IF;
 
   IF NOT (
@@ -583,6 +663,19 @@ BEGIN
     RAISE EXCEPTION 'invalid enrollment status transition: % -> %', v_row.status, p_status;
   END IF;
 
+  IF v_row.status = 'lista_espera'
+     AND p_status = 'matriculado'
+     AND v_class.capacity IS NOT NULL
+     AND (
+       SELECT count(*)
+       FROM public.discipleship_enrollments e
+       WHERE e.class_id = v_class.id
+         AND e.id <> v_row.id
+         AND e.status IN ('matriculado', 'ativo')
+     ) >= v_class.capacity THEN
+    RAISE EXCEPTION 'class has reached its capacity (%)', v_class.capacity;
+  END IF;
+
   -- Conclusão não pode depender apenas de um botão livre: valida as regras
   -- configuradas no curso (frequência mínima e, se exigida, nota mínima),
   -- a menos que um coordenador/gestor (discipleship.manage) registre uma
@@ -590,27 +683,75 @@ BEGIN
   IF p_status = 'concluido' AND NOT p_override_eligibility THEN
     IF v_course.requires_attendance THEN
       SELECT count(*) INTO v_total_sessions
-      FROM public.discipleship_attendance a
-      WHERE a.enrollment_id = p_enrollment_id AND a.status IN ('presente', 'ausente', 'justificado');
+      FROM public.discipleship_sessions s
+      WHERE s.class_id = v_class.id
+        AND s.status = 'realizada'
+        AND s.session_date >= v_row.enrolled_at::date;
+
+      SELECT count(*) INTO v_launched_sessions
+      FROM public.discipleship_sessions s
+      JOIN public.discipleship_attendance a
+        ON a.session_id = s.id
+       AND a.enrollment_id = p_enrollment_id
+       AND a.status IN ('presente', 'ausente', 'justificado')
+      WHERE s.class_id = v_class.id
+        AND s.status = 'realizada'
+        AND s.session_date >= v_row.enrolled_at::date;
 
       SELECT count(*) INTO v_present_sessions
-      FROM public.discipleship_attendance a
-      WHERE a.enrollment_id = p_enrollment_id AND a.status IN ('presente', 'justificado');
+      FROM public.discipleship_sessions s
+      JOIN public.discipleship_attendance a
+        ON a.session_id = s.id
+       AND a.enrollment_id = p_enrollment_id
+       AND a.status IN ('presente', 'justificado')
+      WHERE s.class_id = v_class.id
+        AND s.status = 'realizada'
+        AND s.session_date >= v_row.enrolled_at::date;
 
       v_attendance_pct := CASE WHEN v_total_sessions > 0 THEN (v_present_sessions::numeric / v_total_sessions) * 100 ELSE 0 END;
 
-      IF v_total_sessions = 0 OR v_attendance_pct < v_course.minimum_attendance_percentage THEN
-        RAISE EXCEPTION 'enrollment does not meet minimum attendance (%.2f%% required, got %.2f%% over % launched sessions)',
+      IF v_total_sessions = 0 THEN
+        RAISE EXCEPTION 'enrollment has no completed sessions to calculate attendance';
+      END IF;
+
+      IF v_launched_sessions <> v_total_sessions THEN
+        RAISE EXCEPTION 'attendance is missing for % of % completed sessions',
+          v_total_sessions - v_launched_sessions, v_total_sessions;
+      END IF;
+
+      IF v_attendance_pct < v_course.minimum_attendance_percentage THEN
+        RAISE EXCEPTION 'enrollment does not meet minimum attendance (%.2f%% required, got %.2f%% over % completed sessions)',
           v_course.minimum_attendance_percentage, v_attendance_pct, v_total_sessions;
       END IF;
     END IF;
 
-    IF v_course.requires_assessment AND v_course.minimum_passing_score IS NOT NULL THEN
-      SELECT sum(r.score * a.weight) / NULLIF(sum(a.weight), 0), sum(a.weight)
+    IF v_course.requires_assessment THEN
+      SELECT count(*) INTO v_required_assessments
+      FROM public.discipleship_assessments a
+      WHERE a.class_id = v_class.id AND a.status <> 'cancelada';
+
+      SELECT count(*) INTO v_recorded_assessments
+      FROM public.discipleship_assessments a
+      JOIN public.discipleship_assessment_results r
+        ON r.assessment_id = a.id AND r.enrollment_id = p_enrollment_id
+      WHERE a.class_id = v_class.id AND a.status = 'aplicada';
+
+      IF v_required_assessments = 0 THEN
+        RAISE EXCEPTION 'course requires assessment but this class has no active assessments';
+      END IF;
+
+      IF v_recorded_assessments <> v_required_assessments THEN
+        RAISE EXCEPTION 'assessment results are incomplete (% of % recorded)',
+          v_recorded_assessments, v_required_assessments;
+      END IF;
+
+      SELECT sum(((r.score / a.max_score) * 10) * a.weight) / NULLIF(sum(a.weight), 0), sum(a.weight)
         INTO v_avg_score, v_total_weight
       FROM public.discipleship_assessment_results r
       JOIN public.discipleship_assessments a ON a.id = r.assessment_id
-      WHERE r.enrollment_id = p_enrollment_id;
+      WHERE r.enrollment_id = p_enrollment_id
+        AND a.class_id = v_class.id
+        AND a.status = 'aplicada';
 
       IF v_total_weight IS NULL OR v_total_weight = 0 OR v_avg_score < v_course.minimum_passing_score THEN
         RAISE EXCEPTION 'enrollment does not meet minimum passing score (%.2f required, got %)',
@@ -625,7 +766,10 @@ BEGIN
 
   UPDATE public.discipleship_enrollments
   SET status = p_status,
-      final_result = COALESCE(p_final_result, final_result),
+      final_result = COALESCE(
+        p_final_result,
+        CASE WHEN p_status = 'concluido' THEN 'aprovado' ELSE final_result END
+      ),
       administrative_notes = COALESCE(NULLIF(btrim(p_notes), ''), administrative_notes),
       started_at = CASE WHEN p_status = 'ativo' AND started_at IS NULL THEN CURRENT_DATE ELSE started_at END,
       completed_at = CASE WHEN p_status IN ('concluido', 'desistente', 'cancelado') AND completed_at IS NULL THEN CURRENT_DATE ELSE completed_at END

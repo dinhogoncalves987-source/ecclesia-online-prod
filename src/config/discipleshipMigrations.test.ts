@@ -157,6 +157,8 @@ describe("Discipulado — escrita crítica somente por RPC (nunca burlável por 
     const PUBLIC_RPCS = [
       "reorder_discipleship_lessons(uuid, uuid[])",
       "update_discipleship_class_status(uuid, text)",
+      "update_discipleship_session_status(uuid, text)",
+      "update_discipleship_assessment_status(uuid, text)",
       "assign_discipleship_staff(uuid, uuid, text, date, text)",
       "end_discipleship_staff_assignment(uuid, date)",
       "enroll_member_in_class(uuid, uuid, text)",
@@ -166,6 +168,8 @@ describe("Discipulado — escrita crítica somente por RPC (nunca burlável por 
       "create_discipleship_followup(uuid, text, date, text, uuid, text)",
       "get_discipleship_enrollment_progress(uuid)",
       "mark_discipleship_certificate_issued(uuid, uuid)",
+      "search_discipleship_members(uuid, text, integer)",
+      "get_discipleship_member_labels(uuid, uuid[])",
     ];
     for (const signature of PUBLIC_RPCS) {
       const fnName = signature.split("(")[0];
@@ -187,6 +191,9 @@ describe("Discipulado — escrita crítica somente por RPC (nunca burlável por 
     );
     expect(permissionsHistorySql).toContain(
       "REVOKE ALL ON FUNCTION public._discipleship_enrollments_register_history() FROM PUBLIC, anon, authenticated",
+    );
+    expect(permissionsHistorySql).toMatch(
+      /REVOKE ALL ON FUNCTION public\._register_discipleship_member_history\([\s\S]*?\) FROM PUBLIC, anon, authenticated/,
     );
   });
 
@@ -257,6 +264,55 @@ describe("Discipulado — máquinas de estado protegidas contra lançamento em t
     expect(classesSql).toContain("p_override_eligibility");
     expect(classesSql).toContain("enrollment does not meet minimum attendance");
     expect(classesSql).toContain("enrollment does not meet minimum passing score");
+  });
+
+  it("override de conclusão exige discipleship.manage e justificativa", () => {
+    expect(classesSql).toContain("only discipleship managers can override completion eligibility");
+    expect(classesSql).toContain("override justification is required");
+    expect(classesSql).toMatch(
+      /p_override_eligibility[\s\S]*?has_org_access_permission\(auth\.uid\(\), v_class\.organization_id, 'discipleship\.manage'\)/,
+    );
+  });
+
+  it("frequência só é lançada em encontro realizado e ausências de lançamento bloqueiam conclusão", () => {
+    expect(learningRecordsSql).toContain("attendance can only be recorded for a completed session");
+    expect(classesSql).toContain("attendance is missing for % of % completed sessions");
+    expect(classesSql).toMatch(/FROM public\.discipleship_sessions s[\s\S]*?s\.status = 'realizada'/);
+  });
+
+  it("notas só são lançadas em avaliação aplicada e a média é normalizada para 0–10", () => {
+    expect(learningRecordsSql).toContain("results can only be recorded for an applied assessment");
+    expect(classesSql).toContain("(r.score / a.max_score) * 10");
+    expect(classesSql).toContain("assessment results are incomplete");
+  });
+});
+
+describe("Discipulado — invariantes corrigidas pela revisão Codex", () => {
+  it("preflights de assinatura usam to_regprocedure, nunca to_regproc com assinatura", () => {
+    expect(allSqlNoComments).not.toMatch(/to_regproc\('[^']+\([^']*\)'\)/);
+    expect(allSqlNoComments).toMatch(/to_regprocedure\('public\.has_org_access_permission\(uuid,uuid,text\)'\)/);
+    expect(allSqlNoComments).toMatch(/to_regprocedure\('public\.can_operate_discipleship_class\(uuid,uuid,uuid\)'\)/);
+  });
+
+  it("reordenação usa faixa temporária positiva e rejeita ids duplicados", () => {
+    expect(foundationSql).not.toContain("SET sequence_number = -sequence_number");
+    expect(foundationSql).toContain("SET sequence_number = sequence_number + v_offset");
+    expect(foundationSql).toContain("lesson id list cannot contain duplicates");
+  });
+
+  it("curso/turma/sessão/equipe/matrícula validam o escopo organizacional", () => {
+    expect(foundationSql).toContain("course department must belong to the course organization tree");
+    expect(classesSql).toContain("class location must belong to the class organization tree");
+    expect(classesSql).toContain("staff member is outside the class organization scope");
+    expect(classesSql).toContain("member is outside the class organization scope");
+    expect(learningRecordsSql).toContain("session lesson must belong to the class course");
+    expect(learningRecordsSql).toContain("session instructor must be active staff in this class");
+  });
+
+  it("capacidade da turma é verificada sob lock", () => {
+    expect(classesSql).toMatch(
+      /FROM public\.discipleship_classes\s+WHERE id = p_class_id\s+FOR UPDATE/,
+    );
   });
 });
 
@@ -370,17 +426,15 @@ describe("Discipulado — integração com member_history (timeline instituciona
     expect(permissionsHistorySql).toContain("WHEN NEW.status = 'transferido' THEN 'transferencia_turma'");
   });
 
-  it("todo evento registrado usa source_module = 'discipulado'", () => {
-    // Ancorado em "PERFORM public." para capturar somente CHAMADAS reais da
-    // função (nunca a prosa dos comentários, a própria CREATE OR REPLACE, ou
-    // os REVOKE/GRANT que também citam o nome da função).
-    const registerCalls = stripSqlComments(permissionsHistorySql).match(
-      /PERFORM public\.register_member_history_event\(([\s\S]*?)\);/g,
-    ) ?? [];
-    expect(registerCalls.length).toBe(2);
-    for (const call of registerCalls) {
-      expect(call, call.slice(0, 60)).toContain("'discipulado'");
-    }
+  it("todo evento do helper interno usa source_module = 'discipulado'", () => {
+    const helper = stripSqlComments(permissionsHistorySql).match(
+      /CREATE OR REPLACE FUNCTION public\._register_discipleship_member_history\([\s\S]*?\$\$;/,
+    )?.[0];
+    expect(helper).toBeTruthy();
+    expect(helper).toContain("'discipulado', 'discipleship_enrollments'");
+    expect(permissionsHistorySql).toContain(
+      "PERFORM public._register_discipleship_member_history(",
+    );
   });
 });
 

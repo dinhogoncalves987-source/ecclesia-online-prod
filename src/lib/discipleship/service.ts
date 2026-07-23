@@ -37,6 +37,12 @@ export type DiscipleshipAttendanceRow = Tables<"discipleship_attendance">;
 export type DiscipleshipAssessmentRow = Tables<"discipleship_assessments">;
 export type DiscipleshipAssessmentResultRow = Tables<"discipleship_assessment_results">;
 export type DiscipleshipFollowupRow = Tables<"discipleship_followups">;
+export type DiscipleshipMemberLabel = {
+  id: string;
+  full_name: string;
+  known_name: string | null;
+  member_code: string | null;
+};
 
 /** Mesmo formato de erro usado por memberHistory.ts (preserva `code` do PostgREST). */
 export type LoadError = { code?: string; message: string } | null;
@@ -44,6 +50,34 @@ type LoadResult<T> = { rows: T[]; error: LoadError };
 
 function toLoadError(error: { code?: string; message: string } | null): LoadError {
   return error ? { code: error.code, message: error.message } : null;
+}
+
+// ── Diretório mínimo de membros ──────────────────────────────────────────
+
+export async function searchDiscipleshipMembers(
+  organizationId: string,
+  query: string,
+): Promise<LoadResult<DiscipleshipMemberLabel>> {
+  const { data, error } = await supabase.rpc("search_discipleship_members", {
+    p_organization_id: organizationId,
+    p_query: query.trim() || undefined,
+    p_limit: 30,
+  });
+  if (error) return { rows: [], error: toLoadError(error) };
+  return { rows: data ?? [], error: null };
+}
+
+export async function getDiscipleshipMemberLabels(
+  organizationId: string,
+  memberIds: string[],
+): Promise<LoadResult<DiscipleshipMemberLabel>> {
+  if (memberIds.length === 0) return { rows: [], error: null };
+  const { data, error } = await supabase.rpc("get_discipleship_member_labels", {
+    p_organization_id: organizationId,
+    p_member_ids: memberIds,
+  });
+  if (error) return { rows: [], error: toLoadError(error) };
+  return { rows: data ?? [], error: null };
 }
 
 // ── Locais ────────────────────────────────────────────────────────────────
@@ -354,7 +388,18 @@ export async function updateDiscipleshipEnrollmentStatus(input: {
 }
 
 export async function getDiscipleshipEnrollmentProgress(enrollmentId: string): Promise<{
-  data: { total_sessions_launched: number; present_sessions: number; attendance_percentage: number | null; average_score: number | null; assessments_weighted: number | null } | null;
+  data: {
+    total_completed_sessions: number;
+    total_sessions_launched: number;
+    missing_attendance_records: number;
+    present_sessions: number;
+    attendance_percentage: number | null;
+    average_score: number | null;
+    assessments_weighted: number | null;
+    required_assessments: number;
+    recorded_assessments: number;
+    missing_assessment_results: number;
+  } | null;
   error: string | null;
 }> {
   const { data, error } = await supabase.rpc("get_discipleship_enrollment_progress", { p_enrollment_id: enrollmentId });
@@ -397,6 +442,17 @@ export async function createDiscipleshipSession(input: {
 }): Promise<{ row: DiscipleshipSessionRow | null; error: string | null }> {
   const { data, error } = await supabase.from("discipleship_sessions").insert(input).select("*").single();
   return { row: data ?? null, error: error?.message ?? null };
+}
+
+export async function updateDiscipleshipSessionStatus(
+  sessionId: string,
+  status: "realizada" | "cancelada",
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.rpc("update_discipleship_session_status", {
+    p_session_id: sessionId,
+    p_status: status,
+  });
+  return { error: error?.message ?? null };
 }
 
 /** Usado pela Visão Geral/Relatórios: encontros de várias turmas de uma vez. */
@@ -474,6 +530,17 @@ export async function createDiscipleshipAssessment(input: {
 }): Promise<{ row: DiscipleshipAssessmentRow | null; error: string | null }> {
   const { data, error } = await supabase.from("discipleship_assessments").insert(input).select("*").single();
   return { row: data ?? null, error: error?.message ?? null };
+}
+
+export async function updateDiscipleshipAssessmentStatus(
+  assessmentId: string,
+  status: "aplicada" | "cancelada",
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.rpc("update_discipleship_assessment_status", {
+    p_assessment_id: assessmentId,
+    p_status: status,
+  });
+  return { error: error?.message ?? null };
 }
 
 /** Usado pela Visão Geral/Relatórios: avaliações de várias turmas de uma vez. */

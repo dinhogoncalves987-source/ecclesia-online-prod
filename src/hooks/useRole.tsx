@@ -61,11 +61,6 @@ const MODULE_ACCESS: Record<string, AppRole[]> = {
   "/admin/solicitacoes": ["super_admin", "church_admin", "pastor", "secretary"],
   "/admin/carteira-ecclesia": ["super_admin", "church_admin", "pastor", "secretary", "member"],
   "/admin/porteiro": ["porteiro"],
-  // OPERAÇÃO 2 (Discipulado) — fallback de papel legado, mesmo padrão de
-  // "/admin/chat-secretaria". A checagem primária é por capability
-  // ("discipleship.read", ver ROUTE_ACCESS_PERMISSIONS em accessControl.ts);
-  // este mapa só cobre organizações sem linha em organization_responsibles.
-  "/admin/discipulado": ["super_admin", "church_admin", "pastor", "secretary"],
 };
 
 /**
@@ -226,11 +221,11 @@ export function useRole() {
     // perfis, inclusive super_admin).
     const path = /^\/admin\/membros\/[^/]+$/.test(rawPath) ? "/admin/membros" : rawPath;
     const requiredCapability = ROUTE_ACCESS_PERMISSIONS[path];
-    if (
-      requiredCapability
-      && (canonicalRole === "super_admin" || capabilities.has(requiredCapability))
-    ) {
-      return true;
+    if (requiredCapability) {
+      // Rotas governadas por capability são fail-closed. Cair depois para o
+      // papel legado deixava a tela visível mesmo quando a RPC/RLS recusava
+      // a unidade — exatamente o estado "abre, mas não funciona".
+      return canonicalRole === "super_admin" || capabilities.has(requiredCapability);
     }
     // Modo Porteiro e uma capacidade extra (porteiro), nunca a identidade
     // base do usuario — por isso a checagem usa extraRoles, nao

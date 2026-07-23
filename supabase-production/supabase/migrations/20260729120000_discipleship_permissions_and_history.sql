@@ -158,6 +158,176 @@ GRANT EXECUTE ON FUNCTION public.register_member_history_event(
   uuid, text, text, text, timestamptz, text, text, uuid, uuid, text, text, text, text, text
 ) TO service_role;
 
+-- Helper interno do módulo. A função compartilhada da Secretaria exige
+-- members.write, o que faria uma matrícula lançada por coordenador ou
+-- professor autorizado falhar no trigger de histórico. Aqui a autorização é
+-- reconfirmada no escopo da turma e a inserção continua append-only.
+CREATE OR REPLACE FUNCTION public._register_discipleship_member_history(
+  p_enrollment_id uuid,
+  p_history_type text,
+  p_title text,
+  p_description text DEFAULT NULL,
+  p_document_id uuid DEFAULT NULL
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_enrollment public.discipleship_enrollments%ROWTYPE;
+  v_class public.discipleship_classes%ROWTYPE;
+  v_member_org uuid;
+  v_history_id uuid;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
+
+  SELECT * INTO v_enrollment
+  FROM public.discipleship_enrollments
+  WHERE id = p_enrollment_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'enrollment not found'; END IF;
+
+  SELECT * INTO v_class
+  FROM public.discipleship_classes
+  WHERE id = v_enrollment.class_id;
+
+  IF NOT public.can_operate_discipleship_class(auth.uid(), v_class.id, v_class.organization_id) THEN
+    RAISE EXCEPTION 'access denied to register discipleship history';
+  END IF;
+
+  SELECT COALESCE(congregation_id, sector_id, organization_id)
+    INTO v_member_org
+  FROM public.members
+  WHERE id = v_enrollment.member_id;
+
+  IF v_member_org IS NULL
+     OR NOT public.is_organization_descendant_or_self(v_class.organization_id, v_member_org) THEN
+    RAISE EXCEPTION 'enrollment member is outside the class organization scope';
+  END IF;
+
+  IF p_history_type NOT IN (
+    'matricula', 'inicio_formacao', 'conclusao_formacao',
+    'desligamento_formacao', 'transferencia_turma', 'certificado_emitido'
+  ) THEN
+    RAISE EXCEPTION 'invalid discipleship history type: %', p_history_type;
+  END IF;
+
+  IF NULLIF(btrim(p_title), '') IS NULL THEN
+    RAISE EXCEPTION 'discipleship history title is required';
+  END IF;
+
+  INSERT INTO public.member_history (
+    member_id, organization_id, history_type, title, description, occurred_at,
+    source_module, source_table, source_id, document_id, visibility,
+    created_by, legacy_source, legacy_module, legacy_code
+  ) VALUES (
+    v_enrollment.member_id, v_member_org, p_history_type, btrim(p_title),
+    p_description, now(), 'discipulado', 'discipleship_enrollments',
+    v_enrollment.id, p_document_id, 'normal', auth.uid(),
+    v_enrollment.legacy_source, v_enrollment.legacy_module,
+    v_enrollment.legacy_code
+  )
+  RETURNING id INTO v_history_id;
+
+  RETURN v_history_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public._register_discipleship_member_history(
+  uuid, text, text, text, uuid
+) FROM PUBLIC, anon, authenticated;
+
+-- Diretório mínimo para o módulo. Evita baixar CPF, telefone, e-mail e todos
+-- os milhares de membros no navegador apenas para escolher um nome.
+CREATE OR REPLACE FUNCTION public.search_discipleship_members(
+  p_organization_id uuid,
+  p_query text DEFAULT NULL,
+  p_limit integer DEFAULT 30
+)
+RETURNS TABLE (
+  id uuid,
+  full_name text,
+  known_name text,
+  member_code text
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_query text := NULLIF(btrim(COALESCE(p_query, '')), '');
+  v_limit integer := LEAST(GREATEST(COALESCE(p_limit, 30), 1), 50);
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
+  IF NOT public.has_org_access_permission(auth.uid(), p_organization_id, 'discipleship.read') THEN
+    RAISE EXCEPTION 'access denied to discipleship member directory';
+  END IF;
+
+  RETURN QUERY
+  SELECT m.id, m.full_name, m.known_name, m.member_code
+  FROM public.members m
+  WHERE public.is_organization_descendant_or_self(
+          p_organization_id,
+          COALESCE(m.congregation_id, m.sector_id, m.organization_id)
+        )
+    AND (
+      v_query IS NULL
+      OR m.full_name ILIKE ('%' || v_query || '%')
+      OR COALESCE(m.known_name, '') ILIKE ('%' || v_query || '%')
+      OR COALESCE(m.member_code, '') ILIKE ('%' || v_query || '%')
+      OR COALESCE(m.legacy_code, '') ILIKE ('%' || v_query || '%')
+      OR COALESCE(m.legacy_registration, '') ILIKE ('%' || v_query || '%')
+    )
+  ORDER BY COALESCE(NULLIF(m.known_name, ''), m.full_name), m.full_name
+  LIMIT v_limit;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.search_discipleship_members(uuid, text, integer)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.search_discipleship_members(uuid, text, integer)
+  TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.get_discipleship_member_labels(
+  p_organization_id uuid,
+  p_member_ids uuid[]
+)
+RETURNS TABLE (
+  id uuid,
+  full_name text,
+  known_name text,
+  member_code text
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
+  IF NOT public.has_org_access_permission(auth.uid(), p_organization_id, 'discipleship.read') THEN
+    RAISE EXCEPTION 'access denied to discipleship member directory';
+  END IF;
+  IF p_member_ids IS NULL OR cardinality(p_member_ids) = 0 THEN RETURN; END IF;
+
+  RETURN QUERY
+  SELECT m.id, m.full_name, m.known_name, m.member_code
+  FROM public.members m
+  WHERE m.id = ANY(p_member_ids)
+    AND public.is_organization_descendant_or_self(
+          p_organization_id,
+          COALESCE(m.congregation_id, m.sector_id, m.organization_id)
+        )
+  ORDER BY COALESCE(NULLIF(m.known_name, ''), m.full_name), m.full_name;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.get_discipleship_member_labels(uuid, uuid[])
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_discipleship_member_labels(uuid, uuid[])
+  TO authenticated;
+
 -- ── Contrato de emissão de certificado (elegibilidade + registro) ───────
 -- A emissão VISUAL do certificado (PDF/layout) está fora do escopo desta
 -- operação (ver docs/architecture/operacao-2-discipulado.md, pendências).
@@ -206,21 +376,28 @@ BEGIN
   END IF;
 
   IF p_document_id IS NULL OR NOT EXISTS (
-    SELECT 1 FROM public.documents WHERE id = p_document_id AND organization_id = v_class.organization_id
+    SELECT 1
+    FROM public.documents d
+    WHERE d.id = p_document_id
+      AND public.is_organization_descendant_or_self(d.organization_id, v_class.organization_id)
   ) THEN
-    RAISE EXCEPTION 'document not found for this organization';
+    RAISE EXCEPTION 'document not found in the class organization tree';
+  END IF;
+
+  -- Repetir a mesma ação (duplo clique/retry de rede) é idempotente.
+  IF v_row.certificate_document_id = p_document_id
+     AND v_row.certificate_issued_at IS NOT NULL THEN
+    RETURN;
   END IF;
 
   UPDATE public.discipleship_enrollments
   SET certificate_document_id = p_document_id, certificate_issued_at = now()
   WHERE id = p_enrollment_id;
 
-  PERFORM public.register_member_history_event(
-    v_row.member_id, 'certificado_emitido',
+  PERFORM public._register_discipleship_member_history(
+    v_row.id, 'certificado_emitido',
     'Certificado emitido: ' || v_course.name,
-    NULL, now(), 'discipulado', 'discipleship_enrollments', v_row.id,
-    p_document_id, NULL, 'normal',
-    v_row.legacy_source, v_row.legacy_module, v_row.legacy_code
+    NULL, p_document_id
   );
 END;
 $$;
@@ -238,7 +415,6 @@ AS $$
 DECLARE
   v_course_name text;
   v_class_name text;
-  v_member_id uuid;
   v_history_type text;
   v_title text;
 BEGIN
@@ -246,8 +422,6 @@ BEGIN
   FROM public.discipleship_classes cl
   JOIN public.discipleship_courses co ON co.id = cl.course_id
   WHERE cl.id = NEW.class_id;
-
-  v_member_id := NEW.member_id;
 
   IF TG_OP = 'INSERT' THEN
     v_history_type := 'matricula';
@@ -275,11 +449,8 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  PERFORM public.register_member_history_event(
-    v_member_id, v_history_type, v_title, NEW.administrative_notes,
-    COALESCE(NEW.updated_at, now()), 'discipulado', 'discipleship_enrollments', NEW.id,
-    NULL, NULL, 'normal',
-    NEW.legacy_source, NEW.legacy_module, NEW.legacy_code
+  PERFORM public._register_discipleship_member_history(
+    NEW.id, v_history_type, v_title, NEW.administrative_notes, NULL
   );
 
   RETURN NEW;

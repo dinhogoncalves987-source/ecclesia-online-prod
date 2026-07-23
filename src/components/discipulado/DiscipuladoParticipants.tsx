@@ -1,7 +1,7 @@
 /**
  * Participantes (OPERAÇÃO 2) — localiza uma pessoa já existente em
- * public.members (reaproveitando DiscipuladoMemberPicker/matchesMemberSearch,
- * nunca um novo cadastro) e mostra SOMENTE os dados do Discipulado dessa
+ * public.members (reaproveitando o seletor escopado do módulo, nunca um novo
+ * cadastro) e mostra SOMENTE os dados do Discipulado dessa
  * pessoa, com link para o perfil institucional completo do membro
  * (src/pages/MemberProfile.tsx) — sem duplicar o formulário de membros.
  */
