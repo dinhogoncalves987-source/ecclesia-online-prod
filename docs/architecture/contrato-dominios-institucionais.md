@@ -166,3 +166,41 @@ A importação em si **não foi implementada** nesta operação — apenas a est
 
 Nenhuma tela, rota ou tabela funcional de Discipulado/Teologia/Missões foi criada nesta operação —
 apenas os pontos de extensão acima, já testados e em uso real pela Secretaria.
+
+## 10. Extensões reais criadas pela Operação 2 (Discipulado)
+
+> Esta seção só registra o que a Operação 2 efetivamente criou sobre o contrato acima. As decisões
+> da Operação 1 (seções 1–9) não foram alteradas. Detalhe completo em
+> `docs/architecture/operacao-2-discipulado.md`.
+
+- **Catálogo de `member_history.history_type` estendido** (migration
+  `20260729120000_discipleship_permissions_and_history.sql`, nunca reabrindo a migration original da
+  Op. 1): 5 novos marcos genéricos — `matricula`, `inicio_formacao`, `conclusao_formacao`,
+  `desligamento_formacao`, `transferencia_turma`. Nomeados de propósito para Teologia reutilizar sem
+  nova migration de catálogo.
+- **`source_module = 'discipulado'`** passou de valor previsto no enum para valor real em uso — todo
+  evento de matrícula/formação chega à timeline por um trigger dedicado
+  (`_discipleship_enrollments_register_history`), nunca chamando `register_member_history_event()`
+  direto do frontend.
+- **12 tabelas novas** (`discipleship_locations`, `discipleship_departments`, `discipleship_courses`,
+  `discipleship_lessons`, `discipleship_classes`, `discipleship_staff_assignments`,
+  `discipleship_enrollments`, `discipleship_sessions`, `discipleship_attendance`,
+  `discipleship_assessments`, `discipleship_assessment_results`, `discipleship_followups`) — todas
+  referenciam `members.id`/`organizations.id`, nenhuma tabela de pessoa ou organização paralela.
+- **4 capabilities novas**: `discipleship.read`, `discipleship.manage`, `discipleship.teach`,
+  `discipleship.confidential` — mesmo padrão de `members.confidential` (nunca concedida por
+  conveniência junto de read/manage/teach).
+- **3 responsabilidades operacionais novas**: `discipleship_coordinator`, `discipleship_secretary`,
+  `discipleship_teacher` — mesmo formato de `access_responsibility_definitions` já usado pela
+  Secretaria (`inherits_to_descendants=false`, `is_governance=false`, escopo local).
+- **Decisão documentada**: `public.groups` (pequenos grupos de comunhão) **não** foi reaproveitado
+  para representar "departamento curricular" do WinTechi — semântica incompatível. Criada
+  `discipleship_departments` como catálogo próprio, opcional, sem duplicar hierarquia de
+  `organizations`.
+- **Padrão de "escrita só por RPC" replicado**: tabelas com máquina de estados ou risco de burla de
+  autoria (`enrollments`, `staff_assignments`, `attendance`, `assessment_results`, `followups`)
+  revogam INSERT/UPDATE/DELETE de `authenticated`, mesmo padrão já usado por `member_occurrences` na
+  Operação 1 — confirmando que este é o padrão do projeto, não uma decisão isolada da Secretaria.
+- **Contrato de certificado (elegibilidade + registro, sem emissão visual)**: reaproveita
+  `public.documents` + `member_history` tipo `certificado_emitido` (já existente da Op. 1) — nenhuma
+  tabela ou gerador de documento novo.

@@ -40,6 +40,16 @@ export const ACCESS_PERMISSION_KEYS = [
   "requests.read",
   "requests.manage",
   "chat.secretaria",
+  // OPERAÇÃO 2 (Discipulado) — espelha as capabilities criadas em
+  // 20260729090000_discipleship_foundation.sql. "discipleship.confidential"
+  // segue o MESMO padrão de "members.confidential": nunca concedida junto
+  // com read/manage/teach por conveniência, apenas a quem já detém
+  // governança (church_admin/responsible_pastor) ou recebe a
+  // responsabilidade explicitamente.
+  "discipleship.read",
+  "discipleship.manage",
+  "discipleship.teach",
+  "discipleship.confidential",
 ] as const;
 
 export type AccessPermission = (typeof ACCESS_PERMISSION_KEYS)[number];
@@ -61,6 +71,11 @@ export const ACCESS_RESPONSIBILITY_KEYS = [
   "group_manager",
   "gatekeeper",
   "requests_manager",
+  // OPERAÇÃO 2 (Discipulado) — espelha access_responsibility_definitions
+  // inseridas em 20260729090000_discipleship_foundation.sql.
+  "discipleship_coordinator",
+  "discipleship_secretary",
+  "discipleship_teacher",
 ] as const;
 
 export type AccessResponsibility = (typeof ACCESS_RESPONSIBILITY_KEYS)[number];
@@ -239,6 +254,40 @@ export const ACCESS_RESPONSIBILITIES: readonly AccessResponsibilityDefinition[] 
     inheritsToDescendants: false,
     governance: false,
   },
+  // OPERAÇÃO 2 (Discipulado) — espelha os INSERTs em
+  // access_responsibility_definitions de
+  // 20260729090000_discipleship_foundation.sql. church_admin e
+  // responsible_pastor (acima) já recebem as capabilities de discipleship
+  // idempotentemente pela migration; estas três são responsabilidades
+  // operacionais adicionais, escopadas à unidade recebida
+  // (inheritsToDescendants: false, mesmo padrão de secretary/group_manager).
+  {
+    key: "discipleship_coordinator",
+    label: "Coordenador(a) de Discipulado",
+    description: "Gerencia cursos, turmas, equipe e matrículas do Discipulado no escopo recebido.",
+    category: "ministries",
+    permissions: ["discipleship.read", "discipleship.manage", "discipleship.teach"],
+    inheritsToDescendants: false,
+    governance: false,
+  },
+  {
+    key: "discipleship_secretary",
+    label: "Secretário(a) de Discipulado",
+    description: "Administra turmas e matrículas do Discipulado, sem acesso a acompanhamento confidencial.",
+    category: "ministries",
+    permissions: ["discipleship.read", "discipleship.manage"],
+    inheritsToDescendants: false,
+    governance: false,
+  },
+  {
+    key: "discipleship_teacher",
+    label: "Discipulador(a) / Professor(a)",
+    description: "Leciona e lança frequência, avaliação e acompanhamento somente nas turmas às quais está atribuído.",
+    category: "ministries",
+    permissions: ["discipleship.read", "discipleship.teach"],
+    inheritsToDescendants: false,
+    governance: false,
+  },
 ] as const;
 
 export const ACCESS_RESPONSIBILITY_BY_KEY = new Map(
@@ -263,6 +312,9 @@ export const ROUTE_ACCESS_PERMISSIONS: Partial<Record<string, AccessPermission>>
   "/admin/chat-secretaria": "chat.secretaria",
   "/admin/solicitacoes": "requests.read",
   "/admin/porteiro": "gatekeeper.use",
+  // OPERAÇÃO 2 (Discipulado) — staging-only (ver src/config/modules.ts);
+  // gate de rota real, independente do módulo estar ou não visível no menu.
+  "/admin/discipulado": "discipleship.read",
 };
 
 export function isAccessResponsibility(value: string): value is AccessResponsibility {

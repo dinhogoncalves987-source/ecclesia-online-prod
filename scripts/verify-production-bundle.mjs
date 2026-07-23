@@ -122,6 +122,12 @@ const FORBIDDEN_TERMS_SOURCE = [
   "tv-digital",
   "canal-ecclesia",
   "CanalEcclesia",
+  // OPERAÇÃO 2 (Discipulado, 2026-07-29) — staging-only enquanto as
+  // migrations discipleship_* não forem aplicadas em nenhum ambiente (ver
+  // src/config/modules.ts e docs/architecture/operacao-2-discipulado.md).
+  // Mesmo padrão de tree-shaking condicional de Marketplace/Comunidade —
+  // App.tsx só faz `import("./pages/Discipulado")` quando IS_STAGING_BUILD.
+  "pages/Discipulado",
 ];
 const FORBIDDEN_TERMS = FORBIDDEN_TERMS_SOURCE.map((term) => term.toLowerCase());
 

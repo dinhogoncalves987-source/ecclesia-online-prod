@@ -28,6 +28,15 @@ export const HISTORY_TYPES = [
   "certificado_emitido",
   "registro_importado",
   "outro",
+  // OPERAÇÃO 2 (Discipulado) — marcos institucionais de formação, estendidos
+  // por 20260729120000_discipleship_permissions_and_history.sql. Nomes
+  // genéricos de propósito: Teologia poderá reutilizá-los para
+  // matrícula/formatura sem exigir nova extensão de catálogo.
+  "matricula",
+  "inicio_formacao",
+  "conclusao_formacao",
+  "desligamento_formacao",
+  "transferencia_turma",
 ] as const;
 
 export type HistoryType = (typeof HISTORY_TYPES)[number];
@@ -51,6 +60,11 @@ export const HISTORY_TYPE_LABELS: Record<HistoryType, string> = {
   certificado_emitido: "Certificado emitido",
   registro_importado: "Registro importado",
   outro: "Outro",
+  matricula: "Matrícula em formação",
+  inicio_formacao: "Início de formação",
+  conclusao_formacao: "Conclusão de formação",
+  desligamento_formacao: "Desligamento de formação",
+  transferencia_turma: "Transferência de turma",
 };
 
 /** Visibilidade de um evento/ocorrência. */

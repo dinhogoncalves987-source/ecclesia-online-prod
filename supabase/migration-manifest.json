@@ -94,7 +94,11 @@
     "20260728100000_member_occurrences.sql",
     "20260728110000_member_ordinations.sql",
     "20260728120000_member_transfers.sql",
-    "20260728130000_member_organization_history.sql"
+    "20260728130000_member_organization_history.sql",
+    "20260729090000_discipleship_foundation.sql",
+    "20260729100000_discipleship_classes_and_enrollments.sql",
+    "20260729110000_discipleship_learning_records.sql",
+    "20260729120000_discipleship_permissions_and_history.sql"
   ],
   "staging_only": [
     "20260519200000_demo_seed.sql",

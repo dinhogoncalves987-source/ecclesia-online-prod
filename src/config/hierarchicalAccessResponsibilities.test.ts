@@ -21,6 +21,23 @@ const productionSql = readFileSync(
   "utf8",
 );
 
+// A migration acima (20260716130000) já foi promovida a production_management
+// e não pode mais ser reescrita (ver supabase/migration-manifest.json). Novas
+// operações modulares (Discipulado, e futuramente Teologia/Missões) inserem
+// suas PRÓPRIAS linhas em access_responsibility_definitions em migrations
+// posteriores e independentes, nunca reabrindo esta. A cobertura "toda
+// responsabilidade do frontend existe em algum INSERT real" precisa então
+// somar o texto de todas essas migrations — cada entrada abaixo corresponde a
+// uma operação que estendeu o catálogo de responsabilidades.
+const EXTRA_RESPONSIBILITY_MIGRATION_FILES = [
+  // OPERAÇÃO 2 (Discipulado) — insere discipleship_coordinator/secretary/teacher.
+  "20260729090000_discipleship_foundation.sql",
+];
+const extraResponsibilitySql = EXTRA_RESPONSIBILITY_MIGRATION_FILES
+  .map((file) => readFileSync(path.join(ROOT, "supabase", "migrations", file), "utf8"))
+  .join("\n");
+const allResponsibilitySql = stagingSql + "\n" + extraResponsibilitySql;
+
 describe("arquitetura hierárquica de acessos", () => {
   it("mantém a migration de teste/staging e produção idêntica byte a byte", () => {
     expect(stagingSql).toBe(productionSql);
@@ -80,7 +97,7 @@ describe("arquitetura hierárquica de acessos", () => {
   it("cobre exatamente as responsabilidades declaradas no frontend", () => {
     expect(ACCESS_RESPONSIBILITIES).toHaveLength(ACCESS_RESPONSIBILITY_KEYS.length);
     for (const key of ACCESS_RESPONSIBILITY_KEYS) {
-      expect(stagingSql).toContain(`('${key}',`);
+      expect(allResponsibilitySql).toContain(`('${key}',`);
     }
   });
 

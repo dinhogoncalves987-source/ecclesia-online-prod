@@ -104,6 +104,16 @@ describe("isModuleEnabled", () => {
     }
   });
 
+  // OPERAÇÃO 2 (Discipulado) — backend real (discipleship_* tables/RPCs), mas
+  // as migrations ainda NÃO foram aplicadas em nenhum banco (ver
+  // docs/architecture/operacao-2-discipulado.md). Diferente de
+  // Marketplace/Comunidade, isso não é "maquete sem backend" — é backend
+  // pronto aguardando aplicação/validação. Permanece staging-only até lá.
+  it("disables discipleship in production (migrations ainda não aplicadas) and enables in staging", () => {
+    expect(isModuleEnabled("discipleship", "production")).toBe(false);
+    expect(isModuleEnabled("discipleship", "staging")).toBe(true);
+  });
+
   // CORREÇÃO 2026-07-17: Bíblia/IA, Culto & Louvor, Campanhas, Cartas de
   // Recomendação e Relatórios não dependem de dado fictício exibido ao
   // usuário (todos têm backend real no Supabase) — nunca deveriam ter sido
@@ -136,6 +146,11 @@ describe("isRouteEnabled", () => {
   it("enables staging-only routes in staging", () => {
     expect(isRouteEnabled("/admin/marketplace", "staging")).toBe(true);
     expect(isRouteEnabled("/admin/comunidade", "staging")).toBe(true);
+  });
+
+  it("disables /admin/discipulado in production and enables in staging", () => {
+    expect(isRouteEnabled("/admin/discipulado", "production")).toBe(false);
+    expect(isRouteEnabled("/admin/discipulado", "staging")).toBe(true);
   });
 
   // CORREÇÃO 2026-07-17: /admin/biblia, /admin/culto*, /admin/campanhas,

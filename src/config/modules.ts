@@ -65,6 +65,11 @@ export type ModuleId =
   | "marketplace"
   | "community"
   | "reports"
+  // OPERAÇÃO 2 — Discipulado. Migrations criadas mas AINDA NÃO aplicadas em
+  // nenhum ambiente (ver docs/architecture/operacao-2-discipulado.md) —
+  // portanto staging-only por definição, nunca "both", até serem aplicadas e
+  // validadas em staging real.
+  | "discipleship"
   // Stage-only, preservados na branch histórica staging-tv-canal
   | "tv-digital"
   | "canal-ecclesia";
@@ -248,6 +253,15 @@ const STAGING_ONLY_MODULES: readonly ModuleDefinition[] = IS_STAGING_BUILD ? [
   { id: "marketplace", availability: "staging", label: "Marketplace" },
   { id: "community", availability: "staging", label: "Comunidade" },
 
+  // OPERAÇÃO 2 (2026-07-29) — Discipulado. Backend real (discipleship_*
+  // tables/RPCs, ver supabase/migrations/20260729*), mas as migrations ainda
+  // NÃO foram aplicadas em nenhum banco (staging ou produção) — permanece
+  // staging-only até aplicação + validação. Promoção para "both" só depois
+  // de: (1) aplicar as 4 migrations em staging, (2) validar RLS/RPCs com
+  // dados reais, (3) só então promover para produção. Ver
+  // docs/architecture/operacao-2-discipulado.md, seção "Disponibilidade".
+  { id: "discipleship", availability: "staging", label: "Discipulado" },
+
   // Stage-only — preservados em staging-tv-canal, restauração controlada
   // documentada em docs/AMBIENTES_PRODUCAO_STAGING.md. Nenhuma rota/arquivo
   // foi copiado para esta integração; os identificadores existem aqui só
@@ -308,6 +322,7 @@ const ROUTE_MODULE_MAP: Readonly<Record<string, ModuleId>> = {
   "/admin/relatorios": "reports",
   "/admin/marketplace": "marketplace",
   "/admin/comunidade": "community",
+  "/admin/discipulado": "discipleship",
 };
 
 /**

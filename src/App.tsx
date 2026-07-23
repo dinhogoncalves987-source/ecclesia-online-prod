@@ -149,6 +149,13 @@ const Marketplace = IS_STAGING_BUILD ? lazy(() => import("./pages/Marketplace"))
 
 const Comunidade = IS_STAGING_BUILD ? lazy(() => import("./pages/Comunidade")) : null;
 
+// OPERAÇÃO 2 (Discipulado) — staging-only: as migrations discipleship_* AINDA
+// NÃO foram aplicadas em nenhum banco (ver
+// docs/architecture/operacao-2-discipulado.md). Mesma técnica de tree-shaking
+// condicional usada por Marketplace/Comunidade acima — o chunk da página não
+// é emitido no build de produção.
+const Discipulado = IS_STAGING_BUILD ? lazy(() => import("./pages/Discipulado")) : null;
+
 // CORREÇÃO 2026-07-20: "devotional" foi promovido de volta para "both" em
 // src/config/modules.ts — a página pública de compartilhamento do
 // versículo do dia precisa acompanhar, senão um link enviado por um membro
@@ -263,6 +270,8 @@ const App = () => (
               <Route path="/admin/marketplace" element={<ProtectedRoute><ModuleGate moduleId="marketplace">{Marketplace && <Marketplace />}</ModuleGate></ProtectedRoute>} />
 
               <Route path="/admin/comunidade" element={<ProtectedRoute><ModuleGate moduleId="community">{Comunidade && <Comunidade />}</ModuleGate></ProtectedRoute>} />
+
+              <Route path="/admin/discipulado" element={<ProtectedRoute><ModuleGate moduleId="discipleship">{Discipulado && <Discipulado />}</ModuleGate></ProtectedRoute>} />
 
               {/* Global chat — accessible to all roles */}
               <Route path="/admin/chat" element={<ProtectedRoute><ChatSecretaria /></ProtectedRoute>} />

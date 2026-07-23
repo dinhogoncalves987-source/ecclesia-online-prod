@@ -61,6 +61,11 @@ const MODULE_ACCESS: Record<string, AppRole[]> = {
   "/admin/solicitacoes": ["super_admin", "church_admin", "pastor", "secretary"],
   "/admin/carteira-ecclesia": ["super_admin", "church_admin", "pastor", "secretary", "member"],
   "/admin/porteiro": ["porteiro"],
+  // OPERAÇÃO 2 (Discipulado) — fallback de papel legado, mesmo padrão de
+  // "/admin/chat-secretaria". A checagem primária é por capability
+  // ("discipleship.read", ver ROUTE_ACCESS_PERMISSIONS em accessControl.ts);
+  // este mapa só cobre organizações sem linha em organization_responsibles.
+  "/admin/discipulado": ["super_admin", "church_admin", "pastor", "secretary"],
 };
 
 /**

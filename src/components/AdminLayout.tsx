@@ -5,7 +5,7 @@ import {
   Heart, MessageSquare, UsersRound, Archive, BarChart3, Menu, X,
   Bell, ChevronLeft, ChevronDown, Settings, LogOut, Maximize, Minimize, Globe,
   Shield, User, Building2, Music2, Gavel, Briefcase, ShoppingBag, MessageCircle, Megaphone, ScrollText,
-  MessagesSquare, ClipboardList, CreditCard, LayoutGrid, ScanLine
+  MessagesSquare, ClipboardList, CreditCard, LayoutGrid, ScanLine, GraduationCap
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -64,6 +64,9 @@ const navSections: NavSection[] = [
       { icon: BookOpen, label: "Bíblia Sagrada", path: "/admin/biblia" },
       { icon: Music2, label: "Culto & Louvor", path: "/admin/culto" },
       { icon: Megaphone, label: "Campanhas", path: "/admin/campanhas" },
+      // OPERAÇÃO 2 — staging-only (ver src/config/modules.ts); filtrado por
+      // isRouteEnabled() abaixo, igual aos demais itens desta seção.
+      { icon: GraduationCap, label: "Discipulado", path: "/admin/discipulado" },
     ],
   },
   {

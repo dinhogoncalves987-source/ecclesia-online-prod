@@ -2813,6 +2813,839 @@ export type Database = {
           },
         ]
       }
+      // ── OPERAÇÃO 2 (Discipulado) — migrations 20260729090000 a
+      // 20260729120000. NÃO aplicadas em nenhum banco ainda (ver
+      // docs/architecture/operacao-2-discipulado.md). Espelham exatamente as
+      // colunas das migrations correspondentes.
+      discipleship_locations: {
+        Row: {
+          address_text: string | null
+          capacity: number | null
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          location_type: string
+          name: string
+          organization_id: string
+          short_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          address_text?: string | null
+          capacity?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          location_type?: string
+          name: string
+          organization_id: string
+          short_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address_text?: string | null
+          capacity?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          location_type?: string
+          name?: string
+          organization_id?: string
+          short_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discipleship_locations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discipleship_departments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          name: string
+          organization_id: string
+          short_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          name: string
+          organization_id: string
+          short_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          name?: string
+          organization_id?: string
+          short_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discipleship_departments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discipleship_courses: {
+        Row: {
+          code: string | null
+          completion_criteria: string | null
+          created_at: string
+          created_by: string | null
+          department_id: string | null
+          description: string | null
+          expected_lessons_count: number | null
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          minimum_attendance_percentage: number
+          minimum_passing_score: number | null
+          name: string
+          objectives: string | null
+          organization_id: string
+          requires_assessment: boolean
+          requires_attendance: boolean
+          short_name: string | null
+          status: string
+          updated_at: string
+          workload_hours: number | null
+        }
+        Insert: {
+          code?: string | null
+          completion_criteria?: string | null
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          description?: string | null
+          expected_lessons_count?: number | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          minimum_attendance_percentage?: number
+          minimum_passing_score?: number | null
+          name: string
+          objectives?: string | null
+          organization_id: string
+          requires_assessment?: boolean
+          requires_attendance?: boolean
+          short_name?: string | null
+          status?: string
+          updated_at?: string
+          workload_hours?: number | null
+        }
+        Update: {
+          code?: string | null
+          completion_criteria?: string | null
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          description?: string | null
+          expected_lessons_count?: number | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          minimum_attendance_percentage?: number
+          minimum_passing_score?: number | null
+          name?: string
+          objectives?: string | null
+          organization_id?: string
+          requires_assessment?: boolean
+          requires_attendance?: boolean
+          short_name?: string | null
+          status?: string
+          updated_at?: string
+          workload_hours?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discipleship_courses_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discipleship_courses_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "discipleship_departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discipleship_lessons: {
+        Row: {
+          content: string | null
+          course_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          estimated_duration_minutes: number | null
+          id: string
+          is_mandatory: boolean
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          sequence_number: number
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content?: string | null
+          course_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          estimated_duration_minutes?: number | null
+          id?: string
+          is_mandatory?: boolean
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          sequence_number: number
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string | null
+          course_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          estimated_duration_minutes?: number | null
+          id?: string
+          is_mandatory?: boolean
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          sequence_number?: number
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discipleship_lessons_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "discipleship_courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discipleship_classes: {
+        Row: {
+          capacity: number | null
+          code: string | null
+          course_id: string
+          created_at: string
+          created_by: string | null
+          expected_end_date: string | null
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          location_id: string | null
+          modality: string
+          name: string
+          notes: string | null
+          organization_id: string
+          short_name: string | null
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          capacity?: number | null
+          code?: string | null
+          course_id: string
+          created_at?: string
+          created_by?: string | null
+          expected_end_date?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          location_id?: string | null
+          modality?: string
+          name: string
+          notes?: string | null
+          organization_id: string
+          short_name?: string | null
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          capacity?: number | null
+          code?: string | null
+          course_id?: string
+          created_at?: string
+          created_by?: string | null
+          expected_end_date?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          location_id?: string | null
+          modality?: string
+          name?: string
+          notes?: string | null
+          organization_id?: string
+          short_name?: string | null
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discipleship_classes_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "discipleship_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discipleship_classes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discipleship_classes_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "discipleship_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discipleship_staff_assignments: {
+        Row: {
+          class_id: string
+          created_at: string
+          created_by: string | null
+          end_date: string | null
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          member_id: string
+          notes: string | null
+          role: string
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          class_id: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          member_id: string
+          notes?: string | null
+          role: string
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          class_id?: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          member_id?: string
+          notes?: string | null
+          role?: string
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discipleship_staff_assignments_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "discipleship_classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discipleship_staff_assignments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discipleship_enrollments: {
+        Row: {
+          administrative_notes: string | null
+          certificate_document_id: string | null
+          certificate_issued_at: string | null
+          class_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          enrolled_at: string
+          final_result: string | null
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          member_id: string
+          organization_id: string
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          administrative_notes?: string | null
+          certificate_document_id?: string | null
+          certificate_issued_at?: string | null
+          class_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          enrolled_at?: string
+          final_result?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          member_id: string
+          organization_id: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          administrative_notes?: string | null
+          certificate_document_id?: string | null
+          certificate_issued_at?: string | null
+          class_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          enrolled_at?: string
+          final_result?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          member_id?: string
+          organization_id?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discipleship_enrollments_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "discipleship_classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discipleship_enrollments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discipleship_enrollments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discipleship_enrollments_certificate_document_id_fkey"
+            columns: ["certificate_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discipleship_sessions: {
+        Row: {
+          class_id: string
+          content_covered: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          instructor_member_id: string | null
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          lesson_id: string | null
+          location_id: string | null
+          modality: string | null
+          notes: string | null
+          session_date: string
+          session_time: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          class_id: string
+          content_covered?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          instructor_member_id?: string | null
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          lesson_id?: string | null
+          location_id?: string | null
+          modality?: string | null
+          notes?: string | null
+          session_date?: string
+          session_time?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          class_id?: string
+          content_covered?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          instructor_member_id?: string | null
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          lesson_id?: string | null
+          location_id?: string | null
+          modality?: string | null
+          notes?: string | null
+          session_date?: string
+          session_time?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discipleship_sessions_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "discipleship_classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discipleship_sessions_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "discipleship_lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discipleship_sessions_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "discipleship_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discipleship_sessions_instructor_member_id_fkey"
+            columns: ["instructor_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discipleship_attendance: {
+        Row: {
+          enrollment_id: string
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          observation: string | null
+          recorded_at: string
+          recorded_by: string | null
+          session_id: string
+          status: string
+        }
+        Insert: {
+          enrollment_id: string
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          observation?: string | null
+          recorded_at?: string
+          recorded_by?: string | null
+          session_id: string
+          status?: string
+        }
+        Update: {
+          enrollment_id?: string
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          observation?: string | null
+          recorded_at?: string
+          recorded_by?: string | null
+          session_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discipleship_attendance_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "discipleship_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discipleship_attendance_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "discipleship_enrollments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discipleship_assessments: {
+        Row: {
+          assessment_type: string
+          class_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          max_score: number
+          scheduled_at: string | null
+          status: string
+          title: string
+          updated_at: string
+          weight: number
+        }
+        Insert: {
+          assessment_type?: string
+          class_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          max_score?: number
+          scheduled_at?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          weight?: number
+        }
+        Update: {
+          assessment_type?: string
+          class_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          max_score?: number
+          scheduled_at?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discipleship_assessments_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "discipleship_classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discipleship_assessment_results: {
+        Row: {
+          assessment_id: string
+          enrollment_id: string
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          observation: string | null
+          recorded_at: string
+          recorded_by: string | null
+          score: number
+        }
+        Insert: {
+          assessment_id: string
+          enrollment_id: string
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          observation?: string | null
+          recorded_at?: string
+          recorded_by?: string | null
+          score: number
+        }
+        Update: {
+          assessment_id?: string
+          enrollment_id?: string
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          observation?: string | null
+          recorded_at?: string
+          recorded_by?: string | null
+          score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discipleship_assessment_results_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "discipleship_assessments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discipleship_assessment_results_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "discipleship_enrollments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discipleship_followups: {
+        Row: {
+          attachment_path: string | null
+          created_at: string
+          created_by: string | null
+          document_id: string | null
+          enrollment_id: string
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          observation: string
+          occurred_at: string
+          visibility: string
+        }
+        Insert: {
+          attachment_path?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_id?: string | null
+          enrollment_id: string
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          observation: string
+          occurred_at?: string
+          visibility?: string
+        }
+        Update: {
+          attachment_path?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_id?: string | null
+          enrollment_id?: string
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          observation?: string
+          occurred_at?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discipleship_followups_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "discipleship_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discipleship_followups_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_announcements: {
         Row: {
           button_label: string | null
@@ -3178,6 +4011,80 @@ export type Database = {
       get_my_managed_group_ids: {
         Args: { _organization_id: string }
         Returns: string[]
+      }
+      // ── OPERAÇÃO 2 (Discipulado) — RPCs das migrations 20260729090000 a
+      // 20260729120000. NÃO aplicadas em nenhum banco ainda.
+      reorder_discipleship_lessons: {
+        Args: { p_course_id: string; p_lesson_ids: string[] }
+        Returns: undefined
+      }
+      update_discipleship_class_status: {
+        Args: { p_class_id: string; p_status: string }
+        Returns: undefined
+      }
+      assign_discipleship_staff: {
+        Args: {
+          p_class_id: string
+          p_member_id: string
+          p_notes?: string
+          p_role: string
+          p_start_date?: string
+        }
+        Returns: string
+      }
+      end_discipleship_staff_assignment: {
+        Args: { p_assignment_id: string; p_end_date?: string }
+        Returns: undefined
+      }
+      can_operate_discipleship_class: {
+        Args: { _class_id: string; _organization_id: string; _user_id: string }
+        Returns: boolean
+      }
+      enroll_member_in_class: {
+        Args: { p_class_id: string; p_member_id: string; p_status?: string }
+        Returns: string
+      }
+      update_discipleship_enrollment_status: {
+        Args: {
+          p_enrollment_id: string
+          p_final_result?: string
+          p_notes?: string
+          p_override_eligibility?: boolean
+          p_status: string
+        }
+        Returns: undefined
+      }
+      record_discipleship_attendance: {
+        Args: { p_entries: Json; p_session_id: string }
+        Returns: undefined
+      }
+      record_discipleship_assessment_result: {
+        Args: {
+          p_assessment_id: string
+          p_enrollment_id: string
+          p_observation?: string
+          p_score: number
+        }
+        Returns: string
+      }
+      create_discipleship_followup: {
+        Args: {
+          p_attachment_path?: string
+          p_document_id?: string
+          p_enrollment_id: string
+          p_observation: string
+          p_occurred_at?: string
+          p_visibility?: string
+        }
+        Returns: string
+      }
+      get_discipleship_enrollment_progress: {
+        Args: { p_enrollment_id: string }
+        Returns: Json
+      }
+      mark_discipleship_certificate_issued: {
+        Args: { p_document_id: string; p_enrollment_id: string }
+        Returns: undefined
       }
       has_org_access_permission: {
         Args: {
