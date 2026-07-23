@@ -3646,6 +3646,1294 @@ export type Database = {
           },
         ]
       }
+      theology_institutes: {
+        Row: {
+          accreditation_info: string | null
+          code: string | null
+          created_at: string
+          created_by: string | null
+          default_minimum_attendance_percentage: number
+          default_minimum_passing_score: number
+          description: string | null
+          id: string
+          is_active: boolean
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          name: string
+          organization_id: string
+          short_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          accreditation_info?: string | null
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_minimum_attendance_percentage?: number
+          default_minimum_passing_score?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          name: string
+          organization_id: string
+          short_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          accreditation_info?: string | null
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_minimum_attendance_percentage?: number
+          default_minimum_passing_score?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          name?: string
+          organization_id?: string
+          short_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theology_institutes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      theology_study_centers: {
+        Row: {
+          address_text: string | null
+          capacity: number | null
+          center_type: string
+          created_at: string
+          created_by: string | null
+          id: string
+          institute_id: string | null
+          is_active: boolean
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          name: string
+          organization_id: string
+          short_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          address_text?: string | null
+          capacity?: number | null
+          center_type?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          institute_id?: string | null
+          is_active?: boolean
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          name: string
+          organization_id: string
+          short_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address_text?: string | null
+          capacity?: number | null
+          center_type?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          institute_id?: string | null
+          is_active?: boolean
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          name?: string
+          organization_id?: string
+          short_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theology_study_centers_institute_id_fkey"
+            columns: ["institute_id"]
+            isOneToOne: false
+            referencedRelation: "theology_institutes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_study_centers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      theology_subjects: {
+        Row: {
+          code: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          name: string
+          organization_id: string
+          short_name: string | null
+          status: string
+          updated_at: string
+          workload_hours: number | null
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          name: string
+          organization_id: string
+          short_name?: string | null
+          status?: string
+          updated_at?: string
+          workload_hours?: number | null
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          name?: string
+          organization_id?: string
+          short_name?: string | null
+          status?: string
+          updated_at?: string
+          workload_hours?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theology_subjects_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      theology_programs: {
+        Row: {
+          code: string | null
+          completion_criteria: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          institute_id: string | null
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          minimum_attendance_percentage: number
+          minimum_passing_score: number | null
+          name: string
+          objectives: string | null
+          organization_id: string
+          requires_assessment: boolean
+          requires_attendance: boolean
+          short_name: string | null
+          status: string
+          updated_at: string
+          workload_hours: number | null
+        }
+        Insert: {
+          code?: string | null
+          completion_criteria?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          institute_id?: string | null
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          minimum_attendance_percentage?: number
+          minimum_passing_score?: number | null
+          name: string
+          objectives?: string | null
+          organization_id: string
+          requires_assessment?: boolean
+          requires_attendance?: boolean
+          short_name?: string | null
+          status?: string
+          updated_at?: string
+          workload_hours?: number | null
+        }
+        Update: {
+          code?: string | null
+          completion_criteria?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          institute_id?: string | null
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          minimum_attendance_percentage?: number
+          minimum_passing_score?: number | null
+          name?: string
+          objectives?: string | null
+          organization_id?: string
+          requires_assessment?: boolean
+          requires_attendance?: boolean
+          short_name?: string | null
+          status?: string
+          updated_at?: string
+          workload_hours?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theology_programs_institute_id_fkey"
+            columns: ["institute_id"]
+            isOneToOne: false
+            referencedRelation: "theology_institutes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_programs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      theology_curriculum_items: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_mandatory: boolean
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          notes: string | null
+          program_id: string
+          sequence_number: number
+          status: string
+          subject_id: string
+          updated_at: string
+          workload_hours_override: number | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_mandatory?: boolean
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          notes?: string | null
+          program_id: string
+          sequence_number: number
+          status?: string
+          subject_id: string
+          updated_at?: string
+          workload_hours_override?: number | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_mandatory?: boolean
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          notes?: string | null
+          program_id?: string
+          sequence_number?: number
+          status?: string
+          subject_id?: string
+          updated_at?: string
+          workload_hours_override?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theology_curriculum_items_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "theology_programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_curriculum_items_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "theology_subjects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      theology_periods: {
+        Row: {
+          code: string | null
+          created_at: string
+          created_by: string | null
+          end_date: string | null
+          id: string
+          institute_id: string | null
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          name: string
+          notes: string | null
+          organization_id: string
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          institute_id?: string | null
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          name: string
+          notes?: string | null
+          organization_id: string
+          start_date: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          institute_id?: string | null
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          name?: string
+          notes?: string | null
+          organization_id?: string
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theology_periods_institute_id_fkey"
+            columns: ["institute_id"]
+            isOneToOne: false
+            referencedRelation: "theology_institutes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_periods_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      theology_classes: {
+        Row: {
+          capacity: number | null
+          code: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          modality: string
+          name: string
+          notes: string | null
+          organization_id: string
+          period_id: string
+          program_id: string
+          short_name: string | null
+          status: string
+          study_center_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          capacity?: number | null
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          modality?: string
+          name: string
+          notes?: string | null
+          organization_id: string
+          period_id: string
+          program_id: string
+          short_name?: string | null
+          status?: string
+          study_center_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          capacity?: number | null
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          modality?: string
+          name?: string
+          notes?: string | null
+          organization_id?: string
+          period_id?: string
+          program_id?: string
+          short_name?: string | null
+          status?: string
+          study_center_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theology_classes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_classes_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "theology_periods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_classes_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "theology_programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_classes_study_center_id_fkey"
+            columns: ["study_center_id"]
+            isOneToOne: false
+            referencedRelation: "theology_study_centers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      theology_class_offerings: {
+        Row: {
+          capacity: number | null
+          class_id: string
+          created_at: string
+          created_by: string | null
+          curriculum_item_id: string
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          notes: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          capacity?: number | null
+          class_id: string
+          created_at?: string
+          created_by?: string | null
+          curriculum_item_id: string
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          capacity?: number | null
+          class_id?: string
+          created_at?: string
+          created_by?: string | null
+          curriculum_item_id?: string
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theology_class_offerings_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "theology_classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_class_offerings_curriculum_item_id_fkey"
+            columns: ["curriculum_item_id"]
+            isOneToOne: false
+            referencedRelation: "theology_curriculum_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      theology_staff_assignments: {
+        Row: {
+          class_id: string
+          created_at: string
+          created_by: string | null
+          end_date: string | null
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          member_id: string
+          notes: string | null
+          offering_id: string | null
+          role: string
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          class_id: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          member_id: string
+          notes?: string | null
+          offering_id?: string | null
+          role: string
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          class_id?: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          member_id?: string
+          notes?: string | null
+          offering_id?: string | null
+          role?: string
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theology_staff_assignments_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "theology_classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_staff_assignments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_staff_assignments_offering_id_fkey"
+            columns: ["offering_id"]
+            isOneToOne: false
+            referencedRelation: "theology_class_offerings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      theology_enrollments: {
+        Row: {
+          administrative_notes: string | null
+          certificate_document_id: string | null
+          certificate_issued_at: string | null
+          class_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          enrolled_at: string
+          final_result: string | null
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          member_id: string
+          organization_id: string
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          administrative_notes?: string | null
+          certificate_document_id?: string | null
+          certificate_issued_at?: string | null
+          class_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          enrolled_at?: string
+          final_result?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          member_id: string
+          organization_id: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          administrative_notes?: string | null
+          certificate_document_id?: string | null
+          certificate_issued_at?: string | null
+          class_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          enrolled_at?: string
+          final_result?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          member_id?: string
+          organization_id?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theology_enrollments_certificate_document_id_fkey"
+            columns: ["certificate_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_enrollments_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "theology_classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_enrollments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_enrollments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      theology_offering_enrollments: {
+        Row: {
+          attempt_number: number
+          closed_at: string | null
+          closed_by: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          enrollment_id: string
+          final_grade: number | null
+          final_result: string | null
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          notes: string | null
+          offering_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempt_number?: number
+          closed_at?: string | null
+          closed_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          enrollment_id: string
+          final_grade?: number | null
+          final_result?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          notes?: string | null
+          offering_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempt_number?: number
+          closed_at?: string | null
+          closed_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          enrollment_id?: string
+          final_grade?: number | null
+          final_result?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          notes?: string | null
+          offering_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theology_offering_enrollments_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "theology_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_offering_enrollments_offering_id_fkey"
+            columns: ["offering_id"]
+            isOneToOne: false
+            referencedRelation: "theology_class_offerings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      theology_sessions: {
+        Row: {
+          content_covered: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          instructor_member_id: string | null
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          notes: string | null
+          offering_id: string
+          session_date: string
+          session_time: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          content_covered?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          instructor_member_id?: string | null
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          notes?: string | null
+          offering_id: string
+          session_date?: string
+          session_time?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          content_covered?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          instructor_member_id?: string | null
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          notes?: string | null
+          offering_id?: string
+          session_date?: string
+          session_time?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theology_sessions_instructor_member_id_fkey"
+            columns: ["instructor_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_sessions_offering_id_fkey"
+            columns: ["offering_id"]
+            isOneToOne: false
+            referencedRelation: "theology_class_offerings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      theology_attendance: {
+        Row: {
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          observation: string | null
+          offering_enrollment_id: string
+          recorded_at: string
+          recorded_by: string | null
+          session_id: string
+          status: string
+        }
+        Insert: {
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          observation?: string | null
+          offering_enrollment_id: string
+          recorded_at?: string
+          recorded_by?: string | null
+          session_id: string
+          status?: string
+        }
+        Update: {
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          observation?: string | null
+          offering_enrollment_id?: string
+          recorded_at?: string
+          recorded_by?: string | null
+          session_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theology_attendance_offering_enrollment_id_fkey"
+            columns: ["offering_enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "theology_offering_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_attendance_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "theology_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      theology_assessment_models: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          minimum_passing_score: number
+          name: string
+          organization_id: string
+          program_id: string | null
+          retake_rule: string | null
+          rounding_rule: string
+          scale_max_score: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          minimum_passing_score?: number
+          name: string
+          organization_id: string
+          program_id?: string | null
+          retake_rule?: string | null
+          rounding_rule?: string
+          scale_max_score?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          minimum_passing_score?: number
+          name?: string
+          organization_id?: string
+          program_id?: string | null
+          retake_rule?: string | null
+          rounding_rule?: string
+          scale_max_score?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theology_assessment_models_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_assessment_models_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "theology_programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      theology_assessment_model_components: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_mandatory: boolean
+          max_score: number
+          model_id: string
+          name: string
+          sequence_number: number
+          updated_at: string
+          weight: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_mandatory?: boolean
+          max_score?: number
+          model_id: string
+          name: string
+          sequence_number: number
+          updated_at?: string
+          weight?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_mandatory?: boolean
+          max_score?: number
+          model_id?: string
+          name?: string
+          sequence_number?: number
+          updated_at?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theology_assessment_model_components_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "theology_assessment_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      theology_assessments: {
+        Row: {
+          assessment_type: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          model_id: string
+          offering_id: string
+          published_at: string | null
+          scheduled_at: string | null
+          status: string
+          title: string
+          updated_at: string
+          weight: number
+        }
+        Insert: {
+          assessment_type?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          model_id: string
+          offering_id: string
+          published_at?: string | null
+          scheduled_at?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          weight?: number
+        }
+        Update: {
+          assessment_type?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          model_id?: string
+          offering_id?: string
+          published_at?: string | null
+          scheduled_at?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theology_assessments_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "theology_assessment_models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_assessments_offering_id_fkey"
+            columns: ["offering_id"]
+            isOneToOne: false
+            referencedRelation: "theology_class_offerings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      theology_assessment_results: {
+        Row: {
+          assessment_id: string
+          component_id: string
+          id: string
+          observation: string | null
+          offering_enrollment_id: string
+          recorded_at: string
+          recorded_by: string | null
+          score: number
+        }
+        Insert: {
+          assessment_id: string
+          component_id: string
+          id?: string
+          observation?: string | null
+          offering_enrollment_id: string
+          recorded_at?: string
+          recorded_by?: string | null
+          score: number
+        }
+        Update: {
+          assessment_id?: string
+          component_id?: string
+          id?: string
+          observation?: string | null
+          offering_enrollment_id?: string
+          recorded_at?: string
+          recorded_by?: string | null
+          score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theology_assessment_results_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "theology_assessments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_assessment_results_component_id_fkey"
+            columns: ["component_id"]
+            isOneToOne: false
+            referencedRelation: "theology_assessment_model_components"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_assessment_results_offering_enrollment_id_fkey"
+            columns: ["offering_enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "theology_offering_enrollments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      theology_grade_audit_log: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          id: string
+          justification: string
+          new_score: number
+          previous_score: number
+          result_id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          justification: string
+          new_score: number
+          previous_score: number
+          result_id: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          justification?: string
+          new_score?: number
+          previous_score?: number
+          result_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theology_grade_audit_log_result_id_fkey"
+            columns: ["result_id"]
+            isOneToOne: false
+            referencedRelation: "theology_assessment_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      theology_transaction_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          enrollment_id: string | null
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          link_type: string
+          notes: string | null
+          organization_id: string
+          period_id: string | null
+          transaction_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          enrollment_id?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          link_type?: string
+          notes?: string | null
+          organization_id: string
+          period_id?: string | null
+          transaction_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          enrollment_id?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          link_type?: string
+          notes?: string | null
+          organization_id?: string
+          period_id?: string | null
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "theology_transaction_links_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "theology_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_transaction_links_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_transaction_links_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "theology_periods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "theology_transaction_links_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_announcements: {
         Row: {
           button_label: string | null
@@ -4164,6 +5452,185 @@ export type Database = {
       set_campaign_featured: {
         Args: { p_campaign_id: string; p_organization_id: string }
         Returns: undefined
+      }
+      reorder_theology_curriculum_items: {
+        Args: { p_item_ids: string[]; p_program_id: string }
+        Returns: undefined
+      }
+      update_theology_period_status: {
+        Args: { p_period_id: string; p_status: string }
+        Returns: undefined
+      }
+      update_theology_class_status: {
+        Args: { p_class_id: string; p_status: string }
+        Returns: undefined
+      }
+      update_theology_class_offering_status: {
+        Args: { p_offering_id: string; p_status: string }
+        Returns: undefined
+      }
+      assign_theology_staff: {
+        Args: {
+          p_class_id: string
+          p_member_id: string
+          p_notes?: string
+          p_offering_id?: string
+          p_role: string
+          p_start_date?: string
+        }
+        Returns: string
+      }
+      end_theology_staff_assignment: {
+        Args: { p_assignment_id: string; p_end_date?: string }
+        Returns: undefined
+      }
+      can_operate_theology_class: {
+        Args: { _class_id: string; _organization_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_operate_theology_offering: {
+        Args: {
+          _offering_id: string
+          _organization_id: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      enroll_member_in_theology_class: {
+        Args: { p_class_id: string; p_member_id: string; p_status?: string }
+        Returns: string
+      }
+      update_theology_enrollment_status: {
+        Args: {
+          p_enrollment_id: string
+          p_final_result?: string
+          p_notes?: string
+          p_override_eligibility?: boolean
+          p_status: string
+        }
+        Returns: undefined
+      }
+      enroll_member_in_theology_offering: {
+        Args: { p_enrollment_id: string; p_offering_id: string }
+        Returns: string
+      }
+      update_theology_offering_enrollment_status: {
+        Args: {
+          p_final_grade?: number
+          p_final_result?: string
+          p_notes?: string
+          p_offering_enrollment_id: string
+          p_status: string
+        }
+        Returns: undefined
+      }
+      update_theology_session_status: {
+        Args: { p_session_id: string; p_status: string }
+        Returns: undefined
+      }
+      record_theology_attendance: {
+        Args: { p_entries: Json; p_session_id: string }
+        Returns: undefined
+      }
+      update_theology_assessment_status: {
+        Args: { p_assessment_id: string; p_status: string }
+        Returns: undefined
+      }
+      record_theology_assessment_result: {
+        Args: {
+          p_assessment_id: string
+          p_component_id: string
+          p_observation?: string
+          p_offering_enrollment_id: string
+          p_score: number
+        }
+        Returns: string
+      }
+      amend_theology_assessment_result: {
+        Args: { p_justification: string; p_new_score: number; p_result_id: string }
+        Returns: undefined
+      }
+      search_theology_members: {
+        Args: {
+          p_limit?: number
+          p_organization_id: string
+          p_query?: string
+        }
+        Returns: {
+          full_name: string
+          id: string
+          known_name: string | null
+          member_code: string | null
+        }[]
+      }
+      get_theology_member_labels: {
+        Args: {
+          p_member_ids: string[]
+          p_organization_id: string
+        }
+        Returns: {
+          full_name: string
+          id: string
+          known_name: string | null
+          member_code: string | null
+        }[]
+      }
+      mark_theology_certificate_issued: {
+        Args: { p_document_id: string; p_enrollment_id: string }
+        Returns: undefined
+      }
+      get_theology_student_transcript: {
+        Args: { p_member_id: string; p_organization_id: string }
+        Returns: {
+          attempt_number: number | null
+          class_id: string
+          class_name: string
+          completed_at: string | null
+          enrollment_id: string
+          enrollment_status: string
+          final_grade: number | null
+          final_result: string | null
+          is_mandatory: boolean | null
+          offering_enrollment_id: string | null
+          offering_status: string | null
+          program_name: string
+          subject_name: string | null
+        }[]
+      }
+      list_theology_period_graduates: {
+        Args: { p_period_id: string }
+        Returns: {
+          already_concluded: boolean
+          class_id: string
+          class_name: string
+          enrollment_id: string
+          enrollment_status: string
+          member_id: string
+          program_name: string
+        }[]
+      }
+      link_theology_transaction: {
+        Args: {
+          p_enrollment_id?: string
+          p_link_type: string
+          p_notes?: string
+          p_period_id?: string
+          p_transaction_id: string
+        }
+        Returns: string
+      }
+      list_theology_linked_transactions: {
+        Args: { p_enrollment_id?: string; p_period_id?: string }
+        Returns: {
+          amount: number
+          link_id: string
+          link_type: string
+          transaction_date: string
+          transaction_description: string | null
+          transaction_id: string
+          transaction_status: string
+          transaction_type: string
+        }[]
       }
     }
     Enums: {

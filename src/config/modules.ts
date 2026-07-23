@@ -70,6 +70,10 @@ export type ModuleId =
   // portanto staging-only por definição, nunca "both", até serem aplicadas e
   // validadas em staging real.
   | "discipleship"
+  // OPERAÇÃO 3 — Teologia. Migrations criadas mas AINDA NÃO aplicadas em
+  // nenhum ambiente (ver docs/architecture/operacao-3-teologia.md) —
+  // staging-only por definição, mesmo padrão do Discipulado.
+  | "theology"
   // Stage-only, preservados na branch histórica staging-tv-canal
   | "tv-digital"
   | "canal-ecclesia";
@@ -262,6 +266,13 @@ const STAGING_ONLY_MODULES: readonly ModuleDefinition[] = IS_STAGING_BUILD ? [
   // docs/architecture/operacao-2-discipulado.md, seção "Disponibilidade".
   { id: "discipleship", availability: "staging", label: "Discipulado" },
 
+  // OPERAÇÃO 3 (2026-07-30) — Teologia. Backend real (theology_* tables/
+  // RPCs, ver supabase/migrations/20260730*), mas as migrations ainda NÃO
+  // foram aplicadas em nenhum banco — permanece staging-only até aplicação +
+  // validação, mesmo critério de promoção do Discipulado. Ver
+  // docs/architecture/operacao-3-teologia.md, seção "Disponibilidade".
+  { id: "theology", availability: "staging", label: "Teologia" },
+
   // Stage-only — preservados em staging-tv-canal, restauração controlada
   // documentada em docs/AMBIENTES_PRODUCAO_STAGING.md. Nenhuma rota/arquivo
   // foi copiado para esta integração; os identificadores existem aqui só
@@ -323,6 +334,7 @@ const ROUTE_MODULE_MAP: Readonly<Record<string, ModuleId>> = {
   "/admin/marketplace": "marketplace",
   "/admin/comunidade": "community",
   "/admin/discipulado": "discipleship",
+  "/admin/teologia": "theology",
 };
 
 /**

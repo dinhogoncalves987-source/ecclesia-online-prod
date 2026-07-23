@@ -32,6 +32,8 @@ const productionSql = readFileSync(
 const EXTRA_RESPONSIBILITY_MIGRATION_FILES = [
   // OPERAÇÃO 2 (Discipulado) — insere discipleship_coordinator/secretary/teacher.
   "20260729090000_discipleship_foundation.sql",
+  // OPERAÇÃO 3 (Teologia) — insere theology_coordinator/secretary/teacher.
+  "20260730090000_theology_foundation.sql",
 ];
 const extraResponsibilitySql = EXTRA_RESPONSIBILITY_MIGRATION_FILES
   .map((file) => readFileSync(path.join(ROOT, "supabase", "migrations", file), "utf8"))

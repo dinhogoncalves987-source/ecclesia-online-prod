@@ -34,7 +34,7 @@ export function FormSelectLabeled({ label, value, onChange, options, required, p
   );
 }
 
-export function FormInputLabeled({ label, value, onChange, required, type = "text", placeholder, min, step }: {
+export function FormInputLabeled({ label, value, onChange, required, type = "text", placeholder, min, max, step }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
@@ -42,6 +42,7 @@ export function FormInputLabeled({ label, value, onChange, required, type = "tex
   type?: string;
   placeholder?: string;
   min?: string | number;
+  max?: string | number;
   step?: string | number;
 }) {
   return (
@@ -53,6 +54,7 @@ export function FormInputLabeled({ label, value, onChange, required, type = "tex
         type={type}
         value={value}
         min={min}
+        max={max}
         step={step}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}

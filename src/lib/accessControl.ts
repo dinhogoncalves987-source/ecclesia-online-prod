@@ -50,6 +50,16 @@ export const ACCESS_PERMISSION_KEYS = [
   "discipleship.manage",
   "discipleship.teach",
   "discipleship.confidential",
+  // OPERAÇÃO 3 (Teologia) — espelha as capabilities criadas em
+  // 20260730090000_theology_foundation.sql. Mesmo padrão de
+  // "discipleship.confidential"/"members.confidential": nunca concedida
+  // junto com read/manage/teach por conveniência. "theology.teach" nunca
+  // autoriza operação financeira — vínculo de transação exige finance.*
+  // real (ver 20260730140000_theology_finance_links_and_permissions.sql).
+  "theology.read",
+  "theology.manage",
+  "theology.teach",
+  "theology.confidential",
 ] as const;
 
 export type AccessPermission = (typeof ACCESS_PERMISSION_KEYS)[number];
@@ -76,6 +86,11 @@ export const ACCESS_RESPONSIBILITY_KEYS = [
   "discipleship_coordinator",
   "discipleship_secretary",
   "discipleship_teacher",
+  // OPERAÇÃO 3 (Teologia) — espelha access_responsibility_definitions
+  // inseridas em 20260730090000_theology_foundation.sql.
+  "theology_coordinator",
+  "theology_secretary",
+  "theology_teacher",
 ] as const;
 
 export type AccessResponsibility = (typeof ACCESS_RESPONSIBILITY_KEYS)[number];
@@ -288,6 +303,36 @@ export const ACCESS_RESPONSIBILITIES: readonly AccessResponsibilityDefinition[] 
     inheritsToDescendants: false,
     governance: false,
   },
+  // OPERAÇÃO 3 (Teologia) — mesmo formato de access_responsibility_definitions
+  // já usado por Secretaria/Discipulado (inheritsToDescendants=false,
+  // governance=false, escopo local).
+  {
+    key: "theology_coordinator",
+    label: "Coordenador(a) de Teologia",
+    description: "Gerencia instituto, núcleos, currículo, períodos, turmas, equipe e matrículas da Teologia no escopo recebido.",
+    category: "ministries",
+    permissions: ["theology.read", "theology.manage", "theology.teach"],
+    inheritsToDescendants: false,
+    governance: false,
+  },
+  {
+    key: "theology_secretary",
+    label: "Secretário(a) Acadêmico(a) de Teologia",
+    description: "Administra períodos, turmas e matrículas da Teologia, sem acesso a acompanhamento confidencial.",
+    category: "ministries",
+    permissions: ["theology.read", "theology.manage"],
+    inheritsToDescendants: false,
+    governance: false,
+  },
+  {
+    key: "theology_teacher",
+    label: "Professor(a) de Teologia",
+    description: "Leciona e lança frequência, avaliação e resultados somente nas turmas/unidades às quais está atribuído.",
+    category: "ministries",
+    permissions: ["theology.read", "theology.teach"],
+    inheritsToDescendants: false,
+    governance: false,
+  },
 ] as const;
 
 export const ACCESS_RESPONSIBILITY_BY_KEY = new Map(
@@ -315,6 +360,9 @@ export const ROUTE_ACCESS_PERMISSIONS: Partial<Record<string, AccessPermission>>
   // OPERAÇÃO 2 (Discipulado) — staging-only (ver src/config/modules.ts);
   // gate de rota real, independente do módulo estar ou não visível no menu.
   "/admin/discipulado": "discipleship.read",
+  // OPERAÇÃO 3 (Teologia) — staging-only (ver src/config/modules.ts); mesmo
+  // gate de rota real por capability, fail-closed.
+  "/admin/teologia": "theology.read",
 };
 
 export function isAccessResponsibility(value: string): value is AccessResponsibility {

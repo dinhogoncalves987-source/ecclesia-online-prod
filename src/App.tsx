@@ -156,6 +156,11 @@ const Comunidade = IS_STAGING_BUILD ? lazy(() => import("./pages/Comunidade")) :
 // é emitido no build de produção.
 const Discipulado = IS_STAGING_BUILD ? lazy(() => import("./pages/Discipulado")) : null;
 
+// OPERAÇÃO 3 (Teologia) — staging-only: as migrations theology_* AINDA NÃO
+// foram aplicadas em nenhum banco (ver docs/architecture/operacao-3-teologia.md).
+// Mesma técnica de tree-shaking condicional do Discipulado.
+const Teologia = IS_STAGING_BUILD ? lazy(() => import("./pages/Teologia")) : null;
+
 // CORREÇÃO 2026-07-20: "devotional" foi promovido de volta para "both" em
 // src/config/modules.ts — a página pública de compartilhamento do
 // versículo do dia precisa acompanhar, senão um link enviado por um membro
@@ -272,6 +277,8 @@ const App = () => (
               <Route path="/admin/comunidade" element={<ProtectedRoute><ModuleGate moduleId="community">{Comunidade && <Comunidade />}</ModuleGate></ProtectedRoute>} />
 
               <Route path="/admin/discipulado" element={<ProtectedRoute><ModuleGate moduleId="discipleship">{Discipulado && <Discipulado />}</ModuleGate></ProtectedRoute>} />
+
+              <Route path="/admin/teologia" element={<ProtectedRoute><ModuleGate moduleId="theology">{Teologia && <Teologia />}</ModuleGate></ProtectedRoute>} />
 
               {/* Global chat — accessible to all roles */}
               <Route path="/admin/chat" element={<ProtectedRoute><ChatSecretaria /></ProtectedRoute>} />

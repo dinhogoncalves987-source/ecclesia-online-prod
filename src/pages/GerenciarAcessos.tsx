@@ -167,6 +167,10 @@ function ResponsibilityPicker({
             && (
               isModuleEnabled("discipleship")
               || !item.key.startsWith("discipleship_")
+            )
+            && (
+              isModuleEnabled("theology")
+              || !item.key.startsWith("theology_")
             ),
         );
         return (

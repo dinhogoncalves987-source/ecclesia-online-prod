@@ -98,7 +98,13 @@
     "20260729090000_discipleship_foundation.sql",
     "20260729100000_discipleship_classes_and_enrollments.sql",
     "20260729110000_discipleship_learning_records.sql",
-    "20260729120000_discipleship_permissions_and_history.sql"
+    "20260729120000_discipleship_permissions_and_history.sql",
+    "20260730090000_theology_foundation.sql",
+    "20260730100000_theology_curriculum.sql",
+    "20260730110000_theology_periods_classes_enrollments.sql",
+    "20260730120000_theology_attendance_and_assessments.sql",
+    "20260730130000_theology_results_history_and_documents.sql",
+    "20260730140000_theology_finance_links_and_permissions.sql"
   ],
   "staging_only": [
     "20260519200000_demo_seed.sql",

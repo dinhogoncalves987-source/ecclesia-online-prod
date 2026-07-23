@@ -114,6 +114,14 @@ describe("isModuleEnabled", () => {
     expect(isModuleEnabled("discipleship", "staging")).toBe(true);
   });
 
+  // OPERAÇÃO 3 (Teologia) — mesmo critério do Discipulado: backend real
+  // (theology_* tables/RPCs, ver docs/architecture/operacao-3-teologia.md),
+  // migrations ainda NÃO aplicadas em nenhum banco. Staging-only até lá.
+  it("disables theology in production (migrations ainda não aplicadas) and enables in staging", () => {
+    expect(isModuleEnabled("theology", "production")).toBe(false);
+    expect(isModuleEnabled("theology", "staging")).toBe(true);
+  });
+
   // CORREÇÃO 2026-07-17: Bíblia/IA, Culto & Louvor, Campanhas, Cartas de
   // Recomendação e Relatórios não dependem de dado fictício exibido ao
   // usuário (todos têm backend real no Supabase) — nunca deveriam ter sido

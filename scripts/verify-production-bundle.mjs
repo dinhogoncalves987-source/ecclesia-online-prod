@@ -128,6 +128,11 @@ const FORBIDDEN_TERMS_SOURCE = [
   // Mesmo padrão de tree-shaking condicional de Marketplace/Comunidade —
   // App.tsx só faz `import("./pages/Discipulado")` quando IS_STAGING_BUILD.
   "pages/Discipulado",
+  // OPERAÇÃO 3 (Teologia, 2026-07-30) — staging-only enquanto as migrations
+  // theology_* não forem aplicadas em nenhum ambiente (ver
+  // src/config/modules.ts e docs/architecture/operacao-3-teologia.md).
+  // Mesmo padrão de tree-shaking condicional do Discipulado.
+  "pages/Teologia",
 ];
 const FORBIDDEN_TERMS = FORBIDDEN_TERMS_SOURCE.map((term) => term.toLowerCase());
 
