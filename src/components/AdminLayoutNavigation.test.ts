@@ -15,9 +15,9 @@ function section(id: string, nextId: string): string {
 describe("AdminLayout — navegação e altura responsiva", () => {
   const espiritual = section("espiritual", "secretaria");
   const secretaria = section("secretaria", "financeiro");
-  const financeiro = section("financeiro", "portaria");
-  const portaria = section("portaria", "relatorios");
-  const relatorios = section("relatorios", "admin");
+  const financeiro = section("financeiro", "relatorios");
+  const relatorios = section("relatorios", "portaria");
+  const portaria = section("portaria", "admin");
 
   it.each([
     "/admin/discipulado",
@@ -39,18 +39,21 @@ describe("AdminLayout — navegação e altura responsiva", () => {
     expect(paths).not.toContain("/admin/missoes");
   });
 
-  it("mantém a ordem Financeiro, Discipulado, Teologia, Missões, Portaria e Relatórios", () => {
+  it("mantém a ordem Financeiro, Missões, Teologia, Discipulado, Relatórios e Portaria", () => {
     expect(financeiro.indexOf("/admin/financeiro")).toBeLessThan(
-      financeiro.indexOf("/admin/discipulado"),
+      financeiro.indexOf("/admin/missoes"),
     );
-    expect(financeiro.indexOf("/admin/discipulado")).toBeLessThan(
+    expect(financeiro.indexOf("/admin/missoes")).toBeLessThan(
       financeiro.indexOf("/admin/teologia"),
     );
     expect(financeiro.indexOf("/admin/teologia")).toBeLessThan(
-      financeiro.indexOf("/admin/missoes"),
+      financeiro.indexOf("/admin/discipulado"),
     );
-    expect(portaria).toContain("/admin/porteiro");
     expect(relatorios).toContain("/admin/relatorios");
+    expect(portaria).toContain("/admin/porteiro");
+    expect(source.indexOf('id: "relatorios"')).toBeLessThan(
+      source.indexOf('id: "portaria"'),
+    );
   });
 
   it("mantém a lista rolável entre cabeçalho e rodapé fixos", () => {

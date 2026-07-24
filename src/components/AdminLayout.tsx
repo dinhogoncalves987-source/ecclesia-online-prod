@@ -93,9 +93,16 @@ const navSections: NavSection[] = [
       { icon: Wallet, label: "Financeiro", path: "/admin/financeiro" },
       // Formação e atuação institucional são operações próprias. Permanecem
       // staging-only e são filtradas normalmente por isRouteEnabled().
-      { icon: GraduationCap, label: "Discipulado", path: "/admin/discipulado" },
-      { icon: Landmark, label: "Teologia", path: "/admin/teologia" },
       { icon: Send, label: "Missões", path: "/admin/missoes" },
+      { icon: Landmark, label: "Teologia", path: "/admin/teologia" },
+      { icon: GraduationCap, label: "Discipulado", path: "/admin/discipulado" },
+    ],
+  },
+  {
+    id: "relatorios",
+    separator: true,
+    items: [
+      { icon: BarChart3, label: "Relatórios", path: "/admin/relatorios" },
     ],
   },
   {
@@ -105,13 +112,6 @@ const navSections: NavSection[] = [
     separator: true,
     items: [
       { icon: ScanLine, label: "Modo Porteiro", path: "/admin/porteiro" },
-    ],
-  },
-  {
-    id: "relatorios",
-    separator: true,
-    items: [
-      { icon: BarChart3, label: "Relatórios", path: "/admin/relatorios" },
     ],
   },
   {
