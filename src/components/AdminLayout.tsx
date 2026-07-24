@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { SupportModeBanner } from "@/components/platform/SupportModeBanner";
 import { RequireSupportOrganization } from "@/components/platform/RequireSupportOrganization";
 import { useSupportContext } from "@/contexts/SupportContext";
+import { environment } from "@/config/environment";
 import { isRouteEnabled } from "@/config/modules";
 import flagBR from "@/assets/flag-br.png";
 import flagUS from "@/assets/flag-us.png";
@@ -40,7 +41,8 @@ const SECRETARIA_PATHS = [
   "/admin/membros", "/admin/carteira-ecclesia", "/admin/agenda", "/admin/comunicacao",
   "/admin/grupos", "/admin/escalas", "/admin/documentos",
   "/admin/cartas-recomendacao", "/admin/assembleia-geral", "/admin/oracoes",
-  "/admin/chat-secretaria", "/admin/solicitacoes",
+  "/admin/chat-secretaria", "/admin/solicitacoes", "/admin/discipulado",
+  "/admin/teologia", "/admin/missoes",
 ];
 // Global chat route — lives outside Secretaria, never auto-expands it
 const GLOBAL_CHAT_PATH = "/admin/chat";
@@ -64,15 +66,6 @@ const navSections: NavSection[] = [
       { icon: BookOpen, label: "Bíblia Sagrada", path: "/admin/biblia" },
       { icon: Music2, label: "Culto & Louvor", path: "/admin/culto" },
       { icon: Megaphone, label: "Campanhas", path: "/admin/campanhas" },
-      // OPERAÇÃO 2 — staging-only (ver src/config/modules.ts); filtrado por
-      // isRouteEnabled() abaixo, igual aos demais itens desta seção.
-      { icon: GraduationCap, label: "Discipulado", path: "/admin/discipulado" },
-      // OPERAÇÃO 3 — mesmo padrão staging-only do Discipulado: visibilidade
-      // real controlada por isRouteEnabled() abaixo.
-      { icon: Landmark, label: "Teologia", path: "/admin/teologia" },
-      // OPERAÇÃO 4 — mesmo padrão staging-only do Discipulado/Teologia:
-      // visibilidade real controlada por isRouteEnabled() abaixo.
-      { icon: Send, label: "Missões", path: "/admin/missoes" },
     ],
   },
   {
@@ -84,6 +77,11 @@ const navSections: NavSection[] = [
       { icon: Users, label: "Membros", path: "/admin/membros" },
       { icon: CreditCard, label: "Carteira de Membro", path: "/admin/carteira-ecclesia" },
       { icon: ScrollText, label: "Cartas de Recomendação", path: "/admin/cartas-recomendacao" },
+      // Formação e atuação institucional pertencem à Secretaria. As rotas
+      // continuam staging-only e são filtradas por isRouteEnabled().
+      { icon: GraduationCap, label: "Discipulado", path: "/admin/discipulado" },
+      { icon: Landmark, label: "Teologia", path: "/admin/teologia" },
+      { icon: Send, label: "Missões", path: "/admin/missoes" },
       { icon: ClipboardList, label: "Solicitações", path: "/admin/solicitacoes" },
       { icon: Archive, label: "Documentos", path: "/admin/documentos" },
       { icon: MessageSquare, label: "Comunicação", path: "/admin/comunicacao" },
@@ -274,7 +272,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const isActive = (path: string) => location.pathname === path;
 
   const renderNavSections = (collapsed: boolean, onLinkClick?: () => void) => (
-    <nav className="flex-1 px-3 py-2 overflow-y-auto">
+    <nav className="flex-1 min-h-0 px-3 py-2 overflow-y-auto overscroll-contain">
       {resolvedSections.map(section => {
         const visibleItems = section.items.filter(item => canAccess(item.path) && isRouteEnabled(item.path));
         if (visibleItems.length === 0) return null;
@@ -380,14 +378,20 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <PresenceProvider organizationId={church?.id} currentUserId={user?.id}>
-    <div className="min-h-screen bg-background flex">
+    <div
+      className={`min-h-screen bg-background flex lg:min-h-0 lg:overflow-hidden ${
+        environment.isStaging
+          ? "lg:h-[calc(100dvh-1.75rem)]"
+          : "lg:h-dvh"
+      }`}
+    >
       {/* Desktop Sidebar */}
       <aside
-        className={`hidden lg:flex flex-col shrink-0 bg-card shadow-executive transition-all duration-300 ${
+        className={`hidden lg:flex min-h-0 overflow-hidden flex-col shrink-0 bg-card shadow-executive transition-all duration-300 ${
           sidebarCollapsed ? "w-[72px]" : "w-72"
         }`}
       >
-        <Link to="/admin" className="p-4 flex items-center gap-3 h-16">
+        <Link to="/admin" className="p-4 flex shrink-0 items-center gap-3 h-16">
           <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
             <span className="text-accent font-serif text-xl">Ω</span>
           </div>
@@ -398,7 +402,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
         {renderNavSections(sidebarCollapsed)}
 
-        <div className="p-3 border-t border-border/50 space-y-1">
+        <div className="shrink-0 p-3 border-t border-border/50 space-y-1">
           {/* Configurações — collapsible section at the bottom */}
           {!sidebarCollapsed ? (
             <div>
@@ -458,7 +462,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 min-h-0 flex flex-col min-w-0">
         {/* Header */}
         {/*
           Header não é "sticky" no mobile de propósito: no diagnóstico do
@@ -471,7 +475,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           contexto de composição extra sem necessidade. Em desktop (`lg:`), o
           <main> volta a rolar internamente e o header permanece sticky.
         */}
-        <header className="h-16 bg-card/95 lg:bg-card/80 lg:backdrop-blur-md shadow-[var(--shadow-sm)] flex items-center justify-between px-4 lg:px-8 z-30 lg:sticky lg:top-0">
+        <header className="h-16 shrink-0 bg-card/95 lg:bg-card/80 lg:backdrop-blur-md shadow-[var(--shadow-sm)] flex items-center justify-between px-4 lg:px-8 z-30 lg:sticky lg:top-0">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(true)}
@@ -578,7 +582,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           (`lg:`), o <main> volta a rolar internamente (mais previsível numa
           janela grande, sem o mesmo risco em hardware desktop).
         */}
-        <main className="flex-1 overflow-visible pb-20 lg:pb-0 lg:overflow-y-auto lg:overflow-x-hidden">
+        <main className="flex-1 min-h-0 overflow-visible pb-20 lg:pb-0 lg:overflow-y-auto lg:overflow-x-hidden">
           {/* Support mode banner — visible for all platform users */}
           <SupportModeBanner />
           <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
@@ -622,7 +626,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
               {renderNavSections(false, () => setMobileMenuOpen(false))}
 
-              <div className="p-3 border-t border-border/50 space-y-0.5">
+              <div className="shrink-0 p-3 border-t border-border/50 space-y-0.5">
                 {/* Configurações — collapsible in mobile too */}
                 <button
                   onClick={() => setConfigExpanded(v => !v)}

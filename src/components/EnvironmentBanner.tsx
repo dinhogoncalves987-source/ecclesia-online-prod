@@ -28,7 +28,7 @@ export function EnvironmentBanner() {
     <div
       role="status"
       data-testid="environment-banner"
-      className="sticky top-0 z-[60] w-full bg-amber-500 px-3 py-1.5 text-center text-xs font-semibold uppercase tracking-wider text-amber-950"
+      className="sticky top-0 z-[60] flex h-7 w-full shrink-0 items-center justify-center bg-amber-500 px-3 text-center text-xs font-semibold uppercase tracking-wider text-amber-950"
     >
       Ambiente de teste — dados e integrações não são de produção
     </div>

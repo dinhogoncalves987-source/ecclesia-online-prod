@@ -26,7 +26,7 @@ describe("EnvironmentBanner", () => {
     }));
     const { EnvironmentBanner } = await import("./EnvironmentBanner");
     render(<EnvironmentBanner />);
-    expect(screen.getByTestId("environment-banner")).toBeInTheDocument();
+    expect(screen.getByTestId("environment-banner")).toHaveClass("h-7");
     expect(screen.getByText(/ambiente de teste/i)).toBeInTheDocument();
     expect(document.querySelector('meta[name="robots"]')).toHaveAttribute("content", "noindex, nofollow");
   });
