@@ -265,3 +265,114 @@ apenas os pontos de extensão acima, já testados e em uso real pela Secretaria.
   domínio futuro com dado avaliativo/numérico sujeito a correção pós-publicação.
 - **Contrato de certificado (elegibilidade + registro, sem emissão visual)**: mesmo contrato da
   Operação 2, reaproveitando `public.documents` + `member_history` tipo `certificado_emitido`.
+
+## 12. Extensões reais criadas pela Operação 4 (Missões)
+
+> Esta seção só registra o que a Operação 4 efetivamente criou sobre o contrato acima. As decisões
+> das Operações 1, 2 e 3 (seções 1–11) não foram alteradas nem reabertas. Detalhe completo em
+> `docs/architecture/operacao-4-missoes.md`. Entrega estrutural do Sonnet, **ainda pendente de
+> revisão técnica final do Codex** — diferente das seções 10/11, que já documentam operações
+> revisadas.
+
+- **Catálogo de `member_history.history_type` estendido** (migration
+  `20260731140000_missions_history_and_reports.sql`, nunca reabrindo as migrations de catálogo das
+  Operações 1/2): 4 novos marcos, semanticamente distintos dos marcos de formação de
+  Discipulado/Teologia — `envio_missionario`, `retorno_missionario`,
+  `encerramento_atividade_missionaria`, `vinculacao_projeto_missionario`. Nenhum marco de formação
+  reaproveitado, porque envio/retorno de missionário não é matrícula/conclusão de curso.
+- **`source_module = 'missoes'`** passou de valor previsto no enum (desde a Operação 1) para valor
+  real em uso — todo marco chega à timeline por trigger dedicado
+  (`_missions_missionaries_register_history`/`_missions_project_assignments_register_history`) via
+  helper próprio (`_register_missions_member_history`), nunca chamando
+  `register_member_history_event()` direto do frontend. Movimentações financeiras comuns (vínculo de
+  transação) **não** geram evento na timeline pessoal — só marcos institucionais do missionário.
+- **9 tabelas novas** no namespace `missions_*` (`missions_settings`, `missions_missionaries`,
+  `missions_missionary_confidential_info`, `missions_projects`, `missions_project_assignments`,
+  `missions_supporters`, `missions_supporter_commitments`, `missions_commitment_installments`,
+  `missions_transaction_links`) — todas referenciam `members.id`/`organizations.id`, nenhuma tabela
+  de pessoa, organização, campanha, documento ou storage paralela. `missions_projects.campaign_id`
+  é uma ligação especializada com `public.campaigns` já existente (nunca uma campanha duplicada).
+- **Separação pública × confidencial por tabela** (não por coluna): dados operacionais do missionário
+  ficam em `missions_missionaries` (legível por `missions.read`); documento pessoal, contato de
+  emergência e observações confidenciais ficam em `missions_missionary_confidential_info`, legível
+  **somente** por `missions.confidential` — mesmo princípio de `members.confidential`, aplicado agora
+  com tabela própria porque a confidencialidade é constante por missionário, não um evento pontual.
+- **4 capabilities novas**: `missions.read`, `missions.manage`, `missions.finance`,
+  `missions.confidential` — mesmo padrão de `discipleship.*`/`theology.*` (nunca concedida por
+  conveniência junto de outra capability do mesmo domínio). `missions.finance` **nunca substitui**
+  `finance.read`/`finance.write` reais — toda RPC financeira de Missões verifica as duas
+  capabilities, separadamente, na organização real de cada lado do vínculo.
+- **3 responsabilidades operacionais novas**: `missions_coordinator`, `missions_secretary`,
+  `missions_treasurer` — mesmo formato de `access_responsibility_definitions` já usado por
+  Secretaria/Discipulado/Teologia (`inherits_to_descendants=false`, `is_governance=false`, escopo
+  local). `missions_treasurer` recebe `missions.finance` mas **não** `missions.manage` e **não**
+  nenhuma capability `finance.*` — responsabilidade financeira missionária nunca concede Financeiro
+  geral automaticamente.
+- **Compromisso previsto ≠ recebimento real**: `missions_supporter_commitments`/
+  `missions_commitment_installments` representam obrigação/parcela **previstas** (WinTechi
+  "Mensalidades a Receber"); `status`/`paid_amount` da parcela são **sempre derivados** de transações
+  reais vinculadas (`_recompute_missions_installment_status`), nunca escritos manualmente como
+  pago/parcial. O único caminho de escrita manual é `cancelado`/`isento`, bloqueado se já existir
+  valor pago real.
+- **Vínculo financeiro fino, sem duplicar valor/saldo/fechamento**: `missions_transaction_links` não
+  tem coluna monetária — apenas liga uma `public.transactions` real a **exatamente um** contexto
+  missionário (parcela, projeto, missionário ou campanha), exigindo **ambas** as capabilities
+  (`missions.finance` + `finance.read`/`finance.write`) simultaneamente para ler ou escrever.
+  "Portadores" do WinTechi = `finance_accounts` reais; "Contas/Grupos Contábeis" =
+  `finance_account_categories` reais; saldo/recibo/fechamento continuam exclusivamente no motor
+  financeiro existente — nenhuma segunda contabilidade foi criada.
+- **Padrão de "escrita só por RPC" replicado**: as 9 tabelas novas revogam INSERT/UPDATE/DELETE de
+  `authenticated`, mesmo padrão confirmado nas Operações 1, 2 e 3.
+- **Diretório mínimo de membros sem PII**: `search_missions_members`/`get_missions_member_labels`
+  retornam somente `id`/`full_name`/`known_name`/`member_code`, limitados a 50 resultados — mesmo
+  padrão de `search_theology_members`/`search_discipleship_members`.
+- **Relatórios derivados, nunca um segundo motor genérico**: `get_missions_dashboard_summary`,
+  `list_missions_missionaries_by_field`, `list_missions_project_indicators` e
+  `list_missions_commitment_installments` calculam tudo em tempo real sobre as tabelas reais — nenhum
+  dado de relatório é persistido.
+
+## 13. Como as quatro operações se encaixam sem duplicação de domínio
+
+Secretaria (Operação 1), Discipulado (Operação 2), Teologia (Operação 3) e Missões (Operação 4)
+compartilham exatamente a mesma fundação institucional e nunca a duplicam:
+
+- **Uma única pessoa**: `public.members`. Aluno de Discipulado, aluno/professor de Teologia,
+  missionário, apoiador/contribuinte e coordenador de Missões são todos **papéis** que referenciam
+  `members.id` — nenhuma operação criou uma segunda identidade humana.
+- **Uma única árvore organizacional**: `public.organizations` + `has_org_access_permission()` +
+  `is_organization_descendant_or_self()`. As quatro operações resolvem autorização e escopo
+  exclusivamente por essa árvore — nenhuma hierarquia paralela de igreja/distrito/setor foi criada.
+- **Uma única timeline institucional**: `public.member_history`, com `source_module` distinguindo a
+  origem (`secretaria`/`discipulado`/`teologia`/`missoes`/`sistema`) e um catálogo `history_type`
+  **aditivo** — cada operação estendeu o catálogo só quando a semântica não existia (Discipulado
+  criou os 5 marcos genéricos de formação; Teologia reaproveitou-os sem extensão; Missões criou 4
+  marcos próprios de atividade missionária, semanticamente distintos de formação). Nenhuma operação
+  criou uma segunda tabela de histórico.
+- **Um único repositório de documentos**: `public.documents` + bucket `member-documents`, reaproveitado
+  por ocorrências, ordenações, transferências, certificados de Discipulado/Teologia e documento
+  confidencial de missionário — nenhum novo bucket ou tabela de arquivo.
+- **Um único motor financeiro**: `public.transactions` + `finance_*`. Teologia e Missões (as duas
+  operações com necessidade financeira real) nunca criaram uma segunda contabilidade — apenas tabelas
+  de **ligação fina** sem coluna monetária (`theology_transaction_links`,
+  `missions_transaction_links`), cada uma exigindo simultaneamente a capability do domínio acadêmico/
+  missionário **e** a capability financeira real. Discipulado não teve necessidade financeira própria
+  auditada nesta arquitetura.
+- **Capabilities por domínio, nunca role hardcoded**: cada operação criou capabilities com o mesmo
+  prefixo namespaced (`discipleship.*`/`theology.*`/`missions.*`) e o mesmo padrão de
+  `.confidential` restrito à governança, resolvidas sempre por
+  `has_org_access_permission()`/`hasCapability()` — nunca uma string de role comparada diretamente.
+- **Namespaces de tabela isolados, padrões replicados**: `discipleship_*`, `theology_*` e
+  `missions_*` nunca têm FK cruzada entre si nem com tabelas de outro domínio (além de `members`/
+  `organizations`/`documents`/`transactions`/`campaigns`, que são a fundação compartilhada). Os
+  padrões de RLS, RPC `SECURITY DEFINER`, revogação de escrita direta, locks `FOR UPDATE`, diretório
+  mínimo de membros e helper de histórico com reautorização de escopo foram **replicados** em cada
+  operação — nunca herdados por FK, porque cada domínio tem sua própria semântica de negócio.
+- **Staging-only até homologação**: as três operações posteriores à Secretaria (Discipulado, Teologia,
+  Missões) entregam suas migrations sem aplicar em nenhum ambiente, e seus módulos permanecem
+  `"staging"` em `src/config/modules.ts` até homologação manual e promoção explícita para `"both"` —
+  nenhuma delas altera o comportamento de produção nesta entrega.
+
+Com a Operação 4, a arquitetura planejada nas quatro operações está estruturalmente completa: os
+quatro domínios funcionais do Ecclesia (administrativo/pastoral, formação simples, formação acadêmica
+e missões) compartilham a mesma pessoa, a mesma árvore organizacional, a mesma timeline, o mesmo
+repositório de documentos e o mesmo motor financeiro — sem nenhuma duplicação de domínio central.

@@ -60,6 +60,17 @@ export const ACCESS_PERMISSION_KEYS = [
   "theology.manage",
   "theology.teach",
   "theology.confidential",
+  // OPERAÇÃO 4 (Missões) — espelha as capabilities criadas em
+  // 20260731090000_missions_foundation.sql. Mesmo padrão de
+  // "theology.confidential"/"discipleship.confidential": nunca concedida
+  // junto com read/manage/finance por conveniência. "missions.finance"
+  // NUNCA substitui finance.read/finance.write — vínculo de transação
+  // exige AMBAS as capabilities reais (ver
+  // 20260731130000_missions_transaction_links.sql).
+  "missions.read",
+  "missions.manage",
+  "missions.finance",
+  "missions.confidential",
 ] as const;
 
 export type AccessPermission = (typeof ACCESS_PERMISSION_KEYS)[number];
@@ -91,6 +102,11 @@ export const ACCESS_RESPONSIBILITY_KEYS = [
   "theology_coordinator",
   "theology_secretary",
   "theology_teacher",
+  // OPERAÇÃO 4 (Missões) — espelha access_responsibility_definitions
+  // inseridas em 20260731090000_missions_foundation.sql.
+  "missions_coordinator",
+  "missions_secretary",
+  "missions_treasurer",
 ] as const;
 
 export type AccessResponsibility = (typeof ACCESS_RESPONSIBILITY_KEYS)[number];
@@ -333,6 +349,39 @@ export const ACCESS_RESPONSIBILITIES: readonly AccessResponsibilityDefinition[] 
     inheritsToDescendants: false,
     governance: false,
   },
+  // OPERAÇÃO 4 (Missões) — mesmo formato de access_responsibility_definitions
+  // já usado por Discipulado/Teologia (inheritsToDescendants=false,
+  // governance=false, escopo local). "missions_treasurer" NUNCA recebe
+  // finance.* automaticamente: vínculo de transação real continua exigindo
+  // uma responsabilidade financeira geral (treasurer/assistant_treasurer)
+  // além de missions.finance (ver contrato §10 e §6 da operação).
+  {
+    key: "missions_coordinator",
+    label: "Coordenador(a) de Missões",
+    description: "Gerencia missionários, projetos, apoiadores e compromissos de Missões no escopo recebido.",
+    category: "ministries",
+    permissions: ["missions.read", "missions.manage", "missions.finance"],
+    inheritsToDescendants: false,
+    governance: false,
+  },
+  {
+    key: "missions_secretary",
+    label: "Secretário(a) de Missões",
+    description: "Administra cadastros de missionários, projetos e apoiadores, sem vincular transações financeiras.",
+    category: "ministries",
+    permissions: ["missions.read", "missions.manage"],
+    inheritsToDescendants: false,
+    governance: false,
+  },
+  {
+    key: "missions_treasurer",
+    label: "Tesoureiro(a) de Missões",
+    description: "Vincula transações financeiras reais aos contextos de Missões; não concede capabilities gerais do Financeiro.",
+    category: "ministries",
+    permissions: ["missions.read", "missions.finance"],
+    inheritsToDescendants: false,
+    governance: false,
+  },
 ] as const;
 
 export const ACCESS_RESPONSIBILITY_BY_KEY = new Map(
@@ -363,6 +412,9 @@ export const ROUTE_ACCESS_PERMISSIONS: Partial<Record<string, AccessPermission>>
   // OPERAÇÃO 3 (Teologia) — staging-only (ver src/config/modules.ts); mesmo
   // gate de rota real por capability, fail-closed.
   "/admin/teologia": "theology.read",
+  // OPERAÇÃO 4 (Missões) — staging-only (ver src/config/modules.ts); mesmo
+  // gate de rota real por capability, fail-closed.
+  "/admin/missoes": "missions.read",
 };
 
 export function isAccessResponsibility(value: string): value is AccessResponsibility {

@@ -133,6 +133,11 @@ const FORBIDDEN_TERMS_SOURCE = [
   // src/config/modules.ts e docs/architecture/operacao-3-teologia.md).
   // Mesmo padrão de tree-shaking condicional do Discipulado.
   "pages/Teologia",
+  // OPERAÇÃO 4 (Missões, 2026-07-31) — staging-only enquanto as migrations
+  // missions_* não forem aplicadas em nenhum ambiente (ver
+  // src/config/modules.ts e docs/architecture/operacao-4-missoes.md).
+  // Mesmo padrão de tree-shaking condicional do Discipulado/Teologia.
+  "pages/Missoes",
 ];
 const FORBIDDEN_TERMS = FORBIDDEN_TERMS_SOURCE.map((term) => term.toLowerCase());
 

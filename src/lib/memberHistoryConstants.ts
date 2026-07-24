@@ -37,6 +37,13 @@ export const HISTORY_TYPES = [
   "conclusao_formacao",
   "desligamento_formacao",
   "transferencia_turma",
+  // OPERAÇÃO 4 (Missões) — marcos de atividade missionária, estendidos por
+  // 20260731140000_missions_history_and_reports.sql. Semanticamente
+  // distintos dos marcos de formação acima (envio/retorno não é matrícula).
+  "envio_missionario",
+  "retorno_missionario",
+  "encerramento_atividade_missionaria",
+  "vinculacao_projeto_missionario",
 ] as const;
 
 export type HistoryType = (typeof HISTORY_TYPES)[number];
@@ -65,6 +72,10 @@ export const HISTORY_TYPE_LABELS: Record<HistoryType, string> = {
   conclusao_formacao: "Conclusão de formação",
   desligamento_formacao: "Desligamento de formação",
   transferencia_turma: "Transferência de turma",
+  envio_missionario: "Envio missionário",
+  retorno_missionario: "Retorno missionário",
+  encerramento_atividade_missionaria: "Encerramento de atividade missionária",
+  vinculacao_projeto_missionario: "Vinculação a projeto missionário",
 };
 
 /** Visibilidade de um evento/ocorrência. */

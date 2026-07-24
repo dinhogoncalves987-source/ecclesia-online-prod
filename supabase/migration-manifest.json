@@ -104,7 +104,13 @@
     "20260730110000_theology_periods_classes_enrollments.sql",
     "20260730120000_theology_attendance_and_assessments.sql",
     "20260730130000_theology_results_history_and_documents.sql",
-    "20260730140000_theology_finance_links_and_permissions.sql"
+    "20260730140000_theology_finance_links_and_permissions.sql",
+    "20260731090000_missions_foundation.sql",
+    "20260731100000_missions_missionaries.sql",
+    "20260731110000_missions_projects.sql",
+    "20260731120000_missions_supporters_commitments.sql",
+    "20260731130000_missions_transaction_links.sql",
+    "20260731140000_missions_history_and_reports.sql"
   ],
   "staging_only": [
     "20260519200000_demo_seed.sql",

@@ -122,6 +122,14 @@ describe("isModuleEnabled", () => {
     expect(isModuleEnabled("theology", "staging")).toBe(true);
   });
 
+  // OPERAÇÃO 4 (Missões) — mesmo critério do Discipulado/Teologia: backend
+  // real (missions_* tables/RPCs, ver docs/architecture/operacao-4-missoes.md),
+  // migrations ainda NÃO aplicadas em nenhum banco. Staging-only até lá.
+  it("disables missions in production (migrations ainda não aplicadas) and enables in staging", () => {
+    expect(isModuleEnabled("missions", "production")).toBe(false);
+    expect(isModuleEnabled("missions", "staging")).toBe(true);
+  });
+
   // CORREÇÃO 2026-07-17: Bíblia/IA, Culto & Louvor, Campanhas, Cartas de
   // Recomendação e Relatórios não dependem de dado fictício exibido ao
   // usuário (todos têm backend real no Supabase) — nunca deveriam ter sido
@@ -159,6 +167,18 @@ describe("isRouteEnabled", () => {
   it("disables /admin/discipulado in production and enables in staging", () => {
     expect(isRouteEnabled("/admin/discipulado", "production")).toBe(false);
     expect(isRouteEnabled("/admin/discipulado", "staging")).toBe(true);
+  });
+
+  it("disables /admin/teologia in production and enables in staging", () => {
+    expect(isRouteEnabled("/admin/teologia", "production")).toBe(false);
+    expect(isRouteEnabled("/admin/teologia", "staging")).toBe(true);
+  });
+
+  // OPERAÇÃO 4 (Missões) — mesma allowlist staging-only de
+  // Discipulado/Teologia (contrato §13 da operação).
+  it("disables /admin/missoes in production and enables in staging", () => {
+    expect(isRouteEnabled("/admin/missoes", "production")).toBe(false);
+    expect(isRouteEnabled("/admin/missoes", "staging")).toBe(true);
   });
 
   // CORREÇÃO 2026-07-17: /admin/biblia, /admin/culto*, /admin/campanhas,

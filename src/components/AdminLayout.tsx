@@ -5,7 +5,7 @@ import {
   Heart, MessageSquare, UsersRound, Archive, BarChart3, Menu, X,
   Bell, ChevronLeft, ChevronDown, Settings, LogOut, Maximize, Minimize, Globe,
   Shield, User, Building2, Music2, Gavel, Briefcase, ShoppingBag, MessageCircle, Megaphone, ScrollText,
-  MessagesSquare, ClipboardList, CreditCard, LayoutGrid, ScanLine, GraduationCap, Landmark
+  MessagesSquare, ClipboardList, CreditCard, LayoutGrid, ScanLine, GraduationCap, Landmark, Send
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -70,6 +70,9 @@ const navSections: NavSection[] = [
       // OPERAÇÃO 3 — mesmo padrão staging-only do Discipulado: visibilidade
       // real controlada por isRouteEnabled() abaixo.
       { icon: Landmark, label: "Teologia", path: "/admin/teologia" },
+      // OPERAÇÃO 4 — mesmo padrão staging-only do Discipulado/Teologia:
+      // visibilidade real controlada por isRouteEnabled() abaixo.
+      { icon: Send, label: "Missões", path: "/admin/missoes" },
     ],
   },
   {

@@ -4934,6 +4934,701 @@ export type Database = {
           },
         ]
       }
+      missions_settings: {
+        Row: {
+          created_at: string
+          default_account_category_id: string | null
+          default_cost_center_id: string | null
+          default_finance_account_id: string | null
+          default_periodicity: string
+          id: string
+          installment_due_day: number
+          late_alert_days: number
+          notes: string | null
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          default_account_category_id?: string | null
+          default_cost_center_id?: string | null
+          default_finance_account_id?: string | null
+          default_periodicity?: string
+          id?: string
+          installment_due_day?: number
+          late_alert_days?: number
+          notes?: string | null
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          default_account_category_id?: string | null
+          default_cost_center_id?: string | null
+          default_finance_account_id?: string | null
+          default_periodicity?: string
+          id?: string
+          installment_due_day?: number
+          late_alert_days?: number
+          notes?: string | null
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "missions_settings_default_finance_account_id_fkey"
+            columns: ["default_finance_account_id"]
+            isOneToOne: false
+            referencedRelation: "finance_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_settings_default_account_category_id_fkey"
+            columns: ["default_account_category_id"]
+            isOneToOne: false
+            referencedRelation: "finance_account_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_settings_default_cost_center_id_fkey"
+            columns: ["default_cost_center_id"]
+            isOneToOne: false
+            referencedRelation: "finance_cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      missions_missionaries: {
+        Row: {
+          coordinator_member_id: string | null
+          created_at: string
+          created_by: string | null
+          ended_at: string | null
+          field_city: string | null
+          field_country: string | null
+          field_description: string | null
+          field_region: string | null
+          field_state: string | null
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          member_id: string
+          organization_id: string
+          public_notes: string | null
+          returned_at: string | null
+          sent_at: string | null
+          start_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          coordinator_member_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          ended_at?: string | null
+          field_city?: string | null
+          field_country?: string | null
+          field_description?: string | null
+          field_region?: string | null
+          field_state?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          member_id: string
+          organization_id: string
+          public_notes?: string | null
+          returned_at?: string | null
+          sent_at?: string | null
+          start_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          coordinator_member_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          ended_at?: string | null
+          field_city?: string | null
+          field_country?: string | null
+          field_description?: string | null
+          field_region?: string | null
+          field_state?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          member_id?: string
+          organization_id?: string
+          public_notes?: string | null
+          returned_at?: string | null
+          sent_at?: string | null
+          start_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "missions_missionaries_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: true
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_missionaries_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_missionaries_coordinator_member_id_fkey"
+            columns: ["coordinator_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      missions_missionary_confidential_info: {
+        Row: {
+          attachment_path: string | null
+          confidential_notes: string | null
+          created_at: string
+          document_id: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          health_notes: string | null
+          id: string
+          missionary_id: string
+          personal_document: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          attachment_path?: string | null
+          confidential_notes?: string | null
+          created_at?: string
+          document_id?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          health_notes?: string | null
+          id?: string
+          missionary_id: string
+          personal_document?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          attachment_path?: string | null
+          confidential_notes?: string | null
+          created_at?: string
+          document_id?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          health_notes?: string | null
+          id?: string
+          missionary_id?: string
+          personal_document?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "missions_missionary_confidential_info_missionary_id_fkey"
+            columns: ["missionary_id"]
+            isOneToOne: true
+            referencedRelation: "missions_missionaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_missionary_confidential_info_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      missions_projects: {
+        Row: {
+          attachment_path: string | null
+          campaign_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          document_id: string | null
+          end_date: string | null
+          field_city: string | null
+          field_country: string | null
+          field_region: string | null
+          field_state: string | null
+          goals_notes: string | null
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          name: string
+          objectives: string | null
+          organization_id: string
+          start_date: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attachment_path?: string | null
+          campaign_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          document_id?: string | null
+          end_date?: string | null
+          field_city?: string | null
+          field_country?: string | null
+          field_region?: string | null
+          field_state?: string | null
+          goals_notes?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          name: string
+          objectives?: string | null
+          organization_id: string
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attachment_path?: string | null
+          campaign_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          document_id?: string | null
+          end_date?: string | null
+          field_city?: string | null
+          field_country?: string | null
+          field_region?: string | null
+          field_state?: string | null
+          goals_notes?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          name?: string
+          objectives?: string | null
+          organization_id?: string
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "missions_projects_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_projects_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_projects_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      missions_project_assignments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          end_date: string | null
+          id: string
+          member_id: string
+          notes: string | null
+          project_id: string
+          role: string
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          member_id: string
+          notes?: string | null
+          project_id: string
+          role: string
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          member_id?: string
+          notes?: string | null
+          project_id?: string
+          role?: string
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "missions_project_assignments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "missions_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_project_assignments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      missions_supporters: {
+        Row: {
+          contact_preference: string
+          created_at: string
+          created_by: string | null
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          member_id: string
+          notes: string | null
+          organization_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          contact_preference?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          member_id: string
+          notes?: string | null
+          organization_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          contact_preference?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          member_id?: string
+          notes?: string | null
+          organization_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "missions_supporters_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_supporters_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      missions_supporter_commitments: {
+        Row: {
+          campaign_id: string | null
+          committed_amount: number
+          created_at: string
+          created_by: string | null
+          end_date: string | null
+          id: string
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          missionary_id: string | null
+          notes: string | null
+          organization_id: string
+          periodicity: string
+          project_id: string | null
+          start_date: string
+          status: string
+          supporter_id: string
+          updated_at: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          committed_amount: number
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          missionary_id?: string | null
+          notes?: string | null
+          organization_id: string
+          periodicity?: string
+          project_id?: string | null
+          start_date?: string
+          status?: string
+          supporter_id: string
+          updated_at?: string
+        }
+        Update: {
+          campaign_id?: string | null
+          committed_amount?: number
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          missionary_id?: string | null
+          notes?: string | null
+          organization_id?: string
+          periodicity?: string
+          project_id?: string | null
+          start_date?: string
+          status?: string
+          supporter_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "missions_supporter_commitments_supporter_id_fkey"
+            columns: ["supporter_id"]
+            isOneToOne: false
+            referencedRelation: "missions_supporters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_supporter_commitments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_supporter_commitments_missionary_id_fkey"
+            columns: ["missionary_id"]
+            isOneToOne: false
+            referencedRelation: "missions_missionaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_supporter_commitments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "missions_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_supporter_commitments_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      missions_commitment_installments: {
+        Row: {
+          commitment_id: string
+          created_at: string
+          created_by: string | null
+          due_date: string
+          expected_amount: number
+          id: string
+          notes: string | null
+          organization_id: string
+          paid_amount: number
+          reference_month: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          commitment_id: string
+          created_at?: string
+          created_by?: string | null
+          due_date: string
+          expected_amount: number
+          id?: string
+          notes?: string | null
+          organization_id: string
+          paid_amount?: number
+          reference_month: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          commitment_id?: string
+          created_at?: string
+          created_by?: string | null
+          due_date?: string
+          expected_amount?: number
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          paid_amount?: number
+          reference_month?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "missions_commitment_installments_commitment_id_fkey"
+            columns: ["commitment_id"]
+            isOneToOne: false
+            referencedRelation: "missions_supporter_commitments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_commitment_installments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      missions_transaction_links: {
+        Row: {
+          campaign_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          installment_id: string | null
+          legacy_code: string | null
+          legacy_module: string | null
+          legacy_source: string | null
+          link_type: string
+          missionary_id: string | null
+          notes: string | null
+          organization_id: string
+          project_id: string | null
+          transaction_id: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          installment_id?: string | null
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          link_type: string
+          missionary_id?: string | null
+          notes?: string | null
+          organization_id: string
+          project_id?: string | null
+          transaction_id: string
+        }
+        Update: {
+          campaign_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          installment_id?: string | null
+          legacy_code?: string | null
+          legacy_module?: string | null
+          legacy_source?: string | null
+          link_type?: string
+          missionary_id?: string | null
+          notes?: string | null
+          organization_id?: string
+          project_id?: string | null
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "missions_transaction_links_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: true
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_transaction_links_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_transaction_links_installment_id_fkey"
+            columns: ["installment_id"]
+            isOneToOne: false
+            referencedRelation: "missions_commitment_installments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_transaction_links_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "missions_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_transaction_links_missionary_id_fkey"
+            columns: ["missionary_id"]
+            isOneToOne: false
+            referencedRelation: "missions_missionaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "missions_transaction_links_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_announcements: {
         Row: {
           button_label: string | null
@@ -5634,6 +6329,286 @@ export type Database = {
           transaction_id: string
           transaction_status: string
           transaction_type: string
+        }[]
+      }
+      upsert_missions_settings: {
+        Args: {
+          p_default_account_category_id?: string
+          p_default_cost_center_id?: string
+          p_default_finance_account_id?: string
+          p_default_periodicity?: string
+          p_installment_due_day?: number
+          p_late_alert_days?: number
+          p_notes?: string
+          p_organization_id: string
+        }
+        Returns: string
+      }
+      create_missions_missionary: {
+        Args: {
+          p_coordinator_member_id?: string
+          p_field_city?: string
+          p_field_country?: string
+          p_field_description?: string
+          p_field_region?: string
+          p_field_state?: string
+          p_member_id: string
+          p_organization_id: string
+          p_public_notes?: string
+        }
+        Returns: string
+      }
+      update_missions_missionary_profile: {
+        Args: {
+          p_coordinator_member_id?: string
+          p_field_city?: string
+          p_field_country?: string
+          p_field_description?: string
+          p_field_region?: string
+          p_field_state?: string
+          p_missionary_id: string
+          p_public_notes?: string
+        }
+        Returns: undefined
+      }
+      update_missions_missionary_status: {
+        Args: {
+          p_effective_date?: string
+          p_missionary_id: string
+          p_notes?: string
+          p_status: string
+        }
+        Returns: undefined
+      }
+      upsert_missions_missionary_confidential_info: {
+        Args: {
+          p_attachment_path?: string
+          p_confidential_notes?: string
+          p_document_id?: string
+          p_emergency_contact_name?: string
+          p_emergency_contact_phone?: string
+          p_health_notes?: string
+          p_missionary_id: string
+          p_personal_document?: string
+        }
+        Returns: string
+      }
+      create_missions_project: {
+        Args: {
+          p_campaign_id?: string
+          p_description?: string
+          p_end_date?: string
+          p_field_city?: string
+          p_field_country?: string
+          p_field_region?: string
+          p_field_state?: string
+          p_goals_notes?: string
+          p_name: string
+          p_objectives?: string
+          p_organization_id: string
+          p_start_date?: string
+        }
+        Returns: string
+      }
+      update_missions_project_profile: {
+        Args: {
+          p_campaign_id?: string
+          p_description?: string
+          p_end_date?: string
+          p_field_city?: string
+          p_field_country?: string
+          p_field_region?: string
+          p_field_state?: string
+          p_goals_notes?: string
+          p_name: string
+          p_objectives?: string
+          p_project_id: string
+          p_start_date?: string
+        }
+        Returns: undefined
+      }
+      update_missions_project_status: {
+        Args: { p_notes?: string; p_project_id: string; p_status: string }
+        Returns: undefined
+      }
+      assign_missions_project_member: {
+        Args: {
+          p_member_id: string
+          p_notes?: string
+          p_project_id: string
+          p_role: string
+          p_start_date?: string
+        }
+        Returns: string
+      }
+      end_missions_project_assignment: {
+        Args: { p_assignment_id: string; p_end_date?: string }
+        Returns: undefined
+      }
+      create_missions_supporter: {
+        Args: {
+          p_contact_preference?: string
+          p_member_id: string
+          p_notes?: string
+          p_organization_id: string
+        }
+        Returns: string
+      }
+      update_missions_supporter_status: {
+        Args: { p_status: string; p_supporter_id: string }
+        Returns: undefined
+      }
+      create_missions_commitment: {
+        Args: {
+          p_campaign_id?: string
+          p_committed_amount: number
+          p_end_date?: string
+          p_missionary_id?: string
+          p_notes?: string
+          p_periodicity: string
+          p_project_id?: string
+          p_start_date?: string
+          p_supporter_id: string
+        }
+        Returns: string
+      }
+      update_missions_commitment_status: {
+        Args: { p_commitment_id: string; p_status: string }
+        Returns: undefined
+      }
+      generate_missions_commitment_installment: {
+        Args: {
+          p_commitment_id: string
+          p_due_date: string
+          p_expected_amount?: number
+          p_reference_month: string
+        }
+        Returns: string
+      }
+      refresh_missions_installment_status: {
+        Args: { p_installment_id: string }
+        Returns: undefined
+      }
+      set_missions_installment_exemption: {
+        Args: { p_installment_id: string; p_notes?: string; p_status: string }
+        Returns: undefined
+      }
+      link_missions_transaction: {
+        Args: {
+          p_campaign_id?: string
+          p_installment_id?: string
+          p_link_type: string
+          p_missionary_id?: string
+          p_notes?: string
+          p_project_id?: string
+          p_transaction_id: string
+        }
+        Returns: string
+      }
+      unlink_missions_transaction: {
+        Args: { p_link_id: string }
+        Returns: undefined
+      }
+      list_missions_linked_transactions: {
+        Args: {
+          p_campaign_id?: string
+          p_installment_id?: string
+          p_missionary_id?: string
+          p_project_id?: string
+        }
+        Returns: {
+          amount: number
+          link_id: string
+          link_type: string
+          transaction_date: string
+          transaction_description: string | null
+          transaction_id: string
+          transaction_status: string
+          transaction_type: string
+        }[]
+      }
+      search_missions_members: {
+        Args: {
+          p_limit?: number
+          p_organization_id: string
+          p_query?: string
+        }
+        Returns: {
+          full_name: string
+          id: string
+          known_name: string | null
+          member_code: string | null
+        }[]
+      }
+      get_missions_member_labels: {
+        Args: {
+          p_member_ids: string[]
+          p_organization_id: string
+        }
+        Returns: {
+          full_name: string
+          id: string
+          known_name: string | null
+          member_code: string | null
+        }[]
+      }
+      get_missions_dashboard_summary: {
+        Args: { p_organization_id: string }
+        Returns: {
+          commitments_ativo: number
+          expected_total_amount: number
+          installments_overdue_amount: number
+          installments_overdue_count: number
+          installments_pending_amount: number
+          installments_pending_count: number
+          missionaries_ativo: number
+          missionaries_candidato: number
+          missionaries_em_licenca: number
+          missionaries_em_preparacao: number
+          missionaries_encerrado: number
+          missionaries_retornado: number
+          projects_ativo: number
+          projects_planejado: number
+          received_total_amount: number
+          supporters_ativo: number
+        }[]
+      }
+      list_missions_missionaries_by_field: {
+        Args: { p_organization_id: string }
+        Returns: {
+          field_country: string | null
+          field_region: string | null
+          field_state: string | null
+          missionary_count: number
+        }[]
+      }
+      list_missions_project_indicators: {
+        Args: { p_organization_id: string; p_project_id?: string }
+        Returns: {
+          active_missionaries: number
+          expected_amount: number
+          project_id: string
+          project_name: string
+          project_status: string
+          received_amount: number
+        }[]
+      }
+      list_missions_commitment_installments: {
+        Args: {
+          p_only_overdue?: boolean
+          p_organization_id: string
+          p_status_filter?: string
+        }
+        Returns: {
+          commitment_id: string
+          context_label: string
+          due_date: string
+          expected_amount: number
+          installment_id: string
+          paid_amount: number
+          reference_month: string
+          status: string
+          supporter_member_name: string
         }[]
       }
     }
