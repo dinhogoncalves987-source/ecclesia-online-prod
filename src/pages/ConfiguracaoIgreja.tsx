@@ -88,22 +88,22 @@ export default function ConfiguracaoIgreja() {
       if (data) {
         setForm({
           name: data.name ?? "",
-          short_name: (data as any).short_name ?? "",
-          acronym: (data as any).acronym ?? "",
+          short_name: data.short_name ?? "",
+          acronym: data.acronym ?? "",
           cnpj: data.cnpj ?? "",
-          street: (data as any).street ?? "",
-          address_number: (data as any).address_number ?? "",
-          address_complement: (data as any).address_complement ?? "",
-          neighborhood: (data as any).neighborhood ?? "",
-          city: (data as any).city ?? "",
-          state: (data as any).state ?? "",
-          zip_code: (data as any).zip_code ?? "",
-          phone: (data as any).phone ?? "",
-          email: (data as any).email ?? "",
-          website_url: (data as any).website_url ?? "",
-          pastor_president_name: (data as any).pastor_president_name ?? "",
+          street: data.street ?? "",
+          address_number: data.address_number ?? "",
+          address_complement: data.address_complement ?? "",
+          neighborhood: data.neighborhood ?? "",
+          city: data.city ?? "",
+          state: data.state ?? "",
+          zip_code: data.zip_code ?? "",
+          phone: data.phone ?? "",
+          email: data.email ?? "",
+          website_url: data.website_url ?? "",
+          pastor_president_name: data.pastor_president_name ?? "",
         });
-        setLogoUrl((data as any).logo_url ?? null);
+        setLogoUrl(data.logo_url ?? null);
       }
       setLoading(false);
     };
@@ -118,37 +118,41 @@ export default function ConfiguracaoIgreja() {
     if (!form.name.trim()) { toast.error(t("Nome da igreja é obrigatório")); return; }
 
     setSaving(true);
-    const { error } = await supabase
-      .from("organizations")
-      .update({
-        name: form.name.trim(),
-        short_name: form.short_name.trim() || null,
-        acronym: form.acronym.trim() || null,
-        cnpj: form.cnpj.trim() || null,
-        street: form.street.trim() || null,
-        address_number: form.address_number.trim() || null,
-        address_complement: form.address_complement.trim() || null,
-        neighborhood: form.neighborhood.trim() || null,
-        city: form.city.trim() || null,
-        state: form.state.trim() || null,
-        zip_code: form.zip_code.trim() || null,
-        phone: form.phone.trim() || null,
-        email: form.email.trim() || null,
-        website_url: form.website_url.trim() || null,
-        pastor_president_name: form.pastor_president_name.trim() || null,
-      } as any)
-      .eq("id", church.id);
+    try {
+      const { error } = await supabase.rpc("save_organization_profile", {
+        p_organization_id: church.id,
+        p_name: form.name.trim(),
+        p_short_name: form.short_name.trim() || null,
+        p_acronym: form.acronym.trim() || null,
+        p_cnpj: form.cnpj.trim() || null,
+        p_street: form.street.trim() || null,
+        p_address_number: form.address_number.trim() || null,
+        p_address_complement: form.address_complement.trim() || null,
+        p_neighborhood: form.neighborhood.trim() || null,
+        p_city: form.city.trim() || null,
+        p_state: form.state.trim() || null,
+        p_zip_code: form.zip_code.trim() || null,
+        p_phone: form.phone.trim() || null,
+        p_email: form.email.trim() || null,
+        p_website_url: form.website_url.trim() || null,
+        p_pastor_president_name: form.pastor_president_name.trim() || null,
+      });
 
-    setSaving(false);
+      if (error) {
+        console.error("[ConfiguracaoIgreja] Erro ao salvar:", error);
+        toast.error(`${t("Erro ao salvar:")} ${error.message}`);
+        return;
+      }
 
-    if (error) {
-      console.error("[ConfiguracaoIgreja] Erro ao salvar:", error);
-      toast.error(`${t("Erro ao salvar:")} ${error.message}`);
-      return;
+      await refetch();
+      toast.success(t("Configurações salvas com sucesso"));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t("Erro inesperado");
+      console.error("[ConfiguracaoIgreja] Erro inesperado ao salvar:", error);
+      toast.error(`${t("Erro ao salvar:")} ${message}`);
+    } finally {
+      setSaving(false);
     }
-
-    toast.success(t("Configurações salvas com sucesso"));
-    refetch();
   };
 
   // ── Upload de logo ────────────────────────────────────────────────────────
@@ -158,48 +162,70 @@ export default function ConfiguracaoIgreja() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const acceptedTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
+    if (!acceptedTypes.has(file.type)) {
+      toast.error(t("Use uma imagem PNG, JPG ou WEBP"));
+      e.target.value = "";
+      return;
+    }
+
     const maxMb = 2;
     if (file.size > maxMb * 1024 * 1024) {
       toast.error(`${t("Logo deve ter no máximo")} ${maxMb}MB`);
+      e.target.value = "";
       return;
     }
 
-    const ext = file.name.split(".").pop()?.toLowerCase() ?? "png";
+    const extByType: Record<string, string> = {
+      "image/png": "png",
+      "image/jpeg": "jpg",
+      "image/webp": "webp",
+    };
+    const ext = extByType[file.type];
     const path = `organization-logos/${church.id}/logo.${ext}`;
 
     setUploadingLogo(true);
-    const { error: uploadError } = await supabase.storage
-      .from("organization-assets")
-      .upload(path, file, { upsert: true, contentType: file.type });
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from("organization-assets")
+        .upload(path, file, { upsert: true, contentType: file.type });
 
-    if (uploadError) {
-      console.error("[ConfiguracaoIgreja] Erro no upload:", uploadError);
-      toast.error(`${t("Erro ao subir logo:")} ${uploadError.message}`);
+      if (uploadError) {
+        console.error("[ConfiguracaoIgreja] Erro no upload:", uploadError);
+        toast.error(`${t("Erro ao subir logo:")} ${uploadError.message}`);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from("organization-assets")
+        .getPublicUrl(path);
+
+      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+      const { error: updateError } = await supabase.rpc(
+        "save_organization_logo",
+        {
+          p_organization_id: church.id,
+          p_logo_url: publicUrl,
+        },
+      );
+
+      if (updateError) {
+        console.error("[ConfiguracaoIgreja] Erro ao persistir logo:", updateError);
+        toast.error(`${t("Erro ao salvar URL do logo:")} ${updateError.message}`);
+        return;
+      }
+
+      setLogoUrl(publicUrl);
+      toast.success(t("Logo atualizado com sucesso"));
+      refetch();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t("Erro inesperado");
+      console.error("[ConfiguracaoIgreja] Erro inesperado no logo:", error);
+      toast.error(`${t("Erro ao subir logo:")} ${message}`);
+    } finally {
       setUploadingLogo(false);
-      return;
+      e.target.value = "";
     }
-
-    const { data: urlData } = supabase.storage
-      .from("organization-assets")
-      .getPublicUrl(path);
-
-    const publicUrl = urlData.publicUrl + `?t=${Date.now()}`;
-
-    const { error: updateError } = await supabase
-      .from("organizations")
-      .update({ logo_url: publicUrl } as any)
-      .eq("id", church.id);
-
-    if (updateError) {
-      toast.error(`${t("Erro ao salvar URL do logo:")} ${updateError.message}`);
-      setUploadingLogo(false);
-      return;
-    }
-
-    setLogoUrl(publicUrl);
-    setUploadingLogo(false);
-    toast.success(t("Logo atualizado com sucesso"));
-    refetch();
   };
 
   // ── Preview de identidade ─────────────────────────────────────────────────

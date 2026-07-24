@@ -33,74 +33,121 @@ export default function Perfil() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    setUploading(true);
-    const ext = file.name.split(".").pop();
-    const path = `${user.id}/avatar.${ext}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("avatars")
-      .upload(path, file, { upsert: true });
-
-    if (uploadError) {
-      toast({ title: t("Erro ao enviar foto"), description: uploadError.message, variant: "destructive" });
-      setUploading(false);
-      return;
-    }
-
-    const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
-    const url = urlData.publicUrl + "?t=" + Date.now();
-
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update({ avatar_url: url })
-      .eq("user_id", user.id)
-      .select("user_id")
-      .single();
-
-    setUploading(false);
-
-    if (updateError) {
-      // Nunca mostrar sucesso sem persistência real confirmada.
+    const acceptedTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
+    if (!acceptedTypes.has(file.type)) {
       toast({
-        title: t("Erro ao salvar foto"),
-        description: updateError.message,
+        title: t("Formato não suportado"),
+        description: t("Use uma imagem PNG, JPG ou WEBP"),
         variant: "destructive",
       });
+      e.target.value = "";
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: t("Imagem muito grande"),
+        description: t("A foto deve ter no máximo 5MB"),
+        variant: "destructive",
+      });
+      e.target.value = "";
       return;
     }
 
-    setAvatarUrl(url);
-    await invalidateOwnProfile(user.id);
-    toast({ title: t("Foto atualizada!") });
+    setUploading(true);
+    const extByType: Record<string, string> = {
+      "image/png": "png",
+      "image/jpeg": "jpg",
+      "image/webp": "webp",
+    };
+    const ext = extByType[file.type];
+    const path = `${user.id}/avatar.${ext}`;
+
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true, contentType: file.type });
+
+      if (uploadError) {
+        toast({ title: t("Erro ao enviar foto"), description: uploadError.message, variant: "destructive" });
+        return;
+      }
+
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+      const url = `${urlData.publicUrl}?t=${Date.now()}`;
+      const { error: updateError } = await supabase.rpc(
+        "save_own_profile_avatar",
+        { p_avatar_url: url },
+      );
+
+      if (updateError) {
+        // Nunca mostrar sucesso sem persistência real confirmada.
+        toast({
+          title: t("Erro ao salvar foto"),
+          description: updateError.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setAvatarUrl(url);
+      await invalidateOwnProfile(user.id);
+      toast({ title: t("Foto atualizada!") });
+    } catch (error) {
+      toast({
+        title: t("Erro ao enviar foto"),
+        description: error instanceof Error ? error.message : t("Erro inesperado"),
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
   };
 
   const handleSave = async () => {
     if (!user) return;
-    setSaving(true);
-
-    const { error } = await supabase
-      .from("profiles")
-      .update({ full_name: fullName.trim(), phone: phone.trim(), role_title: roleTitle.trim() })
-      .eq("user_id", user.id)
-      .select("user_id")
-      .single();
-
-    if (error) {
+    if (!fullName.trim()) {
       toast({
-        title: t("Erro ao salvar"),
-        description: error.message || t("Não foi possível salvar. Tente novamente."),
+        title: t("Nome completo é obrigatório"),
         variant: "destructive",
       });
-      setSaving(false);
       return;
     }
+    setSaving(true);
 
-    // Só mostra sucesso DEPOIS de confirmar a persistência real no banco —
-    // e recarrega a fonte única (React Query), que também atualiza o
-    // cabeçalho/avatar/menu do AdminLayout imediatamente, sem novo login.
-    await invalidateOwnProfile(user.id);
-    setSaving(false);
-    toast({ title: t("Perfil atualizado com sucesso!") });
+    try {
+      const { error } = await supabase.rpc("save_own_profile", {
+        p_full_name: fullName.trim(),
+        p_phone: phone.trim() || null,
+        p_role_title: roleTitle.trim() || null,
+      });
+
+      if (error) {
+        toast({
+          title: t("Erro ao salvar"),
+          description: error.message || t("Não foi possível salvar. Tente novamente."),
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Só mostra sucesso DEPOIS de confirmar a persistência real no banco —
+      // e recarrega a fonte única (React Query), que também atualiza o
+      // cabeçalho/avatar/menu do AdminLayout imediatamente, sem novo login.
+      await invalidateOwnProfile(user.id);
+      toast({ title: t("Perfil atualizado com sucesso!") });
+    } catch (error) {
+      toast({
+        title: t("Erro ao salvar"),
+        description:
+          error instanceof Error
+            ? error.message
+            : t("Não foi possível salvar. Tente novamente."),
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const initials = fullName
