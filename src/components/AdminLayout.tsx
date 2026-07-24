@@ -5,7 +5,8 @@ import {
   Heart, MessageSquare, UsersRound, Archive, BarChart3, Menu, X,
   Bell, ChevronLeft, ChevronDown, Settings, LogOut, Maximize, Minimize, Globe,
   Shield, User, Building2, Music2, Gavel, Briefcase, ShoppingBag, MessageCircle, Megaphone, ScrollText,
-  MessagesSquare, ClipboardList, CreditCard, LayoutGrid, ScanLine, GraduationCap, Landmark, Send
+  MessagesSquare, ClipboardList, CreditCard, LayoutGrid, ScanLine, GraduationCap, Landmark, Send,
+  ArrowRightLeft, Award
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { motion, AnimatePresence } from "framer-motion";
@@ -41,7 +42,8 @@ const SECRETARIA_PATHS = [
   "/admin/membros", "/admin/carteira-ecclesia", "/admin/agenda", "/admin/comunicacao",
   "/admin/grupos", "/admin/escalas", "/admin/documentos",
   "/admin/cartas-recomendacao", "/admin/assembleia-geral", "/admin/oracoes",
-  "/admin/chat-secretaria", "/admin/solicitacoes",
+  "/admin/chat-secretaria", "/admin/solicitacoes", "/admin/cartas-transferencia",
+  "/admin/certificados",
 ];
 // Global chat route — lives outside Secretaria, never auto-expands it
 const GLOBAL_CHAT_PATH = "/admin/chat";
@@ -76,6 +78,8 @@ const navSections: NavSection[] = [
       { icon: Users, label: "Membros", path: "/admin/membros" },
       { icon: CreditCard, label: "Carteira de Membro", path: "/admin/carteira-ecclesia" },
       { icon: ScrollText, label: "Cartas de Recomendação", path: "/admin/cartas-recomendacao" },
+      { icon: ArrowRightLeft, label: "Cartas de Transferência", path: "/admin/cartas-transferencia" },
+      { icon: Award, label: "Certificados", path: "/admin/certificados" },
       { icon: ClipboardList, label: "Solicitações", path: "/admin/solicitacoes" },
       { icon: Archive, label: "Documentos", path: "/admin/documentos" },
       { icon: MessageSquare, label: "Comunicação", path: "/admin/comunicacao" },

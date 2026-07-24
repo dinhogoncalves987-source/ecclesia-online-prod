@@ -2635,6 +2635,139 @@ export type Database = {
           },
         ]
       }
+      institutional_certificates: {
+        Row: {
+          body_text: string | null
+          certificate_number: string | null
+          certificate_type: string
+          course_name: string | null
+          created_at: string
+          created_by: string | null
+          document_id: string | null
+          event_date: string
+          family_member_id: string | null
+          id: string
+          issued_at: string | null
+          issued_by: string | null
+          location: string | null
+          member_id: string
+          organization_id: string
+          period_end: string | null
+          period_start: string | null
+          public_token: string | null
+          recipient_name: string
+          related_member_id: string | null
+          revocation_reason: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+          secondary_recipient_name: string | null
+          second_signer_name: string | null
+          second_signer_role: string | null
+          signer_name: string | null
+          signer_role: string | null
+          source_enrollment_id: string | null
+          source_module: string
+          status: string
+          title: string
+          updated_at: string
+          workload_hours: number | null
+        }
+        Insert: {
+          body_text?: string | null
+          certificate_number?: string | null
+          certificate_type: string
+          course_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_id?: string | null
+          event_date: string
+          family_member_id?: string | null
+          id?: string
+          issued_at?: string | null
+          issued_by?: string | null
+          location?: string | null
+          member_id: string
+          organization_id: string
+          period_end?: string | null
+          period_start?: string | null
+          public_token?: string | null
+          recipient_name: string
+          related_member_id?: string | null
+          revocation_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          secondary_recipient_name?: string | null
+          second_signer_name?: string | null
+          second_signer_role?: string | null
+          signer_name?: string | null
+          signer_role?: string | null
+          source_enrollment_id?: string | null
+          source_module?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          workload_hours?: number | null
+        }
+        Update: {
+          body_text?: string | null
+          certificate_number?: string | null
+          certificate_type?: string
+          course_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_id?: string | null
+          event_date?: string
+          family_member_id?: string | null
+          id?: string
+          issued_at?: string | null
+          issued_by?: string | null
+          location?: string | null
+          member_id?: string
+          organization_id?: string
+          period_end?: string | null
+          period_start?: string | null
+          public_token?: string | null
+          recipient_name?: string
+          related_member_id?: string | null
+          revocation_reason?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          secondary_recipient_name?: string | null
+          second_signer_name?: string | null
+          second_signer_role?: string | null
+          signer_name?: string | null
+          signer_role?: string | null
+          source_enrollment_id?: string | null
+          source_module?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          workload_hours?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "institutional_certificates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "institutional_certificates_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "institutional_certificates_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       member_transfers: {
         Row: {
           approved_at: string | null
@@ -2642,8 +2775,12 @@ export type Database = {
           attachment_path: string | null
           completed_at: string | null
           created_at: string
+          cancellation_reason: string | null
           destination_church_name: string | null
+          destination_city: string | null
+          destination_country: string | null
           destination_organization_id: string | null
+          destination_state: string | null
           destination_type: string
           direction: string
           document_id: string | null
@@ -2654,13 +2791,21 @@ export type Database = {
           member_id: string
           organization_id: string
           origin_church_name: string | null
+          origin_city: string | null
+          origin_country: string | null
           origin_organization_id: string | null
+          origin_state: string | null
           origin_type: string
           reason: string | null
           recommendation_letter_id: string | null
           requested_at: string | null
           requested_by: string | null
+          public_token: string | null
+          issued_at: string | null
+          signer_name: string | null
+          signer_role: string | null
           status: string
+          transfer_number: string | null
           updated_at: string
         }
         Insert: {
@@ -2669,8 +2814,12 @@ export type Database = {
           attachment_path?: string | null
           completed_at?: string | null
           created_at?: string
+          cancellation_reason?: string | null
           destination_church_name?: string | null
+          destination_city?: string | null
+          destination_country?: string | null
           destination_organization_id?: string | null
+          destination_state?: string | null
           destination_type?: string
           direction: string
           document_id?: string | null
@@ -2681,13 +2830,21 @@ export type Database = {
           member_id: string
           organization_id: string
           origin_church_name?: string | null
+          origin_city?: string | null
+          origin_country?: string | null
           origin_organization_id?: string | null
+          origin_state?: string | null
           origin_type?: string
           reason?: string | null
           recommendation_letter_id?: string | null
           requested_at?: string | null
           requested_by?: string | null
+          public_token?: string | null
+          issued_at?: string | null
+          signer_name?: string | null
+          signer_role?: string | null
           status?: string
+          transfer_number?: string | null
           updated_at?: string
         }
         Update: {
@@ -2696,8 +2853,12 @@ export type Database = {
           attachment_path?: string | null
           completed_at?: string | null
           created_at?: string
+          cancellation_reason?: string | null
           destination_church_name?: string | null
+          destination_city?: string | null
+          destination_country?: string | null
           destination_organization_id?: string | null
+          destination_state?: string | null
           destination_type?: string
           direction?: string
           document_id?: string | null
@@ -2708,13 +2869,21 @@ export type Database = {
           member_id?: string
           organization_id?: string
           origin_church_name?: string | null
+          origin_city?: string | null
+          origin_country?: string | null
           origin_organization_id?: string | null
+          origin_state?: string | null
           origin_type?: string
           reason?: string | null
           recommendation_letter_id?: string | null
           requested_at?: string | null
           requested_by?: string | null
+          public_token?: string | null
+          issued_at?: string | null
+          signer_name?: string | null
+          signer_role?: string | null
           status?: string
+          transfer_number?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -5946,6 +6115,105 @@ export type Database = {
           p_requested_at?: string
         }
         Returns: string
+      }
+      create_member_transfer_letter: {
+        Args: {
+          p_destination_church_name?: string
+          p_destination_city?: string
+          p_destination_country?: string
+          p_destination_organization_id?: string
+          p_destination_state?: string
+          p_destination_type: string
+          p_member_id: string
+          p_reason?: string
+          p_requested_at?: string
+        }
+        Returns: string
+      }
+      cancel_member_transfer_letter: {
+        Args: { p_reason: string; p_transfer_id: string }
+        Returns: undefined
+      }
+      issue_member_transfer_letter: {
+        Args: {
+          p_signer_name?: string
+          p_signer_role?: string
+          p_transfer_id: string
+        }
+        Returns: string
+      }
+      list_member_transfer_letters: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
+      get_public_member_transfer_letter: {
+        Args: { p_token: string }
+        Returns: Json
+      }
+      search_secretaria_members: {
+        Args: {
+          p_limit?: number
+          p_organization_id: string
+          p_query?: string
+        }
+        Returns: {
+          baptized_at: string | null
+          baptism_place: string | null
+          full_name: string
+          id: string
+          known_name: string | null
+          member_code: string | null
+          spouse_name: string | null
+        }[]
+      }
+      create_institutional_certificate: {
+        Args: {
+          p_body_text?: string
+          p_certificate_type: string
+          p_event_date?: string
+          p_family_member_id?: string
+          p_location?: string
+          p_member_id: string
+          p_organization_id: string
+          p_period_end?: string
+          p_period_start?: string
+          p_recipient_name?: string
+          p_related_member_id?: string
+          p_secondary_recipient_name?: string
+          p_second_signer_name?: string
+          p_second_signer_role?: string
+          p_signer_name?: string
+          p_signer_role?: string
+          p_source_enrollment_id?: string
+          p_source_module?: string
+          p_course_name?: string
+          p_workload_hours?: number
+        }
+        Returns: string
+      }
+      issue_institutional_certificate: {
+        Args: { p_certificate_id: string }
+        Returns: string
+      }
+      revoke_institutional_certificate: {
+        Args: { p_certificate_id: string; p_reason: string }
+        Returns: undefined
+      }
+      list_institutional_certificates: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
+      get_public_institutional_certificate: {
+        Args: { p_token: string }
+        Returns: Json
+      }
+      list_member_family_for_certificates: {
+        Args: { p_member_id: string }
+        Returns: Json
+      }
+      list_academic_certificate_candidates: {
+        Args: { p_organization_id: string }
+        Returns: Json
       }
       get_my_access_capabilities: {
         Args: Record<PropertyKey, never>

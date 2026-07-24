@@ -166,6 +166,14 @@ const Teologia = IS_STAGING_BUILD ? lazy(() => import("./pages/Teologia")) : nul
 // Mesma técnica de tree-shaking condicional do Discipulado/Teologia.
 const Missoes = IS_STAGING_BUILD ? lazy(() => import("./pages/Missoes")) : null;
 
+// OPERAÇÃO 5 (Documentos Oficiais) — staging-only durante homologação das
+// migrations 20260801*. Inclui Carta de Transferência, Central de
+// Certificados e as duas páginas públicas dos QR permanentes.
+const CartasTransferencia = IS_STAGING_BUILD ? lazy(() => import("./pages/CartasTransferencia")) : null;
+const Certificados = IS_STAGING_BUILD ? lazy(() => import("./pages/Certificados")) : null;
+const ValidarTransferencia = IS_STAGING_BUILD ? lazy(() => import("./pages/ValidarTransferencia")) : null;
+const ValidarCertificado = IS_STAGING_BUILD ? lazy(() => import("./pages/ValidarCertificado")) : null;
+
 // CORREÇÃO 2026-07-20: "devotional" foi promovido de volta para "both" em
 // src/config/modules.ts — a página pública de compartilhamento do
 // versículo do dia precisa acompanhar, senão um link enviado por um membro
@@ -221,6 +229,8 @@ const App = () => (
 
               <Route path="/share" element={<SharePublic />} />
               <Route path="/validar/carta/:token" element={<ValidarCarta />} />
+              <Route path="/validar/transferencia/:token" element={ValidarTransferencia ? <ValidarTransferencia /> : <NotFound />} />
+              <Route path="/validar/certificado/:token" element={ValidarCertificado ? <ValidarCertificado /> : <NotFound />} />
               <Route path="/validar-membro/:id" element={<ValidarMembro />} />
               <Route path="/convite-membro/:token" element={<ConviteMembro />} />
               <Route path="/convite-acesso/:token" element={<ConviteAcesso />} />
@@ -260,6 +270,10 @@ const App = () => (
               <Route path="/admin/documentos" element={<ProtectedRoute><Documentos /></ProtectedRoute>} />
 
               <Route path="/admin/cartas-recomendacao" element={<ProtectedRoute><ModuleGate moduleId="recommendation-letters"><CartasRecomendacao /></ModuleGate></ProtectedRoute>} />
+
+              <Route path="/admin/cartas-transferencia" element={<ProtectedRoute><ModuleGate moduleId="official-documents">{CartasTransferencia && <CartasTransferencia />}</ModuleGate></ProtectedRoute>} />
+
+              <Route path="/admin/certificados" element={<ProtectedRoute><ModuleGate moduleId="official-documents">{Certificados && <Certificados />}</ModuleGate></ProtectedRoute>} />
 
               <Route path="/admin/relatorios" element={<ProtectedRoute><ModuleGate moduleId="reports"><Relatorios /></ModuleGate></ProtectedRoute>} />
 
@@ -323,4 +337,3 @@ const App = () => (
 
 
 export default App;
-

@@ -39,6 +39,14 @@ describe("AdminLayout — navegação e altura responsiva", () => {
     expect(paths).not.toContain("/admin/missoes");
   });
 
+  it.each([
+    "/admin/cartas-transferencia",
+    "/admin/certificados",
+  ])("%s fica dentro da Secretaria", (route) => {
+    expect(secretaria).toContain(route);
+    expect(financeiro).not.toContain(route);
+  });
+
   it("mantém a ordem Financeiro, Missões, Teologia, Discipulado, Relatórios e Portaria", () => {
     expect(financeiro.indexOf("/admin/financeiro")).toBeLessThan(
       financeiro.indexOf("/admin/missoes"),

@@ -378,3 +378,22 @@ Com a Operação 4, a arquitetura planejada nas quatro operações está estrutu
 quatro domínios funcionais do Ecclesia (administrativo/pastoral, formação simples, formação acadêmica
 e missões) compartilham a mesma pessoa, a mesma árvore organizacional, a mesma timeline, o mesmo
 repositório de documentos e o mesmo motor financeiro — sem nenhuma duplicação de domínio central.
+
+## 14. Operação 5 — Documentos Oficiais
+
+Cartas de Transferência e Certificados são uma camada documental da Secretaria,
+não um quinto cadastro de pessoas:
+
+- Carta de Transferência amplia `member_transfers`, usa `documents` e mantém o
+  evento já integrado a `member_history`;
+- certificados manuais usam `members`/`member_family`; certificados acadêmicos
+  só podem nascer de matrículas concluídas em Discipulado ou Teologia;
+- o logo e a marca d’água são sempre derivados de `organizations.logo_url`;
+- números oficiais são sequenciais por organização/tipo/ano e gerados
+  atomicamente no banco;
+- QR de documento usa token permanente próprio, diferente do token efêmero de
+  autenticação da Carteira de Membro;
+- validações públicas expõem somente os campos documentais seguros e mostram
+  cancelamento/revogação sem apagar o histórico.
+
+Detalhes em `docs/architecture/operacao-5-documentos-oficiais.md`.

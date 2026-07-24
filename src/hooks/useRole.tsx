@@ -46,6 +46,8 @@ const MODULE_ACCESS: Record<string, AppRole[]> = {
   "/admin/grupos": ["super_admin", "church_admin", "pastor", "secretary", "leader"],
   "/admin/documentos": ["super_admin", "church_admin", "pastor", "secretary", "leader"],
   "/admin/cartas-recomendacao": ["super_admin", "church_admin", "pastor", "secretary", "member"],
+  "/admin/cartas-transferencia": ["super_admin", "church_admin", "pastor", "secretary"],
+  "/admin/certificados": ["super_admin", "church_admin", "pastor", "secretary"],
   "/admin/relatorios": ["super_admin", "church_admin", "tesoureiro", "contador"],
   "/admin/assembleia-geral": ["super_admin", "church_admin", "pastor", "secretary", "leader", "member"],
   "/admin/escalas": ["super_admin", "church_admin", "pastor", "secretary", "leader", "member"],

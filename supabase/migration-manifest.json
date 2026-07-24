@@ -111,7 +111,9 @@
     "20260731110000_missions_projects.sql",
     "20260731120000_missions_supporters_commitments.sql",
     "20260731130000_missions_transaction_links.sql",
-    "20260731140000_missions_history_and_reports.sql"
+    "20260731140000_missions_history_and_reports.sql",
+    "20260801090000_official_transfer_letters.sql",
+    "20260801100000_institutional_certificates.sql"
   ],
   "staging_only": [
     "20260519200000_demo_seed.sql",

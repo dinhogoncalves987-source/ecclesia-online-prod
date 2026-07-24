@@ -138,6 +138,11 @@ const FORBIDDEN_TERMS_SOURCE = [
   // src/config/modules.ts e docs/architecture/operacao-4-missoes.md).
   // Mesmo padrão de tree-shaking condicional do Discipulado/Teologia.
   "pages/Missoes",
+  // OPERAÇÃO 5 (Documentos Oficiais) — staging-only durante homologação.
+  "pages/CartasTransferencia",
+  "pages/Certificados",
+  "pages/ValidarTransferencia",
+  "pages/ValidarCertificado",
 ];
 const FORBIDDEN_TERMS = FORBIDDEN_TERMS_SOURCE.map((term) => term.toLowerCase());
 

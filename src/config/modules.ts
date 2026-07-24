@@ -78,6 +78,7 @@ export type ModuleId =
   // nenhum ambiente (ver docs/architecture/operacao-4-missoes.md) —
   // staging-only por definição, mesmo padrão do Discipulado/Teologia.
   | "missions"
+  | "official-documents"
   // Stage-only, preservados na branch histórica staging-tv-canal
   | "tv-digital"
   | "canal-ecclesia";
@@ -284,6 +285,11 @@ const STAGING_ONLY_MODULES: readonly ModuleDefinition[] = IS_STAGING_BUILD ? [
   // docs/architecture/operacao-4-missoes.md, seção "Disponibilidade".
   { id: "missions", availability: "staging", label: "Missões" },
 
+  // OPERAÇÃO 5 — Cartas de Transferência e Certificados Oficiais. Backend
+  // real, QR permanente e documentos vinculados ao cadastro canônico, em
+  // homologação exclusiva no staging antes de qualquer promoção.
+  { id: "official-documents", availability: "staging", label: "Documentos Oficiais" },
+
   // Stage-only — preservados em staging-tv-canal, restauração controlada
   // documentada em docs/AMBIENTES_PRODUCAO_STAGING.md. Nenhuma rota/arquivo
   // foi copiado para esta integração; os identificadores existem aqui só
@@ -347,6 +353,8 @@ const ROUTE_MODULE_MAP: Readonly<Record<string, ModuleId>> = {
   "/admin/discipulado": "discipleship",
   "/admin/teologia": "theology",
   "/admin/missoes": "missions",
+  "/admin/cartas-transferencia": "official-documents",
+  "/admin/certificados": "official-documents",
 };
 
 /**

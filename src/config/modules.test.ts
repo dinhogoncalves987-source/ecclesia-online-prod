@@ -130,6 +130,11 @@ describe("isModuleEnabled", () => {
     expect(isModuleEnabled("missions", "staging")).toBe(true);
   });
 
+  it("keeps official documents staging-only until homologation", () => {
+    expect(isModuleEnabled("official-documents", "production")).toBe(false);
+    expect(isModuleEnabled("official-documents", "staging")).toBe(true);
+  });
+
   // CORREÇÃO 2026-07-17: Bíblia/IA, Culto & Louvor, Campanhas, Cartas de
   // Recomendação e Relatórios não dependem de dado fictício exibido ao
   // usuário (todos têm backend real no Supabase) — nunca deveriam ter sido
@@ -179,6 +184,14 @@ describe("isRouteEnabled", () => {
   it("disables /admin/missoes in production and enables in staging", () => {
     expect(isRouteEnabled("/admin/missoes", "production")).toBe(false);
     expect(isRouteEnabled("/admin/missoes", "staging")).toBe(true);
+  });
+
+  it.each([
+    "/admin/cartas-transferencia",
+    "/admin/certificados",
+  ])("keeps %s staging-only during homologation", (route) => {
+    expect(isRouteEnabled(route, "production")).toBe(false);
+    expect(isRouteEnabled(route, "staging")).toBe(true);
   });
 
   // CORREÇÃO 2026-07-17: /admin/biblia, /admin/culto*, /admin/campanhas,
