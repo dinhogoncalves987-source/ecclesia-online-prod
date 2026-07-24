@@ -6072,6 +6072,51 @@ export type Database = {
         Args: { _target_organization_id: string; _user_id: string }
         Returns: boolean
       }
+      can_edit_organization_profile: {
+        Args: { _organization_id: string; _user_id: string }
+        Returns: boolean
+      }
+      organization_asset_organization_id: {
+        Args: { _object_name: string }
+        Returns: string
+      }
+      save_organization_logo: {
+        Args: { p_logo_url: string; p_organization_id: string }
+        Returns: Json
+      }
+      save_organization_profile: {
+        Args: {
+          p_acronym?: string | null
+          p_address_complement?: string | null
+          p_address_number?: string | null
+          p_city?: string | null
+          p_cnpj?: string | null
+          p_email?: string | null
+          p_name: string
+          p_neighborhood?: string | null
+          p_organization_id: string
+          p_pastor_president_name?: string | null
+          p_phone?: string | null
+          p_short_name?: string | null
+          p_state?: string | null
+          p_street?: string | null
+          p_website_url?: string | null
+          p_zip_code?: string | null
+        }
+        Returns: Json
+      }
+      save_own_profile: {
+        Args: {
+          p_full_name: string
+          p_phone?: string | null
+          p_role_title?: string | null
+        }
+        Returns: Json
+      }
+      save_own_profile_avatar: {
+        Args: { p_avatar_url: string }
+        Returns: Json
+      }
       create_member_occurrence: {
         Args: {
           p_attachment_path?: string
