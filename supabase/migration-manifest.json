@@ -77,7 +77,9 @@
     "20260722090000_finance_assets.sql",
     "20260723090000_finance_accountability.sql",
     "20260724090000_organizations_hierarchy_read.sql",
-    "20260725090000_internal_chat_realtime_hardening.sql"
+    "20260725090000_internal_chat_realtime_hardening.sql",
+    "20260726090000_assembleia_de_deus_finance_template.sql",
+    "20260726100000_finance_import_transactions_bulk_rpc.sql"
   ],
   "staging_feature": [
     "20260526100000_staging_worship_tables.sql",
