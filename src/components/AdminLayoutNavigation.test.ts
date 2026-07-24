@@ -14,27 +14,43 @@ function section(id: string, nextId: string): string {
 
 describe("AdminLayout — navegação e altura responsiva", () => {
   const espiritual = section("espiritual", "secretaria");
-  const secretaria = section("secretaria", "portaria");
+  const secretaria = section("secretaria", "financeiro");
+  const financeiro = section("financeiro", "portaria");
+  const portaria = section("portaria", "relatorios");
+  const relatorios = section("relatorios", "admin");
 
   it.each([
     "/admin/discipulado",
     "/admin/teologia",
     "/admin/missoes",
-  ])("%s fica dentro da Secretaria e não na seção espiritual", (route) => {
-    expect(secretaria).toContain(route);
+  ])("%s fica abaixo do Financeiro e fora da Secretaria", (route) => {
+    expect(financeiro).toContain(route);
+    expect(secretaria).not.toContain(route);
     expect(espiritual).not.toContain(route);
   });
 
-  it.each([
-    "/admin/discipulado",
-    "/admin/teologia",
-    "/admin/missoes",
-  ])("%s expande automaticamente a Secretaria", (route) => {
+  it("não expande a Secretaria ao abrir os módulos operacionais", () => {
     const paths = source.slice(
       source.indexOf("const SECRETARIA_PATHS"),
       source.indexOf("const GLOBAL_CHAT_PATH"),
     );
-    expect(paths).toContain(route);
+    expect(paths).not.toContain("/admin/discipulado");
+    expect(paths).not.toContain("/admin/teologia");
+    expect(paths).not.toContain("/admin/missoes");
+  });
+
+  it("mantém a ordem Financeiro, Discipulado, Teologia, Missões, Portaria e Relatórios", () => {
+    expect(financeiro.indexOf("/admin/financeiro")).toBeLessThan(
+      financeiro.indexOf("/admin/discipulado"),
+    );
+    expect(financeiro.indexOf("/admin/discipulado")).toBeLessThan(
+      financeiro.indexOf("/admin/teologia"),
+    );
+    expect(financeiro.indexOf("/admin/teologia")).toBeLessThan(
+      financeiro.indexOf("/admin/missoes"),
+    );
+    expect(portaria).toContain("/admin/porteiro");
+    expect(relatorios).toContain("/admin/relatorios");
   });
 
   it("mantém a lista rolável entre cabeçalho e rodapé fixos", () => {

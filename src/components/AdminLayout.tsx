@@ -41,8 +41,7 @@ const SECRETARIA_PATHS = [
   "/admin/membros", "/admin/carteira-ecclesia", "/admin/agenda", "/admin/comunicacao",
   "/admin/grupos", "/admin/escalas", "/admin/documentos",
   "/admin/cartas-recomendacao", "/admin/assembleia-geral", "/admin/oracoes",
-  "/admin/chat-secretaria", "/admin/solicitacoes", "/admin/discipulado",
-  "/admin/teologia", "/admin/missoes",
+  "/admin/chat-secretaria", "/admin/solicitacoes",
 ];
 // Global chat route — lives outside Secretaria, never auto-expands it
 const GLOBAL_CHAT_PATH = "/admin/chat";
@@ -77,11 +76,6 @@ const navSections: NavSection[] = [
       { icon: Users, label: "Membros", path: "/admin/membros" },
       { icon: CreditCard, label: "Carteira de Membro", path: "/admin/carteira-ecclesia" },
       { icon: ScrollText, label: "Cartas de Recomendação", path: "/admin/cartas-recomendacao" },
-      // Formação e atuação institucional pertencem à Secretaria. As rotas
-      // continuam staging-only e são filtradas por isRouteEnabled().
-      { icon: GraduationCap, label: "Discipulado", path: "/admin/discipulado" },
-      { icon: Landmark, label: "Teologia", path: "/admin/teologia" },
-      { icon: Send, label: "Missões", path: "/admin/missoes" },
       { icon: ClipboardList, label: "Solicitações", path: "/admin/solicitacoes" },
       { icon: Archive, label: "Documentos", path: "/admin/documentos" },
       { icon: MessageSquare, label: "Comunicação", path: "/admin/comunicacao" },
@@ -90,6 +84,18 @@ const navSections: NavSection[] = [
       { icon: FileText, label: "Escalas", path: "/admin/escalas" },
       { icon: UsersRound, label: "Pequenos Grupos", path: "/admin/grupos" },
       { icon: Gavel, label: "Assembleia Geral", path: "/admin/assembleia-geral" },
+    ],
+  },
+  {
+    id: "financeiro",
+    separator: true,
+    items: [
+      { icon: Wallet, label: "Financeiro", path: "/admin/financeiro" },
+      // Formação e atuação institucional são operações próprias. Permanecem
+      // staging-only e são filtradas normalmente por isRouteEnabled().
+      { icon: GraduationCap, label: "Discipulado", path: "/admin/discipulado" },
+      { icon: Landmark, label: "Teologia", path: "/admin/teologia" },
+      { icon: Send, label: "Missões", path: "/admin/missoes" },
     ],
   },
   {
@@ -102,10 +108,9 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    id: "financeiro",
+    id: "relatorios",
     separator: true,
     items: [
-      { icon: Wallet, label: "Financeiro", path: "/admin/financeiro" },
       { icon: BarChart3, label: "Relatórios", path: "/admin/relatorios" },
     ],
   },
