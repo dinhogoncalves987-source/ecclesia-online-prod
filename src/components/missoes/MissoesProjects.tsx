@@ -7,13 +7,13 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Loader2, Compass, UserPlus, X } from "lucide-react";
+import { Plus, Loader2, Compass, UserPlus, X, Pencil } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useRole } from "@/hooks/useRole";
 import {
-  loadMissionsProjects, createMissionsProject, updateMissionsProjectStatus,
+  loadMissionsProjects, createMissionsProject, updateMissionsProjectProfile, updateMissionsProjectStatus,
   loadMissionsProjectAssignments, assignMissionsProjectMember, endMissionsProjectAssignment,
   getMissionsMemberLabels,
   type MissionsProjectRow, type MissionsProjectAssignmentRow, type MissionsMemberLabel,
@@ -61,6 +61,11 @@ export function MissoesProjects({ organizationId }: { organizationId: string }) 
   }, [organizationId]);
 
   useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => {
+    setSelected((current) => (
+      current ? projects.find((project) => project.id === current.id) ?? null : null
+    ));
+  }, [projects]);
 
   if (loading) {
     return <div className="flex items-center justify-center py-16 text-muted-foreground gap-2"><Loader2 className="animate-spin" size={18} /> Carregando projetos…</div>;
@@ -138,17 +143,23 @@ function CreateProjectDialog({ open, onOpenChange, organizationId, onCreated }: 
   const [fieldCountry, setFieldCountry] = useState("");
   const [fieldState, setFieldState] = useState("");
   const [fieldCity, setFieldCity] = useState("");
+  const [fieldRegion, setFieldRegion] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [goalsNotes, setGoalsNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
   const reset = () => {
     setName(""); setDescription(""); setObjectives(""); setFieldCountry(""); setFieldState("");
-    setFieldCity(""); setStartDate(""); setEndDate("");
+    setFieldCity(""); setFieldRegion(""); setStartDate(""); setEndDate(""); setGoalsNotes("");
   };
 
   const handleSave = async () => {
     if (!name.trim()) { toast.error("Informe o nome do projeto."); return; }
+    if (startDate && endDate && endDate < startDate) {
+      toast.error("A data de término não pode ser anterior à data de início.");
+      return;
+    }
     setSaving(true);
     const { error } = await createMissionsProject({
       organization_id: organizationId,
@@ -158,8 +169,10 @@ function CreateProjectDialog({ open, onOpenChange, organizationId, onCreated }: 
       field_country: fieldCountry.trim() || null,
       field_state: fieldState.trim() || null,
       field_city: fieldCity.trim() || null,
+      field_region: fieldRegion.trim() || null,
       start_date: startDate || null,
       end_date: endDate || null,
+      goals_notes: goalsNotes.trim() || null,
     });
     setSaving(false);
     if (error) { toast.error(`Não foi possível criar o projeto: ${error}`); return; }
@@ -177,15 +190,17 @@ function CreateProjectDialog({ open, onOpenChange, organizationId, onCreated }: 
           <FormInputLabeled label="Nome do projeto" value={name} onChange={setName} required placeholder="Ex.: Missão Amazônia 2027" />
           <FormTextareaLabeled label="Descrição" value={description} onChange={setDescription} />
           <FormTextareaLabeled label="Objetivos" value={objectives} onChange={setObjectives} />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <FormInputLabeled label="País" value={fieldCountry} onChange={setFieldCountry} />
             <FormInputLabeled label="Estado" value={fieldState} onChange={setFieldState} />
             <FormInputLabeled label="Cidade" value={fieldCity} onChange={setFieldCity} />
+            <FormInputLabeled label="Região/campo" value={fieldRegion} onChange={setFieldRegion} />
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <FormInputLabeled label="Início previsto" type="date" value={startDate} onChange={setStartDate} />
             <FormInputLabeled label="Término previsto" type="date" value={endDate} onChange={setEndDate} />
           </div>
+          <FormTextareaLabeled label="Metas e acompanhamento" value={goalsNotes} onChange={setGoalsNotes} />
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
@@ -209,9 +224,21 @@ function ProjectDetailDialog({ project, organizationId, canManage, onClose, onCh
   const [loadingAssignments, setLoadingAssignments] = useState(true);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const currentStatus = project.status as MissionsProjectStatus;
   const closed = isProjectClosed(currentStatus);
+  const today = new Date().toISOString().slice(0, 10);
+  const hasEligibleMissionaryAssignment = assignments.some(
+    (assignment) => (
+      assignment.role === "missionario"
+      && assignment.status === "ativo"
+      && assignment.start_date <= today
+    ),
+  );
+  const activationReady = Boolean(project.start_date)
+    && project.start_date! <= today
+    && hasEligibleMissionaryAssignment;
   const nextOptions = MISSIONS_PROJECT_STATUSES.filter(
     (s) => s !== currentStatus && isValidProjectStatusTransition(currentStatus, s),
   );
@@ -259,20 +286,58 @@ function ProjectDetailDialog({ project, organizationId, canManage, onClose, onCh
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-2">
             <StatusPill label={MISSIONS_PROJECT_STATUS_LABELS[currentStatus]} tone={STATUS_TONE[currentStatus]} />
-            {closed && <span className="text-xs text-muted-foreground">Projeto fechado — sem novos vínculos ou lançamentos comuns.</span>}
+            {closed ? (
+              <span className="text-xs text-muted-foreground">Projeto fechado — sem novos vínculos ou lançamentos comuns.</span>
+            ) : canManage ? (
+              <Button size="sm" variant="ghost" onClick={() => setEditOpen(true)}>
+                <Pencil size={14} className="mr-1.5" /> Editar
+              </Button>
+            ) : null}
           </div>
 
           {canManage && nextOptions.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {nextOptions.map((status) => (
-                <Button key={status} size="sm" variant="outline" disabled={saving} onClick={() => handleTransition(status)}>
+                <Button
+                  key={status}
+                  size="sm"
+                  variant="outline"
+                  disabled={saving || (status === "ativo" && !activationReady)}
+                  title={status === "ativo" && !activationReady
+                    ? "Para ativar, informe uma data de início vigente e mantenha ao menos um missionário elegível associado."
+                    : undefined}
+                  onClick={() => handleTransition(status)}
+                >
                   {MISSIONS_PROJECT_STATUS_LABELS[status]}
                 </Button>
               ))}
             </div>
           )}
 
+          {canManage && nextOptions.includes("ativo") && !activationReady && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-muted-foreground">
+              Para ativar este projeto, a data de início precisa ter chegado e deve existir ao menos
+              um vínculo ativo com papel “Missionário”. O cadastro missionário também precisa estar elegível.
+            </div>
+          )}
+
           {project.description && <p className="text-sm text-muted-foreground">{project.description}</p>}
+          <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+            <p>
+              <span className="font-medium text-foreground">Campo:</span>{" "}
+              {[project.field_city, project.field_state, project.field_country, project.field_region]
+                .filter(Boolean).join(" · ") || "Não informado"}
+            </p>
+            <p>
+              <span className="font-medium text-foreground">Período:</span>{" "}
+              {project.start_date
+                ? new Date(`${project.start_date}T00:00:00`).toLocaleDateString("pt-BR")
+                : "Início não informado"}
+              {project.end_date
+                ? ` até ${new Date(`${project.end_date}T00:00:00`).toLocaleDateString("pt-BR")}`
+                : ""}
+            </p>
+          </div>
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -329,6 +394,94 @@ function ProjectDetailDialog({ project, organizationId, canManage, onClose, onCh
           onAssigned={reloadAssignments}
         />
       )}
+      {editOpen && (
+        <EditProjectDialog
+          project={project}
+          onClose={() => setEditOpen(false)}
+          onSaved={onChanged}
+        />
+      )}
+    </Dialog>
+  );
+}
+
+function EditProjectDialog({ project, onClose, onSaved }: {
+  project: MissionsProjectRow;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState(project.name);
+  const [description, setDescription] = useState(project.description ?? "");
+  const [objectives, setObjectives] = useState(project.objectives ?? "");
+  const [fieldCountry, setFieldCountry] = useState(project.field_country ?? "");
+  const [fieldState, setFieldState] = useState(project.field_state ?? "");
+  const [fieldCity, setFieldCity] = useState(project.field_city ?? "");
+  const [fieldRegion, setFieldRegion] = useState(project.field_region ?? "");
+  const [startDate, setStartDate] = useState(project.start_date ?? "");
+  const [endDate, setEndDate] = useState(project.end_date ?? "");
+  const [goalsNotes, setGoalsNotes] = useState(project.goals_notes ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      toast.error("Informe o nome do projeto.");
+      return;
+    }
+    if (startDate && endDate && endDate < startDate) {
+      toast.error("A data de término não pode ser anterior à data de início.");
+      return;
+    }
+    setSaving(true);
+    const { error } = await updateMissionsProjectProfile({
+      project_id: project.id,
+      organization_id: project.organization_id,
+      name: name.trim(),
+      description: description.trim() || null,
+      objectives: objectives.trim() || null,
+      campaign_id: project.campaign_id,
+      field_country: fieldCountry.trim() || null,
+      field_state: fieldState.trim() || null,
+      field_city: fieldCity.trim() || null,
+      field_region: fieldRegion.trim() || null,
+      start_date: startDate || null,
+      end_date: endDate || null,
+      goals_notes: goalsNotes.trim() || null,
+    });
+    setSaving(false);
+    if (error) {
+      toast.error(`Não foi possível atualizar o projeto: ${error}`);
+      return;
+    }
+    toast.success("Projeto atualizado.");
+    onClose();
+    onSaved();
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Editar projeto</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <FormInputLabeled label="Nome do projeto" value={name} onChange={setName} required />
+          <FormTextareaLabeled label="Descrição" value={description} onChange={setDescription} />
+          <FormTextareaLabeled label="Objetivos" value={objectives} onChange={setObjectives} />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <FormInputLabeled label="País" value={fieldCountry} onChange={setFieldCountry} />
+            <FormInputLabeled label="Estado" value={fieldState} onChange={setFieldState} />
+            <FormInputLabeled label="Cidade" value={fieldCity} onChange={setFieldCity} />
+            <FormInputLabeled label="Região/campo" value={fieldRegion} onChange={setFieldRegion} />
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <FormInputLabeled label="Início" type="date" value={startDate} onChange={setStartDate} />
+            <FormInputLabeled label="Término" type="date" value={endDate} onChange={setEndDate} />
+          </div>
+          <FormTextareaLabeled label="Metas e acompanhamento" value={goalsNotes} onChange={setGoalsNotes} />
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleSave} disabled={saving}>{saving ? "Salvando…" : "Salvar alterações"}</Button>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
   );
 }

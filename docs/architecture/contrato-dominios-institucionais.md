@@ -268,11 +268,10 @@ apenas os pontos de extensão acima, já testados e em uso real pela Secretaria.
 
 ## 12. Extensões reais criadas pela Operação 4 (Missões)
 
-> Esta seção só registra o que a Operação 4 efetivamente criou sobre o contrato acima. As decisões
-> das Operações 1, 2 e 3 (seções 1–11) não foram alteradas nem reabertas. Detalhe completo em
-> `docs/architecture/operacao-4-missoes.md`. Entrega estrutural do Sonnet, **ainda pendente de
-> revisão técnica final do Codex** — diferente das seções 10/11, que já documentam operações
-> revisadas.
+> Esta seção registra o que a Operação 4 efetivamente criou sobre o contrato acima. As decisões das
+> Operações 1, 2 e 3 (seções 1–11) não foram alteradas nem reabertas. Detalhe completo em
+> `docs/architecture/operacao-4-missoes.md`. A fundação criada pelo Sonnet foi revisada pelo Codex;
+> as migrations permanecem não aplicadas e o módulo continua staging-only até homologação real.
 
 - **Catálogo de `member_history.history_type` estendido** (migration
   `20260731140000_missions_history_and_reports.sql`, nunca reabrindo as migrations de catálogo das
@@ -311,13 +310,16 @@ apenas os pontos de extensão acima, já testados e em uso real pela Secretaria.
 - **Compromisso previsto ≠ recebimento real**: `missions_supporter_commitments`/
   `missions_commitment_installments` representam obrigação/parcela **previstas** (WinTechi
   "Mensalidades a Receber"); `status`/`paid_amount` da parcela são **sempre derivados** de transações
-  reais vinculadas (`_recompute_missions_installment_status`), nunca escritos manualmente como
-  pago/parcial. O único caminho de escrita manual é `cancelado`/`isento`, bloqueado se já existir
-  valor pago real.
+  reais de `Entrada` com status `Confirmado`/`Pago`, vinculadas por
+  `_recompute_missions_installment_status`, nunca escritos manualmente como pago/parcial. O único
+  caminho de escrita manual é `cancelado`/`isento`, com justificativa e bloqueio se já existir valor
+  pago real.
 - **Vínculo financeiro fino, sem duplicar valor/saldo/fechamento**: `missions_transaction_links` não
   tem coluna monetária — apenas liga uma `public.transactions` real a **exatamente um** contexto
   missionário (parcela, projeto, missionário ou campanha), exigindo **ambas** as capabilities
   (`missions.finance` + `finance.read`/`finance.write`) simultaneamente para ler ou escrever.
+  A interface usa `search_missions_available_transactions()` para selecionar somente transações
+  confirmadas/pagas, autorizadas e ainda não vinculadas; UUID interno não é entrada de usuário.
   "Portadores" do WinTechi = `finance_accounts` reais; "Contas/Grupos Contábeis" =
   `finance_account_categories` reais; saldo/recibo/fechamento continuam exclusivamente no motor
   financeiro existente — nenhuma segunda contabilidade foi criada.

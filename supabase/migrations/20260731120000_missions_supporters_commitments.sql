@@ -174,6 +174,17 @@ BEGIN
     RAISE EXCEPTION 'invalid supporter status: %', p_status;
   END IF;
 
+  IF p_status = v_row.status THEN
+    RETURN;
+  END IF;
+
+  IF NOT (
+    (v_row.status = 'ativo' AND p_status IN ('inativo', 'encerrado'))
+    OR (v_row.status = 'inativo' AND p_status IN ('ativo', 'encerrado'))
+  ) THEN
+    RAISE EXCEPTION 'invalid supporter status transition: % -> %', v_row.status, p_status;
+  END IF;
+
   UPDATE public.missions_supporters SET status = p_status WHERE id = p_supporter_id;
 END;
 $$;
@@ -231,7 +242,10 @@ ALTER TABLE public.missions_supporter_commitments ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "missions_commitments capability select" ON public.missions_supporter_commitments;
 CREATE POLICY "missions_commitments capability select" ON public.missions_supporter_commitments
 FOR SELECT TO authenticated
-USING (public.has_org_access_permission(auth.uid(), organization_id, 'missions.read'));
+USING (
+  public.has_org_access_permission(auth.uid(), organization_id, 'missions.read')
+  AND public.has_org_access_permission(auth.uid(), organization_id, 'finance.read')
+);
 
 REVOKE INSERT, UPDATE, DELETE ON public.missions_supporter_commitments FROM authenticated;
 GRANT SELECT ON public.missions_supporter_commitments TO authenticated;
@@ -259,11 +273,23 @@ DECLARE
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
 
-  SELECT * INTO v_supporter FROM public.missions_supporters WHERE id = p_supporter_id;
+  SELECT * INTO v_supporter FROM public.missions_supporters WHERE id = p_supporter_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'supporter not found'; END IF;
 
   IF NOT public.has_org_access_permission(auth.uid(), v_supporter.organization_id, 'missions.manage') THEN
     RAISE EXCEPTION 'access denied to create a commitment for this supporter';
+  END IF;
+
+  IF NOT public.has_org_access_permission(auth.uid(), v_supporter.organization_id, 'finance.write') THEN
+    RAISE EXCEPTION 'access denied: finance.write is required to create a financial commitment';
+  END IF;
+
+  IF NOT public.has_org_access_permission(auth.uid(), v_supporter.organization_id, 'missions.finance') THEN
+    RAISE EXCEPTION 'access denied: missions.finance is required to create a financial commitment';
+  END IF;
+
+  IF v_supporter.status <> 'ativo' THEN
+    RAISE EXCEPTION 'commitments can only be created for active supporters';
   END IF;
 
   IF num_nonnulls(p_missionary_id, p_project_id, p_campaign_id) <> 1 THEN
@@ -279,17 +305,31 @@ BEGIN
   END IF;
 
   IF p_missionary_id IS NOT NULL THEN
-    SELECT organization_id INTO v_context_org FROM public.missions_missionaries WHERE id = p_missionary_id;
+    SELECT organization_id INTO v_context_org
+    FROM public.missions_missionaries
+    WHERE id = p_missionary_id
+      AND status IN ('em_preparacao', 'ativo', 'em_licenca');
   ELSIF p_project_id IS NOT NULL THEN
-    SELECT organization_id INTO v_context_org FROM public.missions_projects WHERE id = p_project_id;
+    SELECT organization_id INTO v_context_org
+    FROM public.missions_projects
+    WHERE id = p_project_id
+      AND status IN ('planejado', 'ativo', 'suspenso');
   ELSE
-    SELECT organization_id INTO v_context_org FROM public.campaigns WHERE id = p_campaign_id;
+    SELECT organization_id INTO v_context_org
+    FROM public.campaigns
+    WHERE id = p_campaign_id
+      AND status IN ('active', 'paused');
   END IF;
 
-  IF v_context_org IS NULL THEN RAISE EXCEPTION 'commitment context not found'; END IF;
+  IF v_context_org IS NULL THEN
+    RAISE EXCEPTION 'commitment context was not found or is not open for new commitments';
+  END IF;
 
-  IF NOT public.is_organization_descendant_or_self(v_supporter.organization_id, v_context_org)
-     AND NOT public.is_organization_descendant_or_self(v_context_org, v_supporter.organization_id) THEN
+  IF NOT public.has_org_access_permission(auth.uid(), v_context_org, 'missions.finance') THEN
+    RAISE EXCEPTION 'access denied: missions.finance is required in the commitment context';
+  END IF;
+
+  IF NOT public.is_organization_descendant_or_self(v_supporter.organization_id, v_context_org) THEN
     RAISE EXCEPTION 'commitment context is outside the supporter organization scope';
   END IF;
 
@@ -339,6 +379,18 @@ BEGIN
     RAISE EXCEPTION 'access denied to update this commitment';
   END IF;
 
+  IF NOT public.has_org_access_permission(auth.uid(), v_row.organization_id, 'finance.write') THEN
+    RAISE EXCEPTION 'access denied: finance.write is required to update a financial commitment';
+  END IF;
+
+  IF NOT public.has_org_access_permission(auth.uid(), v_row.organization_id, 'missions.finance') THEN
+    RAISE EXCEPTION 'access denied: missions.finance is required to update a financial commitment';
+  END IF;
+
+  IF p_status = v_row.status THEN
+    RETURN;
+  END IF;
+
   IF NOT (
     (v_row.status = 'ativo' AND p_status IN ('pausado', 'encerrado', 'cancelado'))
     OR (v_row.status = 'pausado' AND p_status IN ('ativo', 'encerrado', 'cancelado'))
@@ -362,7 +414,7 @@ CREATE TABLE IF NOT EXISTS public.missions_commitment_installments (
   commitment_id uuid NOT NULL REFERENCES public.missions_supporter_commitments(id) ON DELETE CASCADE,
   organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE RESTRICT,
 
-  reference_month text NOT NULL CHECK (reference_month ~ '^[0-9]{4}-[0-9]{2}$'),
+  reference_month text NOT NULL CHECK (reference_month ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),
   due_date date NOT NULL,
   expected_amount numeric(14,2) NOT NULL CHECK (expected_amount > 0),
 
@@ -392,7 +444,10 @@ ALTER TABLE public.missions_commitment_installments ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "missions_installments capability select" ON public.missions_commitment_installments;
 CREATE POLICY "missions_installments capability select" ON public.missions_commitment_installments
 FOR SELECT TO authenticated
-USING (public.has_org_access_permission(auth.uid(), organization_id, 'missions.read'));
+USING (
+  public.has_org_access_permission(auth.uid(), organization_id, 'missions.read')
+  AND public.has_org_access_permission(auth.uid(), organization_id, 'finance.read')
+);
 
 REVOKE INSERT, UPDATE, DELETE ON public.missions_commitment_installments FROM authenticated;
 GRANT SELECT ON public.missions_commitment_installments TO authenticated;
@@ -410,6 +465,7 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_commitment public.missions_supporter_commitments%ROWTYPE;
+  v_reference_date date;
   v_id uuid;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
@@ -421,16 +477,42 @@ BEGIN
     RAISE EXCEPTION 'access denied to generate installments for this commitment';
   END IF;
 
+  IF NOT public.has_org_access_permission(auth.uid(), v_commitment.organization_id, 'finance.write') THEN
+    RAISE EXCEPTION 'access denied: finance.write is required to generate a financial installment';
+  END IF;
+
+  IF NOT public.has_org_access_permission(auth.uid(), v_commitment.organization_id, 'missions.finance') THEN
+    RAISE EXCEPTION 'access denied: missions.finance is required to generate a financial installment';
+  END IF;
+
   IF v_commitment.status <> 'ativo' THEN
     RAISE EXCEPTION 'installments can only be generated for active commitments';
   END IF;
 
-  IF p_reference_month IS NULL OR p_reference_month !~ '^[0-9]{4}-[0-9]{2}$' THEN
+  IF p_reference_month IS NULL OR p_reference_month !~ '^[0-9]{4}-(0[1-9]|1[0-2])$' THEN
     RAISE EXCEPTION 'invalid reference month: %', p_reference_month;
+  END IF;
+
+  v_reference_date := (p_reference_month || '-01')::date;
+
+  IF v_reference_date < date_trunc('month', v_commitment.start_date)::date
+     OR (
+       v_commitment.end_date IS NOT NULL
+       AND v_reference_date > date_trunc('month', v_commitment.end_date)::date
+     ) THEN
+    RAISE EXCEPTION 'reference month is outside the commitment validity period';
   END IF;
 
   IF p_due_date IS NULL THEN
     RAISE EXCEPTION 'due date is required';
+  END IF;
+
+  IF date_trunc('month', p_due_date)::date <> v_reference_date THEN
+    RAISE EXCEPTION 'due date must belong to the reference month';
+  END IF;
+
+  IF COALESCE(p_expected_amount, v_commitment.committed_amount) <= 0 THEN
+    RAISE EXCEPTION 'expected amount must be greater than zero';
   END IF;
 
   INSERT INTO public.missions_commitment_installments (
@@ -475,7 +557,9 @@ BEGIN
     SELECT COALESCE(SUM(t.amount), 0) INTO v_paid
     FROM public.missions_transaction_links l
     JOIN public.transactions t ON t.id = l.transaction_id
-    WHERE l.installment_id = p_installment_id AND t.type = 'Entrada';
+    WHERE l.installment_id = p_installment_id
+      AND t.type = 'Entrada'
+      AND t.status IN ('Confirmado', 'Pago');
   ELSE
     v_paid := 0;
   END IF;
@@ -514,8 +598,9 @@ BEGIN
   SELECT organization_id INTO v_org_id FROM public.missions_commitment_installments WHERE id = p_installment_id;
   IF v_org_id IS NULL THEN RAISE EXCEPTION 'installment not found'; END IF;
 
-  IF NOT public.has_org_access_permission(auth.uid(), v_org_id, 'missions.read') THEN
-    RAISE EXCEPTION 'access denied to refresh this installment';
+  IF NOT public.has_org_access_permission(auth.uid(), v_org_id, 'missions.read')
+     OR NOT public.has_org_access_permission(auth.uid(), v_org_id, 'finance.read') THEN
+    RAISE EXCEPTION 'access denied: missions.read and finance.read are required to refresh this installment';
   END IF;
 
   PERFORM public._recompute_missions_installment_status(p_installment_id);
@@ -550,6 +635,14 @@ BEGIN
     RAISE EXCEPTION 'access denied to change this installment';
   END IF;
 
+  IF NOT public.has_org_access_permission(auth.uid(), v_row.organization_id, 'finance.write') THEN
+    RAISE EXCEPTION 'access denied: finance.write is required to change this financial installment';
+  END IF;
+
+  IF NOT public.has_org_access_permission(auth.uid(), v_row.organization_id, 'missions.finance') THEN
+    RAISE EXCEPTION 'access denied: missions.finance is required to change this financial installment';
+  END IF;
+
   IF p_status NOT IN ('cancelado', 'isento') THEN
     RAISE EXCEPTION 'this function only sets cancelado or isento';
   END IF;
@@ -558,9 +651,13 @@ BEGIN
     RAISE EXCEPTION 'cannot cancel/exempt an installment that already has a real payment';
   END IF;
 
+  IF NULLIF(btrim(p_notes), '') IS NULL THEN
+    RAISE EXCEPTION 'a justification is required to cancel or exempt an installment';
+  END IF;
+
   UPDATE public.missions_commitment_installments
   SET status = p_status,
-      notes = CASE WHEN NULLIF(btrim(p_notes), '') IS NOT NULL THEN NULLIF(btrim(p_notes), '') ELSE notes END
+      notes = NULLIF(btrim(p_notes), '')
   WHERE id = p_installment_id;
 END;
 $$;

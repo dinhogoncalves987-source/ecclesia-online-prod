@@ -410,11 +410,17 @@ STABLE
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
+DECLARE
+  v_can_view_finance boolean;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
   IF NOT public.has_org_access_permission(auth.uid(), p_organization_id, 'missions.read') THEN
     RAISE EXCEPTION 'access denied to missions dashboard';
   END IF;
+
+  v_can_view_finance := public.has_org_access_permission(
+    auth.uid(), p_organization_id, 'finance.read'
+  );
 
   RETURN QUERY
   SELECT
@@ -428,12 +434,24 @@ BEGIN
     (SELECT COUNT(*) FROM public.missions_projects mp WHERE mp.organization_id = p_organization_id AND mp.status = 'planejado'),
     (SELECT COUNT(*) FROM public.missions_supporters ms WHERE ms.organization_id = p_organization_id AND ms.status = 'ativo'),
     (SELECT COUNT(*) FROM public.missions_supporter_commitments mc WHERE mc.organization_id = p_organization_id AND mc.status = 'ativo'),
-    (SELECT COUNT(*) FROM public.missions_commitment_installments mi WHERE mi.organization_id = p_organization_id AND mi.status IN ('previsto', 'pendente')),
-    (SELECT COALESCE(SUM(mi.expected_amount - mi.paid_amount), 0) FROM public.missions_commitment_installments mi WHERE mi.organization_id = p_organization_id AND mi.status IN ('previsto', 'pendente')),
-    (SELECT COUNT(*) FROM public.missions_commitment_installments mi WHERE mi.organization_id = p_organization_id AND mi.status = 'atrasado'),
-    (SELECT COALESCE(SUM(mi.expected_amount - mi.paid_amount), 0) FROM public.missions_commitment_installments mi WHERE mi.organization_id = p_organization_id AND mi.status = 'atrasado'),
-    (SELECT COALESCE(SUM(mi.expected_amount), 0) FROM public.missions_commitment_installments mi WHERE mi.organization_id = p_organization_id AND mi.status NOT IN ('cancelado', 'isento')),
-    (SELECT COALESCE(SUM(mi.paid_amount), 0) FROM public.missions_commitment_installments mi WHERE mi.organization_id = p_organization_id);
+    CASE WHEN v_can_view_finance THEN
+      (SELECT COUNT(*) FROM public.missions_commitment_installments mi WHERE mi.organization_id = p_organization_id AND mi.status IN ('previsto', 'pendente'))
+    ELSE NULL::bigint END,
+    CASE WHEN v_can_view_finance THEN
+      (SELECT COALESCE(SUM(mi.expected_amount - mi.paid_amount), 0) FROM public.missions_commitment_installments mi WHERE mi.organization_id = p_organization_id AND mi.status IN ('previsto', 'pendente'))
+    ELSE NULL::numeric END,
+    CASE WHEN v_can_view_finance THEN
+      (SELECT COUNT(*) FROM public.missions_commitment_installments mi WHERE mi.organization_id = p_organization_id AND mi.status = 'atrasado')
+    ELSE NULL::bigint END,
+    CASE WHEN v_can_view_finance THEN
+      (SELECT COALESCE(SUM(mi.expected_amount - mi.paid_amount), 0) FROM public.missions_commitment_installments mi WHERE mi.organization_id = p_organization_id AND mi.status = 'atrasado')
+    ELSE NULL::numeric END,
+    CASE WHEN v_can_view_finance THEN
+      (SELECT COALESCE(SUM(mi.expected_amount), 0) FROM public.missions_commitment_installments mi WHERE mi.organization_id = p_organization_id AND mi.status NOT IN ('cancelado', 'isento'))
+    ELSE NULL::numeric END,
+    CASE WHEN v_can_view_finance THEN
+      (SELECT COALESCE(SUM(mi.paid_amount), 0) FROM public.missions_commitment_installments mi WHERE mi.organization_id = p_organization_id)
+    ELSE NULL::numeric END;
 END;
 $$;
 
@@ -493,8 +511,9 @@ SET search_path = public, pg_temp
 AS $$
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
-  IF NOT public.has_org_access_permission(auth.uid(), p_organization_id, 'missions.read') THEN
-    RAISE EXCEPTION 'access denied to missions project indicators';
+  IF NOT public.has_org_access_permission(auth.uid(), p_organization_id, 'missions.read')
+     OR NOT public.has_org_access_permission(auth.uid(), p_organization_id, 'finance.read') THEN
+    RAISE EXCEPTION 'access denied: missions.read and finance.read are required for project indicators';
   END IF;
 
   RETURN QUERY
@@ -507,7 +526,9 @@ BEGIN
     COALESCE((
       SELECT SUM(t.amount) FROM public.missions_transaction_links l
       JOIN public.transactions t ON t.id = l.transaction_id
-      WHERE l.project_id = p.id AND t.type = 'Entrada'
+      WHERE l.project_id = p.id
+        AND t.type = 'Entrada'
+        AND t.status IN ('Confirmado', 'Pago')
     ), 0),
     (SELECT COUNT(*) FROM public.missions_project_assignments a
       WHERE a.project_id = p.id AND a.role = 'missionario' AND a.status = 'ativo')
@@ -546,8 +567,9 @@ SET search_path = public, pg_temp
 AS $$
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
-  IF NOT public.has_org_access_permission(auth.uid(), p_organization_id, 'missions.read') THEN
-    RAISE EXCEPTION 'access denied to missions installments report';
+  IF NOT public.has_org_access_permission(auth.uid(), p_organization_id, 'missions.read')
+     OR NOT public.has_org_access_permission(auth.uid(), p_organization_id, 'finance.read') THEN
+    RAISE EXCEPTION 'access denied: missions.read and finance.read are required for installments report';
   END IF;
 
   IF p_status_filter IS NOT NULL AND p_status_filter NOT IN (

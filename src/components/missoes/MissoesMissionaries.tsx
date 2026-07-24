@@ -71,6 +71,11 @@ export function MissoesMissionaries({ organizationId }: { organizationId: string
   }, [organizationId]);
 
   useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => {
+    setSelected((current) => (
+      current ? missionaries.find((missionary) => missionary.id === current.id) ?? null : null
+    ));
+  }, [missionaries]);
 
   if (loading) {
     return <div className="flex items-center justify-center py-16 text-muted-foreground gap-2"><Loader2 className="animate-spin" size={18} /> Carregando missionários…</div>;

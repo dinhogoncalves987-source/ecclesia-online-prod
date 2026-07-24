@@ -181,11 +181,34 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_id uuid;
+  v_existing_account_id uuid;
+  v_existing_category_id uuid;
+  v_existing_cost_center_id uuid;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
 
   IF NOT public.has_org_access_permission(auth.uid(), p_organization_id, 'missions.manage') THEN
     RAISE EXCEPTION 'access denied to configure missions settings';
+  END IF;
+
+  SELECT
+    default_finance_account_id,
+    default_account_category_id,
+    default_cost_center_id
+  INTO
+    v_existing_account_id,
+    v_existing_category_id,
+    v_existing_cost_center_id
+  FROM public.missions_settings
+  WHERE organization_id = p_organization_id;
+
+  IF (
+       p_default_finance_account_id IS DISTINCT FROM v_existing_account_id
+       OR p_default_account_category_id IS DISTINCT FROM v_existing_category_id
+       OR p_default_cost_center_id IS DISTINCT FROM v_existing_cost_center_id
+     )
+     AND NOT public.has_org_access_permission(auth.uid(), p_organization_id, 'finance.read') THEN
+    RAISE EXCEPTION 'access denied: finance.read is required to configure financial defaults';
   END IF;
 
   IF p_default_periodicity NOT IN ('unica', 'mensal', 'trimestral', 'semestral', 'anual') THEN

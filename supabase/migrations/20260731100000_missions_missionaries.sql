@@ -231,6 +231,10 @@ BEGIN
     RAISE EXCEPTION 'access denied to update this missionary';
   END IF;
 
+  IF v_row.status = 'encerrado' THEN
+    RAISE EXCEPTION 'an ended missionary profile is immutable';
+  END IF;
+
   UPDATE public.missions_missionaries
   SET coordinator_member_id = p_coordinator_member_id,
       field_country = NULLIF(btrim(p_field_country), ''),
@@ -280,6 +284,14 @@ BEGIN
     RAISE EXCEPTION 'access denied to update missionary status';
   END IF;
 
+  IF p_status = v_row.status THEN
+    RETURN;
+  END IF;
+
+  IF p_effective_date IS NOT NULL AND p_effective_date > CURRENT_DATE THEN
+    RAISE EXCEPTION 'missionary status effective date cannot be in the future';
+  END IF;
+
   IF NOT (
     (v_row.status = 'candidato' AND p_status IN ('em_preparacao', 'encerrado'))
     OR (v_row.status = 'em_preparacao' AND p_status IN ('ativo', 'encerrado'))
@@ -294,7 +306,11 @@ BEGIN
   SET status = p_status,
       sent_at = CASE WHEN p_status = 'ativo' AND v_row.status = 'em_preparacao' THEN COALESCE(p_effective_date, CURRENT_DATE) ELSE sent_at END,
       start_at = CASE WHEN p_status = 'ativo' AND v_row.status = 'em_preparacao' THEN COALESCE(p_effective_date, CURRENT_DATE) ELSE start_at END,
-      returned_at = CASE WHEN p_status = 'retornado' THEN COALESCE(p_effective_date, CURRENT_DATE) ELSE returned_at END,
+      returned_at = CASE
+        WHEN p_status = 'retornado' THEN COALESCE(p_effective_date, CURRENT_DATE)
+        WHEN v_row.status = 'retornado' AND p_status = 'em_preparacao' THEN NULL
+        ELSE returned_at
+      END,
       ended_at = CASE WHEN p_status = 'encerrado' THEN COALESCE(p_effective_date, CURRENT_DATE) ELSE ended_at END,
       public_notes = CASE WHEN NULLIF(btrim(p_notes), '') IS NOT NULL THEN NULLIF(btrim(p_notes), '') ELSE public_notes END
   WHERE id = p_missionary_id;
@@ -382,12 +398,17 @@ BEGIN
     RAISE EXCEPTION 'access denied to manage confidential missionary information';
   END IF;
 
-  SELECT organization_id INTO v_base_org_id FROM public.members WHERE id = v_missionary.member_id;
+  SELECT COALESCE(congregation_id, sector_id, organization_id) INTO v_base_org_id
+  FROM public.members WHERE id = v_missionary.member_id;
 
   IF p_document_id IS NOT NULL AND NOT EXISTS (
-    SELECT 1 FROM public.documents d WHERE d.id = p_document_id AND d.organization_id = v_base_org_id
+    SELECT 1
+    FROM public.documents d
+    WHERE d.id = p_document_id
+      AND public.is_organization_descendant_or_self(v_missionary.organization_id, d.organization_id)
+      AND public.is_organization_descendant_or_self(v_missionary.organization_id, v_base_org_id)
   ) THEN
-    RAISE EXCEPTION 'document not found for this organization';
+    RAISE EXCEPTION 'document not found in the missionary organization scope';
   END IF;
 
   INSERT INTO public.missions_missionary_confidential_info (

@@ -231,6 +231,7 @@ describe("Missões — escrita crítica somente por RPC (nunca burlável por UPD
       "link_missions_transaction(uuid, text, uuid, uuid, uuid, uuid, text)",
       "unlink_missions_transaction(uuid)",
       "list_missions_linked_transactions(uuid, uuid, uuid, uuid)",
+      "search_missions_available_transactions(uuid, text, integer)",
       "search_missions_members(uuid, text, integer)",
       "get_missions_member_labels(uuid, uuid[])",
       "get_missions_dashboard_summary(uuid)",
@@ -272,8 +273,11 @@ describe("Missões — escrita crítica somente por RPC (nunca burlável por UPD
   });
 
   it("register_member_history_event permanece interno (service_role) — Missões nunca o expõe direto ao navegador", () => {
-    expect(historyReportsSql).not.toMatch(/GRANT EXECUTE ON FUNCTION public\.register_member_history_event[\s\S]*?TO authenticated/);
-    expect(historyReportsSql).toContain("TO service_role");
+    const grant = historyReportsSql.match(
+      /GRANT EXECUTE ON FUNCTION public\.register_member_history_event\([\s\S]*?\)\s+TO\s+([^;]+);/,
+    );
+    expect(grant).toBeTruthy();
+    expect(grant?.[1].trim()).toBe("service_role");
   });
 });
 
@@ -321,6 +325,12 @@ describe("Missões — máquinas de estado protegidas contra lançamento em cont
     expect(projectsSql).toContain("invalid project status transition: % -> %");
     expect(projectsSql).toMatch(/v_row\.status = 'rascunho' AND p_status IN \('planejado', 'cancelado'\)/);
     expect(projectsSql).toMatch(/v_row\.status = 'concluido' AND p_status = 'arquivado'/);
+    expect(projectsSql).toContain("project start date is required before activation");
+    expect(projectsSql).toContain("project cannot be activated before its start date");
+    expect(projectsSql).toContain("at least one active assignment to an eligible missionary is required before activation");
+    expect(projectsSql).toMatch(
+      /JOIN public\.missions_missionaries mm[\s\S]*mm\.status IN \('em_preparacao', 'ativo', 'em_licenca'\)/,
+    );
   });
 
   it("compromisso segue ativo/pausado, sem retorno de encerrado/cancelado (terminal)", () => {
@@ -333,14 +343,22 @@ describe("Missões — máquinas de estado protegidas contra lançamento em cont
   });
 
   it("apenas missionário/projeto associado ao papel 'missionario' exige registro prévio em missions_missionaries", () => {
-    expect(projectsSql).toContain("member must be registered as a missionary before this role can be assigned");
+    expect(projectsSql).toContain("member must have an eligible missionary record in the project scope");
+  });
+
+  it("apoiador encerrado é terminal e as transições usam lock/idempotência", () => {
+    expect(supportersSql).toContain("invalid supporter status transition: % -> %");
+    expect(supportersSql).toContain("IF p_status = v_row.status THEN");
+    expect(supportersSql).toMatch(/v_row\.status = 'ativo' AND p_status IN \('inativo', 'encerrado'\)/);
   });
 });
 
 describe("Missões — parcela nunca é marcada como paga sem transação real (contrato §7)", () => {
   it("_recompute_missions_installment_status deriva o status somando somente transações reais do tipo 'Entrada'", () => {
     expect(supportersSql).toMatch(/JOIN public\.transactions t ON t\.id = l\.transaction_id/);
-    expect(supportersSql).toContain("WHERE l.installment_id = p_installment_id AND t.type = 'Entrada'");
+    expect(supportersSql).toMatch(
+      /WHERE l\.installment_id = p_installment_id\s+AND t\.type = 'Entrada'\s+AND t\.status IN \('Confirmado', 'Pago'\)/,
+    );
   });
 
   it("cancelado/isento são preservados (nunca recomputados) até nova ação manual", () => {
@@ -351,6 +369,7 @@ describe("Missões — parcela nunca é marcada como paga sem transação real (
     expect(supportersSql).toContain("this function only sets cancelado or isento");
     expect(supportersSql).toContain("cannot cancel/exempt an installment that already has a real payment");
     expect(supportersSql).toMatch(/v_row\.paid_amount > 0 OR v_row\.status = 'pago'/);
+    expect(supportersSql).toContain("a justification is required to cancel or exempt an installment");
   });
 
   it("nenhuma RPC de Missões aceita p_status = 'pago'/'parcial' como parâmetro manual", () => {
@@ -384,6 +403,7 @@ describe("Missões — vínculo financeiro sem duplicar valor/saldo/conta/fecham
   it("vínculo aponta para exatamente um contexto missionário — nunca dois, nunca nenhum", () => {
     expect(txLinksSql).toContain("CHECK (num_nonnulls(installment_id, project_id, missionary_id, campaign_id) = 1)");
     expect(txLinksSql).toContain("exactly one missions context must be informed");
+    expect(txLinksSql).toContain("link type does not match the informed missions context");
   });
 
   it("compromisso também aponta para exatamente um contexto (missionário/projeto/campanha)", () => {
@@ -393,6 +413,12 @@ describe("Missões — vínculo financeiro sem duplicar valor/saldo/conta/fecham
 
   it("uma transação só pode ser vinculada uma vez (nunca contada duas vezes em contextos diferentes)", () => {
     expect(txLinksSql).toContain("transaction is already linked to a missions context");
+  });
+
+  it("transação pendente nunca é vinculada e parcela só aceita entrada confirmada/paga", () => {
+    expect(txLinksSql).toContain("only confirmed or paid transactions can be linked to missions");
+    expect(txLinksSql).toContain("an installment can only be settled by an incoming transaction");
+    expect(txLinksSql).toContain("v_transaction.status NOT IN ('Confirmado', 'Pago')");
   });
 
   it("link_missions_transaction verifica finance.write na transação E missions.finance no contexto, separadamente", () => {
@@ -411,8 +437,9 @@ describe("Missões — vínculo financeiro sem duplicar valor/saldo/conta/fecham
       txLinksSql.indexOf("CREATE OR REPLACE FUNCTION public.unlink_missions_transaction"),
       txLinksSql.indexOf("REVOKE ALL ON FUNCTION public.unlink_missions_transaction"),
     );
-    expect(fn).toContain("public.has_org_access_permission(auth.uid(), v_row.organization_id, 'finance.write')");
-    expect(fn).toContain("public.has_org_access_permission(auth.uid(), v_row.organization_id, 'missions.finance')");
+    expect(fn).toContain("public.has_org_access_permission(auth.uid(), v_transaction_org, 'finance.write')");
+    expect(fn).toContain("public.has_org_access_permission(auth.uid(), v_context_org, 'missions.finance')");
+    expect(fn).toContain("linked missions context is outside the transaction organization scope");
   });
 
   it("list_missions_linked_transactions exige missions.read E finance.read, separadamente", () => {
@@ -617,11 +644,14 @@ describe("Missões — relatórios derivados, nunca um segundo motor genérico (
     );
     expect(fn).toContain("STABLE");
     expect(fn).toMatch(/RETURN QUERY\s+SELECT/);
+    expect(fn).toContain("v_can_view_finance");
   });
 
   it("list_missions_project_indicators deriva previsto de compromissos ativos e realizado de transações reais vinculadas", () => {
     expect(historyReportsSql).toContain("FROM public.missions_supporter_commitments mc");
-    expect(historyReportsSql).toMatch(/FROM public\.missions_transaction_links l\s+JOIN public\.transactions t ON t\.id = l\.transaction_id\s+WHERE l\.project_id = p\.id AND t\.type = 'Entrada'/);
+    expect(historyReportsSql).toMatch(
+      /FROM public\.missions_transaction_links l\s+JOIN public\.transactions t ON t\.id = l\.transaction_id\s+WHERE l\.project_id = p\.id\s+AND t\.type = 'Entrada'\s+AND t\.status IN \('Confirmado', 'Pago'\)/,
+    );
   });
 
   it("list_missions_commitment_installments revalida a organização real por p_organization_id e permite filtro de atraso", () => {
@@ -631,6 +661,7 @@ describe("Missões — relatórios derivados, nunca um segundo motor genérico (
     );
     expect(fn).toContain("WHERE i.organization_id = p_organization_id");
     expect(fn).toContain("p_only_overdue");
+    expect(fn).toContain("'finance.read'");
   });
 
   it("todas as RPCs de relatório são STABLE e SECURITY DEFINER, revalidando missions.read", () => {

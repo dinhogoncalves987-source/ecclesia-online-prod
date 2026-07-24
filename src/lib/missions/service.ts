@@ -36,6 +36,9 @@ export type MissionsSupporterRow = Tables<"missions_supporters">;
 export type MissionsSupporterCommitmentRow = Tables<"missions_supporter_commitments">;
 export type MissionsCommitmentInstallmentRow = Tables<"missions_commitment_installments">;
 export type MissionsTransactionLinkRow = Tables<"missions_transaction_links">;
+export type MissionsCampaignRow = Pick<Tables<"campaigns">, "id" | "title" | "status">;
+
+export type MissionsFinanceOption = { id: string; label: string };
 
 export type MissionsMemberLabel = {
   id: string;
@@ -91,6 +94,37 @@ export async function loadMissionsSettings(
     .eq("organization_id", organizationId)
     .maybeSingle();
   return { row: data ?? null, error: error?.message ?? null };
+}
+
+export async function loadMissionsFinanceOptions(organizationId: string): Promise<{
+  accounts: MissionsFinanceOption[];
+  categories: MissionsFinanceOption[];
+  costCenters: MissionsFinanceOption[];
+  error: string | null;
+}> {
+  const [accounts, categories, costCenters] = await Promise.all([
+    supabase.from("finance_accounts").select("id, name").eq("organization_id", organizationId).eq("is_active", true).order("name"),
+    supabase.from("finance_account_categories").select("id, name, code").eq("organization_id", organizationId).eq("is_active", true).order("name"),
+    supabase.from("finance_cost_centers").select("id, name").eq("organization_id", organizationId).eq("is_active", true).order("name"),
+  ]);
+  const error = accounts.error ?? categories.error ?? costCenters.error;
+  return {
+    accounts: (accounts.data ?? []).map((row) => ({ id: row.id, label: row.name })),
+    categories: (categories.data ?? []).map((row) => ({ id: row.id, label: `${row.code} · ${row.name}` })),
+    costCenters: (costCenters.data ?? []).map((row) => ({ id: row.id, label: row.name })),
+    error: error?.message ?? null,
+  };
+}
+
+export async function loadMissionsCampaigns(organizationId: string): Promise<LoadResult<MissionsCampaignRow>> {
+  const { data, error } = await supabase
+    .from("campaigns")
+    .select("id, title, status")
+    .eq("organization_id", organizationId)
+    .in("status", ["active", "paused"])
+    .order("title");
+  if (error) return { rows: [], error: toLoadError(error) };
+  return { rows: data ?? [], error: null };
 }
 
 export async function upsertMissionsSettings(input: {
@@ -548,6 +582,27 @@ export type MissionsLinkedTransactionRow = {
   transaction_status: string;
 };
 
+export type MissionsAvailableTransactionRow = {
+  id: string;
+  transaction_date: string;
+  description: string;
+  amount: number;
+  transaction_type: string;
+  transaction_status: string;
+};
+
+export async function searchMissionsAvailableTransactions(
+  organizationId: string,
+  query: string,
+): Promise<{ rows: MissionsAvailableTransactionRow[]; error: string | null }> {
+  const { data, error } = await supabase.rpc("search_missions_available_transactions", {
+    p_organization_id: organizationId,
+    p_query: query.trim() || undefined,
+    p_limit: 30,
+  });
+  return { rows: data ?? [], error: error?.message ?? null };
+}
+
 export async function listMissionsLinkedTransactions(input: {
   installment_id?: string | null;
   project_id?: string | null;
@@ -576,12 +631,12 @@ export type MissionsDashboardSummary = {
   projects_planejado: number;
   supporters_ativo: number;
   commitments_ativo: number;
-  installments_pending_count: number;
-  installments_pending_amount: number;
-  installments_overdue_count: number;
-  installments_overdue_amount: number;
-  expected_total_amount: number;
-  received_total_amount: number;
+  installments_pending_count: number | null;
+  installments_pending_amount: number | null;
+  installments_overdue_count: number | null;
+  installments_overdue_amount: number | null;
+  expected_total_amount: number | null;
+  received_total_amount: number | null;
 };
 
 export async function getMissionsDashboardSummary(

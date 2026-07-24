@@ -20,14 +20,17 @@ import {
   isValidCommitmentStatusTransition,
   isValidMissionaryStatusTransition,
   isValidProjectStatusTransition,
+  isValidSupporterStatusTransition,
 } from "./rules";
 import {
   MISSIONS_COMMITMENT_STATUSES,
   MISSIONS_MISSIONARY_STATUSES,
   MISSIONS_PROJECT_STATUSES,
+  MISSIONS_SUPPORTER_STATUSES,
   type MissionsCommitmentStatus,
   type MissionsMissionaryStatus,
   type MissionsProjectStatus,
+  type MissionsSupporterStatus,
 } from "./constants";
 
 describe("isValidMissionaryStatusTransition — espelha update_missions_missionary_status()", () => {
@@ -161,6 +164,30 @@ describe("isCommitmentClosed", () => {
     expect(isCommitmentClosed("cancelado")).toBe(true);
     expect(isCommitmentClosed("ativo")).toBe(false);
     expect(isCommitmentClosed("pausado")).toBe(false);
+  });
+});
+
+describe("isValidSupporterStatusTransition — espelha update_missions_supporter_status()", () => {
+  const VALID: Array<[MissionsSupporterStatus, MissionsSupporterStatus]> = [
+    ["ativo", "inativo"],
+    ["ativo", "encerrado"],
+    ["inativo", "ativo"],
+    ["inativo", "encerrado"],
+  ];
+
+  it.each(VALID)("permite %s -> %s", (from, to) => {
+    expect(isValidSupporterStatusTransition(from, to)).toBe(true);
+  });
+
+  it("é idempotente para qualquer estado", () => {
+    for (const status of MISSIONS_SUPPORTER_STATUSES) {
+      expect(isValidSupporterStatusTransition(status, status)).toBe(true);
+    }
+  });
+
+  it("mantém encerrado como estado terminal", () => {
+    expect(isValidSupporterStatusTransition("encerrado", "ativo")).toBe(false);
+    expect(isValidSupporterStatusTransition("encerrado", "inativo")).toBe(false);
   });
 });
 

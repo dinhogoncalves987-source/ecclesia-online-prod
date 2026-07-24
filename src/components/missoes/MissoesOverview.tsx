@@ -8,10 +8,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Send, Users2, Landmark, HeartHandshake, Compass } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { useRole } from "@/hooks/useRole";
 import { getMissionsDashboardSummary, type MissionsDashboardSummary } from "@/lib/missions/service";
 import { EmptyState } from "./missoesFormHelpers";
 
 export function MissoesOverview({ organizationId }: { organizationId: string }) {
+  const { hasCapability } = useRole();
+  const canViewFinance = hasCapability("finance.read");
   const [loading, setLoading] = useState(true);
   const [moduleUnavailable, setModuleUnavailable] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -100,37 +103,50 @@ export function MissoesOverview({ organizationId }: { organizationId: string }) 
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Card>
-          <CardContent className="p-4 space-y-2">
-            <p className="text-sm font-medium flex items-center gap-1.5"><Landmark size={14} /> Previsto × Recebido</p>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Previsto</span>
-              <span className="font-medium">{currency(summary.expected_total_amount)}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Recebido (transações reais)</span>
-              <span className="font-medium">{currency(summary.received_total_amount)}</span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Valores derivados em tempo real do Financeiro — nunca uma segunda contabilidade.
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 space-y-2">
-            <p className="text-sm font-medium">Parcelas em aberto</p>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Pendentes</span>
-              <span className="font-medium">{summary.installments_pending_count} · {currency(summary.installments_pending_amount)}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Atrasadas</span>
-              <span className="font-medium text-destructive">{summary.installments_overdue_count} · {currency(summary.installments_overdue_amount)}</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {canViewFinance
+        && summary.expected_total_amount !== null
+        && summary.received_total_amount !== null
+        && summary.installments_pending_count !== null
+        && summary.installments_pending_amount !== null
+        && summary.installments_overdue_count !== null
+        && summary.installments_overdue_amount !== null ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Card>
+              <CardContent className="p-4 space-y-2">
+                <p className="text-sm font-medium flex items-center gap-1.5"><Landmark size={14} /> Previsto × Recebido</p>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Previsto</span>
+                  <span className="font-medium">{currency(summary.expected_total_amount)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Recebido (transações reais)</span>
+                  <span className="font-medium">{currency(summary.received_total_amount)}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Valores derivados em tempo real do Financeiro — nunca uma segunda contabilidade.
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 space-y-2">
+                <p className="text-sm font-medium">Parcelas em aberto</p>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Pendentes</span>
+                  <span className="font-medium">{summary.installments_pending_count} · {currency(summary.installments_pending_amount)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Atrasadas</span>
+                  <span className="font-medium text-destructive">{summary.installments_overdue_count} · {currency(summary.installments_overdue_amount)}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <EmptyState
+            title="Indicadores financeiros protegidos"
+            description="As informações de valores e parcelas aparecem somente para quem também possui finance.read."
+          />
+        )}
 
       {summary.missionaries_candidato + summary.missionaries_em_preparacao > 0 && (
         <EmptyState

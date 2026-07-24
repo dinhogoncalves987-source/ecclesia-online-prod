@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS public.missions_transaction_links (
   -- AUTORIZAÇÃO sempre reconfirma dinamicamente via JOIN em transactions).
   organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE RESTRICT,
 
-  link_type text NOT NULL CHECK (link_type IN ('compromisso', 'projeto', 'missionario', 'campanha', 'outro')),
+  link_type text NOT NULL CHECK (link_type IN ('compromisso', 'projeto', 'missionario', 'campanha')),
 
   installment_id uuid REFERENCES public.missions_commitment_installments(id) ON DELETE SET NULL,
   project_id uuid REFERENCES public.missions_projects(id) ON DELETE SET NULL,
@@ -63,7 +63,13 @@ CREATE TABLE IF NOT EXISTS public.missions_transaction_links (
   created_at timestamptz NOT NULL DEFAULT now(),
 
   -- Exatamente UM contexto válido — nunca dois, nunca nenhum.
-  CHECK (num_nonnulls(installment_id, project_id, missionary_id, campaign_id) = 1)
+  CHECK (num_nonnulls(installment_id, project_id, missionary_id, campaign_id) = 1),
+  CHECK (
+    (link_type = 'compromisso' AND installment_id IS NOT NULL)
+    OR (link_type = 'projeto' AND project_id IS NOT NULL)
+    OR (link_type = 'missionario' AND missionary_id IS NOT NULL)
+    OR (link_type = 'campanha' AND campaign_id IS NOT NULL)
+  )
 );
 
 -- Uma transação só pode ter UM vínculo missionário (evita contar o mesmo
@@ -152,7 +158,7 @@ DECLARE
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
 
-  SELECT * INTO v_transaction FROM public.transactions WHERE id = p_transaction_id;
+  SELECT * INTO v_transaction FROM public.transactions WHERE id = p_transaction_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'transaction not found'; END IF;
 
   -- Capability financeira SEMPRE na organização real da transação.
@@ -160,7 +166,7 @@ BEGIN
     RAISE EXCEPTION 'access denied: finance.write is required to link a transaction';
   END IF;
 
-  IF p_link_type NOT IN ('compromisso', 'projeto', 'missionario', 'campanha', 'outro') THEN
+  IF p_link_type NOT IN ('compromisso', 'projeto', 'missionario', 'campanha') THEN
     RAISE EXCEPTION 'invalid link type: %', p_link_type;
   END IF;
 
@@ -168,17 +174,48 @@ BEGIN
     RAISE EXCEPTION 'exactly one missions context must be informed';
   END IF;
 
-  IF p_installment_id IS NOT NULL THEN
-    SELECT organization_id INTO v_context_org FROM public.missions_commitment_installments WHERE id = p_installment_id;
-  ELSIF p_project_id IS NOT NULL THEN
-    SELECT organization_id INTO v_context_org FROM public.missions_projects WHERE id = p_project_id;
-  ELSIF p_missionary_id IS NOT NULL THEN
-    SELECT organization_id INTO v_context_org FROM public.missions_missionaries WHERE id = p_missionary_id;
-  ELSE
-    SELECT organization_id INTO v_context_org FROM public.campaigns WHERE id = p_campaign_id;
+  IF NOT (
+    (p_link_type = 'compromisso' AND p_installment_id IS NOT NULL)
+    OR (p_link_type = 'projeto' AND p_project_id IS NOT NULL)
+    OR (p_link_type = 'missionario' AND p_missionary_id IS NOT NULL)
+    OR (p_link_type = 'campanha' AND p_campaign_id IS NOT NULL)
+  ) THEN
+    RAISE EXCEPTION 'link type does not match the informed missions context';
   END IF;
 
-  IF v_context_org IS NULL THEN RAISE EXCEPTION 'missions context not found'; END IF;
+  IF v_transaction.status NOT IN ('Confirmado', 'Pago') THEN
+    RAISE EXCEPTION 'only confirmed or paid transactions can be linked to missions';
+  END IF;
+
+  IF p_installment_id IS NOT NULL THEN
+    SELECT organization_id INTO v_context_org
+    FROM public.missions_commitment_installments
+    WHERE id = p_installment_id
+      AND status NOT IN ('cancelado', 'isento');
+
+    IF v_transaction.type <> 'Entrada' THEN
+      RAISE EXCEPTION 'an installment can only be settled by an incoming transaction';
+    END IF;
+  ELSIF p_project_id IS NOT NULL THEN
+    SELECT organization_id INTO v_context_org
+    FROM public.missions_projects
+    WHERE id = p_project_id
+      AND status IN ('planejado', 'ativo', 'suspenso');
+  ELSIF p_missionary_id IS NOT NULL THEN
+    SELECT organization_id INTO v_context_org
+    FROM public.missions_missionaries
+    WHERE id = p_missionary_id
+      AND status IN ('em_preparacao', 'ativo', 'em_licenca');
+  ELSE
+    SELECT organization_id INTO v_context_org
+    FROM public.campaigns
+    WHERE id = p_campaign_id
+      AND status IN ('active', 'paused');
+  END IF;
+
+  IF v_context_org IS NULL THEN
+    RAISE EXCEPTION 'missions context was not found or is closed for new financial links';
+  END IF;
 
   -- Capability de Missões SEMPRE na organização real do contexto missionário
   -- — NUNCA substituída pela capability financeira acima.
@@ -228,18 +265,47 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_row public.missions_transaction_links%ROWTYPE;
+  v_transaction_org uuid;
+  v_context_org uuid;
 BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
 
-  SELECT * INTO v_row FROM public.missions_transaction_links WHERE id = p_link_id;
+  SELECT * INTO v_row FROM public.missions_transaction_links WHERE id = p_link_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'link not found'; END IF;
 
-  IF NOT public.has_org_access_permission(auth.uid(), v_row.organization_id, 'finance.write') THEN
+  SELECT organization_id INTO v_transaction_org
+  FROM public.transactions
+  WHERE id = v_row.transaction_id
+  FOR UPDATE;
+
+  IF v_transaction_org IS NULL THEN
+    RAISE EXCEPTION 'linked transaction not found';
+  END IF;
+
+  IF v_row.installment_id IS NOT NULL THEN
+    SELECT organization_id INTO v_context_org FROM public.missions_commitment_installments WHERE id = v_row.installment_id;
+  ELSIF v_row.project_id IS NOT NULL THEN
+    SELECT organization_id INTO v_context_org FROM public.missions_projects WHERE id = v_row.project_id;
+  ELSIF v_row.missionary_id IS NOT NULL THEN
+    SELECT organization_id INTO v_context_org FROM public.missions_missionaries WHERE id = v_row.missionary_id;
+  ELSE
+    SELECT organization_id INTO v_context_org FROM public.campaigns WHERE id = v_row.campaign_id;
+  END IF;
+
+  IF v_context_org IS NULL THEN
+    RAISE EXCEPTION 'linked missions context not found';
+  END IF;
+
+  IF NOT public.has_org_access_permission(auth.uid(), v_transaction_org, 'finance.write') THEN
     RAISE EXCEPTION 'access denied: finance.write is required to unlink a transaction';
   END IF;
 
-  IF NOT public.has_org_access_permission(auth.uid(), v_row.organization_id, 'missions.finance') THEN
+  IF NOT public.has_org_access_permission(auth.uid(), v_context_org, 'missions.finance') THEN
     RAISE EXCEPTION 'access denied: missions.finance is required to unlink a transaction';
+  END IF;
+
+  IF NOT public.is_organization_descendant_or_self(v_transaction_org, v_context_org) THEN
+    RAISE EXCEPTION 'linked missions context is outside the transaction organization scope';
   END IF;
 
   DELETE FROM public.missions_transaction_links WHERE id = p_link_id;
@@ -318,6 +384,60 @@ $$;
 REVOKE ALL ON FUNCTION public.list_missions_linked_transactions(uuid, uuid, uuid, uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.list_missions_linked_transactions(uuid, uuid, uuid, uuid) TO authenticated;
 
+-- Seletor seguro para a interface: evita exigir que o usuário copie UUIDs
+-- do Financeiro e não expõe transações fora do escopo real autorizado.
+CREATE OR REPLACE FUNCTION public.search_missions_available_transactions(
+  p_organization_id uuid,
+  p_query text DEFAULT NULL,
+  p_limit integer DEFAULT 30
+)
+RETURNS TABLE (
+  id uuid,
+  transaction_date date,
+  description text,
+  amount numeric,
+  transaction_type text,
+  transaction_status text
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_query text := NULLIF(btrim(COALESCE(p_query, '')), '');
+  v_limit integer := LEAST(GREATEST(COALESCE(p_limit, 30), 1), 50);
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'authentication required'; END IF;
+
+  IF NOT public.has_org_access_permission(auth.uid(), p_organization_id, 'finance.read') THEN
+    RAISE EXCEPTION 'access denied: finance.read is required to search transactions';
+  END IF;
+
+  RETURN QUERY
+  SELECT t.id, t.date, t.description, t.amount, t.type, t.status
+  FROM public.transactions t
+  WHERE t.organization_id = p_organization_id
+    AND t.status IN ('Confirmado', 'Pago')
+    AND NOT EXISTS (
+      SELECT 1
+      FROM public.missions_transaction_links l
+      WHERE l.transaction_id = t.id
+    )
+    AND (
+      v_query IS NULL
+      OR t.description ILIKE ('%' || v_query || '%')
+      OR t.category ILIKE ('%' || v_query || '%')
+      OR t.id::text ILIKE ('%' || v_query || '%')
+    )
+  ORDER BY t.date DESC, t.created_at DESC
+  LIMIT v_limit;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.search_missions_available_transactions(uuid, text, integer) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.search_missions_available_transactions(uuid, text, integer) TO authenticated;
+
 -- ── Trigger: recomputa a parcela quando um vínculo é removido em CASCADE ─
 -- (ex.: exclusão administrativa da própria transação por outro fluxo do
 -- Financeiro geral — fora do escopo de Missões alterar, mas a parcela
@@ -354,6 +474,9 @@ BEGIN
   END IF;
   IF to_regprocedure('public.unlink_missions_transaction(uuid)') IS NULL THEN
     RAISE EXCEPTION 'Migration missions_transaction_links: RPC unlink_missions_transaction nao foi criada';
+  END IF;
+  IF to_regprocedure('public.search_missions_available_transactions(uuid,text,integer)') IS NULL THEN
+    RAISE EXCEPTION 'Migration missions_transaction_links: seletor seguro de transacoes nao foi criado';
   END IF;
   RAISE NOTICE 'Migration missions_transaction_links: tabela, RLS e RPCs financeiras confirmadas ✓';
 END $$;

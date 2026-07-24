@@ -17,9 +17,9 @@ import {
   loadMissionsSupporters, createMissionsSupporter, updateMissionsSupporterStatus,
   loadMissionsCommitments, createMissionsCommitment, updateMissionsCommitmentStatus,
   loadMissionsInstallments, generateMissionsCommitmentInstallment, setMissionsInstallmentExemption,
-  loadMissionsMissionaries, loadMissionsProjects, getMissionsMemberLabels,
+  loadMissionsMissionaries, loadMissionsProjects, loadMissionsCampaigns, getMissionsMemberLabels,
   type MissionsSupporterRow, type MissionsSupporterCommitmentRow, type MissionsCommitmentInstallmentRow,
-  type MissionsMissionaryRow, type MissionsProjectRow, type MissionsMemberLabel,
+  type MissionsMissionaryRow, type MissionsProjectRow, type MissionsMemberLabel, type MissionsCampaignRow,
 } from "@/lib/missions/service";
 import {
   MISSIONS_SUPPORTER_STATUSES, MISSIONS_SUPPORTER_STATUS_LABELS, type MissionsSupporterStatus,
@@ -28,7 +28,12 @@ import {
   MISSIONS_COMMITMENT_STATUSES, MISSIONS_COMMITMENT_STATUS_LABELS, type MissionsCommitmentStatus,
   MISSIONS_INSTALLMENT_STATUS_LABELS, type MissionsInstallmentStatus,
 } from "@/lib/missions/constants";
-import { isValidCommitmentStatusTransition, isCommitmentClosed, canExemptOrCancelInstallment } from "@/lib/missions/rules";
+import {
+  isValidCommitmentStatusTransition,
+  isValidSupporterStatusTransition,
+  isCommitmentClosed,
+  canExemptOrCancelInstallment,
+} from "@/lib/missions/rules";
 import { FormInputLabeled, FormSelectLabeled, FormTextareaLabeled, StatusPill, EmptyState } from "./missoesFormHelpers";
 import { MissoesMemberPicker } from "./MissoesMemberPicker";
 
@@ -60,6 +65,10 @@ const currency = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currenc
 export function MissoesSupporters({ organizationId }: { organizationId: string }) {
   const { hasCapability } = useRole();
   const canManage = hasCapability("missions.manage");
+  const canViewFinance = hasCapability("finance.read");
+  const canManageFinance = canManage
+    && hasCapability("missions.finance")
+    && hasCapability("finance.write");
   const [loading, setLoading] = useState(true);
   const [moduleUnavailable, setModuleUnavailable] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -88,6 +97,11 @@ export function MissoesSupporters({ organizationId }: { organizationId: string }
   }, [organizationId]);
 
   useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => {
+    setSelected((current) => (
+      current ? supporters.find((supporter) => supporter.id === current.id) ?? null : null
+    ));
+  }, [supporters]);
 
   if (loading) {
     return <div className="flex items-center justify-center py-16 text-muted-foreground gap-2"><Loader2 className="animate-spin" size={18} /> Carregando apoiadores…</div>;
@@ -149,6 +163,8 @@ export function MissoesSupporters({ organizationId }: { organizationId: string }
           memberName={memberLabel(selected.member_id)}
           organizationId={organizationId}
           canManage={canManage}
+          canViewFinance={canViewFinance}
+          canManageFinance={canManageFinance}
           onClose={() => setSelected(null)}
           onChanged={reload}
         />
@@ -208,11 +224,22 @@ function CreateSupporterDialog({ open, onOpenChange, organizationId, onCreated }
   );
 }
 
-function SupporterDetailDialog({ supporter, memberName, organizationId, canManage, onClose, onChanged }: {
+function SupporterDetailDialog({
+  supporter,
+  memberName,
+  organizationId,
+  canManage,
+  canViewFinance,
+  canManageFinance,
+  onClose,
+  onChanged,
+}: {
   supporter: MissionsSupporterRow;
   memberName: string;
   organizationId: string;
   canManage: boolean;
+  canViewFinance: boolean;
+  canManageFinance: boolean;
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -224,14 +251,25 @@ function SupporterDetailDialog({ supporter, memberName, organizationId, canManag
   const currentStatus = supporter.status as MissionsSupporterStatus;
 
   const reload = useCallback(async () => {
+    if (!canViewFinance) {
+      setCommitments([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const res = await loadMissionsCommitments(supporter.id);
     setCommitments(res.rows);
     setError(res.error?.message ?? null);
     setLoading(false);
-  }, [supporter.id]);
+  }, [supporter.id, canViewFinance]);
 
   useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => {
+    setSelectedCommitment((current) => (
+      current ? commitments.find((commitment) => commitment.id === current.id) ?? null : null
+    ));
+  }, [commitments]);
 
   const handleStatusChange = async (status: MissionsSupporterStatus) => {
     const { error: err } = await updateMissionsSupporterStatus(supporter.id, status);
@@ -249,23 +287,30 @@ function SupporterDetailDialog({ supporter, memberName, organizationId, canManag
             <StatusPill label={MISSIONS_SUPPORTER_STATUS_LABELS[currentStatus]} tone={SUPPORTER_STATUS_TONE[currentStatus]} />
             {canManage && (
               <div className="flex flex-wrap gap-1.5">
-                {MISSIONS_SUPPORTER_STATUSES.filter((s) => s !== currentStatus).map((s) => (
+                {MISSIONS_SUPPORTER_STATUSES
+                  .filter((status) => status !== currentStatus && isValidSupporterStatusTransition(currentStatus, status))
+                  .map((s) => (
                   <Button key={s} size="sm" variant="outline" onClick={() => handleStatusChange(s)}>{MISSIONS_SUPPORTER_STATUS_LABELS[s]}</Button>
-                ))}
+                  ))}
               </div>
             )}
           </div>
 
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium">Compromissos</p>
-            {canManage && (
+            {canManageFinance && currentStatus === "ativo" && (
               <Button size="sm" variant="outline" onClick={() => setCreateCommitmentOpen(true)}>
                 <Plus size={14} className="mr-1.5" /> Novo compromisso
               </Button>
             )}
           </div>
 
-          {loading ? (
+          {!canViewFinance ? (
+            <EmptyState
+              title="Compromissos financeiros protegidos"
+              description="Visualizar valores, compromissos e parcelas exige finance.read."
+            />
+          ) : loading ? (
             <div className="flex items-center gap-2 text-muted-foreground text-sm py-3"><Loader2 className="animate-spin" size={14} /> Carregando…</div>
           ) : error ? (
             <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
@@ -308,7 +353,7 @@ function SupporterDetailDialog({ supporter, memberName, organizationId, canManag
       {selectedCommitment && (
         <CommitmentDetailDialog
           commitment={selectedCommitment}
-          canManage={canManage}
+          canManage={canManageFinance}
           onClose={() => setSelectedCommitment(null)}
           onChanged={reload}
         />
@@ -328,6 +373,7 @@ function CreateCommitmentDialog({ supporterId, organizationId, onClose, onCreate
   const [contextKind, setContextKind] = useState<ContextKind>("missionario");
   const [missionaries, setMissionaries] = useState<MissionsMissionaryRow[]>([]);
   const [projects, setProjects] = useState<MissionsProjectRow[]>([]);
+  const [campaigns, setCampaigns] = useState<MissionsCampaignRow[]>([]);
   const [memberLabels, setMemberLabels] = useState<Map<string, MissionsMemberLabel>>(new Map());
   const [missionaryId, setMissionaryId] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -336,30 +382,46 @@ function CreateCommitmentDialog({ supporterId, organizationId, onClose, onCreate
   const [amount, setAmount] = useState("");
   const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
+  const [contextLoading, setContextLoading] = useState(true);
+  const [contextLoadError, setContextLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [mRes, pRes] = await Promise.all([loadMissionsMissionaries(organizationId), loadMissionsProjects(organizationId)]);
+      setContextLoading(true);
+      setContextLoadError(null);
+      const [mRes, pRes, cRes] = await Promise.all([
+        loadMissionsMissionaries(organizationId),
+        loadMissionsProjects(organizationId),
+        loadMissionsCampaigns(organizationId),
+      ]);
       if (cancelled) return;
-      setMissionaries(mRes.rows);
-      setProjects(pRes.rows);
+      let nextError = mRes.error?.message ?? pRes.error?.message ?? cRes.error?.message ?? null;
+      setMissionaries(mRes.rows.filter((row) => ["em_preparacao", "ativo", "em_licenca"].includes(row.status)));
+      setProjects(pRes.rows.filter((row) => ["planejado", "ativo", "suspenso"].includes(row.status)));
+      setCampaigns(cRes.rows);
       const memberIds = [...new Set(mRes.rows.map((m) => m.member_id))];
       if (memberIds.length > 0) {
         const labels = await getMissionsMemberLabels(organizationId, memberIds);
-        if (!cancelled) setMemberLabels(new Map(labels.rows.map((m) => [m.id, m])));
+        if (cancelled) return;
+        nextError ??= labels.error?.message ?? null;
+        setMemberLabels(new Map(labels.rows.map((m) => [m.id, m])));
       }
+      setContextLoadError(nextError);
+      setContextLoading(false);
     })();
     return () => { cancelled = true; };
   }, [organizationId]);
 
   const handleSave = async () => {
+    if (contextLoading) { toast.error("Aguarde o carregamento dos contextos."); return; }
+    if (contextLoadError) { toast.error("Corrija o erro de carregamento antes de criar o compromisso."); return; }
     const parsedAmount = Number(amount);
     if (!parsedAmount || parsedAmount <= 0) { toast.error("Informe um valor previsto maior que zero."); return; }
     if (contextKind === "missionario" && !missionaryId) { toast.error("Selecione o missionário."); return; }
     if (contextKind === "projeto" && !projectId) { toast.error("Selecione o projeto."); return; }
-    if (contextKind === "campanha" && !campaignId.trim()) { toast.error("Informe o ID da campanha."); return; }
+    if (contextKind === "campanha" && !campaignId) { toast.error("Selecione a campanha."); return; }
     setSaving(true);
     const { error } = await createMissionsCommitment({
       supporter_id: supporterId,
@@ -367,7 +429,7 @@ function CreateCommitmentDialog({ supporterId, organizationId, onClose, onCreate
       committed_amount: parsedAmount,
       missionary_id: contextKind === "missionario" ? missionaryId : null,
       project_id: contextKind === "projeto" ? projectId : null,
-      campaign_id: contextKind === "campanha" ? campaignId.trim() : null,
+      campaign_id: contextKind === "campanha" ? campaignId : null,
       start_date: startDate,
       notes: notes.trim() || null,
     });
@@ -386,6 +448,16 @@ function CreateCommitmentDialog({ supporterId, organizationId, onClose, onCreate
           <p className="text-xs text-muted-foreground">
             Um compromisso aponta para exatamente um contexto — nunca dois, nunca nenhum.
           </p>
+          {contextLoading && (
+            <div className="flex items-center gap-2 rounded-lg border border-border/60 p-3 text-sm text-muted-foreground">
+              <Loader2 className="animate-spin" size={14} /> Carregando contextos disponíveis…
+            </div>
+          )}
+          {contextLoadError && (
+            <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+              Não foi possível carregar os contextos do compromisso. {contextLoadError}
+            </div>
+          )}
           <FormSelectLabeled
             label="Contexto"
             value={contextKind}
@@ -408,7 +480,13 @@ function CreateCommitmentDialog({ supporterId, organizationId, onClose, onCreate
             <FormSelectLabeled label="Projeto" value={projectId} onChange={setProjectId} options={projects.map((p) => ({ value: p.id, label: p.name }))} />
           )}
           {contextKind === "campanha" && (
-            <FormInputLabeled label="ID da campanha" value={campaignId} onChange={setCampaignId} placeholder="UUID da campanha já existente" />
+            <FormSelectLabeled
+              label="Campanha"
+              value={campaignId}
+              onChange={setCampaignId}
+              options={campaigns.map((campaign) => ({ value: campaign.id, label: campaign.title }))}
+              placeholder="Selecione uma campanha ativa"
+            />
           )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <FormSelectLabeled label="Periodicidade" value={periodicity} onChange={(v) => setPeriodicity(v as MissionsPeriodicity)} options={MISSIONS_PERIODICITIES.map((p) => ({ value: p, label: MISSIONS_PERIODICITY_LABELS[p] }))} />
@@ -419,7 +497,9 @@ function CreateCommitmentDialog({ supporterId, organizationId, onClose, onCreate
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving}>{saving ? "Salvando…" : "Criar compromisso"}</Button>
+          <Button onClick={handleSave} disabled={saving || contextLoading || Boolean(contextLoadError)}>
+            {saving ? "Salvando…" : "Criar compromisso"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -436,6 +516,7 @@ function CommitmentDetailDialog({ commitment, canManage, onClose, onChanged }: {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [exemption, setExemption] = useState<{ installmentId: string; status: "cancelado" | "isento" } | null>(null);
   const currentStatus = commitment.status as MissionsCommitmentStatus;
   const closed = isCommitmentClosed(currentStatus);
   const nextOptions = MISSIONS_COMMITMENT_STATUSES.filter((s) => s !== currentStatus && isValidCommitmentStatusTransition(currentStatus, s));
@@ -455,13 +536,6 @@ function CommitmentDetailDialog({ commitment, canManage, onClose, onChanged }: {
     if (err) { toast.error(`Não foi possível mudar o status: ${err}`); return; }
     toast.success(`Compromisso agora está: ${MISSIONS_COMMITMENT_STATUS_LABELS[status]}`);
     onChanged();
-  };
-
-  const handleExempt = async (installmentId: string, status: "cancelado" | "isento") => {
-    const { error: err } = await setMissionsInstallmentExemption({ installment_id: installmentId, status });
-    if (err) { toast.error(`Não foi possível atualizar a parcela: ${err}`); return; }
-    toast.success("Parcela atualizada.");
-    reload();
   };
 
   return (
@@ -511,7 +585,7 @@ function CommitmentDetailDialog({ commitment, canManage, onClose, onChanged }: {
                     <div className="flex items-center gap-1.5 shrink-0">
                       <StatusPill label={MISSIONS_INSTALLMENT_STATUS_LABELS[status]} tone={INSTALLMENT_STATUS_TONE[status]} />
                       {canExempt && (
-                        <Button size="sm" variant="ghost" onClick={() => handleExempt(i.id, "isento")} title="Isentar (sem valor pago)">
+                        <Button size="sm" variant="ghost" onClick={() => setExemption({ installmentId: i.id, status: "isento" })} title="Isentar (sem valor pago)">
                           <Ban size={14} />
                         </Button>
                       )}
@@ -530,6 +604,69 @@ function CommitmentDetailDialog({ commitment, canManage, onClose, onChanged }: {
       {generateOpen && (
         <GenerateInstallmentDialog commitmentId={commitment.id} onClose={() => setGenerateOpen(false)} onGenerated={reload} />
       )}
+      {exemption && (
+        <InstallmentExemptionDialog
+          installmentId={exemption.installmentId}
+          status={exemption.status}
+          onClose={() => setExemption(null)}
+          onSaved={reload}
+        />
+      )}
+    </Dialog>
+  );
+}
+
+function InstallmentExemptionDialog({
+  installmentId,
+  status,
+  onClose,
+  onSaved,
+}: {
+  installmentId: string;
+  status: "cancelado" | "isento";
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!reason.trim()) {
+      toast.error("Informe a justificativa da alteração.");
+      return;
+    }
+    setSaving(true);
+    const { error } = await setMissionsInstallmentExemption({
+      installment_id: installmentId,
+      status,
+      notes: reason.trim(),
+    });
+    setSaving(false);
+    if (error) {
+      toast.error(`Não foi possível atualizar a parcela: ${error}`);
+      return;
+    }
+    toast.success("Parcela atualizada com justificativa.");
+    onClose();
+    onSaved();
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Justificar isenção da parcela</DialogTitle></DialogHeader>
+        <FormTextareaLabeled
+          label="Justificativa"
+          value={reason}
+          onChange={setReason}
+          required
+          placeholder="Explique por que esta parcela será isenta."
+        />
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleSave} disabled={saving}>{saving ? "Salvando…" : "Confirmar isenção"}</Button>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
   );
 }
@@ -545,7 +682,7 @@ function GenerateInstallmentDialog({ commitmentId, onClose, onGenerated }: {
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
-    if (!/^\d{4}-\d{2}$/.test(referenceMonth)) { toast.error("Informe o mês de referência no formato AAAA-MM."); return; }
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(referenceMonth)) { toast.error("Informe um mês de referência válido."); return; }
     setSaving(true);
     const { error } = await generateMissionsCommitmentInstallment({
       commitment_id: commitmentId,
@@ -565,7 +702,18 @@ function GenerateInstallmentDialog({ commitmentId, onClose, onGenerated }: {
       <DialogContent>
         <DialogHeader><DialogTitle>Gerar parcela prevista</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <FormInputLabeled label="Mês de referência (AAAA-MM)" value={referenceMonth} onChange={setReferenceMonth} required placeholder="2026-08" />
+          <FormInputLabeled
+            label="Mês de referência"
+            type="month"
+            value={referenceMonth}
+            onChange={(value) => {
+              setReferenceMonth(value);
+              if (/^\d{4}-(0[1-9]|1[0-2])$/.test(value)) {
+                setDueDate(`${value}-${dueDate.slice(-2)}`);
+              }
+            }}
+            required
+          />
           <FormInputLabeled label="Vencimento" type="date" value={dueDate} onChange={setDueDate} required />
           <FormInputLabeled label="Valor previsto (opcional — usa o valor do compromisso se vazio)" type="number" min={0.01} step="0.01" value={amount} onChange={setAmount} />
         </div>

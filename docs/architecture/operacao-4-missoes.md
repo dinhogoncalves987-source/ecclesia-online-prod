@@ -1,14 +1,13 @@
 # Operação 4 — Missões completa sobre a fundação revisada do Ecclesia
 
-Documento de passagem da entrega **Sonnet**, ainda **pendente de revisão técnica final do Codex**
-(diferente de `operacao-2-discipulado.md`/`operacao-3-teologia.md`, que já documentam entregas
-revisadas). Ver também `docs/architecture/contrato-dominios-institucionais.md` (contrato entre os
-quatro domínios, seção 12) e `docs/architecture/operacao-3-teologia.md` (Operação 3, já revisada).
-Entrega estrutural construída na branch `handoff/sonnet-operacao-4-missoes-20260723`, criada a
-partir de `review/operacao-3-teologia` (Operações 1, 2 e 3 já revisadas presentes integralmente).
-Nenhuma migration foi aplicada e nenhum push, PR, merge ou deploy foi executado durante a
-construção do Sonnet. Esta é a **quarta e última** operação estrutural planejada da arquitetura do
-Ecclesia.
+Documento final da entrega estrutural **Sonnet**, revisada tecnicamente pelo **Codex** sobre a
+branch `review/operacao-4-missoes`. Ver também
+`docs/architecture/contrato-dominios-institucionais.md` (contrato entre os quatro domínios, seção
+12) e `docs/architecture/operacao-3-teologia.md` (Operação 3 já revisada). A base veio da branch
+`handoff/sonnet-operacao-4-missoes-20260723`, criada a partir de
+`review/operacao-3-teologia`, portanto contém integralmente as Operações 1, 2 e 3 revisadas.
+Nenhuma migration foi aplicada e nenhum push, PR, merge ou deploy foi executado durante a revisão
+Codex. Esta é a **quarta e última** operação estrutural planejada da arquitetura do Ecclesia.
 
 ## 1. Estado encontrado antes da operação (auditoria)
 
@@ -188,7 +187,8 @@ listadas em `supabase/migration-manifest.json` na categoria `staging_feature` (v
 ### 6.4 Parcela nunca é "paga" manualmente (contrato §7)
 
 - `_recompute_missions_installment_status()` calcula `paid_amount` somando somente transações reais
-  do tipo `Entrada` vinculadas à parcela (`JOIN public.transactions`) e deriva o `status`:
+  do tipo `Entrada`, com status financeiro real `Confirmado` ou `Pago`, vinculadas à parcela
+  (`JOIN public.transactions`) e deriva o `status`:
   `pago` (recebido ≥ previsto), `parcial` (recebido > 0 e < previsto), `atrasado` (vencida sem
   recebimento), `pendente` (vence hoje sem recebimento) ou `previsto` (ainda não venceu).
   `cancelado`/`isento` são preservados, nunca recomputados.
@@ -210,7 +210,10 @@ Todas as transições abaixo são validadas dentro de RPCs `SECURITY DEFINER` (n
   `retornado → em_preparacao/encerrado` (nova fase de envio), `encerrado` terminal.
 - **Projeto**: `rascunho → planejado/cancelado`, `planejado → ativo/cancelado`,
   `ativo → suspenso/concluido/cancelado`, `suspenso → ativo/cancelado`, `concluido → arquivado`,
-  `cancelado → arquivado`, `arquivado` terminal.
+  `cancelado → arquivado`, `arquivado` terminal. A ativação também exige data de início vigente e
+  ao menos um vínculo ativo com um missionário ainda elegível; concluir/cancelar encerra os vínculos
+  ativos automaticamente.
+- **Apoiador**: `ativo → inativo/encerrado`, `inativo → ativo/encerrado`, `encerrado` terminal.
 - **Compromisso**: `ativo → pausado/encerrado/cancelado`, `pausado → ativo/encerrado/cancelado`,
   `encerrado`/`cancelado` terminais.
 - **Parcela**: status sempre derivado (ver seção 6.4) — não é uma máquina de estados no sentido
@@ -259,8 +262,9 @@ Todas as 9 tabelas têm `ENABLE ROW LEVEL SECURITY` (verificado por teste). Nenh
 `USING (true)` ou `WITH CHECK (true)` (verificado por teste — nenhuma ocorrência em todo o texto SQL
 das 6 migrations). Toda policy resolve autorização por `has_org_access_permission()` — nunca role
 hardcoded. Tabelas simples (`missions_settings`, `missions_missionaries`, `missions_projects`,
-`missions_supporters`, `missions_supporter_commitments`, `missions_commitment_installments`) usam
-`has_org_access_permission()` direto sobre `organization_id`; tabelas dependentes
+`missions_supporters`) usam `has_org_access_permission()` direto sobre `organization_id`;
+`missions_supporter_commitments` e `missions_commitment_installments` exigem conjuntamente
+`missions.read` e `finance.read`; tabelas dependentes
 (`missions_project_assignments`) resolvem a organização por `EXISTS (... JOIN missions_projects ...)`.
 `missions_missionary_confidential_info` exige `missions.confidential` via `EXISTS (JOIN
 missions_missionaries)`. `missions_transaction_links` exige **ambas** `finance.read` (organização da
@@ -271,7 +275,7 @@ RPC.
 
 ## 11. RPCs e funções internas
 
-**26 RPCs públicas** (`GRANT EXECUTE ... TO authenticated`, todas com `REVOKE ALL ... FROM PUBLIC,
+**27 RPCs públicas** (`GRANT EXECUTE ... TO authenticated`, todas com `REVOKE ALL ... FROM PUBLIC,
 anon`): `upsert_missions_settings`, `create_missions_missionary`,
 `update_missions_missionary_profile`, `update_missions_missionary_status`,
 `upsert_missions_missionary_confidential_info`, `create_missions_project`,
@@ -281,36 +285,39 @@ anon`): `upsert_missions_settings`, `create_missions_missionary`,
 `update_missions_commitment_status`, `generate_missions_commitment_installment`,
 `refresh_missions_installment_status`, `set_missions_installment_exemption`,
 `link_missions_transaction`, `unlink_missions_transaction`, `list_missions_linked_transactions`,
-`search_missions_members`, `get_missions_member_labels`, `get_missions_dashboard_summary`,
+`search_missions_available_transactions`, `search_missions_members`,
+`get_missions_member_labels`, `get_missions_dashboard_summary`,
 `list_missions_missionaries_by_field`, `list_missions_project_indicators`,
 `list_missions_commitment_installments`.
 
-**5 funções internas** (`REVOKE ALL FROM PUBLIC, anon, authenticated` — nunca chamáveis diretamente
+**8 funções internas** (`REVOKE ALL FROM PUBLIC, anon, authenticated` — nunca chamáveis diretamente
 pelo navegador, só por trigger ou por outra função `SECURITY DEFINER`):
 `_missions_missionaries_validate_scope`, `_missions_projects_validate_scope`,
 `_missions_supporters_validate_scope`, `_recompute_missions_installment_status`,
 `_missions_transaction_links_after_delete`, `_register_missions_member_history`,
-`_missions_missionaries_register_history`, `_missions_project_assignments_register_history` (8
-funções internas no total, contando as de histórico da migration 6).
+`_missions_missionaries_register_history`, `_missions_project_assignments_register_history`.
 
 ## 12. Integração financeira (sem duplicar Financeiro)
 
 - `missions_transaction_links` **não tem coluna de valor monetário** — apenas `transaction_id` (FK
   única para `public.transactions`), `organization_id` (snapshot validado), `link_type`
-  (`compromisso`/`projeto`/`missionario`/`campanha`/`outro`), e exatamente um dos quatro contextos
+  (`compromisso`/`projeto`/`missionario`/`campanha`), e exatamente um dos quatro contextos
   (`installment_id`/`project_id`/`missionary_id`/`campaign_id`), via
   `CHECK (num_nonnulls(...) = 1)`.
 - `link_missions_transaction()` exige `finance.write` na organização real da transação **e**
   `missions.finance` na organização real do contexto missionário — nunca uma capability substituindo
   a outra. Caixa central pode vincular contexto descendente; caixa local não vincula contexto
   missionário superior (`is_organization_descendant_or_self`). Uma transação só pode ser vinculada
-  uma vez (índice único em `transaction_id`). Ao vincular uma parcela, recomputa o status dela
-  imediatamente.
+  uma vez (índice único em `transaction_id`) e precisa estar `Confirmado`/`Pago`; uma parcela aceita
+  apenas transação de `Entrada`. Ao vincular uma parcela, recomputa o status dela imediatamente.
 - `unlink_missions_transaction()` exige as mesmas duas capabilities e recomputa a parcela afetada
   após remover o vínculo.
 - `list_missions_linked_transactions()` exige `missions.read` **e** `finance.read` e revalida cada
   linha contra a organização real do contexto e da transação, apesar de ser `SECURITY DEFINER`.
   Valor/tipo/data/descrição/status vêm sempre de `JOIN public.transactions`.
+- `search_missions_available_transactions()` é o seletor server-side da interface: retorna no
+  máximo 50 transações `Confirmado`/`Pago`, ainda não vinculadas e pertencentes à organização
+  financeira autorizada. O usuário nunca precisa conhecer ou copiar UUIDs internos.
 - "Portadores" do WinTechi = `finance_accounts` reais (configuráveis como padrão em
   `missions_settings.default_finance_account_id`); "Contas/Grupos Contábeis" =
   `finance_account_categories` reais (`default_account_category_id`); saldo, transferência,
@@ -343,11 +350,12 @@ funções internas no total, contando as de histórico da migration 6).
   resultados por busca.
 - **Relatórios derivados** (contrato §12), nenhum persistido: `get_missions_dashboard_summary`
   (contagens por situação de missionário, projetos ativos/planejados, apoiadores/compromissos
-  ativos, parcelas pendentes/atrasadas com valor, previsto × realizado total);
+  ativos; campos financeiros ficam `NULL` sem `finance.read`);
   `list_missions_missionaries_by_field` (agrupamento por país/estado/região, só missionários em
   atividade); `list_missions_project_indicators` (previsto de compromissos ativos × realizado de
-  transações reais vinculadas, por projeto); `list_missions_commitment_installments` (parcelas com
-  nome do apoiador, contexto e filtro de atraso).
+  transações de entrada `Confirmado`/`Pago`, por projeto); `list_missions_commitment_installments`
+  (parcelas com nome do apoiador, contexto e filtro de atraso). Os dois relatórios monetários exigem
+  simultaneamente `missions.read` e `finance.read`.
 
 ## 14. Telas e fluxos
 
@@ -358,10 +366,12 @@ funções internas no total, contando as de histórico da migration 6).
   `get_missions_dashboard_summary`, com loading/erro explícitos e distinção de migration ausente),
   `MissoesMissionaries` (lista, criação, edição de perfil público, transições de status, painel de
   informações confidenciais gated por `missions.confidential`), `MissoesProjects` (lista, criação,
-  edição, transições de status, associação de membros com papel), `MissoesSupporters` (apoiadores,
+  edição, transições de status, pré-requisitos de ativação visíveis e associação de membros com
+  papel), `MissoesSupporters` (apoiadores,
   compromissos por contexto, geração de parcelas, isenção/cancelamento), `MissoesFinance` (vínculo de
-  transações reais por contexto, exigindo as duas capabilities), `MissoesReports` (relatórios
-  derivados), `MissoesSettings` (parâmetros organizacionais), `MissoesMemberPicker` (busca
+  transações reais por busca/seleção segura, exigindo as duas capabilities), `MissoesReports`
+  (relatórios monetários ocultos sem `finance.read`), `MissoesSettings` (parâmetros organizacionais
+  com seletores das estruturas reais do Financeiro), `MissoesMemberPicker` (busca
   server-side via `search_missions_members`, mesmo padrão do `TeologiaMemberPicker`/
   `DiscipuladoMemberPicker`), `missoesFormHelpers.tsx` (re-export dos helpers genéricos de
   `discipuladoFormHelpers.tsx` — nenhuma duplicação visual).
@@ -389,7 +399,7 @@ botões utilizáveis por toque, navegação compatível com a barra inferior exi
   verificação pós-DDL em todas, nenhuma migration de Operação 1/2/3 reaberta, regra central de
   identidade (nenhuma tabela de pessoa/organização/documento/storage/campanha paralela), RLS
   habilitado nas 9 tabelas, ausência de `USING/WITH CHECK (true)`, toda policy usando capability
-  real, revogação de escrita direta nas 9 tabelas, `REVOKE ALL`/`GRANT EXECUTE` das 26 RPCs públicas
+  real, revogação de escrita direta nas 9 tabelas, `REVOKE ALL`/`GRANT EXECUTE` das 27 RPCs públicas
   e das funções internas, índices únicos de concorrência/duplicidade, máquinas de estado protegidas
   contra lançamento em contexto inválido/fechado, regra "parcela nunca paga sem transação real"
   (recomputo por soma de `Entrada`, preservação de `cancelado`/`isento`, bloqueio de
@@ -405,7 +415,7 @@ botões utilizáveis por toque, navegação compatível com a barra inferior exi
   comum), diretório mínimo de membros sem PII, relatórios derivados sem segundo motor genérico,
   parâmetros organizacionais sem segredo/credencial.
 - **`src/lib/missions/rules.test.ts` (já existente nesta entrega)**: todas as transições válidas/
-  inválidas de missionário/projeto/compromisso, derivação de status de parcela (preservação de
+  inválidas de missionário/projeto/apoiador/compromisso, derivação de status de parcela (preservação de
   cancelado/isento, pago/parcial/atrasado/pendente/previsto), regra de cancelamento/isenção,
   contexto único do vínculo financeiro, cálculo de percentual de realização.
 - **`src/config/modules.test.ts` (estendido, +2 testes)**: `missions` desabilitado em produção/
@@ -415,55 +425,67 @@ botões utilizáveis por toque, navegação compatível com a barra inferior exi
 
 ## 17. Comandos executados e resultados reais
 
-**Bloqueio de ambiente**: o Shell desta sessão ficou consistentemente sem resposta (`no exit status`)
-para qualquer comando, incluindo comandos triviais (`echo`/`Write-Output`) repetidos em múltiplas
-tentativas espaçadas no tempo. **Nenhum dos comandos abaixo pôde ser executado nesta sessão**:
-`npx vitest run`, `npx tsc --noEmit`, `npx eslint`, `git diff --check`, `npm run build:staging`,
-`npm run build:production`, `npm run verify:production-bundle`. Nenhum resultado desses comandos é
-reportado como aprovado — nenhum foi executado.
+Validação real executada após a revisão Codex:
 
-**Mitigação real aplicada nesta sessão**: na ausência de execução de testes, foi feita **auditoria
-manual linha a linha** das 6 migrations contra os testes escritos em
-`missionsMigrations.test.ts`, o que revelou e corrigiu 3 gaps reais de segurança (ver seção 18) antes
-de qualquer tentativa de execução — as correções foram aplicadas tanto em `supabase/migrations/`
-quanto no espelho `supabase-production/supabase/migrations/`, mantendo os dois em paridade byte a
-byte (reverificado por leitura completa dos 6 pares de arquivo).
+- `npx vitest run`: **51 arquivos, 947 testes aprovados, 0 falhas**.
+- `npx vitest run src/config/missionsMigrations.test.ts
+  src/config/hierarchicalAccessResponsibilities.test.ts src/config/modules.test.ts
+  src/lib/missions/rules.test.ts`: **4 arquivos, 216 testes aprovados, 0 falhas**.
+- `npx tsc --noEmit`: **0 erros**.
+- `npx eslint` nos arquivos de Missões e integrações alteradas: **0 erros e 0 warnings**.
+- `git diff --check`: sem problemas de whitespace.
+- Comparação byte a byte das 6 migrations em `supabase/migrations/` e
+  `supabase-production/supabase/migrations/`: sem divergências.
+- `npm run build:staging`: sucesso; chunk lazy `Missoes-*.js` emitido, junto dos módulos
+  Discipulado/Teologia já revisados.
+- `npm run build:production`, com as variáveis públicas canônicas e guarda de ambiente simulando
+  Vercel/main: sucesso; nenhum chunk de Missões/Discipulado/Teologia emitido.
+- `npm run verify:production-bundle`: sucesso; **83 arquivos** verificados e nenhum termo de módulo
+  staging-only encontrado no bundle de produção.
 
-**Instrução para o revisor/Codex**: os comandos da seção 20 do prompt da operação (`vitest`, `tsc`,
-`eslint`, `git diff --check`, os dois builds e `verify:production-bundle`) devem ser executados em um
-ambiente com shell funcional antes de qualquer promoção deste módulo — nenhum deles foi confirmado
-nesta entrega.
+Os avisos impressos por alguns testes de autenticação são saídas esperadas dos cenários que simulam
+falha de rede/refresh token e não representam falha da suíte.
 
 ## 18. Problemas encontrados e corrigidos durante a construção
 
-- **3 funções internas de validação de escopo sem `REVOKE ALL ... FROM PUBLIC, anon, authenticated`**:
-  `_missions_missionaries_validate_scope()` (`20260731100000_missions_missionaries.sql`),
-  `_missions_projects_validate_scope()` (`20260731110000_missions_projects.sql`) e
-  `_missions_supporters_validate_scope()` (`20260731120000_missions_supporters_commitments.sql`)
-  foram criadas como funções de trigger `SECURITY DEFINER` sem a revogação explícita que todas as
-  outras funções internas do mesmo arquivo (e das Operações 2/3) já tinham. Encontrado por auditoria
-  manual comparando o padrão real usado em `_theology_*_validate_scope`/
-  `_discipleship_*_validate_scope` (todas com `REVOKE ALL ... FROM PUBLIC, anon, authenticated`
-  imediatamente após a definição) contra as 3 funções equivalentes de Missões, que não tinham a linha
-  correspondente. **Corrigido** adicionando a revogação idêntica ao padrão das operações anteriores,
-  em `supabase/migrations/` e replicado byte a byte em `supabase-production/supabase/migrations/`.
-  Sem essa correção, embora a função só seja chamada por trigger (nunca diretamente pelo frontend),
-  ela ficaria **executável diretamente por qualquer usuário autenticado** via RPC genérica do
-  PostgREST (`SECURITY DEFINER` sem `REVOKE` de `authenticated` é chamável), o que poderia permitir
-  levantar (sem alterar dados) informações about a validação de escopo fora do fluxo normal de
-  trigger — risco real de superfície de ataque desnecessária, mesmo sem impacto de escrita direta.
-- Nenhum outro problema estrutural foi encontrado na auditoria manual das 6 migrations, dos 3
-  arquivos de `src/lib/missions/`, dos 8 componentes de `src/components/missoes/`, de
-  `src/pages/Missoes.tsx` e da integração em `accessControl.ts`/`modules.ts`/`App.tsx`/
-  `AdminLayout.tsx`/`types.ts` — todos conferidos contra o texto real dos arquivos (não contra
-  memória de sessão anterior).
+A revisão Codex encontrou e corrigiu problemas além do acabamento visual:
+
+- **Pagamento pendente contado como recebido**: recomputação e indicadores aceitavam qualquer
+  transação de entrada. Agora somente `Entrada` com status `Confirmado` ou `Pago` compõe
+  `paid_amount`/realizado; a RPC de vínculo também recusa transação pendente.
+- **Autorização incompleta ao desvincular**: a operação confiava em organização armazenada no link.
+  Agora trava e relê a transação real, resolve novamente a organização do contexto e exige
+  `finance.write` e `missions.finance` nos dois lados corretos da hierarquia.
+- **Exposição de valores sem permissão financeira**: dashboard e relatórios monetários podiam ser
+  consumidos apenas com `missions.read`. Valores do dashboard agora ficam `NULL` sem
+  `finance.read`, e relatórios de projetos/parcelas exigem as duas capabilities.
+- **Seleção por UUID**: vínculos, compromissos e parâmetros pediam identificadores internos ao
+  usuário. Foram substituídos por seletores de missionário/projeto/campanha/parcela/conta/categoria/
+  centro de custo e por busca server-side de transações confirmadas ainda não vinculadas.
+- **Estados fechados permissivos**: perfis encerrados/fechados agora são imutáveis; projetos fechados
+  não recebem novos vínculos; conclusão/cancelamento encerra participações; apoiador encerrado é
+  terminal; compromisso e parcela exigem locks e capabilities financeira/missionária.
+- **Ativação de projeto sem prontidão operacional**: agora exige data de início vigente e vínculo
+  ativo com um missionário cujo cadastro continua elegível. A interface explica os pré-requisitos e
+  desabilita a ação até a condição básica ser atendida; o banco continua sendo a autoridade final.
+- **Compromisso fora do contexto correto**: criação agora valida estado do apoiador, contexto aberto,
+  direção hierárquica e `missions.finance` no contexto real. Referência mensal, vencimento e validade
+  do compromisso são validados; isenção/cancelamento exige justificativa e ausência de pagamento.
+- **Configurações financeiras sem isolamento suficiente**: alteração de conta/categoria/centro de
+  custo padrão exige `finance.read`; quem não possui a capability preserva os valores já gravados e
+  ainda pode editar parâmetros operacionais. O valor zero de dias de alerta deixou de ser
+  sobrescrito por fallback indevido.
+- **Estado de tela obsoleto e erro silencioso**: seleções de missionário/projeto/apoiador/compromisso
+  são sincronizadas após recarga, e falhas ao buscar contextos aparecem explicitamente em vez de
+  produzir listas vazias que pareciam “sem cadastro”.
+- **Superfície de funções internas**: funções `SECURITY DEFINER` de trigger/helper tiveram
+  `EXECUTE` revogado de `PUBLIC`, `anon` e `authenticated`; o teste do helper de histórico foi
+  corrigido para verificar o `GRANT` exato, sem falso positivo de regex.
+- **Teste de responsabilidades incompleto**: o teste agregador passou a incluir a migration de
+  Missões em vez de interpretar as três novas responsabilidades como regressão da fundação anterior.
 
 ## 19. Limitações reais
 
-- **Nenhum comando de validação foi executado nesta sessão** (vitest/tsc/eslint/builds/
-  verify-production-bundle) — ver seção 17. O teste estático `missionsMigrations.test.ts` foi escrito
-  e revisado manualmente linha a linha contra o SQL real, mas **nunca rodado** pelo `vitest` nesta
-  sessão.
 - **Lacuna financeira documentada** (seção 12): "Emissão de Recibos" e as 4 funções de "Portadores"
   (atualizar/resumir/transferir/inicializar saldo) não têm operação equivalente por módulo no
   Financeiro real hoje — Missões usa o motor financeiro central existente (saldo derivado de
@@ -478,26 +500,25 @@ nesta entrega.
 - `MissoesOverview`/`MissoesReports` dependem de RPCs agregadoras dedicadas (nunca leitura agregada
   client-side) — mas nenhuma delas foi validada contra volume real de dados, já que nenhuma migration
   foi aplicada.
-- Este documento e as migrations **não foram revisados pelo Codex** — diferente de
-  `operacao-2-discipulado.md`/`operacao-3-teologia.md`, que já refletem entrega revisada.
+- Os testes de migration são estáticos e não substituem homologação real de RLS, concorrência e
+  volume em um projeto Supabase de staging.
 
-## 20. Instruções manuais não executadas
+## 20. Próximos passos seguros de homologação
 
-1. **Executar a suíte de validação completa em um ambiente com shell funcional** antes de qualquer
-   revisão adicional: `npx vitest run`, `npx tsc --noEmit`, `npx eslint` nos arquivos novos/
-   alterados, `git diff --check`, `npm run build:staging`, `npm run build:production`, `npm run
-   verify:production-bundle`.
-2. Revisar as 6 migrations (com atenção especial à correção da seção 18) e aplicá-las em **staging**
+1. Aplicar as 6 migrations em **staging**
    primeiro (`supabase db push` manual, nunca por este agente), sempre em ordem cronológica.
-3. Validar RLS/RPCs com dados reais de teste em staging (registro de missionário, transição de
-   status, criação de projeto/compromisso/parcela, vínculo financeiro, geração de histórico).
-4. Só então promover `missions` de `"staging"` para `"both"` em `src/config/modules.ts` (e remover a
+2. Validar RLS/RPCs com usuários de permissões diferentes: somente Missões, somente Financeiro,
+   ambas e nenhuma; incluir hierarquia matriz/distrito/congregação.
+3. Homologar o fluxo completo: missionário, transição de status, projeto e ativação, apoiador,
+   compromisso, parcela, vínculo/desvínculo financeiro, histórico e relatórios.
+4. Testar concorrência e volume em staging, especialmente vínculo único de transação e geração da
+   mesma parcela por duas sessões.
+5. Só então promover `missions` de `"staging"` para `"both"` em `src/config/modules.ts` (e remover a
    condicional `IS_STAGING_BUILD` em `App.tsx`), aplicar em produção, e então liberar o item de menu
    para todas as organizações.
-5. Decidir produto sobre a lacuna financeira da seção 12/19 (recibo/portadores) — idealmente resolvida
+6. Decidir produto sobre a lacuna financeira da seção 12/19 (recibo/portadores) — idealmente resolvida
    uma única vez no Financeiro real, beneficiando também a Teologia.
-6. Nenhum push, PR, deploy ou aplicação de migration deve ocorrer antes da homologação manual em
-   staging e da revisão técnica do Codex.
+7. Nenhuma promoção ou aplicação em produção deve ocorrer antes da homologação manual em staging.
 
 ## 21. Fechamento da arquitetura das quatro operações
 
@@ -508,14 +529,15 @@ repositório de documentos (`documents`/`member-documents`) e o mesmo motor fina
 (`transactions`/`finance_*`) — sem nenhuma tabela de pessoa, organização, histórico, documento ou
 contabilidade paralela criada por qualquer uma das quatro operações. Ver seção 13 de
 `docs/architecture/contrato-dominios-institucionais.md` para o detalhamento de como cada operação se
-encaixa sem duplicação de domínio. Esta entrega ainda depende de revisão técnica do Codex e de
-execução real da suíte de validação (seção 17) antes de ser considerada equivalente, em rigor, às
-Operações 2 e 3.
+encaixa sem duplicação de domínio. Com a revisão técnica Codex e a suíte local concluídas (seção
+17), a arquitetura está no mesmo nível de revisão das Operações 2 e 3; permanece pendente somente a
+homologação com banco e dados reais em staging.
 
 ## 22. Confirmação final
 
-- Nenhum `git commit` foi executado por este agente.
-- Nenhum `git push` foi executado.
+- A revisão Codex foi preparada em commit local para geração de patch de handoff; nenhum commit foi
+  criado em branch remota por este agente.
+- Nenhum `git push` foi executado pelo Codex.
 - Nenhum PR foi aberto.
 - Nenhum merge foi executado.
 - Nenhum deploy (Vercel ou outro) foi realizado.
@@ -527,4 +549,5 @@ Operações 2 e 3.
   1/2/3 não foram alterados. `src/pages/GerenciarAcessos.tsx` só recebeu o filtro estritamente
   necessário para isolar responsabilidades `missions_*` do Gerenciador de Acessos de produção
   enquanto o módulo for staging-only — mesmo padrão já aplicado para `discipleship_*`/`theology_*`.
-- Esta entrega aguarda a revisão técnica final do Codex, conforme instruído no prompt da operação.
+- A revisão técnica Codex e as validações locais foram concluídas; a próxima etapa é homologação
+  manual em staging, não promoção automática.

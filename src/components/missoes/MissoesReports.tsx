@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, BarChart3 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { useRole } from "@/hooks/useRole";
 import {
   listMissionsMissionariesByField, listMissionsProjectIndicators, listMissionsCommitmentInstallmentsReport,
   type MissionsMissionaryByFieldRow, type MissionsProjectIndicatorRow, type MissionsCommitmentInstallmentReportRow,
@@ -33,7 +34,15 @@ const INSTALLMENT_STATUS_TONE: Record<MissionsInstallmentStatus, "neutral" | "su
 };
 
 export function MissoesReports({ organizationId }: { organizationId: string }) {
+  const { hasCapability } = useRole();
+  const canViewFinance = hasCapability("finance.read");
   const [view, setView] = useState<"campo" | "projetos" | "parcelas">("campo");
+
+  useEffect(() => {
+    if (!canViewFinance && view !== "campo") {
+      setView("campo");
+    }
+  }, [canViewFinance, view]);
 
   return (
     <div className="space-y-4">
@@ -48,8 +57,10 @@ export function MissoesReports({ organizationId }: { organizationId: string }) {
       <div className="flex gap-1.5 border-b border-border pb-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {([
           { key: "campo" as const, label: "Missionários por campo" },
-          { key: "projetos" as const, label: "Indicadores de projetos" },
-          { key: "parcelas" as const, label: "Parcelas previstas × pagas" },
+          ...(canViewFinance ? [
+            { key: "projetos" as const, label: "Indicadores de projetos" },
+            { key: "parcelas" as const, label: "Parcelas previstas × pagas" },
+          ] : []),
         ]).map((t) => (
           <button
             key={t.key}
@@ -64,8 +75,14 @@ export function MissoesReports({ organizationId }: { organizationId: string }) {
       </div>
 
       {view === "campo" && <MissionariesByFieldReport organizationId={organizationId} />}
-      {view === "projetos" && <ProjectIndicatorsReport organizationId={organizationId} />}
-      {view === "parcelas" && <InstallmentsReport organizationId={organizationId} />}
+      {canViewFinance && view === "projetos" && <ProjectIndicatorsReport organizationId={organizationId} />}
+      {canViewFinance && view === "parcelas" && <InstallmentsReport organizationId={organizationId} />}
+      {!canViewFinance && (
+        <EmptyState
+          title="Relatórios financeiros protegidos"
+          description="Indicadores de valores e parcelas exigem finance.read. O relatório missionário por campo continua disponível."
+        />
+      )}
     </div>
   );
 }

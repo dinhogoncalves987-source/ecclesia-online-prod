@@ -6527,6 +6527,21 @@ export type Database = {
           transaction_type: string
         }[]
       }
+      search_missions_available_transactions: {
+        Args: {
+          p_limit?: number
+          p_organization_id: string
+          p_query?: string
+        }
+        Returns: {
+          amount: number
+          description: string
+          id: string
+          transaction_date: string
+          transaction_status: string
+          transaction_type: string
+        }[]
+      }
       search_missions_members: {
         Args: {
           p_limit?: number
@@ -6556,11 +6571,11 @@ export type Database = {
         Args: { p_organization_id: string }
         Returns: {
           commitments_ativo: number
-          expected_total_amount: number
-          installments_overdue_amount: number
-          installments_overdue_count: number
-          installments_pending_amount: number
-          installments_pending_count: number
+          expected_total_amount: number | null
+          installments_overdue_amount: number | null
+          installments_overdue_count: number | null
+          installments_pending_amount: number | null
+          installments_pending_count: number | null
           missionaries_ativo: number
           missionaries_candidato: number
           missionaries_em_licenca: number
@@ -6569,7 +6584,7 @@ export type Database = {
           missionaries_retornado: number
           projects_ativo: number
           projects_planejado: number
-          received_total_amount: number
+          received_total_amount: number | null
           supporters_ativo: number
         }[]
       }

@@ -96,6 +96,15 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'campaign is outside the project organization scope';
   END IF;
+
+  IF NEW.document_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1
+    FROM public.documents d
+    WHERE d.id = NEW.document_id
+      AND public.is_organization_descendant_or_self(NEW.organization_id, d.organization_id)
+  ) THEN
+    RAISE EXCEPTION 'document is outside the project organization scope';
+  END IF;
   RETURN NEW;
 END;
 $$;
@@ -206,6 +215,10 @@ BEGIN
     RAISE EXCEPTION 'project name is required';
   END IF;
 
+  IF v_row.status IN ('concluido', 'cancelado', 'arquivado') THEN
+    RAISE EXCEPTION 'a closed project profile is immutable';
+  END IF;
+
   UPDATE public.missions_projects
   SET name = btrim(p_name),
       description = NULLIF(btrim(p_description), ''),
@@ -259,6 +272,10 @@ BEGIN
     RAISE EXCEPTION 'access denied to update project status';
   END IF;
 
+  IF p_status = v_row.status THEN
+    RETURN;
+  END IF;
+
   IF NOT (
     (v_row.status = 'rascunho' AND p_status IN ('planejado', 'cancelado'))
     OR (v_row.status = 'planejado' AND p_status IN ('ativo', 'cancelado'))
@@ -270,10 +287,41 @@ BEGIN
     RAISE EXCEPTION 'invalid project status transition: % -> %', v_row.status, p_status;
   END IF;
 
+  IF p_status = 'ativo' THEN
+    IF v_row.start_date IS NULL THEN
+      RAISE EXCEPTION 'project start date is required before activation';
+    END IF;
+    IF v_row.start_date > CURRENT_DATE THEN
+      RAISE EXCEPTION 'project cannot be activated before its start date';
+    END IF;
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.missions_project_assignments a
+      JOIN public.missions_missionaries mm
+        ON mm.member_id = a.member_id
+       AND mm.status IN ('em_preparacao', 'ativo', 'em_licenca')
+       AND public.is_organization_descendant_or_self(v_row.organization_id, mm.organization_id)
+      WHERE a.project_id = p_project_id
+        AND a.role = 'missionario'
+        AND a.status = 'ativo'
+        AND a.start_date <= CURRENT_DATE
+    ) THEN
+      RAISE EXCEPTION 'at least one active assignment to an eligible missionary is required before activation';
+    END IF;
+  END IF;
+
   UPDATE public.missions_projects
   SET status = p_status,
       goals_notes = CASE WHEN NULLIF(btrim(p_notes), '') IS NOT NULL THEN NULLIF(btrim(p_notes), '') ELSE goals_notes END
   WHERE id = p_project_id;
+
+  IF p_status IN ('concluido', 'cancelado') THEN
+    UPDATE public.missions_project_assignments
+    SET status = 'encerrado',
+        end_date = COALESCE(end_date, GREATEST(CURRENT_DATE, start_date))
+    WHERE project_id = p_project_id
+      AND status = 'ativo';
+  END IF;
 END;
 $$;
 
@@ -360,6 +408,10 @@ BEGIN
     RAISE EXCEPTION 'access denied to assign members to this project';
   END IF;
 
+  IF v_project.status IN ('concluido', 'cancelado', 'arquivado') THEN
+    RAISE EXCEPTION 'members cannot be assigned to a closed project';
+  END IF;
+
   IF p_role NOT IN ('responsavel', 'coordenador', 'missionario', 'apoio') THEN
     RAISE EXCEPTION 'invalid project assignment role: %', p_role;
   END IF;
@@ -372,9 +424,13 @@ BEGIN
   END IF;
 
   IF p_role = 'missionario' AND NOT EXISTS (
-    SELECT 1 FROM public.missions_missionaries mm WHERE mm.member_id = p_member_id
+    SELECT 1
+    FROM public.missions_missionaries mm
+    WHERE mm.member_id = p_member_id
+      AND mm.status IN ('em_preparacao', 'ativo', 'em_licenca', 'retornado')
+      AND public.is_organization_descendant_or_self(v_project.organization_id, mm.organization_id)
   ) THEN
-    RAISE EXCEPTION 'member must be registered as a missionary before this role can be assigned';
+    RAISE EXCEPTION 'member must have an eligible missionary record in the project scope';
   END IF;
 
   IF EXISTS (
@@ -424,6 +480,10 @@ BEGIN
 
   IF v_row.status = 'encerrado' THEN
     RETURN;
+  END IF;
+
+  IF COALESCE(p_end_date, CURRENT_DATE) < v_row.start_date THEN
+    RAISE EXCEPTION 'assignment end date cannot be before its start date';
   END IF;
 
   UPDATE public.missions_project_assignments

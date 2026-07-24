@@ -24,10 +24,12 @@ import {
   MISSIONS_INSTALLMENT_CLOSED_STATUSES,
   MISSIONS_MISSIONARY_CLOSED_STATUSES,
   MISSIONS_PROJECT_CLOSED_STATUSES,
+  MISSIONS_SUPPORTER_CLOSED_STATUSES,
   type MissionsCommitmentStatus,
   type MissionsInstallmentStatus,
   type MissionsMissionaryStatus,
   type MissionsProjectStatus,
+  type MissionsSupporterStatus,
 } from "./constants";
 
 // ── Máquinas de estado (espelham as RPCs — usadas para habilitar/desabilitar ações na UI) ───
@@ -85,6 +87,22 @@ export function isValidCommitmentStatusTransition(
 /** Compromisso encerrado/cancelado — não gera novas parcelas (ver generate_missions_commitment_installment). */
 export function isCommitmentClosed(status: MissionsCommitmentStatus): boolean {
   return (MISSIONS_COMMITMENT_CLOSED_STATUSES as readonly string[]).includes(status);
+}
+
+/** Espelha update_missions_supporter_status() em 20260731120000. */
+export function isValidSupporterStatusTransition(
+  from: MissionsSupporterStatus,
+  to: MissionsSupporterStatus,
+): boolean {
+  if (from === to) return true;
+  return (
+    (from === "ativo" && (to === "inativo" || to === "encerrado"))
+    || (from === "inativo" && (to === "ativo" || to === "encerrado"))
+  );
+}
+
+export function isSupporterClosed(status: MissionsSupporterStatus): boolean {
+  return (MISSIONS_SUPPORTER_CLOSED_STATUSES as readonly string[]).includes(status);
 }
 
 // ── Parcelas: status sempre derivado, nunca marcado manualmente ─────────

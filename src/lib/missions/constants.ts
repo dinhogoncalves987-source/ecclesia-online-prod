@@ -79,6 +79,7 @@ export const MISSIONS_SUPPORTER_STATUS_LABELS: Record<MissionsSupporterStatus, s
   inativo: "Inativo(a)",
   encerrado: "Encerrado(a)",
 };
+export const MISSIONS_SUPPORTER_CLOSED_STATUSES: readonly MissionsSupporterStatus[] = ["encerrado"];
 
 export const MISSIONS_CONTACT_PREFERENCES = ["email", "whatsapp", "telefone", "nenhum"] as const;
 export type MissionsContactPreference = (typeof MISSIONS_CONTACT_PREFERENCES)[number];
@@ -153,7 +154,7 @@ export const MISSIONS_INSTALLMENT_OPEN_STATUSES: readonly MissionsInstallmentSta
 // Contexto missionário de uma transação REAL (public.transactions) — nunca
 // um caixa/saldo/fechamento paralelo (ver contrato §6).
 export const MISSIONS_TRANSACTION_LINK_TYPES = [
-  "compromisso", "projeto", "missionario", "campanha", "outro",
+  "compromisso", "projeto", "missionario", "campanha",
 ] as const;
 export type MissionsTransactionLinkType = (typeof MISSIONS_TRANSACTION_LINK_TYPES)[number];
 export const MISSIONS_TRANSACTION_LINK_TYPE_LABELS: Record<MissionsTransactionLinkType, string> = {
@@ -161,5 +162,4 @@ export const MISSIONS_TRANSACTION_LINK_TYPE_LABELS: Record<MissionsTransactionLi
   projeto: "Projeto",
   missionario: "Missionário",
   campanha: "Campanha",
-  outro: "Outro",
 };
