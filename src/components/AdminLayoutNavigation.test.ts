@@ -29,6 +29,13 @@ describe("AdminLayout — navegação e altura responsiva", () => {
     expect(espiritual).not.toContain(route);
   });
 
+  it("mostra TV Digital e Canal Eclésia na área espiritual, sob controle do staging", () => {
+    expect(espiritual).toContain("/admin/tv/ao-vivo");
+    expect(espiritual).toContain("/canal");
+    expect(secretaria).not.toContain("/admin/tv");
+    expect(financeiro).not.toContain("/canal");
+  });
+
   it("não expande a Secretaria ao abrir os módulos operacionais", () => {
     const paths = source.slice(
       source.indexOf("const SECRETARIA_PATHS"),

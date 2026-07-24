@@ -290,12 +290,11 @@ const STAGING_ONLY_MODULES: readonly ModuleDefinition[] = IS_STAGING_BUILD ? [
   // homologação exclusiva no staging antes de qualquer promoção.
   { id: "official-documents", availability: "staging", label: "Documentos Oficiais" },
 
-  // Stage-only — preservados em staging-tv-canal, restauração controlada
-  // documentada em docs/AMBIENTES_PRODUCAO_STAGING.md. Nenhuma rota/arquivo
-  // foi copiado para esta integração; os identificadores existem aqui só
-  // para que a allowlist já os classifique corretamente quando restaurados.
-  { id: "tv-digital", availability: "staging", label: "TV Digital", note: "restaurar de staging-tv-canal" },
-  { id: "canal-ecclesia", availability: "staging", label: "Canal Ecclésia", note: "restaurar de staging-tv-canal" },
+  // TV Digital e Canal Eclésia restaurados seletivamente da branch
+  // histórica staging-tv-canal para homologação. Continuam staging-only:
+  // o código é excluído estaticamente do build de produção em App.tsx.
+  { id: "tv-digital", availability: "staging", label: "TV Digital" },
+  { id: "canal-ecclesia", availability: "staging", label: "Canal Eclésia" },
 ] : [];
 
 /**
@@ -338,6 +337,13 @@ export function listEnabledModules(appEnv: "production" | "staging" = environmen
  * mapa não são controladas por ambiente (apenas por papel/role, via
  * useRole().canAccess) — nunca precisaram sair da allowlist urgente.
  */
+const STAGING_ONLY_ROUTE_MODULE_MAP: Readonly<Record<string, ModuleId>> = IS_STAGING_BUILD ? {
+  "/admin/tv": "tv-digital",
+  "/tv": "tv-digital",
+  "/canal": "canal-ecclesia",
+  "/video": "canal-ecclesia",
+} : {};
+
 const ROUTE_MODULE_MAP: Readonly<Record<string, ModuleId>> = {
   "/admin/campanhas": "campaigns",
   "/admin/biblia": "bible-ai",
@@ -355,7 +361,25 @@ const ROUTE_MODULE_MAP: Readonly<Record<string, ModuleId>> = {
   "/admin/missoes": "missions",
   "/admin/cartas-transferencia": "official-documents",
   "/admin/certificados": "official-documents",
+  ...STAGING_ONLY_ROUTE_MODULE_MAP,
 };
+
+const STAGING_ONLY_ROUTE_PREFIXES = [
+  "/admin/tv",
+  "/tv",
+  "/canal",
+  "/video",
+] as const;
+
+function findModuleIdForRoute(path: string): ModuleId | null {
+  if (ROUTE_MODULE_MAP[path]) return ROUTE_MODULE_MAP[path];
+
+  const matchingBase = Object.keys(ROUTE_MODULE_MAP)
+    .filter((base) => path.startsWith(`${base}/`))
+    .sort((left, right) => right.length - left.length)[0];
+
+  return matchingBase ? ROUTE_MODULE_MAP[matchingBase] : null;
+}
 
 /**
  * True quando a rota (path exato, sem parâmetros dinâmicos) está habilitada
@@ -363,11 +387,20 @@ const ROUTE_MODULE_MAP: Readonly<Record<string, ModuleId>> = {
  * regra paralela.
  */
 export function isRouteEnabled(path: string, appEnv: "production" | "staging" = environment.appEnv): boolean {
-  const moduleId = ROUTE_MODULE_MAP[path];
+  if (
+    appEnv === "production"
+    && STAGING_ONLY_ROUTE_PREFIXES.some(
+      (base) => path === base || path.startsWith(`${base}/`),
+    )
+  ) {
+    return false;
+  }
+
+  const moduleId = findModuleIdForRoute(path);
   if (!moduleId) return true;
   return isModuleEnabled(moduleId, appEnv);
 }
 
 export function getModuleIdForRoute(path: string): ModuleId | null {
-  return ROUTE_MODULE_MAP[path] ?? null;
+  return findModuleIdForRoute(path);
 }

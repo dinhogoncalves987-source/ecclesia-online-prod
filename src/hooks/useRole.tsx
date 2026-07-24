@@ -41,6 +41,10 @@ const MODULE_ACCESS: Record<string, AppRole[]> = {
   "/admin/culto/roteiros": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
   "/admin/culto/telao": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
   "/admin/culto/assistente": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
+  "/admin/tv": ["super_admin", "church_admin", "pastor", "secretary"],
+  "/tv": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
+  "/canal": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
+  "/video": ["super_admin", "church_admin", "pastor", "secretary", "tesoureiro", "contador", "leader", "member"],
   "/admin/oracoes": ["super_admin", "church_admin", "pastor", "secretary", "leader", "member"],
   "/admin/comunicacao": ["super_admin", "church_admin", "pastor", "secretary", "leader", "member"],
   "/admin/grupos": ["super_admin", "church_admin", "pastor", "secretary", "leader"],
@@ -221,7 +225,17 @@ export function useRole() {
     // lookup, senão a checagem sempre falha (bug real encontrado na
     // implementação original: a rota ficava inacessível para todos os
     // perfis, inclusive super_admin).
-    const path = /^\/admin\/membros\/[^/]+$/.test(rawPath) ? "/admin/membros" : rawPath;
+    const path = /^\/admin\/membros\/[^/]+$/.test(rawPath)
+      ? "/admin/membros"
+      : rawPath === "/admin/tv" || rawPath.startsWith("/admin/tv/")
+        ? "/admin/tv"
+        : rawPath === "/tv" || rawPath.startsWith("/tv/")
+          ? "/tv"
+          : rawPath === "/canal" || rawPath.startsWith("/canal/")
+            ? "/canal"
+            : rawPath === "/video" || rawPath.startsWith("/video/")
+              ? "/video"
+              : rawPath;
     const requiredCapability = ROUTE_ACCESS_PERMISSIONS[path];
     if (requiredCapability) {
       // Rotas governadas por capability são fail-closed. Cair depois para o

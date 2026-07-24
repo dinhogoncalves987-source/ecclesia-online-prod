@@ -166,6 +166,28 @@ const Teologia = IS_STAGING_BUILD ? lazy(() => import("./pages/Teologia")) : nul
 // Mesma técnica de tree-shaking condicional do Discipulado/Teologia.
 const Missoes = IS_STAGING_BUILD ? lazy(() => import("./pages/Missoes")) : null;
 
+// TV Digital e Canal Eclésia — staging-only durante a retomada da
+// homologação. Os imports condicionais são deliberados: no build de
+// produção, as páginas e suas dependências de streaming não entram no
+// grafo do Rollup nem geram chunks em dist/.
+const TvHome = IS_STAGING_BUILD ? lazy(() => import("./pages/TvHome")) : null;
+const TvChannel = IS_STAGING_BUILD ? lazy(() => import("./pages/TvChannel")) : null;
+const TvAdmin = IS_STAGING_BUILD ? lazy(() => import("./pages/admin/TvAdmin")) : null;
+const TvCanais = IS_STAGING_BUILD ? lazy(() => import("./pages/admin/TvCanais")) : null;
+const TvProgramacao = IS_STAGING_BUILD ? lazy(() => import("./pages/admin/TvProgramacao")) : null;
+const TvAoVivo = IS_STAGING_BUILD ? lazy(() => import("./pages/admin/TvAoVivo")) : null;
+const TvBiblioteca = IS_STAGING_BUILD ? lazy(() => import("./pages/admin/TvBiblioteca")) : null;
+const TvConfiguracoes = IS_STAGING_BUILD ? lazy(() => import("./pages/admin/TvConfiguracoes")) : null;
+const TvStudioCamera = IS_STAGING_BUILD ? lazy(() => import("./pages/TvStudioCamera")) : null;
+
+const CanalHome = IS_STAGING_BUILD ? lazy(() => import("./pages/CanalHome")) : null;
+const CanalChannel = IS_STAGING_BUILD ? lazy(() => import("./pages/CanalChannel")) : null;
+const VideoPlayer = IS_STAGING_BUILD ? lazy(() => import("./pages/VideoPlayer")) : null;
+const CanalUpload = IS_STAGING_BUILD ? lazy(() => import("./pages/CanalUpload")) : null;
+const CanalPlaylists = IS_STAGING_BUILD ? lazy(() => import("./pages/CanalPlaylists")) : null;
+const CanalCreateChannel = IS_STAGING_BUILD ? lazy(() => import("./pages/CanalCreateChannel")) : null;
+const CanalMyChannel = IS_STAGING_BUILD ? lazy(() => import("./pages/CanalMyChannel")) : null;
+
 // OPERAÇÃO 5 (Documentos Oficiais) — staging-only durante homologação das
 // migrations 20260801*. Inclui Carta de Transferência, Central de
 // Certificados e as duas páginas públicas dos QR permanentes.
@@ -300,6 +322,30 @@ const App = () => (
               <Route path="/admin/teologia" element={<ProtectedRoute><ModuleGate moduleId="theology">{Teologia && <Teologia />}</ModuleGate></ProtectedRoute>} />
 
               <Route path="/admin/missoes" element={<ProtectedRoute><ModuleGate moduleId="missions">{Missoes && <Missoes />}</ModuleGate></ProtectedRoute>} />
+
+              {IS_STAGING_BUILD ? (
+                <>
+                  {/* TV Digital — disponível somente no staging. */}
+                  <Route path="/tv" element={<ProtectedRoute><ModuleGate moduleId="tv-digital">{TvHome && <TvHome />}</ModuleGate></ProtectedRoute>} />
+                  <Route path="/tv/:channelSlug" element={<ProtectedRoute><ModuleGate moduleId="tv-digital">{TvChannel && <TvChannel />}</ModuleGate></ProtectedRoute>} />
+                  <Route path="/admin/tv" element={<ProtectedRoute><ModuleGate moduleId="tv-digital">{TvAdmin && <TvAdmin />}</ModuleGate></ProtectedRoute>} />
+                  <Route path="/admin/tv/canais" element={<ProtectedRoute><ModuleGate moduleId="tv-digital">{TvCanais && <TvCanais />}</ModuleGate></ProtectedRoute>} />
+                  <Route path="/admin/tv/programacao" element={<ProtectedRoute><ModuleGate moduleId="tv-digital">{TvProgramacao && <TvProgramacao />}</ModuleGate></ProtectedRoute>} />
+                  <Route path="/admin/tv/ao-vivo" element={<ProtectedRoute><ModuleGate moduleId="tv-digital">{TvAoVivo && <TvAoVivo />}</ModuleGate></ProtectedRoute>} />
+                  <Route path="/admin/tv/biblioteca" element={<ProtectedRoute><ModuleGate moduleId="tv-digital">{TvBiblioteca && <TvBiblioteca />}</ModuleGate></ProtectedRoute>} />
+                  <Route path="/admin/tv/configuracoes" element={<ProtectedRoute><ModuleGate moduleId="tv-digital">{TvConfiguracoes && <TvConfiguracoes />}</ModuleGate></ProtectedRoute>} />
+                  <Route path="/tv/studio/:roomId/camera" element={<ModuleGate moduleId="tv-digital">{TvStudioCamera && <TvStudioCamera />}</ModuleGate>} />
+
+                  {/* Canal Eclésia (vídeo sob demanda) — staging-only. */}
+                  <Route path="/canal" element={<ProtectedRoute><ModuleGate moduleId="canal-ecclesia">{CanalHome && <CanalHome />}</ModuleGate></ProtectedRoute>} />
+                  <Route path="/canal/upload" element={<ProtectedRoute><ModuleGate moduleId="canal-ecclesia">{CanalUpload && <CanalUpload />}</ModuleGate></ProtectedRoute>} />
+                  <Route path="/canal/playlists" element={<ProtectedRoute><ModuleGate moduleId="canal-ecclesia">{CanalPlaylists && <CanalPlaylists />}</ModuleGate></ProtectedRoute>} />
+                  <Route path="/canal/criar" element={<ProtectedRoute><ModuleGate moduleId="canal-ecclesia">{CanalCreateChannel && <CanalCreateChannel />}</ModuleGate></ProtectedRoute>} />
+                  <Route path="/canal/meu-canal" element={<ProtectedRoute><ModuleGate moduleId="canal-ecclesia">{CanalMyChannel && <CanalMyChannel />}</ModuleGate></ProtectedRoute>} />
+                  <Route path="/canal/:slug" element={<ProtectedRoute><ModuleGate moduleId="canal-ecclesia">{CanalChannel && <CanalChannel />}</ModuleGate></ProtectedRoute>} />
+                  <Route path="/video/:id" element={<ProtectedRoute><ModuleGate moduleId="canal-ecclesia">{VideoPlayer && <VideoPlayer />}</ModuleGate></ProtectedRoute>} />
+                </>
+              ) : null}
 
               {/* Global chat — accessible to all roles */}
               <Route path="/admin/chat" element={<ProtectedRoute><ChatSecretaria /></ProtectedRoute>} />

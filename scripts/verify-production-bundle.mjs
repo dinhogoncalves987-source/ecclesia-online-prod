@@ -122,6 +122,22 @@ const FORBIDDEN_TERMS_SOURCE = [
   "tv-digital",
   "canal-ecclesia",
   "CanalEcclesia",
+  "pages/TvHome",
+  "pages/TvChannel",
+  "pages/TvStudioCamera",
+  "pages/admin/TvAdmin",
+  "pages/admin/TvCanais",
+  "pages/admin/TvProgramacao",
+  "pages/admin/TvAoVivo",
+  "pages/admin/TvBiblioteca",
+  "pages/admin/TvConfiguracoes",
+  "pages/CanalHome",
+  "pages/CanalChannel",
+  "pages/CanalUpload",
+  "pages/CanalPlaylists",
+  "pages/CanalCreateChannel",
+  "pages/CanalMyChannel",
+  "pages/VideoPlayer",
   // OPERAÇÃO 2 (Discipulado, 2026-07-29) — staging-only enquanto as
   // migrations discipleship_* não forem aplicadas em nenhum ambiente (ver
   // src/config/modules.ts e docs/architecture/operacao-2-discipulado.md).

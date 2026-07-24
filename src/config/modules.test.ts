@@ -169,6 +169,19 @@ describe("isRouteEnabled", () => {
     expect(isRouteEnabled("/admin/comunidade", "staging")).toBe(true);
   });
 
+  it.each([
+    "/admin/tv",
+    "/admin/tv/ao-vivo",
+    "/tv",
+    "/tv/canal-principal",
+    "/canal",
+    "/canal/meu-canal",
+    "/video/video-id",
+  ])("keeps TV/Canal route %s staging-only", (route) => {
+    expect(isRouteEnabled(route, "production")).toBe(false);
+    expect(isRouteEnabled(route, "staging")).toBe(true);
+  });
+
   it("disables /admin/discipulado in production and enables in staging", () => {
     expect(isRouteEnabled("/admin/discipulado", "production")).toBe(false);
     expect(isRouteEnabled("/admin/discipulado", "staging")).toBe(true);
