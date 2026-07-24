@@ -51,7 +51,7 @@ BEGIN
   IF to_regclass('public.access_responsibility_definitions') IS NULL THEN
     v_missing := array_append(v_missing, 'public.access_responsibility_definitions');
   END IF;
-  IF to_regproc('public.has_org_access_permission(uuid,uuid,text)') IS NULL THEN
+  IF to_regprocedure('public.has_org_access_permission(uuid,uuid,text)') IS NULL THEN
     v_missing := array_append(v_missing, 'public.has_org_access_permission()');
   END IF;
   IF cardinality(v_missing) > 0 THEN

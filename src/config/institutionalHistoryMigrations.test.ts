@@ -81,6 +81,15 @@ describe("Operação 1 — nenhuma migration cria campo de rede social externa",
 describe("Operação 1 — member_history (fundação compartilhada)", () => {
   const sql = readStaging("20260728090000_shared_institutional_history_foundation.sql");
 
+  it("valida função sobrecarregável pela assinatura com to_regprocedure, não to_regproc", () => {
+    expect(sql).toContain(
+      "to_regprocedure('public.has_org_access_permission(uuid,uuid,text)')",
+    );
+    expect(sql).not.toContain(
+      "to_regproc('public.has_org_access_permission(uuid,uuid,text)')",
+    );
+  });
+
   it("cria a tabela member_history com colunas de origem, confidencialidade e legado", () => {
     const createTableMatch = sql.match(/CREATE TABLE IF NOT EXISTS public\.member_history \(([\s\S]*?)\n\);/);
     expect(createTableMatch, "CREATE TABLE de member_history não encontrado").toBeTruthy();
