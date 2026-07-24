@@ -51,6 +51,19 @@ export function InternalMessageComposer({
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const composerRootRef = useRef<HTMLDivElement>(null);
+  // Composição de teclado (IME): acentos em mobile, chinês/japonês/coreano
+  // etc. digitam através de um estado intermediário do navegador
+  // (compositionstart → ... → compositionend) antes do caractere final ser
+  // confirmado. Sincronizar o estado React (setText) a CADA evento onChange
+  // durante essa janela força um re-render controlado no meio da composição,
+  // o que em vários WebViews mobile é a causa raiz de caracteres "trocando de
+  // lugar" (ex.: "abençoado" virando "bençoadoa"): o navegador está montando
+  // o glifo composto enquanto o React já reescreveu o value. A correção é
+  // nunca disputar o DOM com o navegador enquanto `isComposingRef` é true —
+  // deixamos o <textarea> nativo desenhar a composição livremente e só
+  // sincronizamos o estado (e o auto-grow, que também mexe em estilo do
+  // elemento a cada tecla) quando a composição termina.
+  const isComposingRef = useRef(false);
 
   const canSend = !disabled && !sending && (text.trim().length > 0 || Boolean(pendingFile));
   const showMic = !disabled && !pendingFile && text.trim().length === 0;
@@ -87,13 +100,23 @@ export function InternalMessageComposer({
   // Teclado mobile não pode cobrir o composer: quando o campo ganha foco,
   // aguarda a animação do teclado virtual e garante que o composer continue
   // visível (rola a própria caixa para dentro da área visível do viewport).
+  // `{ once: true }` só cobria a PRIMEIRA mudança de viewport (abrir o
+  // teclado); qualquer redimensionamento seguinte (teclado com sugestões,
+  // rotação, barra de emoji) deixava de reposicionar o composer. O listener
+  // agora acompanha o campo enquanto ele estiver focado e é removido no
+  // blur/desmontagem — nunca fica "pendurado" além do necessário.
   const handleFocus = useCallback(() => {
     if (!isMobileViewport()) return;
     const scrollIntoView = () => {
       composerRootRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
     };
     setTimeout(scrollIntoView, 300);
-    window.visualViewport?.addEventListener("resize", scrollIntoView, { once: true });
+    window.visualViewport?.addEventListener("resize", scrollIntoView);
+    const removeOnBlur = () => {
+      window.visualViewport?.removeEventListener("resize", scrollIntoView);
+      textareaRef.current?.removeEventListener("blur", removeOnBlur);
+    };
+    textareaRef.current?.addEventListener("blur", removeOnBlur, { once: true });
   }, []);
 
   return (
@@ -210,7 +233,21 @@ export function InternalMessageComposer({
                   <textarea
                     ref={textareaRef}
                     value={text}
-                    onChange={(e) => { setText(e.target.value); adjustHeight(); }}
+                    onChange={(e) => {
+                      // Durante a composição de IME, não sincroniza o estado
+                      // React nem mexe no estilo do elemento — o navegador
+                      // continua desenhando a composição no próprio DOM até
+                      // o compositionend, que faz a sincronização final.
+                      if (isComposingRef.current) return;
+                      setText(e.target.value);
+                      adjustHeight();
+                    }}
+                    onCompositionStart={() => { isComposingRef.current = true; }}
+                    onCompositionEnd={(e) => {
+                      isComposingRef.current = false;
+                      setText(e.currentTarget.value);
+                      adjustHeight();
+                    }}
                     placeholder={placeholder ?? t("Mensagem")}
                     rows={1}
                     disabled={disabled || sending}

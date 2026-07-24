@@ -94,6 +94,8 @@ const Perfil = lazy(() => import("./pages/Perfil"));
 
 const GerenciarAcessos = lazy(() => import("./pages/GerenciarAcessos"));
 
+const LoginOtpTeste = lazy(() => import("./pages/admin/LoginOtpTeste"));
+
 const Congregacoes = lazy(() => import("./pages/Congregacoes"));
 
 const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
@@ -304,6 +306,8 @@ const App = () => (
               <Route path="/admin/perfil" element={<ProtectedRoute><Perfil /></ProtectedRoute>} />
 
               <Route path="/admin/gerenciar-acessos" element={<ProtectedRoute><GerenciarAcessos /></ProtectedRoute>} />
+
+              <Route path="/admin/login-otp-teste" element={<ProtectedRoute><LoginOtpTeste /></ProtectedRoute>} />
 
               <Route path="/admin/congregacoes" element={<ProtectedRoute><Congregacoes /></ProtectedRoute>} />
 

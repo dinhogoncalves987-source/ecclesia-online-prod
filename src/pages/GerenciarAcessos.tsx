@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import {
   Building2,
   Check,
   ChevronRight,
   ClipboardCopy,
+  KeyRound,
   Loader2,
   Mail,
   Search,
@@ -227,7 +228,7 @@ export default function GerenciarAcessos() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const { church, loading: churchLoading } = useChurch();
-  const { canAccess, isSuperAdmin, loading: roleLoading } = useRole();
+  const { canAccess, isSuperAdmin, hasCapability, loading: roleLoading } = useRole();
   const location = useLocation();
   const navigationState = location.state as HierarchyNavigationState;
 
@@ -535,6 +536,11 @@ export default function GerenciarAcessos() {
             <button type="button" onClick={() => { setSelectedResponsibilities(new Set()); setExternalModalOpen(true); }} className="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-sm font-semibold text-primary">
               <UserPlus size={15} /> {t("Convidar externo")}
             </button>
+            {hasCapability("member_login.otp_test") && (
+              <Link to="/admin/login-otp-teste" className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium">
+                <KeyRound size={15} /> {t("Teste de entrada por telefone")}
+              </Link>
+            )}
           </div>
         </header>
 

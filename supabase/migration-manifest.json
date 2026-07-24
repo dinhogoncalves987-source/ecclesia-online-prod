@@ -79,7 +79,8 @@
     "20260725090000_internal_chat_realtime_hardening.sql",
     "20260726090000_assembleia_de_deus_finance_template.sql",
     "20260726100000_finance_import_transactions_bulk_rpc.sql",
-    "20260801110000_profile_and_organization_branding_persistence.sql"
+    "20260801110000_profile_and_organization_branding_persistence.sql",
+    "20260802090000_internal_chat_identity_hardening.sql"
   ],
   "staging_feature": [
     "20260526100000_staging_worship_tables.sql",
@@ -114,7 +115,11 @@
     "20260731130000_missions_transaction_links.sql",
     "20260731140000_missions_history_and_reports.sql",
     "20260801090000_official_transfer_letters.sql",
-    "20260801100000_institutional_certificates.sql"
+    "20260801100000_institutional_certificates.sql",
+    "20260802100000_member_login_otp_foundation.sql",
+    "20260802110000_member_login_otp_admin_test.sql",
+    "20260802120000_tv_canal_foundation.sql",
+    "20260802130000_tv_canal_live_production.sql"
   ],
   "staging_only": [
     "20260519200000_demo_seed.sql",

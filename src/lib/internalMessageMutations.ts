@@ -99,6 +99,20 @@ export async function findOrCreateDirectThread(
   memberId: string,
   memberName: string,
 ): Promise<{ ok: boolean; thread?: InternalThread; isNew?: boolean; error?: string }> {
+  // Guarda de identidade: nunca permite abrir/criar uma conversa direta cujo
+  // "membro" selecionado seja a própria pessoa autenticada (auto-conversa via
+  // seletor administrativo). O banco também rejeita isso via trigger
+  // (internal_threads_reject_self_conversation), mas checamos aqui primeiro
+  // para devolver um erro legível em vez de uma exceção crua de SQL.
+  const { data: targetMember } = await supabase
+    .from("members")
+    .select("user_id")
+    .eq("id", memberId)
+    .maybeSingle();
+  if (targetMember && (targetMember as { user_id?: string | null }).user_id === userId) {
+    return { ok: false, error: "self_thread_not_allowed" };
+  }
+
   // Buscar thread existente com esse membro nessa organização
   const { data: existing, error: findError } = await supabase
     .from("internal_threads")
@@ -134,6 +148,29 @@ export async function findOrCreateDirectThread(
   );
 
   if (error) {
+    // Corrida (duplo clique/retry) contra o índice único
+    // uniq_internal_threads_secretariat_member: outra chamada já criou a
+    // thread entre o SELECT e este INSERT. Em vez de propagar o erro,
+    // recupera a thread que venceu a corrida — nunca duplica a conversa.
+    const isUniqueViolation =
+      (error as { code?: string }).code === "23505" ||
+      /duplicate key|uniq_internal_threads_secretariat_member/i.test(
+        String((error as { message?: string }).message ?? ""),
+      );
+    if (isUniqueViolation) {
+      const { data: winner } = await supabase
+        .from("internal_threads")
+        .select("*")
+        .eq("organization_id", organizationId)
+        .eq("source", "secretariat")
+        .eq("member_id", memberId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (winner) {
+        return { ok: true, thread: mapDbThreadToUi(winner as DbInternalThreadRow), isNew: false };
+      }
+    }
     return { ok: false, error: String((error as { message?: string }).message ?? error) };
   }
 

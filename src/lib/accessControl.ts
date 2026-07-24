@@ -71,6 +71,23 @@ export const ACCESS_PERMISSION_KEYS = [
   "missions.manage",
   "missions.finance",
   "missions.confidential",
+  // OPERAÇÃO ESPECIAL (Auditoria TV/Canal/Chat/OTP) — espelha as capabilities
+  // criadas em 20260802110000_member_login_otp_admin_test.sql (OTP) e
+  // 20260802120000_tv_canal_foundation.sql (TV/Canal). Mesmo padrão de
+  // members.confidential/theology.confidential: "member_login.otp_test"
+  // NUNCA é concedida por conveniência — apenas a quem já detém governança
+  // (church_admin/responsible_pastor), pois revela um código de verificação
+  // ainda que curto e auditado. "tv.live_operate" e "canal.moderate" também
+  // seguem o padrão "separar leitura, gestão, operação ao vivo, publicação/
+  // moderação" pedido no contrato — nenhum secretário vira operador de TV ou
+  // moderador do Canal automaticamente.
+  "member_login.otp_test",
+  "tv.read",
+  "tv.manage",
+  "tv.live_operate",
+  "canal.read",
+  "canal.manage",
+  "canal.moderate",
 ] as const;
 
 export type AccessPermission = (typeof ACCESS_PERMISSION_KEYS)[number];
@@ -107,6 +124,15 @@ export const ACCESS_RESPONSIBILITY_KEYS = [
   "missions_coordinator",
   "missions_secretary",
   "missions_treasurer",
+  // OPERAÇÃO ESPECIAL (TV Digital / Canal Eclésia) — espelha as
+  // access_responsibility_definitions inseridas em
+  // 20260802120000_tv_canal_foundation.sql. Mesmo formato local
+  // (inheritsToDescendants=false, governance=false) já usado por
+  // Discipulado/Teologia/Missões.
+  "tv_manager",
+  "tv_operator",
+  "canal_manager",
+  "canal_moderator",
 ] as const;
 
 export type AccessResponsibility = (typeof ACCESS_RESPONSIBILITY_KEYS)[number];
@@ -382,6 +408,49 @@ export const ACCESS_RESPONSIBILITIES: readonly AccessResponsibilityDefinition[] 
     inheritsToDescendants: false,
     governance: false,
   },
+  // OPERAÇÃO ESPECIAL (TV Digital / Canal Eclésia) — mesmo formato local já
+  // usado por Discipulado/Teologia/Missões. "tv_operator" NUNCA recebe
+  // tv.manage: opera câmeras/direção/transmissão nas produções em que está
+  // escalado, mas não cria/edita canais, grade ou configurações. Nenhuma
+  // dessas responsabilidades é concedida automaticamente a secretary/
+  // assistant_secretary — precisa ser atribuída explicitamente pelo Gestor
+  // de Acessos.
+  {
+    key: "tv_manager",
+    label: "Gestor(a) de TV Digital",
+    description: "Administra canais, programação, biblioteca e configurações da TV Digital da unidade.",
+    category: "ministries",
+    permissions: ["tv.read", "tv.manage", "tv.live_operate"],
+    inheritsToDescendants: false,
+    governance: false,
+  },
+  {
+    key: "tv_operator",
+    label: "Operador(a) de transmissão",
+    description: "Opera direção, câmeras e transmissão ao vivo nas produções da TV Digital; não altera canais nem configurações.",
+    category: "ministries",
+    permissions: ["tv.read", "tv.live_operate"],
+    inheritsToDescendants: false,
+    governance: false,
+  },
+  {
+    key: "canal_manager",
+    label: "Gestor(a) do Canal Eclésia",
+    description: "Cria e administra canais, vídeos e playlists do Canal Eclésia da unidade.",
+    category: "ministries",
+    permissions: ["canal.read", "canal.manage"],
+    inheritsToDescendants: false,
+    governance: false,
+  },
+  {
+    key: "canal_moderator",
+    label: "Moderador(a) do Canal Eclésia",
+    description: "Modera comentários e conteúdo publicado no Canal Eclésia, sem criar ou excluir canais.",
+    category: "ministries",
+    permissions: ["canal.read", "canal.moderate"],
+    inheritsToDescendants: false,
+    governance: false,
+  },
 ] as const;
 
 export const ACCESS_RESPONSIBILITY_BY_KEY = new Map(
@@ -415,6 +484,21 @@ export const ROUTE_ACCESS_PERMISSIONS: Partial<Record<string, AccessPermission>>
   // OPERAÇÃO 4 (Missões) — staging-only (ver src/config/modules.ts); mesmo
   // gate de rota real por capability, fail-closed.
   "/admin/missoes": "missions.read",
+  // OPERAÇÃO ESPECIAL (TV Digital / Canal Eclésia) — staging-only (ver
+  // src/config/modules.ts). Só a superfície ADMINISTRATIVA (/admin/tv) é
+  // gate por capability — "/tv", "/canal" e "/video" são consumo e já ficam
+  // liberados a qualquer membro autenticado via MODULE_ACCESS em
+  // useRole.tsx (mesmo padrão de módulos "todo mundo assiste"; nunca exigir
+  // uma capability de gestão só para consumir a emissora/o catálogo). Ações
+  // de gestão/operação ao vivo/moderação são adicionalmente checadas nas
+  // RPCs e RLS (tv.manage/tv.live_operate/canal.manage/canal.moderate),
+  // nunca só no frontend.
+  "/admin/tv": "tv.read",
+  // PARTE D (Login por telefone/WhatsApp) — revela um código de verificação
+  // ainda que curto/auditado; mesmo padrão de governança de
+  // members.confidential (nunca liberado por conveniência a secretário/
+  // tesoureiro/etc.).
+  "/admin/login-otp-teste": "member_login.otp_test",
 };
 
 export function isAccessResponsibility(value: string): value is AccessResponsibility {

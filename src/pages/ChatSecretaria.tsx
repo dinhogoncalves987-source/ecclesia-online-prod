@@ -20,7 +20,7 @@ import {
   findOrCreateDirectThread,
   sendInternalMessage,
 } from "@/lib/internalMessageMutations";
-import { fetchThreadById } from "@/lib/internalMessages";
+import { fetchThreadById, resolveMemberIdForUser } from "@/lib/internalMessages";
 import { JitsiCallModal } from "@/components/messages/JitsiCallModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,16 +106,42 @@ export default function ChatSecretaria() {
     // Clear nav state so back-navigation doesn't re-trigger
     navigate(pathname, { replace: true, state: {} });
 
-    void findOrCreateDirectThread(church.id, user.id, state.userId, state.userName || t("Usuário"))
-      .then((result) => {
-        if (result.ok && result.thread) {
-          setForcedThread(result.thread);
-          setRefetchKey((k) => k + 1);
-          toast({ title: `${t("Conversa com")} ${state.userName || t("usuário")} ${t("aberta")}` });
-        } else {
-          toast({ title: t("Erro ao abrir conversa"), description: result.error, variant: "destructive" });
-        }
+    // IMPORTANTE: `state.userId` chega como um auth.users.id (ex.: responsável
+    // de uma unidade em Congregacoes.tsx), NUNCA um members.id. Passá-lo
+    // diretamente para findOrCreateDirectThread() como se fosse members.id é
+    // um bug de identidade (thread apontando para a pessoa errada, ou
+    // insert rejeitado pela FK/gatilho de auto-conversa do banco). Resolve o
+    // members.id real desse usuário nesta organização antes de abrir/criar a
+    // conversa — nunca cria um segundo cadastro nem assume o id bruto.
+    if (state.userId === user.id) {
+      toast({
+        title: t("Não é possível iniciar uma conversa consigo mesmo"),
+        variant: "destructive",
       });
+      return;
+    }
+
+    void resolveMemberIdForUser(church.id, state.userId).then((resolvedMemberId) => {
+      if (!resolvedMemberId) {
+        toast({
+          title: t("Erro ao abrir conversa"),
+          description: t("Esta pessoa não possui um cadastro de membro vinculado nesta organização."),
+          variant: "destructive",
+        });
+        return;
+      }
+
+      void findOrCreateDirectThread(church.id, user.id, resolvedMemberId, state.userName || t("Usuário"))
+        .then((result) => {
+          if (result.ok && result.thread) {
+            setForcedThread(result.thread);
+            setRefetchKey((k) => k + 1);
+            toast({ title: `${t("Conversa com")} ${state.userName || t("usuário")} ${t("aberta")}` });
+          } else {
+            toast({ title: t("Erro ao abrir conversa"), description: result.error, variant: "destructive" });
+          }
+        });
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [church?.id, user?.id]);
 
@@ -170,16 +196,24 @@ export default function ChatSecretaria() {
       setMemberSearching(true);
       const { data, error } = await supabase
         .from("members")
-        .select("id, full_name, member_role")
+        .select("id, full_name, member_role, user_id")
         .eq("organization_id", church.id)
         .ilike("full_name", `%${memberSearch.trim()}%`)
         .order("full_name")
         .limit(10);
 
-      if (!error && data) setMemberResults(data as MemberResult[]);
+      // Nunca oferece o próprio cadastro do usuário autenticado como
+      // destinatário — evitar a auto-conversa já na busca, antes mesmo de
+      // depender da guarda de findOrCreateDirectThread()/trigger de banco.
+      if (!error && data) {
+        const filtered = (data as (MemberResult & { user_id?: string | null })[]).filter(
+          (m) => m.user_id !== user?.id,
+        );
+        setMemberResults(filtered as MemberResult[]);
+      }
       setMemberSearching(false);
     }, 300);
-  }, [memberSearch, church?.id, dialogMode]);
+  }, [memberSearch, church?.id, dialogMode, user?.id]);
 
   // ── Ações ──────────────────────────────────────────────────────────────────
 

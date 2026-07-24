@@ -36,6 +36,9 @@ const EXTRA_RESPONSIBILITY_MIGRATION_FILES = [
   "20260730090000_theology_foundation.sql",
   // OPERAÇÃO 4 (Missões) — insere missions_coordinator/secretary/treasurer.
   "20260731090000_missions_foundation.sql",
+  // OPERAÇÃO ESPECIAL (TV Digital/Canal Eclésia) — insere
+  // tv_manager/tv_operator/canal_manager/canal_moderator.
+  "20260802120000_tv_canal_foundation.sql",
 ];
 const extraResponsibilitySql = EXTRA_RESPONSIBILITY_MIGRATION_FILES
   .map((file) => readFileSync(path.join(ROOT, "supabase", "migrations", file), "utf8"))

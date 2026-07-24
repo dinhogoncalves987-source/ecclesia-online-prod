@@ -183,7 +183,7 @@ export default function TvChannel() {
 
         {/* Info do bloco atual */}
         <div className="mt-4 bg-card border border-border rounded-xl p-4">
-          <CurrentBlockInfo block={currentBlock} />
+          <CurrentBlockInfo block={currentBlock} viewerCount={viewerCount} />
         </div>
 
         {/* Próximos da grade */}
@@ -228,7 +228,7 @@ export default function TvChannel() {
   );
 }
 
-function CurrentBlockInfo({ block }: { block: TvCurrentBlock }) {
+function CurrentBlockInfo({ block, viewerCount }: { block: TvCurrentBlock; viewerCount: number }) {
   if (block.type === "offline") {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">

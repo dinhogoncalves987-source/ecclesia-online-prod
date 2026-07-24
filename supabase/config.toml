@@ -11,6 +11,15 @@ verify_jwt = false
 [functions.daily-devotional]
 verify_jwt = false
 
+# verify-member-login-otp é chamada ANTES de existir sessão (o membro ainda
+# não está autenticado — é o próprio fluxo de login por telefone) — precisa
+# aceitar a anon key como Authorization, nunca um JWT de usuário já logado.
+# A segurança real do endpoint está inteiramente na RPC
+# _verify_member_login_otp_internal (hash, expiração, tentativa máxima,
+# consumo único), nunca neste gate.
+[functions.verify-member-login-otp]
+verify_jwt = false
+
 # send-chat-push recebe o JWT REAL do remetente (nunca a publishable key) —
 # precisa do gateway validando o JWT antes mesmo do código da função rodar
 # (defesa em profundidade, além da checagem própria em index.ts).
