@@ -8,14 +8,11 @@
 -- CONTEXTO (auditoria desta operação):
 --   src/lib/tvDigital.ts e src/lib/canalEcclesia.ts já implementam um
 --   contrato de frontend COMPLETO (tipos, mappers, chamadas .from()/.rpc())
---   para dezenas de tabelas/RPCs de TV Digital e Canal Eclésia — mas NENHUMA
---   dessas tabelas/RPCs existe em supabase/migrations nem em
---   supabase-production/supabase/migrations. É um "backend fantasma": toda
---   tela quebra silenciosamente hoje (supabase.from("tv_channels")... contra
---   uma tabela inexistente), ou telas alternativas caem para
---   src/lib/canalMockData.ts. Esta migration cria a fundação real desse
---   contrato, byte a byte compatível com os nomes de coluna já esperados
---   pelo frontend (conferido nos mappers de tvDigital.ts/canalEcclesia.ts).
+--   para dezenas de tabelas/RPCs de TV Digital e Canal Eclésia. Ambientes
+--   antigos de staging podem conter uma fundação parcial de TV criada fora
+--   do histórico local; por isso esta migration também reconcilia esse
+--   legado de forma idempotente, preservando dados e substituindo policies
+--   permissivas. Em banco limpo, cria o mesmo schema canônico desde zero.
 --
 -- ESCOPO desta migration (fundação — consumo, catálogo e grade):
 --   TV Digital: tv_channels, tv_stream_keys, tv_programs, tv_schedule_blocks,
@@ -162,6 +159,39 @@ GRANT EXECUTE ON FUNCTION public._can_consume_org_content(uuid, uuid) TO authent
 -- PARTE A — TV DIGITAL (fundação)
 -- ════════════════════════════════════════════════════════════════════════
 
+-- Staging histórico possuía policies de TV criadas fora do histórico local,
+-- inclusive INSERT anônimo em tv_camera_sessions. As tabelas abaixo recebem
+-- policies canônicas nesta/na próxima migration; remova toda policy legada
+-- antes de recriá-las. Em banco limpo o loop não encontra nenhuma linha.
+DO $$
+DECLARE
+  v_policy record;
+BEGIN
+  FOR v_policy IN
+    SELECT schemaname, tablename, policyname
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename IN (
+        'tv_channels',
+        'tv_stream_keys',
+        'tv_programs',
+        'tv_schedule_blocks',
+        'tv_live_sessions',
+        'tv_replays',
+        'tv_intervals',
+        'tv_view_events'
+      )
+  LOOP
+    EXECUTE format(
+      'DROP POLICY IF EXISTS %I ON %I.%I',
+      v_policy.policyname,
+      v_policy.schemaname,
+      v_policy.tablename
+    );
+  END LOOP;
+END;
+$$;
+
 -- ── tv_channels ─────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.tv_channels (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -187,9 +217,54 @@ CREATE TABLE IF NOT EXISTS public.tv_channels (
   CONSTRAINT uniq_tv_channels_org_slug UNIQUE (organization_id, slug)
 );
 
-CREATE INDEX IF NOT EXISTS idx_tv_channels_org ON public.tv_channels (organization_id) WHERE status <> 'archived';
+-- Compatibilidade com a fundação legada do staging. ADD COLUMN é no-op em
+-- banco limpo/novo e preserva todas as linhas existentes.
+ALTER TABLE public.tv_channels
+  ADD COLUMN IF NOT EXISTS auto_publish_to_canal boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS default_canal_channel_id uuid,
+  ADD COLUMN IF NOT EXISTS max_recording_minutes integer NOT NULL DEFAULT 240
+    CHECK (max_recording_minutes > 0),
+  ADD COLUMN IF NOT EXISTS heartbeat_interval_sec integer NOT NULL DEFAULT 30
+    CHECK (heartbeat_interval_sec > 0),
+  ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
+ALTER TABLE public.tv_channels
+  DROP CONSTRAINT IF EXISTS tv_channels_organization_id_fkey,
+  DROP CONSTRAINT IF EXISTS tv_channels_church_id_fkey,
+  DROP CONSTRAINT IF EXISTS tv_channels_name_check,
+  DROP CONSTRAINT IF EXISTS tv_channels_slug_check;
+ALTER TABLE public.tv_channels
+  ADD CONSTRAINT tv_channels_organization_id_fkey
+    FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT tv_channels_church_id_fkey
+    FOREIGN KEY (church_id) REFERENCES public.organizations(id) ON DELETE SET NULL,
+  ADD CONSTRAINT tv_channels_name_check CHECK (btrim(name) <> ''),
+  ADD CONSTRAINT tv_channels_slug_check CHECK (slug ~ '^[a-z0-9-]+$');
+
+ALTER TABLE public.tv_channels
+  DROP CONSTRAINT IF EXISTS tv_channels_organization_id_slug_key;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.tv_channels'::regclass
+      AND conname = 'uniq_tv_channels_org_slug'
+  ) THEN
+    ALTER TABLE public.tv_channels
+      ADD CONSTRAINT uniq_tv_channels_org_slug UNIQUE (organization_id, slug);
+  END IF;
+END;
+$$;
+
+DROP INDEX IF EXISTS public.idx_tv_channels_org;
+CREATE INDEX idx_tv_channels_org
+  ON public.tv_channels (organization_id)
+  WHERE status <> 'archived';
 
 DROP TRIGGER IF EXISTS update_tv_channels_updated_at ON public.tv_channels;
+DROP TRIGGER IF EXISTS tv_channels_updated_at ON public.tv_channels;
 CREATE TRIGGER update_tv_channels_updated_at
 BEFORE UPDATE ON public.tv_channels
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
@@ -219,6 +294,7 @@ WITH CHECK (public.has_org_access_permission(auth.uid(), organization_id, 'tv.ma
 CREATE TABLE IF NOT EXISTS public.tv_stream_keys (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  church_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL,
   tv_channel_id uuid NOT NULL REFERENCES public.tv_channels(id) ON DELETE CASCADE,
   stream_key_hash text NOT NULL UNIQUE,
   stream_key_last4 text NOT NULL,
@@ -231,7 +307,40 @@ CREATE TABLE IF NOT EXISTS public.tv_stream_keys (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_tv_stream_keys_channel ON public.tv_stream_keys (tv_channel_id);
+ALTER TABLE public.tv_stream_keys
+  ADD COLUMN IF NOT EXISTS church_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL;
+
+ALTER TABLE public.tv_stream_keys
+  DROP CONSTRAINT IF EXISTS tv_stream_keys_organization_id_fkey,
+  DROP CONSTRAINT IF EXISTS tv_stream_keys_church_id_fkey;
+ALTER TABLE public.tv_stream_keys
+  ADD CONSTRAINT tv_stream_keys_organization_id_fkey
+    FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT tv_stream_keys_church_id_fkey
+    FOREIGN KEY (church_id) REFERENCES public.organizations(id) ON DELETE SET NULL;
+
+ALTER TABLE public.tv_stream_keys
+  DROP CONSTRAINT IF EXISTS tv_stream_keys_stream_source_type_check;
+ALTER TABLE public.tv_stream_keys
+  ADD CONSTRAINT tv_stream_keys_stream_source_type_check
+  CHECK (stream_source_type IN ('obs', 'mobile', 'computer', 'mock', 'scheduled'));
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.tv_stream_keys'::regclass
+      AND conname = 'tv_stream_keys_stream_key_hash_key'
+  ) THEN
+    ALTER TABLE public.tv_stream_keys
+      ADD CONSTRAINT tv_stream_keys_stream_key_hash_key UNIQUE (stream_key_hash);
+  END IF;
+END;
+$$;
+
+DROP INDEX IF EXISTS public.idx_tv_stream_keys_channel;
+CREATE INDEX idx_tv_stream_keys_channel ON public.tv_stream_keys (tv_channel_id);
 
 ALTER TABLE public.tv_stream_keys ENABLE ROW LEVEL SECURITY;
 
@@ -244,6 +353,7 @@ WITH CHECK (public.has_org_access_permission(auth.uid(), organization_id, 'tv.ma
 CREATE TABLE IF NOT EXISTS public.tv_programs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  church_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL,
   tv_channel_id uuid NOT NULL REFERENCES public.tv_channels(id) ON DELETE CASCADE,
   title text NOT NULL CHECK (btrim(title) <> ''),
   description text,
@@ -252,14 +362,45 @@ CREATE TABLE IF NOT EXISTS public.tv_programs (
     'homens', 'missoes', 'intervalo', 'noticiario', 'general'
   )),
   host_name text,
+  ministry_id uuid,
   thumbnail_url text,
   default_duration_minutes integer NOT NULL DEFAULT 60 CHECK (default_duration_minutes > 0),
   status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'archived')),
   created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_tv_programs_channel ON public.tv_programs (tv_channel_id) WHERE status <> 'archived';
+ALTER TABLE public.tv_programs
+  ADD COLUMN IF NOT EXISTS church_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS ministry_id uuid,
+  ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
+ALTER TABLE public.tv_programs
+  DROP CONSTRAINT IF EXISTS tv_programs_organization_id_fkey,
+  DROP CONSTRAINT IF EXISTS tv_programs_church_id_fkey,
+  DROP CONSTRAINT IF EXISTS tv_programs_title_check,
+  DROP CONSTRAINT IF EXISTS tv_programs_default_duration_minutes_check;
+ALTER TABLE public.tv_programs
+  ADD CONSTRAINT tv_programs_organization_id_fkey
+    FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT tv_programs_church_id_fkey
+    FOREIGN KEY (church_id) REFERENCES public.organizations(id) ON DELETE SET NULL,
+  ADD CONSTRAINT tv_programs_title_check CHECK (btrim(title) <> ''),
+  ADD CONSTRAINT tv_programs_default_duration_minutes_check
+    CHECK (default_duration_minutes > 0);
+
+DROP INDEX IF EXISTS public.idx_tv_programs_channel;
+CREATE INDEX idx_tv_programs_channel
+  ON public.tv_programs (tv_channel_id)
+  WHERE status <> 'archived';
+
+DROP TRIGGER IF EXISTS tv_programs_updated_at ON public.tv_programs;
+DROP TRIGGER IF EXISTS update_tv_programs_updated_at ON public.tv_programs;
+CREATE TRIGGER update_tv_programs_updated_at
+BEFORE UPDATE ON public.tv_programs
+FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 ALTER TABLE public.tv_programs ENABLE ROW LEVEL SECURITY;
 
@@ -276,6 +417,7 @@ WITH CHECK (public.has_org_access_permission(auth.uid(), organization_id, 'tv.ma
 CREATE TABLE IF NOT EXISTS public.tv_schedule_blocks (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  church_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL,
   tv_channel_id uuid NOT NULL REFERENCES public.tv_channels(id) ON DELETE CASCADE,
   program_id uuid REFERENCES public.tv_programs(id) ON DELETE SET NULL,
   start_time timestamptz NOT NULL,
@@ -290,11 +432,50 @@ CREATE TABLE IF NOT EXISTS public.tv_schedule_blocks (
   priority integer NOT NULL DEFAULT 0,
   created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT tv_schedule_blocks_time_order CHECK (end_time > start_time)
 );
 
-CREATE INDEX IF NOT EXISTS idx_tv_schedule_blocks_channel_time
+ALTER TABLE public.tv_schedule_blocks
+  ADD COLUMN IF NOT EXISTS church_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
+ALTER TABLE public.tv_schedule_blocks
+  DROP CONSTRAINT IF EXISTS tv_schedule_blocks_organization_id_fkey,
+  DROP CONSTRAINT IF EXISTS tv_schedule_blocks_church_id_fkey;
+ALTER TABLE public.tv_schedule_blocks
+  ADD CONSTRAINT tv_schedule_blocks_organization_id_fkey
+    FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT tv_schedule_blocks_church_id_fkey
+    FOREIGN KEY (church_id) REFERENCES public.organizations(id) ON DELETE SET NULL;
+
+ALTER TABLE public.tv_schedule_blocks
+  DROP CONSTRAINT IF EXISTS tv_schedule_blocks_time_check;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.tv_schedule_blocks'::regclass
+      AND conname = 'tv_schedule_blocks_time_order'
+  ) THEN
+    ALTER TABLE public.tv_schedule_blocks
+      ADD CONSTRAINT tv_schedule_blocks_time_order CHECK (end_time > start_time);
+  END IF;
+END;
+$$;
+
+DROP INDEX IF EXISTS public.idx_tv_schedule_channel_time;
+DROP INDEX IF EXISTS public.idx_tv_schedule_blocks_channel_time;
+CREATE INDEX idx_tv_schedule_blocks_channel_time
   ON public.tv_schedule_blocks (tv_channel_id, start_time);
+
+DROP TRIGGER IF EXISTS tv_schedule_blocks_updated_at ON public.tv_schedule_blocks;
+DROP TRIGGER IF EXISTS update_tv_schedule_blocks_updated_at ON public.tv_schedule_blocks;
+CREATE TRIGGER update_tv_schedule_blocks_updated_at
+BEFORE UPDATE ON public.tv_schedule_blocks
+FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 ALTER TABLE public.tv_schedule_blocks ENABLE ROW LEVEL SECURITY;
 
@@ -316,6 +497,7 @@ WITH CHECK (public.has_org_access_permission(auth.uid(), organization_id, 'tv.ma
 CREATE TABLE IF NOT EXISTS public.tv_live_sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  church_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL,
   tv_channel_id uuid NOT NULL REFERENCES public.tv_channels(id) ON DELETE CASCADE,
   schedule_block_id uuid REFERENCES public.tv_schedule_blocks(id) ON DELETE SET NULL,
   program_id uuid REFERENCES public.tv_programs(id) ON DELETE SET NULL,
@@ -345,11 +527,43 @@ CREATE TABLE IF NOT EXISTS public.tv_live_sessions (
   director_last_seen_at timestamptz,
   studio_room_id uuid,
   created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_tv_live_sessions_channel ON public.tv_live_sessions (tv_channel_id, status_transmissao);
-CREATE INDEX IF NOT EXISTS idx_tv_live_sessions_org_created ON public.tv_live_sessions (organization_id, created_at DESC);
+ALTER TABLE public.tv_live_sessions
+  ADD COLUMN IF NOT EXISTS church_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS studio_room_id uuid,
+  ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
+ALTER TABLE public.tv_live_sessions
+  DROP CONSTRAINT IF EXISTS tv_live_sessions_organization_id_fkey,
+  DROP CONSTRAINT IF EXISTS tv_live_sessions_church_id_fkey,
+  DROP CONSTRAINT IF EXISTS tv_live_sessions_viewer_count_check,
+  DROP CONSTRAINT IF EXISTS tv_live_sessions_peak_viewer_count_check;
+ALTER TABLE public.tv_live_sessions
+  ADD CONSTRAINT tv_live_sessions_organization_id_fkey
+    FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT tv_live_sessions_church_id_fkey
+    FOREIGN KEY (church_id) REFERENCES public.organizations(id) ON DELETE SET NULL,
+  ADD CONSTRAINT tv_live_sessions_viewer_count_check CHECK (viewer_count >= 0),
+  ADD CONSTRAINT tv_live_sessions_peak_viewer_count_check CHECK (peak_viewer_count >= 0);
+
+DROP INDEX IF EXISTS public.idx_tv_live_sessions_channel_status;
+DROP INDEX IF EXISTS public.idx_tv_live_sessions_org_active;
+DROP INDEX IF EXISTS public.idx_tv_live_sessions_channel;
+DROP INDEX IF EXISTS public.idx_tv_live_sessions_org_created;
+CREATE INDEX idx_tv_live_sessions_channel
+  ON public.tv_live_sessions (tv_channel_id, status_transmissao);
+CREATE INDEX idx_tv_live_sessions_org_created
+  ON public.tv_live_sessions (organization_id, created_at DESC);
+
+DROP TRIGGER IF EXISTS tv_live_sessions_updated_at ON public.tv_live_sessions;
+DROP TRIGGER IF EXISTS update_tv_live_sessions_updated_at ON public.tv_live_sessions;
+CREATE TRIGGER update_tv_live_sessions_updated_at
+BEFORE UPDATE ON public.tv_live_sessions
+FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 ALTER TABLE public.tv_live_sessions ENABLE ROW LEVEL SECURITY;
 
@@ -379,6 +593,7 @@ WITH CHECK (
 CREATE TABLE IF NOT EXISTS public.tv_replays (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  church_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL,
   tv_channel_id uuid NOT NULL REFERENCES public.tv_channels(id) ON DELETE CASCADE,
   live_session_id uuid REFERENCES public.tv_live_sessions(id) ON DELETE SET NULL,
   program_id uuid REFERENCES public.tv_programs(id) ON DELETE SET NULL,
@@ -395,7 +610,30 @@ CREATE TABLE IF NOT EXISTS public.tv_replays (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_tv_replays_channel ON public.tv_replays (tv_channel_id, created_at DESC);
+ALTER TABLE public.tv_replays
+  ADD COLUMN IF NOT EXISTS church_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL;
+
+ALTER TABLE public.tv_replays
+  DROP CONSTRAINT IF EXISTS tv_replays_organization_id_fkey,
+  DROP CONSTRAINT IF EXISTS tv_replays_church_id_fkey,
+  DROP CONSTRAINT IF EXISTS tv_replays_title_check,
+  DROP CONSTRAINT IF EXISTS tv_replays_duration_seconds_check,
+  DROP CONSTRAINT IF EXISTS tv_replays_file_size_bytes_check;
+ALTER TABLE public.tv_replays
+  ADD CONSTRAINT tv_replays_organization_id_fkey
+    FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT tv_replays_church_id_fkey
+    FOREIGN KEY (church_id) REFERENCES public.organizations(id) ON DELETE SET NULL,
+  ADD CONSTRAINT tv_replays_title_check CHECK (btrim(title) <> ''),
+  ADD CONSTRAINT tv_replays_duration_seconds_check
+    CHECK (duration_seconds IS NULL OR duration_seconds >= 0),
+  ADD CONSTRAINT tv_replays_file_size_bytes_check
+    CHECK (file_size_bytes IS NULL OR file_size_bytes >= 0);
+
+DROP INDEX IF EXISTS public.idx_tv_replays_channel_status;
+DROP INDEX IF EXISTS public.idx_tv_replays_channel;
+CREATE INDEX idx_tv_replays_channel
+  ON public.tv_replays (tv_channel_id, created_at DESC);
 
 ALTER TABLE public.tv_replays ENABLE ROW LEVEL SECURITY;
 
@@ -408,19 +646,128 @@ FOR ALL TO authenticated
 USING (public.has_org_access_permission(auth.uid(), organization_id, 'tv.manage'))
 WITH CHECK (public.has_org_access_permission(auth.uid(), organization_id, 'tv.manage'));
 
--- ── tv_view_events (base de track_tv_view_event) ───────────────────────
-CREATE TABLE IF NOT EXISTS public.tv_view_events (
+-- ── tv_intervals (legado útil: avisos entre programas) ──────────────────
+-- A primeira implementação da TV criou esta tabela diretamente no staging.
+-- Ela é preservada e incorporada ao contrato canônico para que a promoção
+-- replique a mesma estrutura em produção sem apagar conteúdo existente.
+CREATE TABLE IF NOT EXISTS public.tv_intervals (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tv_channel_id uuid NOT NULL REFERENCES public.tv_channels(id) ON DELETE CASCADE,
-  live_session_id uuid REFERENCES public.tv_live_sessions(id) ON DELETE SET NULL,
-  event_type text NOT NULL CHECK (event_type IN ('join', 'heartbeat', 'leave')),
-  viewer_session text NOT NULL,
-  watched_seconds integer NOT NULL DEFAULT 0 CHECK (watched_seconds >= 0),
-  user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  church_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL,
+  tv_channel_id uuid REFERENCES public.tv_channels(id) ON DELETE CASCADE,
+  title text NOT NULL,
+  description text,
+  interval_type text NOT NULL DEFAULT 'aviso'
+    CHECK (interval_type IN ('aviso', 'anuncio', 'chamada', 'propaganda')),
+  media_url text,
+  media_type text CHECK (media_type IN ('video', 'image', 'html')),
+  duration_seconds integer NOT NULL DEFAULT 30,
+  is_active boolean NOT NULL DEFAULT true,
+  display_from timestamptz,
+  display_until timestamptz,
+  priority integer NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_tv_view_events_session ON public.tv_view_events (live_session_id, viewer_session);
+ALTER TABLE public.tv_intervals
+  DROP CONSTRAINT IF EXISTS tv_intervals_organization_id_fkey,
+  DROP CONSTRAINT IF EXISTS tv_intervals_church_id_fkey,
+  DROP CONSTRAINT IF EXISTS tv_intervals_interval_type_check,
+  DROP CONSTRAINT IF EXISTS tv_intervals_media_type_check;
+ALTER TABLE public.tv_intervals
+  ADD CONSTRAINT tv_intervals_organization_id_fkey
+    FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT tv_intervals_church_id_fkey
+    FOREIGN KEY (church_id) REFERENCES public.organizations(id) ON DELETE SET NULL,
+  ADD CONSTRAINT tv_intervals_interval_type_check
+    CHECK (interval_type IN ('aviso', 'anuncio', 'chamada', 'propaganda')),
+  ADD CONSTRAINT tv_intervals_media_type_check
+    CHECK (media_type IS NULL OR media_type IN ('video', 'image', 'html'));
+
+DROP INDEX IF EXISTS public.idx_tv_intervals_org_active;
+CREATE INDEX idx_tv_intervals_org_active
+  ON public.tv_intervals (organization_id, is_active, priority DESC);
+
+ALTER TABLE public.tv_intervals ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY tv_intervals_select ON public.tv_intervals
+FOR SELECT TO authenticated
+USING (public._can_consume_org_content(auth.uid(), organization_id));
+
+CREATE POLICY tv_intervals_write ON public.tv_intervals
+FOR ALL TO authenticated
+USING (public.has_org_access_permission(auth.uid(), organization_id, 'tv.manage'))
+WITH CHECK (public.has_org_access_permission(auth.uid(), organization_id, 'tv.manage'));
+
+-- ── tv_view_events (base de track_tv_view_event) ───────────────────────
+CREATE TABLE IF NOT EXISTS public.tv_view_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  tv_channel_id uuid NOT NULL REFERENCES public.tv_channels(id) ON DELETE CASCADE,
+  live_session_id uuid REFERENCES public.tv_live_sessions(id) ON DELETE SET NULL,
+  replay_id uuid REFERENCES public.tv_replays(id) ON DELETE SET NULL,
+  event_type text NOT NULL CHECK (event_type IN ('join', 'heartbeat', 'leave', 'error')),
+  viewer_session text NOT NULL,
+  viewer_session_id text,
+  watched_seconds integer NOT NULL DEFAULT 0 CHECK (watched_seconds >= 0),
+  watch_duration_seconds integer,
+  player_position_seconds integer,
+  user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  viewer_user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.tv_view_events
+  ADD COLUMN IF NOT EXISTS organization_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS replay_id uuid REFERENCES public.tv_replays(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS viewer_session text,
+  ADD COLUMN IF NOT EXISTS viewer_session_id text,
+  ADD COLUMN IF NOT EXISTS watched_seconds integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS watch_duration_seconds integer,
+  ADD COLUMN IF NOT EXISTS player_position_seconds integer,
+  ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS viewer_user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
+
+UPDATE public.tv_view_events e
+SET organization_id = c.organization_id,
+    viewer_session = COALESCE(NULLIF(e.viewer_session, ''), NULLIF(e.viewer_session_id, ''), 'legacy-' || e.id::text),
+    watched_seconds = GREATEST(COALESCE(e.watched_seconds, e.watch_duration_seconds, 0), 0),
+    user_id = COALESCE(e.user_id, e.viewer_user_id)
+FROM public.tv_channels c
+WHERE c.id = e.tv_channel_id
+  AND (
+    e.organization_id IS NULL
+    OR e.viewer_session IS NULL
+    OR e.viewer_session = ''
+    OR e.user_id IS NULL
+  );
+
+ALTER TABLE public.tv_view_events
+  ALTER COLUMN organization_id SET NOT NULL,
+  ALTER COLUMN viewer_session SET NOT NULL,
+  ALTER COLUMN watched_seconds SET DEFAULT 0,
+  ALTER COLUMN watched_seconds SET NOT NULL;
+
+ALTER TABLE public.tv_view_events
+  DROP CONSTRAINT IF EXISTS tv_view_events_organization_id_fkey;
+ALTER TABLE public.tv_view_events
+  ADD CONSTRAINT tv_view_events_organization_id_fkey
+    FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+ALTER TABLE public.tv_view_events
+  DROP CONSTRAINT IF EXISTS tv_view_events_event_type_check;
+ALTER TABLE public.tv_view_events
+  ADD CONSTRAINT tv_view_events_event_type_check
+  CHECK (event_type IN ('join', 'heartbeat', 'leave', 'error'));
+ALTER TABLE public.tv_view_events
+  DROP CONSTRAINT IF EXISTS tv_view_events_watched_seconds_check;
+ALTER TABLE public.tv_view_events
+  ADD CONSTRAINT tv_view_events_watched_seconds_check
+  CHECK (watched_seconds >= 0);
+
+DROP INDEX IF EXISTS public.idx_tv_view_events_session;
+CREATE INDEX idx_tv_view_events_session
+  ON public.tv_view_events (live_session_id, viewer_session);
 
 ALTER TABLE public.tv_view_events ENABLE ROW LEVEL SECURITY;
 -- Nenhuma policy: só a RPC track_tv_view_event (SECURITY DEFINER) grava.
@@ -575,9 +922,13 @@ BEGIN
   END IF;
 
   INSERT INTO public.tv_view_events (
-    tv_channel_id, live_session_id, event_type, viewer_session, watched_seconds, user_id
+    organization_id, tv_channel_id, live_session_id, event_type,
+    viewer_session, viewer_session_id, watched_seconds, watch_duration_seconds,
+    user_id, viewer_user_id
   ) VALUES (
-    p_channel_id, p_session_id, p_event_type, p_viewer_session, GREATEST(p_watched_seconds, 0), auth.uid()
+    v_org_id, p_channel_id, p_session_id, p_event_type,
+    p_viewer_session, p_viewer_session, GREATEST(p_watched_seconds, 0),
+    GREATEST(p_watched_seconds, 0), auth.uid(), auth.uid()
   );
 
   IF p_session_id IS NOT NULL AND p_event_type = 'join' THEN

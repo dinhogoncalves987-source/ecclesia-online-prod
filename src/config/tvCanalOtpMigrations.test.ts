@@ -197,7 +197,50 @@ describe("Login por telefone/WhatsApp (Parte D) — contrato de segurança", () 
 });
 
 describe("TV ↔ Canal — vínculo idempotente (Parte A + B, contrato §8)", () => {
+  const foundation = () => read(`supabase/migrations/${TV_CANAL_FOUNDATION}`);
   const live = () => read(`supabase/migrations/${TV_CANAL_LIVE}`);
+
+  it("reconcilia a fundação legada do staging sem apagar tabelas nem linhas", () => {
+    const sql = foundation();
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS auto_publish_to_canal");
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS studio_room_id uuid");
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS viewer_session text");
+    expect(sql).toContain("UPDATE public.tv_view_events e");
+    expect(sql).toContain("CREATE TABLE IF NOT EXISTS public.tv_intervals");
+    expect(sql).toContain("CREATE POLICY tv_intervals_write");
+    expect(sql).not.toMatch(/DROP TABLE/i);
+  });
+
+  it("remove policies antigas antes de instalar as policies canônicas de TV", () => {
+    const foundationSql = foundation();
+    const liveSql = live();
+    expect(foundationSql).toContain("FROM pg_policies");
+    expect(foundationSql).toContain("'tv_intervals'");
+    expect(foundationSql).toContain("'tv_view_events'");
+    expect(liveSql).toContain("tablename IN ('tv_studio_rooms', 'tv_camera_sessions')");
+    expect(liveSql).not.toMatch(/CREATE POLICY\s+\w+\s+ON\s+public\.tv_camera_sessions[\s\S]{0,100}TO\s+(?:PUBLIC|anon)/i);
+  });
+
+  it("preserva o contrato legado útil e aceita os estados canônicos da direção", () => {
+    const sql = live();
+    expect(sql).toContain("device_type IN ('mobile', 'desktop', 'obs', 'browser')");
+    expect(sql).toContain("status IN ('waiting', 'connected', 'live', 'on_air', 'disconnected', 'error')");
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS livekit_participant_identity text");
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS director_device_id text");
+  });
+
+  it("usa unicidade parcial compatível com o histórico de reconexões das câmeras", () => {
+    const sql = live();
+    expect(sql).toContain("CREATE UNIQUE INDEX uq_camera_sessions_session_device");
+    expect(sql).toContain("WHERE status NOT IN ('disconnected', 'error') AND device_id IS NOT NULL");
+    expect(sql.match(/ON CONFLICT \(live_session_id, device_id\)/g)).toHaveLength(2);
+  });
+
+  it("preenche os vínculos legados de canal e sala em toda entrada de câmera", () => {
+    const sql = live();
+    expect(sql.match(/organization_id, tv_channel_id, live_session_id, studio_room_id/g)).toHaveLength(3);
+    expect(sql).toContain("SET is_active = false, status = 'ended', ended_at = now()");
+  });
 
   it("usa advisory lock por (organization_id, slug) para nunca duplicar canais em concorrência", () => {
     const sql = live();

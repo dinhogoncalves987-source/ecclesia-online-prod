@@ -50,16 +50,116 @@ $$;
 -- 1. PRODUÇÃO AO VIVO (device_id)
 -- ════════════════════════════════════════════════════════════════════════
 
+-- Remove policies legadas antes de instalar o contrato canônico. O staging
+-- histórico possuía INSERT anônimo em tv_camera_sessions; nenhuma policy de
+-- escrita direta deve sobreviver, pois toda mutação passa pelas RPCs abaixo.
+DO $$
+DECLARE
+  v_policy record;
+BEGIN
+  FOR v_policy IN
+    SELECT schemaname, tablename, policyname
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename IN ('tv_studio_rooms', 'tv_camera_sessions')
+  LOOP
+    EXECUTE format(
+      'DROP POLICY IF EXISTS %I ON %I.%I',
+      v_policy.policyname,
+      v_policy.schemaname,
+      v_policy.tablename
+    );
+  END LOOP;
+END;
+$$;
+
 CREATE TABLE IF NOT EXISTS public.tv_studio_rooms (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  church_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL,
   tv_channel_id uuid NOT NULL REFERENCES public.tv_channels(id) ON DELETE CASCADE,
-  live_session_id uuid NOT NULL REFERENCES public.tv_live_sessions(id) ON DELETE CASCADE,
-  room_name text NOT NULL UNIQUE,
+  live_session_id uuid REFERENCES public.tv_live_sessions(id) ON DELETE SET NULL,
+  room_name text NOT NULL,
+  provider text NOT NULL DEFAULT 'livekit' CHECK (provider IN ('livekit', 'mock')),
+  status text NOT NULL DEFAULT 'waiting'
+    CHECK (status IN ('waiting', 'active', 'ended', 'error')),
+  max_cameras integer NOT NULL DEFAULT 6 CHECK (max_cameras >= 1 AND max_cameras <= 6),
+  director_user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  director_device_id text,
+  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  started_at timestamptz,
+  ended_at timestamptz,
   is_active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT tv_studio_rooms_organization_id_room_name_key UNIQUE (organization_id, room_name),
   CONSTRAINT uniq_tv_studio_rooms_session UNIQUE (live_session_id)
 );
+
+ALTER TABLE public.tv_studio_rooms
+  ADD COLUMN IF NOT EXISTS church_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT 'livekit',
+  ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'waiting',
+  ADD COLUMN IF NOT EXISTS max_cameras integer NOT NULL DEFAULT 6,
+  ADD COLUMN IF NOT EXISTS director_user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS director_device_id text,
+  ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS started_at timestamptz,
+  ADD COLUMN IF NOT EXISTS ended_at timestamptz,
+  ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
+UPDATE public.tv_studio_rooms
+SET is_active = status NOT IN ('ended', 'error')
+WHERE is_active IS DISTINCT FROM (status NOT IN ('ended', 'error'));
+
+ALTER TABLE public.tv_studio_rooms
+  DROP CONSTRAINT IF EXISTS tv_studio_rooms_provider_check,
+  DROP CONSTRAINT IF EXISTS tv_studio_rooms_status_check,
+  DROP CONSTRAINT IF EXISTS tv_studio_rooms_max_cameras_check;
+ALTER TABLE public.tv_studio_rooms
+  ADD CONSTRAINT tv_studio_rooms_provider_check
+    CHECK (provider IN ('livekit', 'mock')),
+  ADD CONSTRAINT tv_studio_rooms_status_check
+    CHECK (status IN ('waiting', 'active', 'ended', 'error')),
+  ADD CONSTRAINT tv_studio_rooms_max_cameras_check
+    CHECK (max_cameras >= 1 AND max_cameras <= 6);
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM public.tv_studio_rooms
+    WHERE live_session_id IS NOT NULL
+    GROUP BY live_session_id
+    HAVING count(*) > 1
+  ) THEN
+    RAISE EXCEPTION 'tv_studio_rooms possui live_session_id duplicado; reconcilie os dados antes de continuar';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.tv_studio_rooms'::regclass
+      AND conname = 'uniq_tv_studio_rooms_session'
+  ) THEN
+    ALTER TABLE public.tv_studio_rooms
+      ADD CONSTRAINT uniq_tv_studio_rooms_session UNIQUE (live_session_id);
+  END IF;
+END;
+$$;
+
+DROP INDEX IF EXISTS public.idx_tv_studio_rooms_channel;
+DROP INDEX IF EXISTS public.idx_tv_studio_rooms_live_session;
+CREATE INDEX idx_tv_studio_rooms_channel
+  ON public.tv_studio_rooms (tv_channel_id, status);
+CREATE INDEX idx_tv_studio_rooms_live_session
+  ON public.tv_studio_rooms (live_session_id);
+
+DROP TRIGGER IF EXISTS tv_studio_rooms_touch_updated ON public.tv_studio_rooms;
+DROP TRIGGER IF EXISTS update_tv_studio_rooms_updated_at ON public.tv_studio_rooms;
+CREATE TRIGGER update_tv_studio_rooms_updated_at
+BEFORE UPDATE ON public.tv_studio_rooms
+FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 ALTER TABLE public.tv_studio_rooms ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tv_studio_rooms_select ON public.tv_studio_rooms
@@ -71,25 +171,94 @@ USING (public._can_consume_org_content(auth.uid(), organization_id));
 CREATE TABLE IF NOT EXISTS public.tv_camera_sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-  live_session_id uuid NOT NULL REFERENCES public.tv_live_sessions(id) ON DELETE CASCADE,
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  device_id text NOT NULL,
+  church_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL,
+  tv_channel_id uuid REFERENCES public.tv_channels(id) ON DELETE CASCADE,
+  live_session_id uuid REFERENCES public.tv_live_sessions(id) ON DELETE SET NULL,
+  studio_room_id uuid REFERENCES public.tv_studio_rooms(id) ON DELETE CASCADE,
+  user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  device_id text,
   camera_name text NOT NULL DEFAULT 'Câmera',
-  camera_number integer NOT NULL DEFAULT 0,
-  device_type text NOT NULL DEFAULT 'mobile' CHECK (device_type IN ('mobile', 'desktop', 'browser')),
+  device_name text,
+  camera_number integer DEFAULT 0,
+  device_type text NOT NULL DEFAULT 'mobile'
+    CHECK (device_type IN ('mobile', 'desktop', 'obs', 'browser')),
   role text NOT NULL DEFAULT 'camera' CHECK (role IN ('director', 'camera')),
   status text NOT NULL DEFAULT 'waiting'
-    CHECK (status IN ('waiting', 'connected', 'on_air', 'disconnected', 'error')),
+    CHECK (status IN ('waiting', 'connected', 'live', 'on_air', 'disconnected', 'error')),
   is_on_air boolean NOT NULL DEFAULT false,
+  livekit_room_name text,
+  livekit_participant_identity text,
+  livekit_track_sid text,
   source_type text NOT NULL DEFAULT 'logged_device'
     CHECK (source_type IN ('logged_device', 'external_link', 'local_demo')),
   last_heartbeat_at timestamptz,
-  connected_at timestamptz NOT NULL DEFAULT now(),
+  connected_at timestamptz,
   disconnected_at timestamptz,
-  CONSTRAINT uniq_tv_camera_sessions_device UNIQUE (live_session_id, device_id)
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_tv_camera_sessions_session ON public.tv_camera_sessions (live_session_id, role, status);
+ALTER TABLE public.tv_camera_sessions
+  ADD COLUMN IF NOT EXISTS church_id uuid REFERENCES public.organizations(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS tv_channel_id uuid REFERENCES public.tv_channels(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS studio_room_id uuid REFERENCES public.tv_studio_rooms(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS device_name text,
+  ADD COLUMN IF NOT EXISTS livekit_room_name text,
+  ADD COLUMN IF NOT EXISTS livekit_participant_identity text,
+  ADD COLUMN IF NOT EXISTS livekit_track_sid text,
+  ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
+ALTER TABLE public.tv_camera_sessions
+  ALTER COLUMN tv_channel_id DROP NOT NULL,
+  ALTER COLUMN live_session_id DROP NOT NULL,
+  ALTER COLUMN studio_room_id DROP NOT NULL,
+  ALTER COLUMN user_id DROP NOT NULL,
+  ALTER COLUMN device_id DROP NOT NULL,
+  ALTER COLUMN connected_at DROP NOT NULL,
+  ALTER COLUMN camera_number DROP NOT NULL,
+  ALTER COLUMN camera_name SET DEFAULT 'Câmera',
+  ALTER COLUMN camera_number SET DEFAULT 0,
+  ALTER COLUMN device_type SET DEFAULT 'mobile';
+
+ALTER TABLE public.tv_camera_sessions
+  DROP CONSTRAINT IF EXISTS tv_camera_sessions_device_type_check,
+  DROP CONSTRAINT IF EXISTS tv_camera_sessions_role_check,
+  DROP CONSTRAINT IF EXISTS tv_camera_sessions_status_check,
+  DROP CONSTRAINT IF EXISTS tv_camera_sessions_source_type_check;
+ALTER TABLE public.tv_camera_sessions
+  ADD CONSTRAINT tv_camera_sessions_device_type_check
+    CHECK (device_type IN ('mobile', 'desktop', 'obs', 'browser')),
+  ADD CONSTRAINT tv_camera_sessions_role_check
+    CHECK (role IN ('director', 'camera')),
+  ADD CONSTRAINT tv_camera_sessions_status_check
+    CHECK (status IN ('waiting', 'connected', 'live', 'on_air', 'disconnected', 'error')),
+  ADD CONSTRAINT tv_camera_sessions_source_type_check
+    CHECK (source_type IN ('logged_device', 'external_link', 'local_demo'));
+
+DROP INDEX IF EXISTS public.idx_tv_camera_sessions_device;
+DROP INDEX IF EXISTS public.idx_tv_camera_sessions_live_session;
+DROP INDEX IF EXISTS public.idx_tv_camera_sessions_room_status;
+DROP INDEX IF EXISTS public.idx_tv_camera_sessions_user;
+DROP INDEX IF EXISTS public.idx_tv_camera_sessions_session;
+DROP INDEX IF EXISTS public.uq_camera_sessions_session_device;
+CREATE INDEX idx_tv_camera_sessions_device
+  ON public.tv_camera_sessions (device_id, live_session_id);
+CREATE INDEX idx_tv_camera_sessions_live_session
+  ON public.tv_camera_sessions (live_session_id);
+CREATE INDEX idx_tv_camera_sessions_room_status
+  ON public.tv_camera_sessions (studio_room_id, status);
+CREATE INDEX idx_tv_camera_sessions_user
+  ON public.tv_camera_sessions (user_id);
+CREATE UNIQUE INDEX uq_camera_sessions_session_device
+  ON public.tv_camera_sessions (live_session_id, device_id)
+  WHERE status NOT IN ('disconnected', 'error') AND device_id IS NOT NULL;
+
+DROP TRIGGER IF EXISTS tv_camera_sessions_touch_updated ON public.tv_camera_sessions;
+DROP TRIGGER IF EXISTS update_tv_camera_sessions_updated_at ON public.tv_camera_sessions;
+CREATE TRIGGER update_tv_camera_sessions_updated_at
+BEFORE UPDATE ON public.tv_camera_sessions
+FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 ALTER TABLE public.tv_camera_sessions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tv_camera_sessions_select ON public.tv_camera_sessions
@@ -174,13 +343,32 @@ BEGIN
 
   SELECT id, tv_studio_rooms.room_name INTO v_room FROM public.tv_studio_rooms WHERE live_session_id = p_live_session_id;
   IF FOUND THEN
+    UPDATE public.tv_studio_rooms
+    SET is_active = true,
+        status = 'active',
+        director_user_id = auth.uid(),
+        started_at = COALESCE(started_at, now()),
+        ended_at = NULL
+    WHERE id = v_room.id;
     RETURN QUERY SELECT v_room.id, v_room.room_name;
     RETURN;
   END IF;
 
-  INSERT INTO public.tv_studio_rooms (organization_id, tv_channel_id, live_session_id, room_name)
-  VALUES (v_session.organization_id, v_session.tv_channel_id, p_live_session_id, 'room_' || replace(gen_random_uuid()::text, '-', ''))
-  ON CONFLICT (live_session_id) DO UPDATE SET is_active = true
+  INSERT INTO public.tv_studio_rooms (
+    organization_id, tv_channel_id, live_session_id, room_name,
+    provider, status, director_user_id, created_by, started_at, is_active
+  )
+  VALUES (
+    v_session.organization_id, v_session.tv_channel_id, p_live_session_id,
+    'room_' || replace(gen_random_uuid()::text, '-', ''),
+    'livekit', 'active', auth.uid(), auth.uid(), now(), true
+  )
+  ON CONFLICT (live_session_id) DO UPDATE SET
+    is_active = true,
+    status = 'active',
+    director_user_id = auth.uid(),
+    started_at = COALESCE(tv_studio_rooms.started_at, now()),
+    ended_at = NULL
   RETURNING id, tv_studio_rooms.room_name INTO v_room;
 
   UPDATE public.tv_live_sessions SET studio_room_id = v_room.id WHERE id = p_live_session_id;
@@ -327,19 +515,30 @@ BEGIN
   )
   RETURNING id INTO v_session_id;
 
-  INSERT INTO public.tv_camera_sessions (
-    organization_id, live_session_id, user_id, device_id, camera_name, camera_number,
-    device_type, role, status, source_type, last_heartbeat_at
-  ) VALUES (
-    p_org_id, v_session_id, auth.uid(), p_director_device_id, 'Direção', 0,
-    'desktop', 'director', 'connected', 'logged_device', now()
-  );
-
-  INSERT INTO public.tv_studio_rooms (organization_id, tv_channel_id, live_session_id, room_name)
-  VALUES (p_org_id, p_channel_id, v_session_id, 'room_' || replace(gen_random_uuid()::text, '-', ''))
+  INSERT INTO public.tv_studio_rooms (
+    organization_id, tv_channel_id, live_session_id, room_name,
+    provider, status, director_user_id, director_device_id, created_by,
+    started_at, is_active
+  )
+  VALUES (
+    p_org_id, p_channel_id, v_session_id,
+    'room_' || replace(gen_random_uuid()::text, '-', ''),
+    'livekit', 'active', auth.uid(), p_director_device_id, auth.uid(),
+    now(), true
+  )
   RETURNING id, tv_studio_rooms.room_name INTO v_room;
 
   UPDATE public.tv_live_sessions SET studio_room_id = v_room.id WHERE id = v_session_id;
+
+  INSERT INTO public.tv_camera_sessions (
+    organization_id, tv_channel_id, live_session_id, studio_room_id,
+    user_id, device_id, camera_name, camera_number,
+    device_type, role, status, source_type, last_heartbeat_at, connected_at
+  ) VALUES (
+    p_org_id, p_channel_id, v_session_id, v_room.id,
+    auth.uid(), p_director_device_id, 'Direção', 0,
+    'desktop', 'director', 'connected', 'logged_device', now(), now()
+  );
 
   RETURN QUERY SELECT v_session_id, v_room.id, v_room.room_name;
 END;
@@ -389,14 +588,24 @@ BEGIN
   WHERE id = p_live_session_id;
 
   INSERT INTO public.tv_camera_sessions (
-    organization_id, live_session_id, user_id, device_id, camera_name, camera_number,
-    device_type, role, status, source_type, last_heartbeat_at
+    organization_id, tv_channel_id, live_session_id, studio_room_id,
+    user_id, device_id, camera_name, camera_number,
+    device_type, role, status, source_type, last_heartbeat_at, connected_at
   ) VALUES (
-    v_session.organization_id, p_live_session_id, auth.uid(), p_director_device_id, 'Direção', 0,
-    'desktop', 'director', 'connected', 'logged_device', now()
+    v_session.organization_id, v_session.tv_channel_id, p_live_session_id, v_session.studio_room_id,
+    auth.uid(), p_director_device_id, 'Direção', 0,
+    'desktop', 'director', 'connected', 'logged_device', now(), now()
   )
-  ON CONFLICT (live_session_id, device_id) DO UPDATE SET
-    status = 'connected', last_heartbeat_at = now(), disconnected_at = NULL, user_id = auth.uid();
+  ON CONFLICT (live_session_id, device_id)
+    WHERE status NOT IN ('disconnected', 'error') AND device_id IS NOT NULL
+  DO UPDATE SET
+    tv_channel_id = EXCLUDED.tv_channel_id,
+    studio_room_id = EXCLUDED.studio_room_id,
+    status = 'connected',
+    last_heartbeat_at = now(),
+    connected_at = COALESCE(tv_camera_sessions.connected_at, now()),
+    disconnected_at = NULL,
+    user_id = auth.uid();
 
   RETURN QUERY SELECT true, 'director_claimed'::text;
 END;
@@ -447,16 +656,26 @@ BEGIN
   WHERE live_session_id = p_live_session_id AND role = 'camera';
 
   INSERT INTO public.tv_camera_sessions (
-    organization_id, live_session_id, user_id, device_id, camera_name, camera_number,
-    device_type, role, status, source_type, last_heartbeat_at
+    organization_id, tv_channel_id, live_session_id, studio_room_id,
+    user_id, device_id, camera_name, camera_number,
+    device_type, role, status, source_type, last_heartbeat_at, connected_at
   ) VALUES (
-    v_session.organization_id, p_live_session_id, auth.uid(), p_device_id,
+    v_session.organization_id, v_session.tv_channel_id, p_live_session_id, v_room.id,
+    auth.uid(), p_device_id,
     COALESCE(NULLIF(btrim(p_camera_name), ''), 'Câmera'), v_next_number,
-    p_device_type, 'camera', 'connected', p_source_type, now()
+    p_device_type, 'camera', 'connected', p_source_type, now(), now()
   )
-  ON CONFLICT (live_session_id, device_id) DO UPDATE SET
-    status = 'connected', last_heartbeat_at = now(), disconnected_at = NULL,
-    camera_name = EXCLUDED.camera_name, user_id = auth.uid()
+  ON CONFLICT (live_session_id, device_id)
+    WHERE status NOT IN ('disconnected', 'error') AND device_id IS NOT NULL
+  DO UPDATE SET
+    tv_channel_id = EXCLUDED.tv_channel_id,
+    studio_room_id = EXCLUDED.studio_room_id,
+    status = 'connected',
+    last_heartbeat_at = now(),
+    connected_at = COALESCE(tv_camera_sessions.connected_at, now()),
+    disconnected_at = NULL,
+    camera_name = EXCLUDED.camera_name,
+    user_id = auth.uid()
   RETURNING id INTO v_camera_id;
 
   RETURN QUERY SELECT v_camera_id, v_next_number, v_room.room_name, v_room.id;
@@ -554,7 +773,9 @@ BEGIN
   SET status = 'disconnected', is_on_air = false, disconnected_at = now()
   WHERE live_session_id = p_live_session_id AND status <> 'disconnected';
 
-  UPDATE public.tv_studio_rooms SET is_active = false WHERE live_session_id = p_live_session_id;
+  UPDATE public.tv_studio_rooms
+  SET is_active = false, status = 'ended', ended_at = now()
+  WHERE live_session_id = p_live_session_id;
 
   RETURN true;
 END;
