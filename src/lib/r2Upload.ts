@@ -36,10 +36,20 @@ import { supabase } from "@/integrations/supabase/client";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
+// "purpose" define, do lado do SERVIDOR (get-r2-upload-url), o bucket e o
+// prefixo de caminho reais — o cliente nunca escolhe bucket/path livremente
+// (isso permitiria caminho ou bucket arbitrário). Cada purpose exige a
+// capability correspondente (canal.manage / tv.manage) validada na Edge
+// Function antes de assinar qualquer upload.
+export type R2UploadPurpose =
+  | "canal-video"
+  | "canal-thumbnail"
+  | "tv-recording"
+  | "tv-asset";
+
 export type R2UploadOptions = {
   file: File;
-  bucket: string;
-  path: string;
+  purpose: R2UploadPurpose;
   organizationId: string;
   onProgress?: (percent: number) => void;
 };
@@ -63,17 +73,17 @@ export type R2Metadata = {
 // ── Solicitar URL assinada ────────────────────────────────────────────────────
 
 async function getPresignedUploadUrl(
-  bucket: string,
-  path: string,
+  purpose: R2UploadPurpose,
   contentType: string,
+  fileSizeBytes: number,
   organizationId: string,
 ): Promise<{ uploadUrl: string; publicUrl: string; storageKey: string } | null> {
   try {
     const { data, error } = await supabase.functions.invoke("get-r2-upload-url", {
       body: {
-        bucket,
-        path,
+        purpose,
         contentType,
+        fileSizeBytes,
         organizationId,
       },
     });
@@ -115,15 +125,14 @@ function uploadWithProgress(
 
 export async function uploadToR2({
   file,
-  bucket,
-  path,
+  purpose,
   organizationId,
   onProgress,
 }: R2UploadOptions): Promise<R2UploadResult> {
   const presigned = await getPresignedUploadUrl(
-    bucket,
-    path,
+    purpose,
     file.type,
+    file.size,
     organizationId,
   );
 
@@ -142,33 +151,6 @@ export async function uploadToR2({
     storageKey: presigned.storageKey,
     publicUrl: presigned.publicUrl,
   };
-}
-
-// ── Gerar path único para o arquivo ──────────────────────────────────────────
-
-export function buildR2Path(
-  organizationId: string,
-  folder: string,
-  file: File,
-): string {
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "bin";
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).slice(2, 8);
-  return `${organizationId}/${folder}/${timestamp}-${random}.${ext}`;
-}
-
-// ── Determinar bucket correto por tipo de arquivo ─────────────────────────────
-
-export function getR2BucketForFile(file: File): "ecclesia-media" | "ecclesia-documents" {
-  const type = file.type.toLowerCase();
-  if (
-    type.startsWith("video/") ||
-    type.startsWith("audio/") ||
-    type.startsWith("image/")
-  ) {
-    return "ecclesia-media";
-  }
-  return "ecclesia-documents";
 }
 
 // ── Verificar se arquivo deve usar R2 (em vez de Supabase Storage) ────────────

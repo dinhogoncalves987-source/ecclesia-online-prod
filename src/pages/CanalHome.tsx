@@ -4,19 +4,31 @@ import { AdminLayout } from "@/components/AdminLayout";
 import { useChurch } from "@/hooks/useChurchContext";
 import {
   fetchEcclesiaChannels, fetchOrgVideos,
-  type EcclesiaChannel, type EcclesiaVideo,
+  type EcclesiaChannel, type EcclesiaVideo, type EcclesiaVideoCategory,
 } from "@/lib/canalEcclesia";
-import {
-  MOCK_CHANNELS, MOCK_VIDEOS, HOME_CATEGORY_LABELS, isOfficialChannel,
-  type HomeCategory,
-} from "@/lib/canalMockData";
 import {
   CanalVideoCard, CanalChannelCard, CanalVideoSkeleton, CanalEmptyState,
 } from "@/components/canal/CanalComponents";
 import {
-  Search, Plus, Radio, TrendingUp, PlayCircle, CheckCircle2,
+  Search, Plus, Radio, TrendingUp, PlayCircle,
   Upload, Settings2,
 } from "lucide-react";
+import { toast } from "sonner";
+
+// Subconjunto de categorias com destaque na Home (mesmos valores reais de
+// EcclesiaVideoCategory usados no banco — apenas os rótulos de filtro).
+type HomeCategory = "all" | Extract<EcclesiaVideoCategory, "culto" | "pregacao" | "louvor" | "estudo" | "jovens" | "missoes" | "testemunho">;
+
+const HOME_CATEGORY_LABELS: Record<HomeCategory, string> = {
+  all: "Início",
+  culto: "Cultos",
+  pregacao: "Pregações",
+  louvor: "Louvor & Clipes",
+  estudo: "Estudos",
+  jovens: "Jovens",
+  missoes: "Missões",
+  testemunho: "Testemunhos",
+};
 
 export default function CanalHome() {
   const { church } = useChurch();
@@ -29,26 +41,25 @@ export default function CanalHome() {
   const [activeCategory, setActiveCategory] = useState<HomeCategory>("all");
 
   useEffect(() => {
+    let active = true;
+    if (!orgId) { setLoading(false); return; }
+    setLoading(true);
     void (async () => {
       try {
-        if (orgId) {
-          const [chs, vids] = await Promise.all([
-            fetchEcclesiaChannels(orgId),
-            fetchOrgVideos(orgId, 24),
-          ]);
-          setChannels(chs.length > 0 ? chs : MOCK_CHANNELS);
-          setVideos(vids.length > 0 ? vids : MOCK_VIDEOS);
-        } else {
-          setChannels(MOCK_CHANNELS);
-          setVideos(MOCK_VIDEOS);
-        }
+        const [chs, vids] = await Promise.all([
+          fetchEcclesiaChannels(orgId),
+          fetchOrgVideos(orgId, 24),
+        ]);
+        if (!active) return;
+        setChannels(chs);
+        setVideos(vids);
       } catch {
-        setChannels(MOCK_CHANNELS);
-        setVideos(MOCK_VIDEOS);
+        if (active) toast.error("Não foi possível carregar o Canal Eclésia. Tente novamente.");
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     })();
+    return () => { active = false; };
   }, [orgId]);
 
   // Filtros
@@ -208,12 +219,6 @@ export default function CanalHome() {
                         <div className="flex items-center gap-2 mb-2 flex-wrap">
                           {featured.tvLiveSessionId && (
                             <span className="text-[10px] font-bold bg-red-600 text-white px-2 py-0.5 rounded">REPLAY</span>
-                          )}
-                          {isOfficialChannel(featured.channelId) && (
-                            <span className="inline-flex items-center gap-1 text-[10px] text-white/80 bg-white/10 px-2 py-0.5 rounded-full">
-                              <CheckCircle2 className="w-3 h-3" />
-                              Canal Oficial
-                            </span>
                           )}
                           <span className="text-xs text-white/60">{channelMap[featured.channelId] ?? ""}</span>
                         </div>

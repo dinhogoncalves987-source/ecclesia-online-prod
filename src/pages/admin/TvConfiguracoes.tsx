@@ -99,15 +99,27 @@ export default function TvConfiguracoes() {
     }
   }
 
-  async function handlePrepareComputer() {
+  // Não existe forma honesta de um navegador "instalar" nada no computador
+  // do usuário — o que esta tela realmente pode verificar é se o Ecclesia
+  // Studio (OBS + WebSocket) já está rodando e aceitando conexão local. Por
+  // isso "preparar computador" nunca é um sucesso fabricado por timeout:
+  // fica em "preparing" até obs.connected virar true de verdade, ou até
+  // obs.error indicar que as tentativas de conexão do useObsWebSocket
+  // (5 tentativas, 5s cada) se esgotaram — o que vier primeiro.
+  function handlePrepareComputer() {
     setPrepState("preparing");
-    try {
-      await new Promise<void>((resolve) => setTimeout(resolve, 2000));
+  }
+
+  useEffect(() => {
+    if (prepState !== "preparing") return;
+    if (obs.connected) {
       setPrepState("success");
-    } catch {
+      return;
+    }
+    if (obs.error) {
       setPrepState("error");
     }
-  }
+  }, [prepState, obs.connected, obs.error]);
 
   async function handleCreateChannel() {
     if (!newChName.trim()) { toast.error("Informe o nome do canal."); return; }
@@ -320,19 +332,21 @@ export default function TvConfiguracoes() {
                 <p className="text-xs text-green-600 dark:text-green-400 mt-1">Aguardando comando</p>
               </div>
             ) : prepState === "success" ? (
-              /* ── Sucesso ────────────────────────────────────────────── */
+              /* ── Sucesso (obs.connected confirmado de verdade) ───────── */
               <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 rounded-xl p-5 text-center">
                 <p className="text-sm font-medium text-green-800 dark:text-green-300">
-                  Computador preparado com sucesso.
+                  Ecclesia Studio conectado neste computador.
                 </p>
               </div>
             ) : prepState === "error" ? (
-              /* ── Erro ───────────────────────────────────────────────── */
+              /* ── Erro real: useObsWebSocket esgotou as tentativas ────── */
               <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-xl p-5 text-center space-y-2">
                 <p className="text-sm font-medium text-red-800 dark:text-red-300">
-                  Não foi possível preparar este computador.
+                  Não foi possível conectar ao Ecclesia Studio neste computador.
                 </p>
-                <p className="text-xs text-red-600 dark:text-red-400">Chame o suporte Ecclesia.</p>
+                <p className="text-xs text-red-600 dark:text-red-400">
+                  Confirme que o Ecclesia Studio (OBS) está aberto neste computador e chame o suporte se persistir.
+                </p>
                 <button
                   onClick={() => setPrepState("idle")}
                   className="text-xs text-primary hover:underline mt-1"
@@ -341,17 +355,20 @@ export default function TvConfiguracoes() {
                 </button>
               </div>
             ) : prepState === "preparing" ? (
-              /* ── Preparando ─────────────────────────────────────────── */
+              /* ── Aguardando conexão real com o Ecclesia Studio ───────── */
               <div className="bg-card border border-border rounded-xl p-8 flex flex-col items-center gap-3">
                 <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-sm text-muted-foreground">Instalando componentes Ecclesia...</p>
+                <p className="text-sm text-muted-foreground">Procurando o Ecclesia Studio neste computador...</p>
+                <p className="text-xs text-muted-foreground/70 text-center max-w-xs">
+                  Abra o Ecclesia Studio (OBS) neste computador. Esta tela atualiza sozinha assim que a conexão for confirmada.
+                </p>
               </div>
             ) : prepState === "confirming" ? (
               /* ── Confirmação ────────────────────────────────────────── */
               <div className="bg-card border border-border rounded-xl p-5 space-y-4">
                 <h3 className="font-semibold">Preparar computador?</h3>
                 <p className="text-sm text-muted-foreground">
-                  O Windows poderá pedir permissão para continuar.
+                  Você precisa ter o Ecclesia Studio (OBS) instalado e aberto neste computador para continuar.
                 </p>
                 <div className="flex gap-3">
                   <button
@@ -361,7 +378,7 @@ export default function TvConfiguracoes() {
                     Cancelar
                   </button>
                   <button
-                    onClick={() => void handlePrepareComputer()}
+                    onClick={handlePrepareComputer}
                     className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition"
                   >
                     Continuar

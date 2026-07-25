@@ -25,3 +25,29 @@ verify_jwt = false
 # (defesa em profundidade, além da checagem própria em index.ts).
 [functions.send-chat-push]
 verify_jwt = true
+
+# validate-tv-stream-key e update-tv-heartbeat são chamadas pela VPS MediaMTX
+# (webhook), nunca pelo navegador de um usuário logado — não existe JWT de
+# usuário nessa chamada. A autenticação real é o segredo compartilhado
+# MEDIAMTX_WEBHOOK_SECRET, validado dentro do próprio index.ts (fail-closed
+# se a variável não estiver configurada).
+[functions.validate-tv-stream-key]
+verify_jwt = false
+
+[functions.update-tv-heartbeat]
+verify_jwt = false
+
+# create-livekit-room/create-livekit-token/end-livekit-room/get-r2-upload-url
+# são chamadas pelo navegador com o JWT real do usuário — verify_jwt=true no
+# gateway é defesa em profundidade além da checagem própria em index.ts.
+[functions.create-livekit-room]
+verify_jwt = true
+
+[functions.create-livekit-token]
+verify_jwt = true
+
+[functions.end-livekit-room]
+verify_jwt = true
+
+[functions.get-r2-upload-url]
+verify_jwt = true

@@ -1,15 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { AdminLayout } from "@/components/AdminLayout";
+import { useChurch } from "@/hooks/useChurchContext";
 import {
-  MOCK_CHANNELS, MOCK_VIDEOS, isOfficialChannel,
-} from "@/lib/canalMockData";
-import { CATEGORY_LABELS, type EcclesiaVideoStatus } from "@/lib/canalEcclesia";
+  fetchEcclesiaChannels, fetchAdminVideos,
+  CATEGORY_LABELS, type EcclesiaChannel, type EcclesiaVideo, type EcclesiaVideoStatus,
+} from "@/lib/canalEcclesia";
+import { CanalVideoSkeleton } from "@/components/canal/CanalComponents";
 import {
-  BarChart3, Upload, Settings2, CheckCircle2, Clock, AlertCircle,
+  BarChart3, Upload, Settings2, CheckCircle2, AlertCircle,
   FileEdit, Eye, EyeOff, Star, Trash2, PlayCircle, Tv2, ArrowLeft,
   Archive, RefreshCw, Plus, ChevronRight, Package, Sparkles, X,
 } from "lucide-react";
+import { toast } from "sonner";
 
 // ── Sub-componente: Modal Importação Assistida ────────────────────────────────
 
@@ -114,17 +117,103 @@ const STATUS_CONFIG: Record<VideoStatus, { label: string; color: string; icon: R
 // ── Página principal ──────────────────────────────────────────────────────────
 
 export default function CanalMyChannel() {
+  const { church, loading: churchLoading } = useChurch();
+  const orgId = church?.id ?? "";
+
   const [showImport, setShowImport] = useState(false);
-  const [activeChannelId, setActiveChannelId] = useState(MOCK_CHANNELS[0]?.id ?? "");
+  const [channels, setChannels] = useState<EcclesiaChannel[]>([]);
+  const [activeChannelId, setActiveChannelId] = useState("");
+  const [channelVideos, setChannelVideos] = useState<EcclesiaVideo[]>([]);
+  const [loadingChannels, setLoadingChannels] = useState(true);
+  const [loadingVideos, setLoadingVideos] = useState(false);
 
-  const activeChannel = MOCK_CHANNELS.find((c) => c.id === activeChannelId) ?? MOCK_CHANNELS[0];
-  const channelVideos = MOCK_VIDEOS.filter((v) => v.channelId === activeChannelId);
-  const official = isOfficialChannel(activeChannelId);
+  useEffect(() => {
+    setActiveChannelId("");
+    if (!orgId) { setChannels([]); setLoadingChannels(false); return; }
+    let active = true;
+    setLoadingChannels(true);
+    void (async () => {
+      try {
+        const chs = await fetchEcclesiaChannels(orgId);
+        if (!active) return;
+        setChannels(chs);
+        setActiveChannelId(chs[0]?.id ?? "");
+      } catch {
+        if (active) toast.error("Não foi possível carregar seus canais.");
+      } finally {
+        if (active) setLoadingChannels(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [orgId]);
 
-  // Simulação de stats
+  useEffect(() => {
+    if (!activeChannelId) { setChannelVideos([]); return; }
+    let active = true;
+    setLoadingVideos(true);
+    void (async () => {
+      try {
+        const vids = await fetchAdminVideos(activeChannelId);
+        if (active) setChannelVideos(vids);
+      } catch {
+        if (active) toast.error("Não foi possível carregar os vídeos do canal.");
+      } finally {
+        if (active) setLoadingVideos(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [activeChannelId]);
+
+  const activeChannel = channels.find((c) => c.id === activeChannelId) ?? null;
+
   const totalViews = channelVideos.reduce((s, v) => s + v.viewCount, 0);
-  const totalLikes = channelVideos.reduce((s, v) => s + v.likeCount, 0);
   const processing = channelVideos.filter((v) => v.status === "processing").length;
+
+  // ── Carregando canais ──────────────────────────────────────────────────────
+  if (churchLoading || loadingChannels) {
+    return (
+      <AdminLayout>
+        <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+          <div className="h-8 w-48 bg-muted rounded animate-pulse" />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-20 bg-muted rounded-xl animate-pulse" />
+            ))}
+          </div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  // ── Nenhum canal ainda ───────────────────────────────────────────────────
+  if (channels.length === 0) {
+    return (
+      <AdminLayout>
+        <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+          <div className="flex items-center gap-3">
+            <Link to="/canal" className="p-2 rounded-xl hover:bg-muted transition">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <div>
+              <h1 className="text-xl font-bold">Meu Canal</h1>
+              <p className="text-xs text-muted-foreground">Painel do criador</p>
+            </div>
+          </div>
+          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3 border border-dashed border-border rounded-2xl">
+            <Tv2 className="w-12 h-12 opacity-20" />
+            <p className="text-sm font-medium">Você ainda não tem um canal nesta organização</p>
+            <Link
+              to="/canal/criar"
+              className="flex items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2 rounded-full text-sm font-semibold hover:bg-primary/90 transition"
+            >
+              <Plus className="w-4 h-4" />
+              Criar canal
+            </Link>
+          </div>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -160,9 +249,9 @@ export default function CanalMyChannel() {
         </div>
 
         {/* ── Seletor de canal ── */}
-        {MOCK_CHANNELS.length > 1 && (
+        {channels.length > 1 && (
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {MOCK_CHANNELS.map((ch) => (
+            {channels.map((ch) => (
               <button
                 key={ch.id}
                 onClick={() => setActiveChannelId(ch.id)}
@@ -174,7 +263,6 @@ export default function CanalMyChannel() {
               >
                 <Tv2 className="w-3.5 h-3.5" />
                 {ch.name}
-                {isOfficialChannel(ch.id) && <CheckCircle2 className="w-3 h-3" />}
               </button>
             ))}
           </div>
@@ -191,12 +279,6 @@ export default function CanalMyChannel() {
               <div className="flex-1 min-w-0 pb-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-lg font-bold">{activeChannel.name}</h2>
-                  {official && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full">
-                      <CheckCircle2 className="w-3 h-3" />
-                      Oficial
-                    </span>
-                  )}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   canal.ecclesia/<span className="font-mono">{activeChannel.slug}</span>
@@ -251,7 +333,11 @@ export default function CanalMyChannel() {
             </Link>
           </div>
 
-          {channelVideos.length === 0 ? (
+          {loadingVideos ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 p-4">
+              {Array.from({ length: 3 }).map((_, i) => <CanalVideoSkeleton key={i} />)}
+            </div>
+          ) : channelVideos.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
               <PlayCircle className="w-12 h-12 opacity-20" />
               <p className="text-sm">Nenhum vídeo publicado ainda</p>

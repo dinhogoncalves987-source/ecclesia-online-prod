@@ -10,10 +10,7 @@ import {
   CATEGORY_LABELS,
 } from "@/lib/canalEcclesia";
 import {
-  getMockChannelBySlug, getMockChannelVideos, isOfficialChannel,
-} from "@/lib/canalMockData";
-import {
-  CanalVideoCard, CanalSubscribeButton, OfficialBadge, CanalVideoSkeleton, CanalEmptyState,
+  CanalVideoCard, CanalSubscribeButton, CanalVideoSkeleton, CanalEmptyState,
 } from "@/components/canal/CanalComponents";
 import {
   Tv2, Bell, BellOff, ArrowLeft, Upload, Settings2, List,
@@ -45,50 +42,44 @@ export default function CanalChannel() {
   const [activeTab, setActiveTab] = useState<Tab>("inicio");
   const [subLoading, setSubLoading] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug) return;
+    let active = true;
+    setLoading(true);
+    setLoadError(null);
     void (async () => {
       try {
-        let ch: EcclesiaChannel | null = null;
-        let vids: EcclesiaVideo[] = [];
-        let pls: EcclesiaPlaylist[] = [];
-
-        if (orgId) {
-          ch = await fetchEcclesiaChannelBySlug(orgId, slug);
+        if (!orgId) {
+          if (active) { setChannel(null); setLoading(false); }
+          return;
         }
-        // Fallback to mock
+
+        const ch = await fetchEcclesiaChannelBySlug(orgId, slug);
         if (!ch) {
-          const mock = getMockChannelBySlug(slug);
-          if (mock) {
-            ch = mock;
-            vids = getMockChannelVideos(mock.id);
-          }
-        } else {
-          [vids, pls] = await Promise.all([
-            fetchChannelVideos(ch.id, 24),
-            fetchChannelPlaylists(ch.id),
-          ]);
-          if (vids.length === 0) vids = getMockChannelVideos(ch.id);
-          if (user?.id) {
-            setIsSubscribed(await checkSubscribed(ch.id, user.id));
-          }
+          if (active) { setChannel(null); setLoading(false); }
+          return;
         }
 
+        const [vids, pls] = await Promise.all([
+          fetchChannelVideos(ch.id, 24),
+          fetchChannelPlaylists(ch.id),
+        ]);
+        const subscribed = user?.id ? await checkSubscribed(ch.id, user.id) : false;
+
+        if (!active) return;
         setChannel(ch);
         setVideos(vids);
         setPlaylists(pls);
+        setIsSubscribed(subscribed);
       } catch {
-        // Fallback to mock
-        const mock = getMockChannelBySlug(slug ?? "");
-        if (mock) {
-          setChannel(mock);
-          setVideos(getMockChannelVideos(mock.id));
-        }
+        if (active) setLoadError("Não foi possível carregar este canal. Tente novamente.");
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     })();
+    return () => { active = false; };
   }, [orgId, slug, user?.id]);
 
   async function handleSubscribe() {
@@ -133,7 +124,7 @@ export default function CanalChannel() {
     return (
       <AdminLayout>
         <CanalEmptyState
-          label="Canal não encontrado."
+          label={loadError ?? "Canal não encontrado."}
           action={
             <Link to="/canal" className="text-sm text-primary hover:underline flex items-center gap-1">
               <ArrowLeft className="w-4 h-4" /> Voltar ao Canal Eclésia
@@ -144,7 +135,6 @@ export default function CanalChannel() {
     );
   }
 
-  const official = isOfficialChannel(channel.id);
   const desc = channel.description ?? "";
 
   return (
@@ -181,7 +171,6 @@ export default function CanalChannel() {
               <div className="pb-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-xl font-bold">{channel.name}</h1>
-                  {official && <OfficialBadge />}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {channel.subscriberCount.toLocaleString("pt-BR")} seguidores
@@ -382,11 +371,10 @@ export default function CanalChannel() {
               </div>
               <div>
                 <h2 className="text-sm font-semibold mb-2">Estatísticas</h2>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   {[
                     { label: "Vídeos", value: channel.videoCount.toLocaleString("pt-BR") },
                     { label: "Seguidores", value: channel.subscriberCount.toLocaleString("pt-BR") },
-                    { label: "Tipo", value: official ? "Canal Oficial" : "Canal" },
                   ].map(({ label, value }) => (
                     <div key={label} className="bg-muted/50 rounded-xl p-4 text-center">
                       <p className="text-lg font-bold">{value}</p>
@@ -395,14 +383,6 @@ export default function CanalChannel() {
                   ))}
                 </div>
               </div>
-              {official && (
-                <div className="flex items-start gap-3 p-4 bg-primary/5 border border-primary/20 rounded-xl">
-                  <OfficialBadge />
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Este é o canal oficial verificado da organização no Canal Eclésia.
-                  </p>
-                </div>
-              )}
               <div className="text-xs text-muted-foreground">
                 Canal criado em {new Date(channel.createdAt).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
               </div>

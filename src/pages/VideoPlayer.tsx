@@ -7,12 +7,10 @@ import {
   fetchVideoById, fetchWatchHistory, saveWatchPosition,
   checkUserLiked, toggleLike, checkSubscribed, toggleSubscription,
   fetchComments, addComment, deleteComment, fetchReplies,
+  fetchEcclesiaChannels, fetchRelatedVideos,
   type EcclesiaVideo, type EcclesiaComment,
   formatDuration, timeAgo, CATEGORY_LABELS,
 } from "@/lib/canalEcclesia";
-import {
-  MOCK_VIDEOS, MOCK_COMMENTS, MOCK_CHANNELS, getMockRelated,
-} from "@/lib/canalMockData";
 import { CanalVideoCard } from "@/components/canal/CanalComponents";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -29,7 +27,7 @@ export default function VideoPlayer() {
   const { user } = useAuth();
 
   const [video, setVideo] = useState<EcclesiaVideo | null>(null);
-  const [channelName, setChannelName] = useState<string>("");
+  const [channelMap, setChannelMap] = useState<Record<string, string>>({});
   const [startAt, setStartAt] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -57,44 +55,29 @@ export default function VideoPlayer() {
 
   useEffect(() => {
     if (!videoId) return;
+    let active = true;
+    setLoading(true);
+    setError(null);
     void (async () => {
       try {
-        let v: EcclesiaVideo | null = await fetchVideoById(videoId);
+        const v = await fetchVideoById(videoId);
 
         if (!v) {
-          // Fallback to mock
-          v = MOCK_VIDEOS.find((m) => m.id === videoId) ?? null;
-          if (v) {
-            const ch = MOCK_CHANNELS.find((c) => c.id === v!.channelId);
-            setChannelName(ch?.name ?? "");
-            setRelatedVideos(getMockRelated(videoId, v.category));
-          }
+          if (active) { setError("Vídeo não encontrado."); setLoading(false); }
+          return;
         }
+        if (active) setVideo(v);
 
-        if (!v) { setError("Vídeo não encontrado."); setLoading(false); return; }
-        setVideo(v);
+        const [channels, related, history] = await Promise.all([
+          fetchEcclesiaChannels(v.organizationId),
+          fetchRelatedVideos(v.organizationId, videoId, v.category),
+          user ? fetchWatchHistory(videoId) : Promise.resolve(null),
+        ]);
+        if (!active) return;
 
-        // Try to get channel name
-        if (!channelName) {
-          try {
-            const { data: ch } = await supabase
-              .from("ecclesia_channels")
-              .select("name")
-              .eq("id", v.channelId)
-              .single();
-            if (ch?.name) setChannelName(ch.name);
-          } catch {
-            const mock = MOCK_CHANNELS.find((c) => c.id === v!.channelId);
-            if (mock) setChannelName(mock.name);
-          }
-        }
-
-        // Related
-        const related = getMockRelated(videoId, v.category);
+        setChannelMap(Object.fromEntries(channels.map((c) => [c.id, c.name])));
         setRelatedVideos(related);
 
-        // Watch history
-        const history = user ? await fetchWatchHistory(videoId) : null;
         if (history?.lastPosition && history.lastPosition > 10) {
           setStartAt(history.lastPosition);
         }
@@ -104,27 +87,20 @@ export default function VideoPlayer() {
             checkUserLiked(videoId, user.id),
             checkSubscribed(v.channelId, user.id),
           ]);
+          if (!active) return;
           setIsLiked(liked);
           setIsSubscribed(subbed);
         }
 
         const coms = await fetchComments(videoId);
-        setComments(coms);
+        if (active) setComments(coms);
       } catch {
-        // Use mock data
-        const mockV = MOCK_VIDEOS.find((m) => m.id === videoId);
-        if (mockV) {
-          setVideo(mockV);
-          const ch = MOCK_CHANNELS.find((c) => c.id === mockV.channelId);
-          setChannelName(ch?.name ?? "");
-          setRelatedVideos(getMockRelated(videoId, mockV.category));
-        } else {
-          setError("Não foi possível reproduzir este vídeo.");
-        }
+        if (active) setError("Não foi possível carregar este vídeo. Tente novamente.");
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     })();
+    return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoId, user?.id]);
 
@@ -362,7 +338,7 @@ export default function VideoPlayer() {
                   </div>
                   <div>
                     <p className="text-sm font-semibold flex items-center gap-1">
-                      {channelName || "Canal"}
+                      {channelMap[video.channelId] || "Canal"}
                       <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
                     </p>
                     <p className="text-xs text-muted-foreground">Canal no Eclésia</p>
@@ -476,26 +452,6 @@ export default function VideoPlayer() {
                   </div>
                 </div>
 
-                {/* Mock comments fallback when real list is empty */}
-                {comments.length === 0 && !user && (
-                  <div className="flex flex-col gap-5 mb-4">
-                    {MOCK_COMMENTS.slice(0, 3).map((mc) => (
-                      <div key={mc.id} className="flex gap-3">
-                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-semibold flex-shrink-0">
-                          {mc.userName.charAt(0)}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <span className="text-sm font-medium">{mc.userName}</span>
-                            <span className="text-xs text-muted-foreground">há {mc.time}</span>
-                          </div>
-                          <p className="text-sm text-muted-foreground">{mc.body}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
                 {/* Comment list */}
                 <div className="flex flex-col gap-5">
                   {comments.map((c) => (
@@ -585,9 +541,9 @@ export default function VideoPlayer() {
                   ))}
                 </div>
 
-                {comments.length === 0 && user && (
+                {comments.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-8">
-                    Nenhum comentário ainda. Seja o primeiro!
+                    {user ? "Nenhum comentário ainda. Seja o primeiro!" : "Nenhum comentário ainda."}
                   </p>
                 )}
               </div>
@@ -603,9 +559,13 @@ export default function VideoPlayer() {
               </h2>
               <div className="flex flex-col gap-3 lg:gap-4">
                 {relatedVideos.map((v) => (
-                  <CanalVideoCard key={v.id} video={v} channelName={
-                    MOCK_CHANNELS.find((c) => c.id === v.channelId)?.name
-                  } showChannel size="compact" />
+                  <CanalVideoCard
+                    key={v.id}
+                    video={v}
+                    channelName={channelMap[v.channelId]}
+                    showChannel
+                    size="compact"
+                  />
                 ))}
               </div>
             </aside>

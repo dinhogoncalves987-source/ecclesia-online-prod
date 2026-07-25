@@ -14,7 +14,7 @@
  * UX: sem jargão técnico. O operador não precisa saber o que é WebRTC, LiveKit, RTMP.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Church, MapPin, Plus, Camera, Smartphone, Link2,
   X, RefreshCw, Radio, WifiOff, ExternalLink, Info, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
@@ -125,16 +125,24 @@ export function EcclesiaStudio({
   }, [createStudioRoom, connectAsDirector]);
 
   // ── Preparar computador ───────────────────────────────────────────────────
+  // Mesma regra de EcclesiaStudio/TvConfiguracoes: nenhum "sucesso" fabricado
+  // por timeout — só vira "success" quando obs.connected é real; vira
+  // "error" quando useObsWebSocket esgota as tentativas de reconexão.
 
-  async function handleStudioPrepare() {
+  function handleStudioPrepare() {
     setStudioPrepState("preparing");
-    try {
-      await new Promise<void>((resolve) => setTimeout(resolve, 2000));
+  }
+
+  useEffect(() => {
+    if (studioPrepState !== "preparing") return;
+    if (obs.connected) {
       setStudioPrepState("success");
-    } catch {
+      return;
+    }
+    if (obs.error) {
       setStudioPrepState("error");
     }
-  }
+  }, [studioPrepState, obs.connected, obs.error]);
 
   // ── Adicionar câmera ──────────────────────────────────────────────────────
 
@@ -307,7 +315,7 @@ export function EcclesiaStudio({
                   {studioPrepState === "confirming" ? (
                     <>
                       <p className="font-medium">Preparar computador?</p>
-                      <p>O Windows poderá pedir permissão para continuar.</p>
+                      <p>Você precisa ter o Ecclesia Studio (OBS) instalado e aberto neste computador.</p>
                       <div className="flex gap-2 pt-1">
                         <button
                           onClick={() => setStudioPrepState("idle")}
@@ -316,7 +324,7 @@ export function EcclesiaStudio({
                           Cancelar
                         </button>
                         <button
-                          onClick={() => void handleStudioPrepare()}
+                          onClick={handleStudioPrepare}
                           className="flex-1 py-1.5 rounded-lg bg-yellow-600 text-white hover:bg-yellow-700 transition font-medium"
                         >
                           Continuar
@@ -326,14 +334,14 @@ export function EcclesiaStudio({
                   ) : studioPrepState === "preparing" ? (
                     <div className="flex items-center gap-2 py-1">
                       <span className="w-3 h-3 border border-yellow-600 border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                      <span>Instalando componentes Ecclesia...</span>
+                      <span>Procurando o Ecclesia Studio neste computador...</span>
                     </div>
                   ) : studioPrepState === "success" ? (
-                    <p className="font-medium py-1">Computador preparado com sucesso.</p>
+                    <p className="font-medium py-1">Ecclesia Studio conectado.</p>
                   ) : studioPrepState === "error" ? (
                     <>
-                      <p className="font-medium">Não foi possível preparar este computador.</p>
-                      <p>Chame o suporte Ecclesia.</p>
+                      <p className="font-medium">Não foi possível conectar ao Ecclesia Studio neste computador.</p>
+                      <p>Confirme que ele está aberto e chame o suporte se persistir.</p>
                       <button
                         onClick={() => setStudioPrepState("idle")}
                         className="underline text-yellow-700 dark:text-yellow-400"

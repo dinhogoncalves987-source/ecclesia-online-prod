@@ -1,10 +1,9 @@
 import { Link } from "react-router-dom";
-import { Play, CheckCircle2, Tv2, Clock } from "lucide-react";
+import { Play, Tv2, Clock } from "lucide-react";
 import {
   type EcclesiaVideo,
   formatDuration, timeAgo, CATEGORY_LABELS,
 } from "@/lib/canalEcclesia";
-import { isOfficialChannel } from "@/lib/canalMockData";
 
 // ── VideoCard rico ─────────────────────────────────────────────────────────────
 
@@ -102,9 +101,7 @@ type ChannelCardProps = {
   description?: string | null;
 };
 
-export function CanalChannelCard({ id, name, slug, subscriberCount, videoCount, logoUrl, description }: ChannelCardProps) {
-  const official = isOfficialChannel(id);
-
+export function CanalChannelCard({ name, slug, subscriberCount, videoCount, logoUrl, description }: ChannelCardProps) {
   return (
     <Link
       to={`/canal/${slug}`}
@@ -119,10 +116,9 @@ export function CanalChannelCard({ id, name, slug, subscriberCount, videoCount, 
         )}
       </div>
 
-      {/* Name + badge */}
+      {/* Name */}
       <div className="flex items-center gap-1 mb-1">
         <p className="font-semibold text-sm line-clamp-1">{name}</p>
-        {official && <CheckCircle2 className="w-3.5 h-3.5 text-primary flex-shrink-0" />}
       </div>
 
       {description && (
@@ -164,17 +160,6 @@ export function CanalSubscribeButton({ isSubscribed, count, loading, onToggle }:
         <span className="font-normal opacity-70">· {count.toLocaleString("pt-BR")}</span>
       )}
     </button>
-  );
-}
-
-// ── OfficialBadge ──────────────────────────────────────────────────────────────
-
-export function OfficialBadge() {
-  return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full">
-      <CheckCircle2 className="w-3 h-3" />
-      Canal Oficial
-    </span>
   );
 }
 

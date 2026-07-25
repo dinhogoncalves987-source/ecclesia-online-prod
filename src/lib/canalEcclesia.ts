@@ -6,7 +6,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
-import { uploadToR2, buildR2Path } from "@/lib/r2Upload";
+import { uploadToR2 } from "@/lib/r2Upload";
 
 // ── Enums ─────────────────────────────────────────────────────────────────────
 
@@ -259,6 +259,37 @@ export async function fetchOrgVideos(
   return (data ?? []).map(mapVideo);
 }
 
+/**
+ * Vídeos relacionados a um vídeo dentro da mesma organização: prioriza a
+ * mesma categoria, depois ordena por visualizações. Nunca preenche com
+ * dados fictícios — se a organização tiver poucos vídeos "ready", retorna
+ * só o que existir de fato (possivelmente uma lista vazia).
+ */
+export async function fetchRelatedVideos(
+  organizationId: string,
+  currentVideoId: string,
+  category: EcclesiaVideoCategory,
+  limit = 6,
+): Promise<EcclesiaVideo[]> {
+  const { data } = await supabase
+    .from("ecclesia_videos")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("status", "ready")
+    .neq("id", currentVideoId)
+    .order("view_count", { ascending: false })
+    .limit(Math.max(limit * 4, 24));
+
+  const videos = (data ?? []).map(mapVideo);
+  return videos
+    .sort((a, b) => {
+      if (a.category === category && b.category !== category) return -1;
+      if (b.category === category && a.category !== category) return 1;
+      return b.viewCount - a.viewCount;
+    })
+    .slice(0, limit);
+}
+
 export async function fetchAdminVideos(channelId: string): Promise<EcclesiaVideo[]> {
   const { data } = await supabase
     .from("ecclesia_videos")
@@ -324,11 +355,9 @@ export async function uploadVideoToR2(
   organizationId: string,
   onProgress?: (pct: number) => void,
 ): Promise<{ ok: boolean; storageKey?: string; publicUrl?: string; error?: string }> {
-  const path = buildR2Path(organizationId, "canal/videos", file);
   const result = await uploadToR2({
     file,
-    bucket: "ecclesia-media",
-    path,
+    purpose: "canal-video",
     organizationId,
     onProgress,
   });
