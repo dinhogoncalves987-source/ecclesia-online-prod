@@ -2640,6 +2640,8 @@ export type Database = {
           body_text: string | null
           certificate_number: string | null
           certificate_type: string
+          corrected_at: string | null
+          corrected_by: string | null
           course_name: string | null
           created_at: string
           created_by: string | null
@@ -2650,6 +2652,7 @@ export type Database = {
           issued_at: string | null
           issued_by: string | null
           location: string | null
+          last_correction_reason: string | null
           member_id: string
           organization_id: string
           period_end: string | null
@@ -2657,6 +2660,7 @@ export type Database = {
           public_token: string | null
           recipient_name: string
           related_member_id: string | null
+          revision: number
           revocation_reason: string | null
           revoked_at: string | null
           revoked_by: string | null
@@ -2676,6 +2680,8 @@ export type Database = {
           body_text?: string | null
           certificate_number?: string | null
           certificate_type: string
+          corrected_at?: string | null
+          corrected_by?: string | null
           course_name?: string | null
           created_at?: string
           created_by?: string | null
@@ -2686,6 +2692,7 @@ export type Database = {
           issued_at?: string | null
           issued_by?: string | null
           location?: string | null
+          last_correction_reason?: string | null
           member_id: string
           organization_id: string
           period_end?: string | null
@@ -2693,6 +2700,7 @@ export type Database = {
           public_token?: string | null
           recipient_name: string
           related_member_id?: string | null
+          revision?: number
           revocation_reason?: string | null
           revoked_at?: string | null
           revoked_by?: string | null
@@ -2712,6 +2720,8 @@ export type Database = {
           body_text?: string | null
           certificate_number?: string | null
           certificate_type?: string
+          corrected_at?: string | null
+          corrected_by?: string | null
           course_name?: string | null
           created_at?: string
           created_by?: string | null
@@ -2722,6 +2732,7 @@ export type Database = {
           issued_at?: string | null
           issued_by?: string | null
           location?: string | null
+          last_correction_reason?: string | null
           member_id?: string
           organization_id?: string
           period_end?: string | null
@@ -2729,6 +2740,7 @@ export type Database = {
           public_token?: string | null
           recipient_name?: string
           related_member_id?: string | null
+          revision?: number
           revocation_reason?: string | null
           revoked_at?: string | null
           revoked_by?: string | null
@@ -2764,6 +2776,47 @@ export type Database = {
             columns: ["document_id"]
             isOneToOne: false
             referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      institutional_certificate_revisions: {
+        Row: {
+          certificate_id: string
+          certificate_status: string
+          changed_at: string
+          changed_by: string | null
+          correction_reason: string
+          id: string
+          revision: number
+          snapshot: Json
+        }
+        Insert: {
+          certificate_id: string
+          certificate_status: string
+          changed_at?: string
+          changed_by?: string | null
+          correction_reason: string
+          id?: string
+          revision: number
+          snapshot: Json
+        }
+        Update: {
+          certificate_id?: string
+          certificate_status?: string
+          changed_at?: string
+          changed_by?: string | null
+          correction_reason?: string
+          id?: string
+          revision?: number
+          snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "institutional_certificate_revisions_certificate_id_fkey"
+            columns: ["certificate_id"]
+            isOneToOne: false
+            referencedRelation: "institutional_certificates"
             referencedColumns: ["id"]
           },
         ]
@@ -6244,11 +6297,39 @@ export type Database = {
         Args: { p_certificate_id: string; p_reason: string }
         Returns: undefined
       }
+      update_institutional_certificate: {
+        Args: {
+          p_body_text?: string
+          p_certificate_id: string
+          p_correction_reason?: string
+          p_course_name?: string
+          p_event_date?: string
+          p_location?: string
+          p_period_end?: string
+          p_period_start?: string
+          p_recipient_name: string
+          p_secondary_recipient_name?: string
+          p_second_signer_name?: string
+          p_second_signer_role?: string
+          p_signer_name?: string
+          p_signer_role?: string
+          p_workload_hours?: number
+        }
+        Returns: undefined
+      }
       list_institutional_certificates: {
         Args: { p_organization_id: string }
         Returns: Json
       }
       get_public_institutional_certificate: {
+        Args: { p_token: string }
+        Returns: Json
+      }
+      generate_member_validation_token: {
+        Args: { p_member_id: string }
+        Returns: Json
+      }
+      validate_member_validation_token: {
         Args: { p_token: string }
         Returns: Json
       }

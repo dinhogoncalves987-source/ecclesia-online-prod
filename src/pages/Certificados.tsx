@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Award, Eye, FilePlus2, Loader2, Search, Send, ShieldX } from "lucide-react";
+import { Award, Eye, FilePlus2, Loader2, Pencil, Search, Send, ShieldX } from "lucide-react";
 import { toast } from "sonner";
 import { AdminLayout } from "@/components/AdminLayout";
 import { CertificateDocument } from "@/components/secretaria/CertificateDocument";
@@ -18,6 +18,7 @@ import {
   listInstitutionalCertificates,
   listMemberFamily,
   revokeInstitutionalCertificate,
+  updateInstitutionalCertificate,
   type AcademicCertificateCandidate,
   type CertificateType,
   type FamilyMemberCertificateOption,
@@ -43,6 +44,7 @@ export default function Certificados() {
   const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [selected, setSelected] = useState<InstitutionalCertificate | null>(null);
+  const [editing, setEditing] = useState<InstitutionalCertificate | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -141,6 +143,9 @@ export default function Certificados() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="outline" onClick={() => setSelected(certificate)}><Eye size={15} className="mr-1" /> Visualizar</Button>
+                    {certificate.status !== "revogado" && (
+                      <Button size="sm" variant="outline" onClick={() => setEditing(certificate)}><Pencil size={15} className="mr-1" /> Editar</Button>
+                    )}
                     {certificate.status === "rascunho" && (
                       <Button size="sm" disabled={busyId === certificate.id} onClick={() => void issue(certificate)}><Send size={15} className="mr-1" /> Emitir</Button>
                     )}
@@ -163,13 +168,218 @@ export default function Certificados() {
         defaultSigner={church.pastor_president_name || ""}
         onCreated={load}
       />
+      {editing && (
+        <EditCertificateDialog
+          key={editing.id}
+          certificate={editing}
+          open
+          onOpenChange={(open) => !open && setEditing(null)}
+          onUpdated={load}
+        />
+      )}
       <Dialog open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)}>
         <DialogContent className="max-w-7xl">
           <DialogHeader><DialogTitle>{selected?.title}</DialogTitle><DialogDescription>Pré-visualização do documento oficial em formato A4 paisagem.</DialogDescription></DialogHeader>
+          {selected && selected.status !== "revogado" && (
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setEditing(selected);
+                  setSelected(null);
+                }}
+              >
+                <Pencil size={15} className="mr-1" /> Editar certificado
+              </Button>
+            </div>
+          )}
           {selected && <CertificateDocument certificate={selected} />}
         </DialogContent>
       </Dialog>
     </AdminLayout>
+  );
+}
+
+function EditCertificateDialog({
+  certificate,
+  open,
+  onOpenChange,
+  onUpdated,
+}: {
+  certificate: InstitutionalCertificate;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onUpdated: () => Promise<void>;
+}) {
+  const [recipientName, setRecipientName] = useState(certificate.recipient_name);
+  const [secondaryName, setSecondaryName] = useState(certificate.secondary_recipient_name || "");
+  const [eventDate, setEventDate] = useState(certificate.event_date.slice(0, 10));
+  const [location, setLocation] = useState(certificate.location || "");
+  const [courseName, setCourseName] = useState(certificate.course_name || "");
+  const [workloadHours, setWorkloadHours] = useState(
+    certificate.workload_hours == null ? "" : String(certificate.workload_hours),
+  );
+  const [periodStart, setPeriodStart] = useState(certificate.period_start?.slice(0, 10) || "");
+  const [periodEnd, setPeriodEnd] = useState(certificate.period_end?.slice(0, 10) || "");
+  const [bodyText, setBodyText] = useState(certificate.body_text || "");
+  const [signerName, setSignerName] = useState(certificate.signer_name || "");
+  const [signerRole, setSignerRole] = useState(certificate.signer_role || "Pastor Presidente");
+  const [secondSignerName, setSecondSignerName] = useState(certificate.second_signer_name || "");
+  const [secondSignerRole, setSecondSignerRole] = useState(certificate.second_signer_role || "Secretaria da Igreja");
+  const [correctionReason, setCorrectionReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const isIssued = certificate.status === "emitido";
+  const isAcademic = certificate.certificate_type === "curso_discipulado"
+    || certificate.certificate_type === "formacao_teologica";
+
+  const submit = async () => {
+    if (!recipientName.trim()) return toast.error("Informe o nome que deve aparecer no certificado.");
+    if (certificate.certificate_type === "casamento" && !secondaryName.trim()) {
+      return toast.error("Informe o nome do cônjuge.");
+    }
+    if (!eventDate) return toast.error("Informe a data do ato ou da conclusão.");
+    if (isIssued && !correctionReason.trim()) {
+      return toast.error("Informe o motivo da correção do certificado emitido.");
+    }
+
+    setSaving(true);
+    const updateError = await updateInstitutionalCertificate({
+      certificateId: certificate.id,
+      recipientName: recipientName.trim(),
+      secondaryRecipientName: secondaryName.trim() || undefined,
+      eventDate,
+      location: location.trim() || undefined,
+      courseName: courseName.trim() || undefined,
+      workloadHours: workloadHours.trim() ? Number(workloadHours) : undefined,
+      periodStart: periodStart || undefined,
+      periodEnd: periodEnd || undefined,
+      bodyText: bodyText.trim() || undefined,
+      signerName: signerName.trim() || undefined,
+      signerRole: signerRole.trim() || undefined,
+      secondSignerName: secondSignerName.trim() || undefined,
+      secondSignerRole: secondSignerRole.trim() || undefined,
+      correctionReason: correctionReason.trim() || undefined,
+    });
+    setSaving(false);
+    if (updateError) return toast.error(updateError.message);
+
+    toast.success(isIssued
+      ? "Certificado corrigido. Número e QR Code foram preservados."
+      : "Rascunho atualizado.");
+    onOpenChange(false);
+    await onUpdated();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{isIssued ? "Corrigir certificado emitido" : "Editar certificado"}</DialogTitle>
+          <DialogDescription>
+            {isIssued
+              ? `O certificado ${certificate.certificate_number} manterá o mesmo número e QR Code. A versão anterior ficará registrada no histórico.`
+              : "Revise os dados antes de emitir o documento oficial."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+            <span className="font-medium">{CERTIFICATE_TYPE_LABELS[certificate.certificate_type]}</span>
+            <span className="ml-2 text-muted-foreground">Revisão {certificate.revision || 1}</span>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Nome no certificado" value={recipientName} onChange={setRecipientName} />
+            {certificate.certificate_type === "casamento" && (
+              <Field label="Nome do cônjuge" value={secondaryName} onChange={setSecondaryName} />
+            )}
+            <label className="text-sm">
+              Data do ato/conclusão
+              <input
+                type="date"
+                value={eventDate}
+                onChange={(event) => setEventDate(event.target.value)}
+                className="mt-1 w-full rounded-lg border border-input bg-background p-2"
+              />
+            </label>
+            <Field label="Local" value={location} onChange={setLocation} />
+          </div>
+
+          {isAcademic && (
+            <div className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">
+              <Field label="Curso/formação" value={courseName} onChange={setCourseName} />
+              <label className="text-sm">
+                Carga horária
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={workloadHours}
+                  onChange={(event) => setWorkloadHours(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-input bg-background p-2"
+                />
+              </label>
+              <label className="text-sm">
+                Início do período
+                <input
+                  type="date"
+                  value={periodStart}
+                  onChange={(event) => setPeriodStart(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-input bg-background p-2"
+                />
+              </label>
+              <label className="text-sm">
+                Fim do período
+                <input
+                  type="date"
+                  value={periodEnd}
+                  onChange={(event) => setPeriodEnd(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-input bg-background p-2"
+                />
+              </label>
+            </div>
+          )}
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Responsável pela assinatura" value={signerName} onChange={setSignerName} />
+            <Field label="Função do responsável" value={signerRole} onChange={setSignerRole} />
+            <Field label="Segunda assinatura" value={secondSignerName} onChange={setSecondSignerName} />
+            <Field label="Função da segunda assinatura" value={secondSignerRole} onChange={setSecondSignerRole} />
+          </div>
+
+          <label className="block text-sm">
+            Texto personalizado
+            <textarea
+              value={bodyText}
+              onChange={(event) => setBodyText(event.target.value)}
+              placeholder="Se vazio, será usado o texto institucional padrão."
+              className="mt-1 min-h-24 w-full rounded-lg border border-input bg-background p-2"
+            />
+          </label>
+
+          {isIssued && (
+            <label className="block text-sm">
+              Motivo da correção
+              <textarea
+                value={correctionReason}
+                onChange={(event) => setCorrectionReason(event.target.value)}
+                placeholder="Ex.: correção da data do batismo informada pela secretaria."
+                className="mt-1 min-h-20 w-full rounded-lg border border-input bg-background p-2"
+              />
+            </label>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button disabled={saving} onClick={() => void submit()}>
+            {saving && <Loader2 className="mr-2 animate-spin" size={16} />}
+            {isIssued ? "Salvar correção" : "Salvar alterações"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -226,6 +436,10 @@ function CreateCertificateDialog({
     if (type === "batismo_aguas" && member?.baptized_at) setEventDate(member.baptized_at);
     if (type === "batismo_aguas" && member?.baptism_place) setLocation(member.baptism_place);
   }, [type, member]);
+
+  useEffect(() => {
+    setSecondSignerRole(isAcademic ? "Coordenador do Curso" : "Secretaria da Igreja");
+  }, [isAcademic]);
 
   const submit = async () => {
     const selectedMemberId = isAcademic ? selectedAcademic?.member_id : member?.id;

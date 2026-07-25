@@ -8,6 +8,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const names = [
   "20260801090000_official_transfer_letters.sql",
   "20260801100000_institutional_certificates.sql",
+  "20260803110000_institutional_certificate_corrections.sql",
 ];
 
 function read(relative: string) {
@@ -22,7 +23,7 @@ describe("Documentos Oficiais — migrations", () => {
     expect(digest(production)).toBe(digest(staging));
   });
 
-  it("classifies both migrations as staging_feature", () => {
+  it("classifies every official-document migration as staging_feature", () => {
     const manifest = JSON.parse(read("supabase/migration-manifest.json")) as {
       staging_feature: string[];
     };
@@ -57,5 +58,16 @@ describe("Documentos Oficiais — migrations", () => {
     expect(sql).toContain("mark_discipleship_certificate_issued");
     expect(sql).toContain("mark_theology_certificate_issued");
     expect(sql).toContain("e.status = 'concluido'");
+  });
+
+  it("allows audited corrections without replacing the certificate identity", () => {
+    const sql = read(`supabase/migrations/${names[2]}`);
+    expect(sql).toContain("institutional_certificate_revisions");
+    expect(sql).toContain("update_institutional_certificate");
+    expect(sql).toContain("correction reason is required for issued certificates");
+    expect(sql).toContain("v_row.revision + 1");
+    expect(sql).toContain("'public_token', v_row.public_token");
+    expect(sql).toContain("'certificate_number', v_row.certificate_number");
+    expect(sql).toContain("revoked certificates cannot be edited");
   });
 });

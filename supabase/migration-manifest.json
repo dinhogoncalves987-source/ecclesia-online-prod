@@ -114,7 +114,8 @@
     "20260731130000_missions_transaction_links.sql",
     "20260731140000_missions_history_and_reports.sql",
     "20260801090000_official_transfer_letters.sql",
-    "20260801100000_institutional_certificates.sql"
+    "20260801100000_institutional_certificates.sql",
+    "20260803110000_institutional_certificate_corrections.sql"
   ],
   "staging_only": [
     "20260519200000_demo_seed.sql",

@@ -90,6 +90,10 @@ export type InstitutionalCertificate = {
   revoked_at: string | null;
   revocation_reason: string | null;
   created_at: string;
+  updated_at: string;
+  revision: number;
+  corrected_at: string | null;
+  last_correction_reason: string | null;
   organization_name: string;
   organization_logo_url: string | null;
   organization_city: string | null;
@@ -145,7 +149,7 @@ export type PublicInstitutionalCertificate = Omit<
   InstitutionalCertificate,
   "organization_id" | "source_module" | "source_enrollment_id" | "member_id" |
   "family_member_id" | "related_member_id" | "document_id" | "public_token" |
-  "created_at"
+  "created_at" | "updated_at" | "last_correction_reason"
 >;
 
 type ServiceResult<T> = { data: T; error: Error | null };
@@ -325,6 +329,43 @@ export async function issueInstitutionalCertificate(
     p_certificate_id: certificateId,
   });
   return { data: data ?? null, error: normalizeRpcError(error) };
+}
+
+export async function updateInstitutionalCertificate(input: {
+  certificateId: string;
+  recipientName: string;
+  secondaryRecipientName?: string;
+  eventDate: string;
+  location?: string;
+  courseName?: string;
+  workloadHours?: number;
+  periodStart?: string;
+  periodEnd?: string;
+  bodyText?: string;
+  signerName?: string;
+  signerRole?: string;
+  secondSignerName?: string;
+  secondSignerRole?: string;
+  correctionReason?: string;
+}): Promise<Error | null> {
+  const { error } = await supabase.rpc("update_institutional_certificate", {
+    p_certificate_id: input.certificateId,
+    p_recipient_name: input.recipientName,
+    p_secondary_recipient_name: input.secondaryRecipientName,
+    p_event_date: input.eventDate,
+    p_location: input.location,
+    p_course_name: input.courseName,
+    p_workload_hours: input.workloadHours,
+    p_period_start: input.periodStart,
+    p_period_end: input.periodEnd,
+    p_body_text: input.bodyText,
+    p_signer_name: input.signerName,
+    p_signer_role: input.signerRole,
+    p_second_signer_name: input.secondSignerName,
+    p_second_signer_role: input.secondSignerRole,
+    p_correction_reason: input.correctionReason,
+  });
+  return normalizeRpcError(error);
 }
 
 export async function revokeInstitutionalCertificate(
