@@ -94,8 +94,6 @@ const Perfil = lazy(() => import("./pages/Perfil"));
 
 const GerenciarAcessos = lazy(() => import("./pages/GerenciarAcessos"));
 
-const LoginOtpTeste = lazy(() => import("./pages/admin/LoginOtpTeste"));
-
 const Congregacoes = lazy(() => import("./pages/Congregacoes"));
 
 const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
@@ -167,6 +165,10 @@ const Teologia = IS_STAGING_BUILD ? lazy(() => import("./pages/Teologia")) : nul
 // foram aplicadas em nenhum banco (ver docs/architecture/operacao-4-missoes.md).
 // Mesma técnica de tree-shaking condicional do Discipulado/Teologia.
 const Missoes = IS_STAGING_BUILD ? lazy(() => import("./pages/Missoes")) : null;
+
+// Ferramenta administrativa para homologar o login por telefone sem disparar
+// WhatsApp. Nunca deve integrar o bundle ou as rotas de produção.
+const LoginOtpTeste = IS_STAGING_BUILD ? lazy(() => import("./pages/admin/LoginOtpTeste")) : null;
 
 // TV Digital e Canal Eclésia — staging-only durante a retomada da
 // homologação. Os imports condicionais são deliberados: no build de
@@ -307,7 +309,9 @@ const App = () => (
 
               <Route path="/admin/gerenciar-acessos" element={<ProtectedRoute><GerenciarAcessos /></ProtectedRoute>} />
 
-              <Route path="/admin/login-otp-teste" element={<ProtectedRoute><LoginOtpTeste /></ProtectedRoute>} />
+              {IS_STAGING_BUILD && LoginOtpTeste ? (
+                <Route path="/admin/login-otp-teste" element={<ProtectedRoute><LoginOtpTeste /></ProtectedRoute>} />
+              ) : null}
 
               <Route path="/admin/congregacoes" element={<ProtectedRoute><Congregacoes /></ProtectedRoute>} />
 

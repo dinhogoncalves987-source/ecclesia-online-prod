@@ -65,7 +65,10 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Autenticação necessária" }), { status: 401, headers: corsHeaders });
     }
 
-    const { studioRoomId } = await req.json() as { studioRoomId?: string };
+    const { studioRoomId, directorDeviceId } = await req.json() as {
+      studioRoomId?: string;
+      directorDeviceId?: string;
+    };
     if (!studioRoomId) {
       return new Response(JSON.stringify({ error: "studioRoomId obrigatório" }), { status: 400, headers: corsHeaders });
     }
@@ -80,12 +83,11 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Sala não encontrada" }), { status: 404, headers: corsHeaders });
     }
 
-    // Passa director_device_id vazio: se o usuário não for o diretor dono do
-    // dispositivo, a RPC só permite a operação via capability tv.manage —
-    // nunca por "conhecer" o studioRoomId sozinho.
+    // A RPC valida o par usuário + device_id do diretor. Gestores com
+    // tv.manage continuam autorizados independentemente do dispositivo.
     const { data: ended, error: endErr } = await userClient.rpc("end_live_production", {
       p_live_session_id: room.live_session_id,
-      p_director_device_id: "",
+      p_director_device_id: directorDeviceId ?? "",
     });
 
     if (endErr) {

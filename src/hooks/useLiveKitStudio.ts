@@ -3,12 +3,12 @@
  *
  * Dois modos:
  *
- *   MOCK (VITE_LIVEKIT_URL não configurado):
+ *   MOCK LOCAL (Vite dev + VITE_TV_STUDIO_MOCK_ENABLED=true):
  *     — Usa câmeras locais do navegador via getUserMedia.
  *     — Salva estado no DB (tv_studio_rooms, tv_camera_sessions).
  *     — Cortes são registrados em tv_cut_log.
  *
- *   LIVEKIT (VITE_LIVEKIT_URL configurado):
+ *   LIVEKIT (padrão obrigatório em qualquer build):
  *     — Cria sala via Edge Function create-livekit-room.
  *     — Diretor entra como subscriber; câmeras remotas publicam vídeo.
  *     — Tracks de câmeras remotas são exibidos no painel.
@@ -23,9 +23,13 @@ import { getOrCreateStudioDeviceId } from "@/lib/studioDevice";
 
 // ── Env ───────────────────────────────────────────────────────────────────────
 
-const LIVEKIT_URL   = import.meta.env.VITE_LIVEKIT_URL ?? "";
-const IS_MOCK       = !LIVEKIT_URL;
-const MAX_CAMERAS   = Number(import.meta.env.VITE_STUDIO_MAX_CAMERAS ?? 6);
+const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL ?? "";
+// Nunca transforma falta de configuração em sucesso num deploy. O modo
+// local existe apenas para desenvolvimento explícito e não pode ser ativado
+// em um build de staging/produção.
+const IS_MOCK = import.meta.env.DEV
+  && import.meta.env.VITE_TV_STUDIO_MOCK_ENABLED === "true";
+const MAX_CAMERAS = Number(import.meta.env.VITE_STUDIO_MAX_CAMERAS ?? 6);
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -135,16 +139,16 @@ export function useLiveKitStudio({
 
   // ── Realtime: atualizar câmeras da sala ──────────────────────────────────────
 
-  const subscribeRealtime = useCallback((studioRoomId: string) => {
+  const subscribeRealtime = useCallback((sessionId: string) => {
     if (realtimeRef.current) void supabase.removeChannel(realtimeRef.current);
 
     const ch = supabase
-      .channel(`studio_room:${studioRoomId}`)
+      .channel(`studio_session:${sessionId}`)
       .on("postgres_changes", {
         event:  "*",
         schema: "public",
         table:  "tv_camera_sessions",
-        filter: `studio_room_id=eq.${studioRoomId}`,
+        filter: `live_session_id=eq.${sessionId}`,
       }, (payload) => {
         if (payload.eventType === "DELETE") {
           const id = (payload.old as { id?: string }).id ?? "";
@@ -152,7 +156,8 @@ export function useLiveKitStudio({
           return;
         }
         const r = payload.new as Record<string, unknown>;
-        const status = String(r.status ?? "waiting") as ParticipantStatus;
+        const rawStatus = String(r.status ?? "waiting");
+        const status = (rawStatus === "on_air" ? "live" : rawStatus) as ParticipantStatus;
         if (status === "disconnected") {
           setParticipants((prev) => prev.filter((p) => p.id !== String(r.id)));
           return;
@@ -183,7 +188,10 @@ export function useLiveKitStudio({
   // ── Criar sala (MOCK ou LiveKit) ─────────────────────────────────────────────
 
   const createStudioRoom = useCallback(async (): Promise<StudioRoomInfo | null> => {
-    if (!organizationId || !channelId) return null;
+    if (!organizationId || !channelId || !liveSessionId) {
+      setError("Inicie uma produção antes de abrir o estúdio.");
+      return null;
+    }
     setIsCreating(true);
     setError(null);
 
@@ -200,24 +208,35 @@ export function useLiveKitStudio({
         const { studio_room_id, room_name } = data[0] as { studio_room_id: string; room_name: string };
         const info: StudioRoomInfo = { studioRoomId: studio_room_id, roomName: room_name, isMock: true };
         setRoomInfo(info);
-        subscribeRealtime(studio_room_id);
+        subscribeRealtime(liveSessionId);
         return info;
       }
 
       // LiveKit: chamar Edge Function
       const result = await callEdgeFunction<{
-        studioRoomId: string; roomName: string; livekitConfigured: boolean;
-      }>("create-livekit-room", { liveSessionId: liveSessionId ?? null }, authToken);
+        studioRoomId: string;
+        roomName: string;
+        livekitConfigured: boolean;
+        livekitRoomCreated: boolean;
+      }>("create-livekit-room", { liveSessionId }, authToken);
 
       if (!result) { setError("Erro ao criar sala LiveKit"); return null; }
+      if (!result.livekitConfigured) {
+        setError("LiveKit não está configurado no servidor.");
+        return null;
+      }
+      if (!result.livekitRoomCreated) {
+        setError("A sala foi registrada, mas o servidor LiveKit não respondeu.");
+        return null;
+      }
 
       const info: StudioRoomInfo = {
         studioRoomId:    result.studioRoomId,
         roomName:        result.roomName,
-        isMock:          !result.livekitConfigured,
+        isMock:          false,
       };
       setRoomInfo(info);
-      subscribeRealtime(result.studioRoomId);
+      subscribeRealtime(liveSessionId);
       return info;
 
     } finally {
@@ -239,12 +258,10 @@ export function useLiveKitStudio({
         { studioRoomId, role: "director" },
         authToken,
       );
-      if (!tokenData) return false;
-
-      // Se LiveKit não está configurado, usar mock
-      if (tokenData.mock) {
-        setIsConnected(true);
-        return true;
+      if (!tokenData) {
+        setError("Não foi possível autorizar a direção no LiveKit.");
+        setIsConnected(false);
+        return false;
       }
 
       const lk = await getLK();
@@ -283,9 +300,9 @@ export function useLiveKitStudio({
 
     } catch (err) {
       console.warn("[useLiveKitStudio] director connect error:", err);
-      setError("Erro ao conectar ao estúdio. Usando modo demonstração.");
-      setIsConnected(true); // fallback to mock
-      return true;
+      setError("Erro ao conectar ao servidor do estúdio.");
+      setIsConnected(false);
+      return false;
     }
   }, [authToken]);
 
@@ -300,21 +317,12 @@ export function useLiveKitStudio({
       return null;
     }
 
-    // Resolver live_session_id a partir do studio_room_id
-    const { data: sessLookup } = await supabase
-      .from("tv_live_sessions")
-      .select("id")
-      .eq("studio_room_id", studioRoomId)
-      .eq("status_transmissao", "live")
-      .limit(1)
-      .single();
-
-    if (!sessLookup) {
-      console.warn("[addMockCamera] Could not resolve live_session_id for studioRoomId:", studioRoomId);
+    if (!liveSessionId) {
+      console.warn("[addMockCamera] liveSessionId ausente para a sala:", studioRoomId);
       return null;
     }
 
-    const result = await joinProductionAsCamera(String(sessLookup.id), {
+    const result = await joinProductionAsCamera(liveSessionId, {
       deviceId:   deviceId ?? getOrCreateStudioDeviceId(),
       cameraName: name,
       deviceType: "browser",
@@ -354,7 +362,7 @@ export function useLiveKitStudio({
     heartbeatTimers.current.set(sessionId, timer);
 
     return participant;
-  }, [participants]);
+  }, [liveSessionId, participants]);
 
   // ── Corte ao vivo ─────────────────────────────────────────────────────────────
 
@@ -403,17 +411,21 @@ export function useLiveKitStudio({
     cleanup();
 
     if (!IS_MOCK) {
-      await callEdgeFunction("end-livekit-room", { studioRoomId: roomInfo.studioRoomId }, authToken);
-    } else {
-      await supabase.from("tv_studio_rooms")
-        .update({ status: "ended", ended_at: new Date().toISOString() })
-        .eq("id", roomInfo.studioRoomId);
+      await callEdgeFunction("end-livekit-room", {
+        studioRoomId: roomInfo.studioRoomId,
+        directorDeviceId: deviceId ?? "",
+      }, authToken);
+    } else if (liveSessionId) {
+      await supabase.rpc("end_live_production", {
+        p_live_session_id: liveSessionId,
+        p_director_device_id: deviceId ?? "",
+      });
     }
     setRoomInfo(null);
     setParticipants([]);
     setIsConnected(false);
     setOnAirId(null);
-  }, [roomInfo, authToken, cleanup]);
+  }, [roomInfo, liveSessionId, deviceId, authToken, cleanup]);
 
   // ── Câmeras visíveis (excluir desconectadas) ──────────────────────────────────
 
@@ -425,13 +437,13 @@ export function useLiveKitStudio({
   // ── Auto-connect quando initialRoomId é fornecido (produção já criada) ────────
 
   useEffect(() => {
-    if (!initialRoomId || roomInfo) return;
+    if (!enabled || !initialRoomId || !liveSessionId || roomInfo) return;
     const info: StudioRoomInfo = { studioRoomId: initialRoomId, roomName: "", isMock: IS_MOCK };
     setRoomInfo(info);
-    subscribeRealtime(initialRoomId);
+    subscribeRealtime(liveSessionId);
     void connectAsDirector(initialRoomId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialRoomId, roomInfo]);
+  }, [enabled, initialRoomId, liveSessionId, roomInfo]);
 
   // Link para câmera remota entrar
   function getCameraLink(studioRoomId: string): string {

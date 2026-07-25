@@ -2,7 +2,8 @@
  * create-livekit-token — PARTE A (TV Digital / Ecclesia Studio).
  *
  * Gera token JWT para participante do Ecclesia Studio. Dois roles:
- *   director — sempre autenticado; identity = "director:{userId}".
+ *   director — autenticado e autorizado na organização da sala;
+ *              identity = "director:{userId}".
  *   camera   — exige um `cameraSessionId` que já exista em
  *              `tv_camera_sessions` (criado pela RPC autenticada e validada
  *              `join_production_as_camera`, 20260802130000). Isso fecha a
@@ -12,8 +13,9 @@
  *              produção — qualquer um que soubesse o studioRoomId podia
  *              publicar câmera sem ter passado pela checagem de organização.
  *
- * Se LiveKit não estiver configurado, retorna `{ mock: true, token: null }`
- * com mensagem explícita — nunca fabrica um token funcional.
+ * Se LiveKit não estiver configurado, falha explicitamente. O modo de
+ * demonstração é uma decisão do frontend baseada em VITE_LIVEKIT_URL e não
+ * pode mascarar uma configuração incompleta do servidor.
  *
  * Variáveis necessárias:
  *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, LIVEKIT_API_KEY,
@@ -55,19 +57,6 @@ serve(async (req) => {
   }
 
   try {
-    const apiKey = Deno.env.get("LIVEKIT_API_KEY");
-    const apiSecret = Deno.env.get("LIVEKIT_API_SECRET");
-    const livekitUrl = Deno.env.get("LIVEKIT_URL") ?? "";
-
-    if (!apiKey || !apiSecret) {
-      return new Response(JSON.stringify({
-        mock: true,
-        token: null,
-        livekitUrl: null,
-        message: "LiveKit não configurado — integração pendente de credenciais",
-      }), { status: 200, headers: corsHeaders });
-    }
-
     const body = await req.json() as {
       studioRoomId: string;
       role: "director" | "camera";
@@ -85,7 +74,7 @@ serve(async (req) => {
 
     const { data: room, error: roomErr } = await admin
       .from("tv_studio_rooms")
-      .select("room_name, is_active, live_session_id")
+      .select("room_name, is_active, live_session_id, organization_id")
       .eq("id", body.studioRoomId)
       .maybeSingle();
 
@@ -113,6 +102,35 @@ serve(async (req) => {
     let userId: string | null = null;
 
     if (isDirector) {
+      const [{ data: liveSession, error: liveSessionErr }, { data: canManage }, { data: canOperate }] = await Promise.all([
+        admin
+          .from("tv_live_sessions")
+          .select("director_user_id, status_transmissao")
+          .eq("id", room.live_session_id)
+          .maybeSingle(),
+        admin.rpc("has_org_access_permission", {
+          _user_id: callerId,
+          _organization_id: room.organization_id,
+          _permission_key: "tv.manage",
+        }),
+        admin.rpc("has_org_access_permission", {
+          _user_id: callerId,
+          _organization_id: room.organization_id,
+          _permission_key: "tv.live_operate",
+        }),
+      ]);
+
+      if (
+        liveSessionErr
+        || !liveSession
+        || !["waiting", "live"].includes(liveSession.status_transmissao)
+      ) {
+        return new Response(JSON.stringify({ error: "Produção não está ativa" }), { status: 403, headers: corsHeaders });
+      }
+      if (liveSession.director_user_id !== callerId && !canManage && !canOperate) {
+        return new Response(JSON.stringify({ error: "Sem permissão para dirigir esta produção" }), { status: 403, headers: corsHeaders });
+      }
+
       userId = callerId;
       identity = `director:${userId}`;
     } else {
@@ -146,13 +164,20 @@ serve(async (req) => {
       userId = camSession.user_id;
     }
 
+    const apiKey = Deno.env.get("LIVEKIT_API_KEY");
+    const apiSecret = Deno.env.get("LIVEKIT_API_SECRET");
+    const livekitUrl = Deno.env.get("LIVEKIT_URL") ?? "";
+    if (!apiKey || !apiSecret || !livekitUrl) {
+      return new Response(JSON.stringify({ error: "LiveKit não configurado" }), { status: 503, headers: corsHeaders });
+    }
+
     const now = Math.floor(Date.now() / 1000);
     const grants = {
       roomJoin: true,
       room: room.room_name,
-      canPublish: true,
-      canSubscribe: true,
-      canPublishData: true,
+      canPublish: !isDirector,
+      canSubscribe: isDirector,
+      canPublishData: isDirector,
     };
 
     const payload: Record<string, unknown> = {

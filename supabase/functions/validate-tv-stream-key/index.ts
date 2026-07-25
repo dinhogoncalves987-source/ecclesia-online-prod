@@ -6,7 +6,10 @@
  * quando alguém tenta publicar em `rtmp://.../live/<liveSessionId>?user=...
  * &pass=<streamKey>`. NÃO é chamada por um usuário autenticado do app — por
  * isso não usa `auth.uid()` e exige um segredo compartilhado
- * (MEDIAMTX_WEBHOOK_SECRET) em vez de um JWT de usuário.
+ * (MEDIAMTX_WEBHOOK_SECRET) em vez de um JWT de usuário. O MediaMTX não
+ * permite configurar headers arbitrários em authHTTPAddress; portanto o
+ * segredo pode chegar no header x-webhook-secret em testes ou no parâmetro
+ * `webhook_secret` da própria URL configurada na VPS.
  *
  * Conhecer o `liveSessionId` sozinho NUNCA é suficiente para publicar: a
  * chave (`pass`) é validada por hash contra `tv_stream_keys` dentro da RPC
@@ -60,7 +63,10 @@ serve(async (req) => {
     // Segredo compartilhado com a VPS — nunca logado, comparado em tempo
     // constante não é viável no runtime Edge padrão, mas o segredo tem alta
     // entropia e o endpoint é fail-closed em qualquer divergência.
-    const providedSecret = req.headers.get("x-webhook-secret") ?? "";
+    const requestUrl = new URL(req.url);
+    const providedSecret = req.headers.get("x-webhook-secret")
+      ?? requestUrl.searchParams.get("webhook_secret")
+      ?? "";
     if (providedSecret.length === 0 || providedSecret !== webhookSecret) {
       return jsonResponse({ ok: false, error: "unauthorized" }, 401);
     }
@@ -82,7 +88,11 @@ serve(async (req) => {
       return jsonResponse({ ok: false, error: "missing_key" }, 401);
     }
 
-    const liveSessionId = path.replace(/^live\//, "").trim();
+    const pathMatch = /^live\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.exec(path.trim());
+    if (!pathMatch) {
+      return jsonResponse({ ok: false, error: "invalid_path" }, 401);
+    }
+    const liveSessionId = pathMatch[1].toLowerCase();
     const keyHash = await sha256Hex(streamKey.trim());
 
     const admin = createClient(supabaseUrl, serviceRoleKey);
@@ -90,6 +100,7 @@ serve(async (req) => {
     const rtmpUrl = liveSessionId ? `rtmp-ingest://${liveSessionId}` : null;
 
     const { data, error } = await admin.rpc("validate_and_start_tv_stream", {
+      p_session_id: liveSessionId,
       p_stream_key_hash: keyHash,
       p_source_type: "obs",
       p_hls_url: hlsUrl,

@@ -77,7 +77,12 @@ async function getPresignedUploadUrl(
   contentType: string,
   fileSizeBytes: number,
   organizationId: string,
-): Promise<{ uploadUrl: string; publicUrl: string; storageKey: string } | null> {
+): Promise<{
+  uploadUrl: string;
+  publicUrl: string;
+  storageKey: string;
+  requiredHeaders: Record<string, string>;
+} | null> {
   try {
     const { data, error } = await supabase.functions.invoke("get-r2-upload-url", {
       body: {
@@ -89,7 +94,13 @@ async function getPresignedUploadUrl(
     });
 
     if (error || !data?.uploadUrl) return null;
-    return data as { uploadUrl: string; publicUrl: string; storageKey: string };
+    return {
+      uploadUrl: String(data.uploadUrl),
+      publicUrl: String(data.publicUrl),
+      storageKey: String(data.storageKey),
+      requiredHeaders: (data.requiredHeaders as Record<string, string> | undefined)
+        ?? { "Content-Type": contentType },
+    };
   } catch {
     return null;
   }
@@ -100,6 +111,7 @@ async function getPresignedUploadUrl(
 function uploadWithProgress(
   url: string,
   file: File,
+  requiredHeaders: Record<string, string>,
   onProgress?: (percent: number) => void,
 ): Promise<boolean> {
   return new Promise((resolve) => {
@@ -116,7 +128,9 @@ function uploadWithProgress(
     xhr.addEventListener("abort", () => resolve(false));
 
     xhr.open("PUT", url, true);
-    xhr.setRequestHeader("Content-Type", file.type);
+    for (const [name, value] of Object.entries(requiredHeaders)) {
+      xhr.setRequestHeader(name, value);
+    }
     xhr.send(file);
   });
 }
@@ -140,7 +154,12 @@ export async function uploadToR2({
     return { ok: false, error: "r2_presigned_url_failed" };
   }
 
-  const uploaded = await uploadWithProgress(presigned.uploadUrl, file, onProgress);
+  const uploaded = await uploadWithProgress(
+    presigned.uploadUrl,
+    file,
+    presigned.requiredHeaders,
+    onProgress,
+  );
 
   if (!uploaded) {
     return { ok: false, error: "r2_upload_failed" };

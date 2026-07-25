@@ -55,6 +55,8 @@ interface Props {
   deviceId?:      string;
   /** Se true, este dispositivo é o diretor e pode fazer cortes. */
   isDirector?:    boolean;
+  /** Notifica o pai antes de um corte manual (pausa automações, por exemplo). */
+  onCutToCamera?: (participantId: string) => void;
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
@@ -70,6 +72,7 @@ export function EcclesiaStudio({
   hlsUrl,
   deviceId,
   isDirector = true,
+  onCutToCamera,
 }: Props) {
   const [mode, setMode]                   = useState<StudioMode>("temple");
   const [showAddCamera, setShowAddCamera] = useState(false);
@@ -84,10 +87,15 @@ export function EcclesiaStudio({
 
   // Buscar token de autenticação do Supabase
   const [authToken, setAuthToken]         = useState<string | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-misused-promises
-  supabase.auth.getSession().then(({ data }) => {
-    if (data.session?.access_token) setAuthToken(data.session.access_token);
-  });
+  useEffect(() => {
+    let active = true;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (active) setAuthToken(data.session?.access_token ?? null);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const {
     roomInfo,
@@ -120,7 +128,11 @@ export function EcclesiaStudio({
   const handleCreateRoom = useCallback(async () => {
     const info = await createStudioRoom();
     if (!info) { toast.error("Erro ao criar sala de estúdio."); return; }
-    await connectAsDirector(info.studioRoomId);
+    const connected = await connectAsDirector(info.studioRoomId);
+    if (!connected) {
+      toast.error("A sala foi criada, mas não foi possível conectar a direção.");
+      return;
+    }
     toast.success("Estúdio pronto! Você é o diretor.");
   }, [createStudioRoom, connectAsDirector]);
 
@@ -172,8 +184,9 @@ export function EcclesiaStudio({
   // ── Corte ao vivo ─────────────────────────────────────────────────────────
 
   const handleCutTo = useCallback(async (participantId: string) => {
+    onCutToCamera?.(participantId);
     await cutToCamera(participantId);
-  }, [cutToCamera]);
+  }, [cutToCamera, onCutToCamera]);
 
   // ── Copiar link de câmera ─────────────────────────────────────────────────
 

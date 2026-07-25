@@ -119,8 +119,9 @@ async function buildPresignedPutUrl(opts: {
   accessKeyId: string;
   secretAccessKey: string;
   expiresSeconds: number;
+  contentType: string;
 }): Promise<string> {
-  const { endpoint, bucket, key, accessKeyId, secretAccessKey, expiresSeconds } = opts;
+  const { endpoint, bucket, key, accessKeyId, secretAccessKey, expiresSeconds, contentType } = opts;
   const url = new URL(endpoint);
   const host = url.host;
   const region = "auto";
@@ -137,14 +138,14 @@ async function buildPresignedPutUrl(opts: {
     "X-Amz-Credential": credential,
     "X-Amz-Date": xAmzDate,
     "X-Amz-Expires": String(expiresSeconds),
-    "X-Amz-SignedHeaders": "host",
+    "X-Amz-SignedHeaders": "content-type;host",
   };
   const canonicalQueryString = Object.keys(queryParams)
     .sort()
     .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(queryParams[k])}`)
     .join("&");
 
-  const canonicalHeaders = `host:${host}\n`;
+  const canonicalHeaders = `content-type:${contentType.trim().toLowerCase()}\nhost:${host}\n`;
   const payloadHash = "UNSIGNED-PAYLOAD";
 
   const canonicalRequest = [
@@ -152,7 +153,7 @@ async function buildPresignedPutUrl(opts: {
     canonicalUri,
     canonicalQueryString,
     canonicalHeaders,
-    "host",
+    "content-type;host",
     payloadHash,
   ].join("\n");
 
@@ -267,11 +268,18 @@ serve(async (req) => {
       accessKeyId: r2AccessKeyId,
       secretAccessKey: r2SecretAccessKey,
       expiresSeconds: 600,
+      contentType,
     });
 
     const publicUrl = `${r2PublicUrl.replace(/\/$/, "")}/${storageKey}`;
 
-    return jsonResponse({ ok: true, uploadUrl, publicUrl, storageKey });
+    return jsonResponse({
+      ok: true,
+      uploadUrl,
+      publicUrl,
+      storageKey,
+      requiredHeaders: { "Content-Type": contentType.trim().toLowerCase() },
+    });
   } catch (error) {
     console.error("get-r2-upload-url error:", error);
     return jsonResponse({ ok: false, error: "internal_error" }, 500);

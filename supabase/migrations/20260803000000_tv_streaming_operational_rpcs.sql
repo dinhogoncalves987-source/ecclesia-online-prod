@@ -36,16 +36,26 @@ BEGIN
 END;
 $$;
 
+-- Uma organização não pode manter duas produções simultâneas para o mesmo
+-- canal. Além de impedir duplo clique/retry, este índice torna inequívoco
+-- qual liveSessionId o MediaMTX está autorizado a publicar.
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_tv_live_sessions_active_channel
+ON public.tv_live_sessions (tv_channel_id)
+WHERE status_transmissao IN ('waiting', 'live');
+
 -- ── RPC: validate_and_start_tv_stream ───────────────────────────────────────
 -- Chamada por validate-tv-stream-key (Edge Function, autenticada via segredo
 -- compartilhado MEDIAMTX_WEBHOOK_SECRET, não via auth.uid()). Só service_role
 -- pode executar. Recebe o HASH da stream key (nunca a chave em texto puro —
 -- o hash é calculado na Edge Function antes de chamar esta RPC) e cria/
--- reativa a sessão ao vivo dentro de uma única transação com FOR UPDATE,
--- eliminando a corrida entre "achar a chave" e "criar/atualizar a sessão"
--- que existiria se isso fosse feito em múltiplas chamadas soltas a partir da
--- Edge Function.
+-- ativa EXATAMENTE a sessão cujo UUID veio no caminho RTMP. A sessão já deve
+-- ter sido criada por create_live_production; esta RPC nunca inventa outra
+-- sessão. Isso garante que live/<liveSessionId> no RTMP, HLS e banco represente
+-- a mesma produção.
+DROP FUNCTION IF EXISTS public.validate_and_start_tv_stream(text, text, text, text);
+
 CREATE OR REPLACE FUNCTION public.validate_and_start_tv_stream(
+  p_session_id uuid,
   p_stream_key_hash text,
   p_source_type text,
   p_hls_url text,
@@ -59,10 +69,12 @@ AS $$
 DECLARE
   v_key record;
   v_channel record;
-  v_existing record;
-  v_session_id uuid;
+  v_session record;
   v_now timestamptz := now();
 BEGIN
+  IF p_session_id IS NULL THEN
+    RETURN jsonb_build_object('valid', false, 'reason', 'invalid_session_id');
+  END IF;
   IF p_stream_key_hash IS NULL OR length(p_stream_key_hash) <> 64 THEN
     RETURN jsonb_build_object('valid', false, 'reason', 'invalid_hash_format');
   END IF;
@@ -84,42 +96,35 @@ BEGIN
     RETURN jsonb_build_object('valid', false, 'reason', 'channel_inactive');
   END IF;
 
-  UPDATE public.tv_stream_keys SET last_used_at = v_now WHERE id = v_key.id;
-
-  SELECT * INTO v_existing
+  SELECT * INTO v_session
   FROM public.tv_live_sessions
-  WHERE tv_channel_id = v_key.tv_channel_id AND status_transmissao IN ('live', 'waiting')
+  WHERE id = p_session_id
+    AND organization_id = v_key.organization_id
+    AND tv_channel_id = v_key.tv_channel_id
+    AND status_transmissao IN ('live', 'waiting')
   FOR UPDATE;
 
-  IF FOUND THEN
-    UPDATE public.tv_live_sessions
-    SET status_transmissao = 'live',
-        stream_key_id = v_key.id,
-        stream_source_type = COALESCE(p_source_type, stream_source_type, 'obs'),
-        hls_url = p_hls_url,
-        rtmp_url = p_rtmp_url,
-        playback_url = COALESCE(p_hls_url, playback_url),
-        started_at = COALESCE(started_at, v_now),
-        last_heartbeat_at = v_now,
-        error_message = NULL
-    WHERE id = v_existing.id;
-    v_session_id := v_existing.id;
-  ELSE
-    INSERT INTO public.tv_live_sessions (
-      organization_id, tv_channel_id, stream_key_id, stream_source_type,
-      status_transmissao, hls_url, rtmp_url, playback_url,
-      started_at, last_heartbeat_at
-    ) VALUES (
-      v_key.organization_id, v_key.tv_channel_id, v_key.id, COALESCE(p_source_type, 'obs'),
-      'live', p_hls_url, p_rtmp_url, p_hls_url,
-      v_now, v_now
-    )
-    RETURNING id INTO v_session_id;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('valid', false, 'reason', 'session_not_found_or_mismatch');
   END IF;
+
+  UPDATE public.tv_stream_keys SET last_used_at = v_now WHERE id = v_key.id;
+
+  UPDATE public.tv_live_sessions
+  SET status_transmissao = 'live',
+      stream_key_id = v_key.id,
+      stream_source_type = COALESCE(p_source_type, stream_source_type, 'obs'),
+      hls_url = p_hls_url,
+      rtmp_url = p_rtmp_url,
+      playback_url = COALESCE(p_hls_url, playback_url),
+      started_at = COALESCE(started_at, v_now),
+      last_heartbeat_at = v_now,
+      error_message = NULL
+  WHERE id = p_session_id;
 
   RETURN jsonb_build_object(
     'valid', true,
-    'session_id', v_session_id,
+    'session_id', p_session_id,
     'tv_channel_id', v_key.tv_channel_id,
     'organization_id', v_key.organization_id,
     'channel_slug', v_channel.slug,
@@ -130,8 +135,8 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.validate_and_start_tv_stream(text, text, text, text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.validate_and_start_tv_stream(text, text, text, text) TO service_role;
+REVOKE ALL ON FUNCTION public.validate_and_start_tv_stream(uuid, text, text, text, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.validate_and_start_tv_stream(uuid, text, text, text, text) TO service_role;
 
 -- ── RPC: stop_tv_stream_by_session ───────────────────────────────────────────
 -- Chamada por um futuro hook "on_publish_done" do MediaMTX (webhook com
@@ -215,7 +220,7 @@ DO $$
 DECLARE
   v_missing text[] := ARRAY[]::text[];
 BEGIN
-  IF to_regprocedure('public.validate_and_start_tv_stream(text,text,text,text)') IS NULL THEN v_missing := array_append(v_missing, 'validate_and_start_tv_stream'); END IF;
+  IF to_regprocedure('public.validate_and_start_tv_stream(uuid,text,text,text,text)') IS NULL THEN v_missing := array_append(v_missing, 'validate_and_start_tv_stream'); END IF;
   IF to_regprocedure('public.stop_tv_stream_by_session(uuid)') IS NULL THEN v_missing := array_append(v_missing, 'stop_tv_stream_by_session'); END IF;
   IF to_regprocedure('public.update_live_session_heartbeat(uuid,integer)') IS NULL THEN v_missing := array_append(v_missing, 'update_live_session_heartbeat'); END IF;
   IF to_regprocedure('public.check_stale_tv_live_sessions()') IS NULL THEN v_missing := array_append(v_missing, 'check_stale_tv_live_sessions'); END IF;

@@ -7,8 +7,12 @@
  * como 'error' após 90s de silêncio — nenhum estado "ao vivo" fica preso
  * indefinidamente só porque o frontend nunca foi atualizado.
  *
+ * Também recebe `action: "end"` no runOnNotReady do MediaMTX para encerrar a
+ * sessão imediatamente quando o publisher desconecta.
+ *
  * Autenticação: mesmo segredo compartilhado MEDIAMTX_WEBHOOK_SECRET usado por
- * validate-tv-stream-key — nunca aceita chamadas sem esse header.
+ * validate-tv-stream-key. Aceita header em testes ou `webhook_secret` na URL
+ * configurada na VPS, pois o MediaMTX não injeta headers arbitrários.
  *
  * Variáveis necessárias:
  *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, MEDIAMTX_WEBHOOK_SECRET
@@ -36,33 +40,43 @@ serve(async (req) => {
       return jsonResponse({ ok: false, error: "not_configured" }, 500);
     }
 
-    const providedSecret = req.headers.get("x-webhook-secret") ?? "";
+    const requestUrl = new URL(req.url);
+    const providedSecret = req.headers.get("x-webhook-secret")
+      ?? requestUrl.searchParams.get("webhook_secret")
+      ?? "";
     if (providedSecret.length === 0 || providedSecret !== webhookSecret) {
       return jsonResponse({ ok: false, error: "unauthorized" }, 401);
     }
 
     const body = await req.json().catch(() => ({}));
     const sessionId = typeof body?.session_id === "string" ? body.session_id : "";
+    const action = body?.action === "end" ? "end" : "heartbeat";
     const viewerCount = typeof body?.viewer_count === "number" && body.viewer_count >= 0
       ? Math.floor(body.viewer_count)
       : null;
 
-    if (!sessionId) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sessionId)) {
       return jsonResponse({ ok: false, error: "missing_session_id" }, 400);
     }
 
     const admin = createClient(supabaseUrl, serviceRoleKey);
-    const { error } = await admin.rpc("update_live_session_heartbeat", {
-      p_session_id: sessionId,
-      p_viewer_count: viewerCount,
-    });
+    const { data, error } = action === "end"
+      ? await admin.rpc("stop_tv_stream_by_session", { p_session_id: sessionId })
+      : await admin.rpc("update_live_session_heartbeat", {
+        p_session_id: sessionId,
+        p_viewer_count: viewerCount,
+      });
 
     if (error) {
       console.error("update-tv-heartbeat: rpc error", error.message);
       return jsonResponse({ ok: false, error: "internal_error" }, 500);
     }
 
-    return jsonResponse({ ok: true });
+    if (action === "end" && data !== true) {
+      return jsonResponse({ ok: false, error: "session_not_active" }, 409);
+    }
+
+    return jsonResponse({ ok: true, action });
   } catch (error) {
     console.error("update-tv-heartbeat error:", error);
     return jsonResponse({ ok: false, error: "internal_error" }, 500);

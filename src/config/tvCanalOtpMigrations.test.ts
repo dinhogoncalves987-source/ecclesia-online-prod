@@ -30,8 +30,16 @@ const OTP_FOUNDATION = "20260802100000_member_login_otp_foundation.sql";
 const OTP_ADMIN_TEST = "20260802110000_member_login_otp_admin_test.sql";
 const TV_CANAL_FOUNDATION = "20260802120000_tv_canal_foundation.sql";
 const TV_CANAL_LIVE = "20260802130000_tv_canal_live_production.sql";
+const TV_STREAMING_OPERATIONS = "20260803000000_tv_streaming_operational_rpcs.sql";
 
-const ALL_NAMES = [CHAT_HARDENING, OTP_FOUNDATION, OTP_ADMIN_TEST, TV_CANAL_FOUNDATION, TV_CANAL_LIVE];
+const ALL_NAMES = [
+  CHAT_HARDENING,
+  OTP_FOUNDATION,
+  OTP_ADMIN_TEST,
+  TV_CANAL_FOUNDATION,
+  TV_CANAL_LIVE,
+  TV_STREAMING_OPERATIONS,
+];
 
 describe("OPERAÇÃO ESPECIAL — migrations novas (TV/Canal/Chat/OTP)", () => {
   it.each(ALL_NAMES)("mirrors %s byte-for-byte in the production directory", (name) => {
@@ -52,7 +60,13 @@ describe("OPERAÇÃO ESPECIAL — migrations novas (TV/Canal/Chat/OTP)", () => {
     const manifest = JSON.parse(read("supabase/migration-manifest.json")) as {
       staging_feature: string[];
     };
-    for (const name of [OTP_FOUNDATION, OTP_ADMIN_TEST, TV_CANAL_FOUNDATION, TV_CANAL_LIVE]) {
+    for (const name of [
+      OTP_FOUNDATION,
+      OTP_ADMIN_TEST,
+      TV_CANAL_FOUNDATION,
+      TV_CANAL_LIVE,
+      TV_STREAMING_OPERATIONS,
+    ]) {
       expect(manifest.staging_feature).toContain(name);
     }
   });
@@ -170,6 +184,16 @@ describe("Login por telefone/WhatsApp (Parte D) — contrato de segurança", () 
     const columns = auditTableMatch![1];
     expect(columns).not.toMatch(/code/i);
   });
+
+  it("a tela que revela OTP manual é importada e roteada somente em staging", () => {
+    const app = read("src/App.tsx");
+    const verifier = read("scripts/verify-production-bundle.mjs");
+    expect(app).toContain(
+      'const LoginOtpTeste = IS_STAGING_BUILD ? lazy(() => import("./pages/admin/LoginOtpTeste")) : null;',
+    );
+    expect(app).toContain("{IS_STAGING_BUILD && LoginOtpTeste ? (");
+    expect(verifier).toContain('"pages/admin/LoginOtpTeste"');
+  });
 });
 
 describe("TV ↔ Canal — vínculo idempotente (Parte A + B, contrato §8)", () => {
@@ -227,5 +251,56 @@ describe("TV/Canal — estados explícitos, nenhum 'ao vivo' fabricado", () => {
   it("status_transmissao usa uma máquina de estados explícita (não texto livre)", () => {
     const sql = read(`supabase/migrations/${TV_CANAL_FOUNDATION}`);
     expect(sql).toMatch(/status_transmissao text[\s\S]{0,80}CHECK\s*\(status_transmissao IN/);
+  });
+});
+
+describe("TV streaming — vínculo operacional MediaMTX ↔ sessão real", () => {
+  const operations = () => read(`supabase/migrations/${TV_STREAMING_OPERATIONS}`);
+  const validator = () => read("supabase/functions/validate-tv-stream-key/index.ts");
+  const heartbeat = () => read("supabase/functions/update-tv-heartbeat/index.ts");
+  const livekitToken = () => read("supabase/functions/create-livekit-token/index.ts");
+
+  it("ativa exatamente o liveSessionId do caminho RTMP e nunca cria uma sessão aleatória", () => {
+    const sql = operations();
+    expect(sql).toContain("p_session_id uuid");
+    expect(sql).toContain("WHERE id = p_session_id");
+    expect(sql).toContain("'session_not_found_or_mismatch'");
+    expect(sql).not.toMatch(/INSERT INTO public\.tv_live_sessions/);
+    expect(sql).toContain("uniq_tv_live_sessions_active_channel");
+  });
+
+  it("a Edge Function exige caminho live/<uuid> exato e envia o UUID à RPC", () => {
+    const code = validator();
+    expect(code).toContain("const pathMatch = /^live\\/");
+    expect(code).toContain("p_session_id: liveSessionId");
+    expect(code).not.toContain('path.replace(/^live\\//, "")');
+  });
+
+  it("o encerramento do publisher é suportado pelo mesmo endpoint autenticado de heartbeat", () => {
+    const code = heartbeat();
+    expect(code).toContain('body?.action === "end"');
+    expect(code).toContain('"stop_tv_stream_by_session"');
+    expect(code).toContain('"update_live_session_heartbeat"');
+  });
+
+  it("token de diretor exige vínculo com a produção ou capability operacional", () => {
+    const code = livekitToken();
+    expect(code).toContain("_permission_key: \"tv.manage\"");
+    expect(code).toContain("_permission_key: \"tv.live_operate\"");
+    expect(code).toContain("liveSession.director_user_id !== callerId");
+    expect(code).toContain("Sem permissão para dirigir esta produção");
+  });
+
+  it("grants do LiveKit respeitam privilégio mínimo entre direção e câmera", () => {
+    const code = livekitToken();
+    expect(code).toContain("canPublish: !isDirector");
+    expect(code).toContain("canSubscribe: isDirector");
+  });
+
+  it("mock do estúdio só pode ser ativado explicitamente no Vite local", () => {
+    const hook = read("src/hooks/useLiveKitStudio.ts");
+    expect(hook).toContain("const IS_MOCK = import.meta.env.DEV");
+    expect(hook).toContain('import.meta.env.VITE_TV_STUDIO_MOCK_ENABLED === "true"');
+    expect(hook).not.toContain("const IS_MOCK       = !LIVEKIT_URL");
   });
 });

@@ -44,6 +44,9 @@ import {
   PlayCircle, StopCircle, WifiOff, Wifi, Mic, MicOff,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
+
+const TV_HLS_BASE_URL = String(import.meta.env.VITE_TV_HLS_BASE_URL ?? "").replace(/\/$/, "");
 
 // ── Tipos locais ───────────────────────────────────────────────────────────────
 
@@ -58,15 +61,16 @@ type ViewState =
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export default function TvAoVivo() {
+  const navigate    = useNavigate();
   const { church }  = useChurch();
   const { user }    = useAuth();
-  const { role }    = useRole();
+  const { hasCapability } = useRole();
   const orgId       = church?.id ?? "";
 
   const deviceId    = getOrCreateStudioDeviceId();
   const deviceLabel = getStudioDeviceLabel();
 
-  const canCreateProduction = ["super_admin", "church_admin", "pastor", "secretary"].includes(role ?? "");
+  const canCreateProduction = hasCapability("tv.manage") || hasCapability("tv.live_operate");
 
   const [view, setView]               = useState<ViewState>("loading");
   const [channels, setChannels]       = useState<TvChannel[]>([]);
@@ -204,7 +208,7 @@ export default function TvAoVivo() {
       .from("tv_camera_sessions")
       .select("id, device_id, camera_name, is_on_air, status")
       .eq("live_session_id", lsId)
-      .in("status", ["connected", "live", "waiting"])
+      .in("status", ["connected", "on_air", "waiting"])
       .then(({ data }) => {
         if (!data) return;
         const map: Record<string, { sessionId: string; cameraName: string; isOnAir: boolean }> = {};
@@ -249,7 +253,6 @@ export default function TvAoVivo() {
       .subscribe();
 
     return () => { void supabase.removeChannel(camCh); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, activeProduction?.liveSessionId]);
 
   // ── Carregar dados iniciais ──────────────────────────────────────────────────
@@ -404,8 +407,11 @@ export default function TvAoVivo() {
   // ── Entrar como câmera ────────────────────────────────────────────────────────
 
   function handleEnterAsCamera(production: LiveProduction) {
-    setActiveProduction(production);
-    setView("camera");
+    if (!production.studioRoomId) {
+      toast.error("A sala do estúdio ainda não está disponível.");
+      return;
+    }
+    navigate(`/tv/studio/${production.studioRoomId}/camera`);
   }
 
   // ── Derived ───────────────────────────────────────────────────────────────────
@@ -444,7 +450,7 @@ export default function TvAoVivo() {
               className="p-2 hover:bg-muted rounded-lg transition text-muted-foreground"
               title="Atualizar"
             >
-              <RefreshCw className={`w-4 h-4 ${view === "loading" ? "animate-spin" : ""}`} />
+              <RefreshCw className="w-4 h-4" />
             </button>
           )}
         </div>
@@ -792,7 +798,11 @@ export default function TvAoVivo() {
               isLive={activeProduction.statusTransmissao === "live"}
               isRecording={false}
               viewerCount={0}
-              hlsUrl={null}
+              hlsUrl={
+                TV_HLS_BASE_URL
+                  ? `${TV_HLS_BASE_URL}/${activeProduction.liveSessionId}/index.m3u8`
+                  : null
+              }
               deviceId={deviceId}
               isDirector
               onCutToCamera={() => triggerManualOverride()}

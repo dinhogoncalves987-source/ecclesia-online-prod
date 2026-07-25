@@ -24,10 +24,11 @@ import {
 } from "@/lib/tvDigital";
 import {
   Settings2, Key, Check, RefreshCw, Plus, Tv2,
-  Eye, EyeOff, Trash2, Monitor, HelpCircle, LayoutGrid, Headphones,
+  Eye, EyeOff, Trash2, Monitor, HelpCircle, LayoutGrid, Headphones, Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { useRole } from "@/hooks/useRole";
 
 const QUALITY_PRESETS = [
   { label: "Alta (1080p)",    bitrate: "4500 Kbps", res: "1920×1080", fps: 30 },
@@ -39,7 +40,9 @@ const QUALITY_PRESETS = [
 export default function TvConfiguracoes() {
   const { church } = useChurch();
   const { user }   = useAuth();
+  const { hasCapability, loading: roleLoading } = useRole();
   const orgId = church?.id ?? "";
+  const canManageTv = hasCapability("tv.manage");
 
   const { obs } = useObsWebSocket();
 
@@ -53,6 +56,10 @@ export default function TvConfiguracoes() {
   const [qualityIdx, setQualityIdx]     = useState(1); // Padrão 720p
   const [tab, setTab]                   = useState<"canais" | "obs" | "studio" | "suporte">("canais");
   const [prepState, setPrepState]       = useState<"idle" | "confirming" | "preparing" | "success" | "error">("idle");
+  const [latestStreamKey, setLatestStreamKey] = useState<{
+    rawKey: string;
+    last4: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!orgId) { setLoading(false); return; }
@@ -70,6 +77,7 @@ export default function TvConfiguracoes() {
   }, [orgId]);
 
   useEffect(() => {
+    setLatestStreamKey(null);
     if (!selectedChannel) return;
     void fetchStreamKeys(selectedChannel).then(setStreamKeys);
   }, [selectedChannel]);
@@ -79,11 +87,13 @@ export default function TvConfiguracoes() {
     const { rawKey, hash, last4 } = await generateStreamKey();
     const result = await createStreamKey(orgId, selectedChannel, sourceType, null, hash, last4, user.id);
     if (result.ok) {
-      toast.success(
-        `Chave criada: ...${last4}\n\nCopiada para a área de transferência.`,
-        { duration: 8000 },
-      );
-      void navigator.clipboard.writeText(rawKey);
+      setLatestStreamKey({ rawKey, last4 });
+      try {
+        await navigator.clipboard.writeText(rawKey);
+        toast.success(`Chave criada e copiada: ...${last4}`, { duration: 8000 });
+      } catch {
+        toast.warning("Chave criada. Copie o valor exibido antes de sair desta tela.", { duration: 10000 });
+      }
       await fetchStreamKeys(selectedChannel).then(setStreamKeys);
     } else {
       toast.error(`Erro ao criar chave: ${result.error ?? ""}`);
@@ -164,6 +174,31 @@ export default function TvConfiguracoes() {
   }
 
   const selectedCh = channels.find((c) => c.id === selectedChannel);
+
+  if (roleLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex justify-center py-20">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (!canManageTv) {
+    return (
+      <AdminLayout>
+        <div className="mx-auto max-w-2xl p-6">
+          <div className="rounded-xl border border-border bg-card p-6 text-center">
+            <h1 className="text-lg font-semibold">Configurações restritas</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Você pode acompanhar a TV, mas somente responsáveis com permissão de gestão podem alterar canais e chaves.
+            </p>
+          </div>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -284,6 +319,29 @@ export default function TvConfiguracoes() {
                   </div>
                 </div>
 
+                {latestStreamKey && (
+                  <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                    <p className="text-xs font-semibold">Copie agora: esta chave completa aparece somente nesta criação.</p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <code className="min-w-0 flex-1 overflow-x-auto rounded bg-background/80 px-2 py-1.5 text-xs">
+                        {latestStreamKey.rawKey}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void navigator.clipboard.writeText(latestStreamKey.rawKey)
+                            .then(() => toast.success("Chave copiada."))
+                            .catch(() => toast.error("Não foi possível copiar automaticamente."));
+                        }}
+                        className="rounded-lg border border-amber-400 p-2 hover:bg-amber-100 dark:hover:bg-amber-950"
+                        title="Copiar chave"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {streamKeys.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground text-sm">
                     <Key className="w-8 h-8 mx-auto mb-2 opacity-20" />
@@ -298,7 +356,7 @@ export default function TvConfiguracoes() {
                           <p className="text-xs font-medium">{STREAM_SOURCE_LABELS[key.streamSourceType]}</p>
                           <p className="text-xs text-muted-foreground font-mono mt-0.5">
                             ••••••••••••{key.streamKeyLast4}
-                            <span className="ml-2 text-muted-foreground/60">(ver chave completa em Ao Vivo)</span>
+                            <span className="ml-2 text-muted-foreground/60">(a chave completa não é armazenada)</span>
                           </p>
                         </div>
                         <span className={`text-xs px-2 py-0.5 rounded-full ${key.isActive ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400" : "bg-gray-100 text-gray-500"}`}>

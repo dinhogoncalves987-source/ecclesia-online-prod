@@ -668,3 +668,109 @@ novo compila e passa nos testes. Pelo desenho do código (TypeScript com tipos e
 de `any` novo além do padrão já existente no arquivo, seguindo exatamente as mesmas convenções de
 Edge Functions já existentes no repositório), a expectativa é de que compile, mas isso precisa ser
 confirmado por execução real antes de qualquer promoção.
+
+---
+
+# REVISÃO CODEX — integridade do streaming e validação real
+
+Esta seção foi produzida sobre o commit Sonnet `34b7899`, na branch local de revisão
+`review/finalizacao-tv-canal-chat-20260725`. Ela **prevalece** quando corrige afirmações das seções
+22–29. Nenhuma migration, Edge Function ou aplicação foi publicada remotamente nesta revisão.
+
+## 30. Falhas reais encontradas e corrigidas
+
+1. **Token LiveKit de diretor sem autorização suficiente.** Um usuário autenticado que descobrisse
+   o UUID de uma sala ativa podia pedir token de diretor. A Edge Function agora exige que o
+   solicitante seja o diretor registrado ou possua `tv.manage`/`tv.live_operate`.
+2. **Privilégios LiveKit excessivos.** Os grants foram reduzidos por papel: diretor apenas assiste
+   e controla dados; câmera publica mídia, sem assinar conteúdo ou receber todas as faixas.
+3. **Falso sucesso LiveKit.** Ausência de configuração ou falha de conexão não produz mais sala,
+   token ou estado conectado fictício. O fluxo falha fechado com erro explícito.
+4. **Realtime das câmeras filtrava coluna inexistente.** A assinatura agora usa
+   `tv_camera_sessions.live_session_id`, e o estado SQL `on_air` é traduzido corretamente para a
+   interface.
+5. **Encerramento do diretor descartava o dispositivo.** `end-livekit-room` recebe e encaminha
+   `directorDeviceId`; o modo sem LiveKit usa a RPC `end_live_production`, sem tentar atualizar
+   colunas inexistentes em `tv_studio_rooms`.
+6. **Autenticação RTMP não vinculava o path à sessão.** O webhook agora aceita somente
+   `live/<UUID>` e a RPC `validate_and_start_tv_stream` bloqueia e valida exatamente essa sessão,
+   organização, canal e chave. Ela nunca cria silenciosamente uma segunda sessão aleatória.
+7. **Concorrência de lives.** Foi adicionado índice parcial único que impede mais de uma sessão
+   `waiting`/`live` por canal.
+8. **Fim da transmissão não chegava ao banco.** `update-tv-heartbeat` agora aceita
+   `action: "end"` e chama `stop_tv_stream_by_session`. A VPS ainda precisa ter o hook
+   `runOnNotReady` configurado para usar esse contrato.
+9. **Assinatura R2 incompleta.** `content-type` passou a integrar os headers assinados do PUT, e o
+   cliente aplica os `requiredHeaders` devolvidos pela Edge Function.
+10. **Câmera inline não entrava no LiveKit.** O botão de câmera abre a rota real do estúdio; a tela
+    de câmera aceita produção `waiting`/`live` e desfaz a sessão no banco se o LiveKit falhar.
+11. **Monitor do diretor sem HLS.** A URL é derivada de `VITE_TV_HLS_BASE_URL` usando exatamente o
+    `liveSessionId`.
+12. **Chave RTMP podia ser perdida.** A chave completa recém-criada fica disponível uma única vez
+    na tela, com cópia e aviso de falha do clipboard; a lista histórica informa corretamente que
+    o segredo completo não é armazenado.
+13. **Configurações expostas a `tv.read`.** A página de configurações agora exige `tv.manage`;
+    iniciar produção aceita `tv.manage` ou a responsabilidade operacional `tv.live_operate`.
+14. **Ferramenta manual de OTP vazava para produção.** `LoginOtpTeste` agora é importada e roteada
+    somente quando `VITE_APP_ENV=staging`; o verificador do bundle de produção proíbe o chunk.
+15. **Paridade de configuração sem isolamento explícito.** Os exemplos de ambiente agora listam
+    HLS, RTMP, LiveKit e R2 separadamente para staging e produção.
+16. **Ausência de LiveKit ativava mock automaticamente.** O mock do estúdio agora só pode existir
+    no servidor Vite local (`DEV`) com opt-in explícito; qualquer build falha fechado sem LiveKit.
+
+## 31. Contratos corrigidos
+
+- A assinatura atual é
+  `validate_and_start_tv_stream(session_id, stream_key_hash, source_type, hls_url, rtmp_url)`.
+- O segredo do webhook pode chegar por header em testes controlados ou pelo parâmetro
+  `webhook_secret`, compatível com o `authHTTPAddress` do MediaMTX.
+- Sem LiveKit configurado, o resultado correto é **503**, nunca `{ mock: true }`.
+- A ferramenta manual de OTP é exclusivamente de staging. O fluxo normal de login continua
+  disponível nos ambientes em que suas migrations e Edge Function forem promovidas; o transporte
+  WhatsApp permanece deliberadamente desligado.
+
+## 32. Validação executada pelo Codex
+
+Resultados reais, executados sobre o código revisado:
+
+- `vitest`: **58 arquivos e 1.039 testes passaram**, zero falhas, depois de todas as correções.
+- ESLint dos arquivos alterados: zero erros.
+- `git diff --check`: sem erro.
+- Build staging: sucesso; TV Digital, Canal Eclésia, Discipulado, Teologia e Missões foram emitidos
+  como chunks separados.
+- Build produção: sucesso.
+- `verify:production-bundle`: sucesso depois da trava adicional, provando também a ausência de
+  `LoginOtpTeste`.
+- `tsc --noEmit -p tsconfig.app.json`: **293 erros**. Não é correto declarar TypeScript limpo.
+  Os erros nos arquivos desta operação decorrem de `src/integrations/supabase/types.ts` ainda não
+  conhecer tabelas e RPCs das migrations não aplicadas; o restante inclui o mesmo passivo
+  preexistente de outros módulos. Os tipos devem ser regenerados a partir do schema homologado,
+  nunca ajustados manualmente para esconder o problema.
+
+## 33. Estado de homologação — não confundir código pronto com serviço pronto
+
+O código está pronto para revisão e aplicação em staging, mas a operação **não está homologada
+de ponta a ponta**:
+
+- as migrations e Edge Functions desta operação ainda não foram publicadas no Supabase;
+- o teste feito na VPS comprovou MediaMTX RTMP→HLS com credenciais internas, mas não comprovou o
+  caminho real `tv_stream_keys → validate-tv-stream-key → sessão exata`;
+- `authHTTPAddress`/hooks do MediaMTX ainda precisam ser conectados às Edge Functions do ambiente;
+- `live.ecclesiabr.online` estava em NXDOMAIN, logo HTTPS público e player sem mixed content não
+  foram homologados;
+- upload real, leitura pública e persistência final no R2 não foram testados;
+- sala, token, câmera e direção com um servidor LiveKit real não foram testados;
+- uma URL presigned PUT não consegue impor sozinha o tamanho que o cliente declarou. Para
+  fiscalização rígida do limite é necessário finalizar o upload com `HEAD`/RPC ou usar um
+  upload proxy/Worker;
+- staging e produção ainda precisam de infraestrutura de mídia isolada. Uma única instância
+  MediaMTX com um único `authHTTPAddress` não pode validar simultaneamente contra dois projetos
+  Supabase sem instâncias, caminhos ou roteador separados;
+- as configurações alteradas diretamente na VPS (Compose, template MediaMTX e Caddy) não estão
+  versionadas no repositório. Antes de produção, devem virar infraestrutura reproduzível e
+  auditável.
+
+Portanto, a próxima etapa segura é: aplicar migrations e funções **somente no staging**, configurar
+DNS/MediaMTX/LiveKit/R2 de staging, executar o roteiro RTMP→HLS→R2→Canal e somente então promover o
+mesmo artefato e o mesmo conjunto de migrations para produção, mantendo apenas dados e segredos
+separados.

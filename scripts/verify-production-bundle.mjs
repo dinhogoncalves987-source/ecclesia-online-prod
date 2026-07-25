@@ -138,6 +138,9 @@ const FORBIDDEN_TERMS_SOURCE = [
   "pages/CanalCreateChannel",
   "pages/CanalMyChannel",
   "pages/VideoPlayer",
+  // O gerador manual de OTP existe exclusivamente para homologação em
+  // staging; produção usa apenas o fluxo normal de entrada do membro.
+  "pages/admin/LoginOtpTeste",
   // OPERAÇÃO 2 (Discipulado, 2026-07-29) — staging-only enquanto as
   // migrations discipleship_* não forem aplicadas em nenhum ambiente (ver
   // src/config/modules.ts e docs/architecture/operacao-2-discipulado.md).

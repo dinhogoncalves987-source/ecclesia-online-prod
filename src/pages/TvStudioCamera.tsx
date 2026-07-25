@@ -158,7 +158,7 @@ export default function TvStudioCamera() {
       .from("tv_live_sessions")
       .select("id")
       .eq("studio_room_id", roomId)
-      .eq("status_transmissao", "live")
+      .in("status_transmissao", ["waiting", "live"])
       .limit(1)
       .single();
 
@@ -195,28 +195,36 @@ export default function TvStudioCamera() {
     // LiveKit (se configurado)
     if (!IS_MOCK) {
       try {
-        const { data: tokenData } = await supabase.functions.invoke<{
-          token: string; livekitUrl: string; mock?: boolean;
+        const { data: tokenData, error: tokenError } = await supabase.functions.invoke<{
+          token: string; livekitUrl: string;
         }>("create-livekit-token", {
           body: { studioRoomId: roomId, role: "camera", cameraSessionId: sid, cameraName: cameraName.trim() },
         });
-        if (tokenData && !tokenData.mock && tokenData.token) {
-          const lk   = await import("livekit-client");
-          const room = new lk.Room();
-          room.on(lk.RoomEvent.DataReceived, (payload: Uint8Array) => {
-            try {
-              const msg = JSON.parse(new TextDecoder().decode(payload)) as { type: string; cameraId: string };
-              if (msg.type === "on_air") setIsOnAir(msg.cameraId === sid);
-            } catch { /* ignore */ }
-          });
-          room.on(lk.RoomEvent.Disconnected, () => setStatus("disconnected"));
-          await room.connect(tokenData.livekitUrl ?? LIVEKIT_URL, tokenData.token);
-          const track = new lk.LocalVideoTrack(cameraStream.getVideoTracks()[0]);
-          await room.localParticipant.publishTrack(track);
-          lkRoomRef.current = room;
+        if (tokenError || !tokenData?.token) {
+          throw tokenError ?? new Error("Token LiveKit não emitido");
         }
+
+        const lk   = await import("livekit-client");
+        const room = new lk.Room();
+        room.on(lk.RoomEvent.DataReceived, (payload: Uint8Array) => {
+          try {
+            const msg = JSON.parse(new TextDecoder().decode(payload)) as { type: string; cameraId: string };
+            if (msg.type === "on_air") setIsOnAir(msg.cameraId === sid);
+          } catch { /* ignore */ }
+        });
+        room.on(lk.RoomEvent.Disconnected, () => setStatus("disconnected"));
+        await room.connect(tokenData.livekitUrl ?? LIVEKIT_URL, tokenData.token);
+        const track = new lk.LocalVideoTrack(cameraStream.getVideoTracks()[0]);
+        await room.localParticipant.publishTrack(track);
+        lkRoomRef.current = room;
       } catch (err) {
-        console.warn("[TvStudioCamera] LiveKit connect failed, continuing mock:", err);
+        console.warn("[TvStudioCamera] LiveKit connect failed:", err);
+        await supabase.rpc("disconnect_camera", { p_camera_session_id: sid });
+        cameraStream.getTracks().forEach((track) => track.stop());
+        setStream(null);
+        setErrorMsg("Não foi possível conectar esta câmera ao estúdio.");
+        setStatus("error");
+        return;
       }
     }
 
