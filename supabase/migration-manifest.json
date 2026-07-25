@@ -120,7 +120,8 @@
     "20260802110000_member_login_otp_admin_test.sql",
     "20260802120000_tv_canal_foundation.sql",
     "20260802130000_tv_canal_live_production.sql",
-    "20260803000000_tv_streaming_operational_rpcs.sql"
+    "20260803000000_tv_streaming_operational_rpcs.sql",
+    "20260803110000_institutional_certificate_corrections.sql"
   ],
   "staging_only": [
     "20260519200000_demo_seed.sql",

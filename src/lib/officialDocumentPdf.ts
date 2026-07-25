@@ -13,6 +13,15 @@ export async function generateOfficialDocumentPdf(
     import("jspdf"),
   ]);
 
+  const images = Array.from(element.querySelectorAll("img"));
+  await Promise.all(images.map((image) => {
+    if (image.complete) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      image.addEventListener("load", () => resolve(), { once: true });
+      image.addEventListener("error", () => resolve(), { once: true });
+    });
+  }));
+
   const canvas = await html2canvas(element, {
     scale: 2,
     useCORS: true,

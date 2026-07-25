@@ -103,6 +103,15 @@ function CardFront({
       <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950" />
       <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-blue-600/25 -translate-y-1/2 translate-x-1/2 blur-3xl" />
       <div className="absolute bottom-0 left-0 w-24 h-24 rounded-full bg-emerald-600/15 translate-y-1/2 -translate-x-1/2 blur-2xl" />
+      {churchLogoUrl && (
+        <img
+          src={churchLogoUrl}
+          alt=""
+          aria-hidden="true"
+          crossOrigin="anonymous"
+          className="pointer-events-none absolute left-1/2 top-1/2 h-[72%] w-[62%] -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.16] mix-blend-screen"
+        />
+      )}
 
       <div className="relative z-10 h-full p-4 flex flex-col justify-between">
         <div className="flex items-start justify-between">
@@ -111,6 +120,7 @@ function CardFront({
               <img
                 src={churchLogoUrl}
                 alt={churchName}
+                crossOrigin="anonymous"
                 className="w-7 h-7 rounded object-contain flex-shrink-0 mt-0.5"
               />
             )}
@@ -194,7 +204,17 @@ function CardFront({
 
 // ── Verso ─────────────────────────────────────────────────────────────────────
 
-function CardBack({ id, member, churchName }: { id: string; member: WalletMember; churchName: string }) {
+function CardBack({
+  id,
+  member,
+  churchName,
+  churchLogoUrl,
+}: {
+  id: string;
+  member: WalletMember;
+  churchName: string;
+  churchLogoUrl?: string | null;
+}) {
   return (
     <div
       id={id}
@@ -203,6 +223,15 @@ function CardBack({ id, member, churchName }: { id: string; member: WalletMember
     >
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-800" />
       <div className="absolute top-0 left-0 w-32 h-32 rounded-full bg-blue-600/15 -translate-y-1/2 -translate-x-1/2 blur-3xl" />
+      {churchLogoUrl && (
+        <img
+          src={churchLogoUrl}
+          alt=""
+          aria-hidden="true"
+          crossOrigin="anonymous"
+          className="pointer-events-none absolute left-1/2 top-1/2 h-[70%] w-[60%] -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.14] mix-blend-screen"
+        />
+      )}
 
       <div className="relative z-10 h-full p-4 flex flex-col justify-between">
         <div className="flex items-center justify-between border-b border-slate-700/50 pb-1.5">
@@ -355,6 +384,17 @@ export function MemberWalletCard({ member, churchName, churchCity, churchState, 
       const backEl  = document.getElementById("wallet-pdf-back");
       if (!frontEl || !backEl) throw new Error("Elementos do cartão não encontrados");
 
+      const images = Array.from(
+        new Set([...frontEl.querySelectorAll("img"), ...backEl.querySelectorAll("img")]),
+      );
+      await Promise.all(images.map((image) => {
+        if (image.complete) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          image.addEventListener("load", () => resolve(), { once: true });
+          image.addEventListener("error", () => resolve(), { once: true });
+        });
+      }));
+
       const captureOpts = { scale: 3, useCORS: true, allowTaint: true, backgroundColor: null, logging: false };
       const frontCanvas = await html2canvas(frontEl, captureOpts);
       const backCanvas  = await html2canvas(backEl,  captureOpts);
@@ -399,7 +439,7 @@ export function MemberWalletCard({ member, churchName, churchCity, churchState, 
       {/* Card visível (frente ou verso) */}
       <div className="w-full max-w-xs">
         {showBack
-          ? <CardBack id="wallet-card-back"  {...{ member, churchName }} />
+          ? <CardBack id="wallet-card-back"  {...{ member, churchName, churchLogoUrl }} />
           : <CardFront id="wallet-card-front" {...cardProps} />}
       </div>
 
@@ -473,7 +513,7 @@ export function MemberWalletCard({ member, churchName, churchCity, churchState, 
         <div style={{ marginBottom: 16 }}>
           <CardFront id="wallet-pdf-front" {...cardProps} qrValue="" pdfQrPlaceholder={pdfQrPlaceholder} />
         </div>
-        <CardBack id="wallet-pdf-back" {...{ member, churchName }} />
+        <CardBack id="wallet-pdf-back" {...{ member, churchName, churchLogoUrl }} />
       </div>
 
       {/* Flip frente / verso */}
