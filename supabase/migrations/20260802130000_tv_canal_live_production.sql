@@ -320,6 +320,41 @@ USING (
 );
 -- Escrita só via log_camera_cut (RPC).
 
+-- A fundação histórica do staging expôs versões anteriores destas RPCs.
+-- Como funções RETURNS TABLE não aceitam alteração do row type via CREATE
+-- OR REPLACE, remova as RPCs recriadas nesta migration e a RPC órfã
+-- join_tv_studio_as_camera, que não pertence mais ao fluxo autorizado.
+DO $$
+DECLARE
+  v_rpc record;
+BEGIN
+  FOR v_rpc IN
+    SELECT p.oid::regprocedure::text AS function_identity
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.prokind = 'f'
+      AND p.proname IN (
+        'create_tv_studio_room',
+        'get_studio_cameras',
+        'log_camera_cut',
+        'list_active_productions',
+        'create_live_production',
+        'claim_production_director',
+        'join_production_as_camera',
+        'join_tv_studio_as_camera',
+        'disconnect_camera',
+        'director_heartbeat',
+        'update_camera_heartbeat',
+        'end_live_production',
+        'set_camera_on_air'
+      )
+  LOOP
+    EXECUTE format('DROP FUNCTION %s', v_rpc.function_identity);
+  END LOOP;
+END;
+$$;
+
 -- ── RPC: create_tv_studio_room ──────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.create_tv_studio_room(p_live_session_id uuid)
 RETURNS TABLE (studio_room_id uuid, room_name text)

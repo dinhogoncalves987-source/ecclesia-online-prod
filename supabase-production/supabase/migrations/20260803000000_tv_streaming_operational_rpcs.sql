@@ -43,6 +43,31 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_tv_live_sessions_active_channel
 ON public.tv_live_sessions (tv_channel_id)
 WHERE status_transmissao IN ('waiting', 'live');
 
+-- Remove versões operacionais antigas antes de instalar o contrato
+-- canônico. Isso permite corrigir RETURNS TABLE/RETURNS scalar sem depender
+-- de CREATE OR REPLACE para uma alteração que o PostgreSQL não suporta.
+DO $$
+DECLARE
+  v_rpc record;
+BEGIN
+  FOR v_rpc IN
+    SELECT p.oid::regprocedure::text AS function_identity
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.prokind = 'f'
+      AND p.proname IN (
+        'validate_and_start_tv_stream',
+        'stop_tv_stream_by_session',
+        'update_live_session_heartbeat',
+        'check_stale_tv_live_sessions'
+      )
+  LOOP
+    EXECUTE format('DROP FUNCTION %s', v_rpc.function_identity);
+  END LOOP;
+END;
+$$;
+
 -- ── RPC: validate_and_start_tv_stream ───────────────────────────────────────
 -- Chamada por validate-tv-stream-key (Edge Function, autenticada via segredo
 -- compartilhado MEDIAMTX_WEBHOOK_SECRET, não via auth.uid()). Só service_role
@@ -52,8 +77,6 @@ WHERE status_transmissao IN ('waiting', 'live');
 -- ter sido criada por create_live_production; esta RPC nunca inventa outra
 -- sessão. Isso garante que live/<liveSessionId> no RTMP, HLS e banco represente
 -- a mesma produção.
-DROP FUNCTION IF EXISTS public.validate_and_start_tv_stream(text, text, text, text);
-
 CREATE OR REPLACE FUNCTION public.validate_and_start_tv_stream(
   p_session_id uuid,
   p_stream_key_hash text,
@@ -215,6 +238,36 @@ $$;
 
 REVOKE ALL ON FUNCTION public.check_stale_tv_live_sessions() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.check_stale_tv_live_sessions() TO service_role;
+
+-- Compatibilidade controlada com eventual cron/Edge Function legado que
+-- ainda chame o nome antigo. A implementação anterior foi removida na
+-- fundação; esta versão canônica mantém o parâmetro de timeout, endurece o
+-- search_path e continua restrita ao service_role.
+CREATE OR REPLACE FUNCTION public.check_stale_live_sessions(
+  p_timeout_seconds integer DEFAULT 90
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_count integer;
+BEGIN
+  UPDATE public.tv_live_sessions
+  SET status_transmissao = 'error',
+      error_message = 'heartbeat_timeout: nenhum sinal da VPS dentro do limite configurado'
+  WHERE status_transmissao = 'live'
+    AND last_heartbeat_at IS NOT NULL
+    AND last_heartbeat_at < now() - make_interval(secs => GREATEST(p_timeout_seconds, 30));
+
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.check_stale_live_sessions(integer) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.check_stale_live_sessions(integer) TO service_role;
 
 DO $$
 DECLARE

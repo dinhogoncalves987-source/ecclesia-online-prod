@@ -772,6 +772,39 @@ CREATE INDEX idx_tv_view_events_session
 ALTER TABLE public.tv_view_events ENABLE ROW LEVEL SECURITY;
 -- Nenhuma policy: só a RPC track_tv_view_event (SECURITY DEFINER) grava.
 
+-- RPCs antigas podem ter os mesmos parâmetros e um ROW TYPE de retorno
+-- diferente. PostgreSQL não permite trocar esse retorno com CREATE OR
+-- REPLACE. Remova as RPCs que serão recriadas e os helpers órfãos da
+-- implementação revertida. DROP sem CASCADE falha com segurança caso exista
+-- alguma dependência SQL inesperada, em vez de removê-la silenciosamente.
+DROP TRIGGER IF EXISTS tv_live_sessions_auto_publish ON public.tv_live_sessions;
+
+DO $$
+DECLARE
+  v_rpc record;
+BEGIN
+  FOR v_rpc IN
+    SELECT p.oid::regprocedure::text AS function_identity
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.prokind = 'f'
+      AND p.proname IN (
+        'get_tv_schedule',
+        'get_current_tv_block',
+        'track_tv_view_event',
+        'generate_recurring_instances',
+        'is_tv_org_member',
+        'check_stale_live_sessions',
+        'tv_auto_publish_to_canal',
+        'get_tv_session_detail'
+      )
+  LOOP
+    EXECUTE format('DROP FUNCTION %s', v_rpc.function_identity);
+  END LOOP;
+END;
+$$;
+
 -- ── RPC: get_tv_schedule ────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.get_tv_schedule(
   p_channel_id uuid,

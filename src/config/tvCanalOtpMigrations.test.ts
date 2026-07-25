@@ -199,6 +199,7 @@ describe("Login por telefone/WhatsApp (Parte D) — contrato de segurança", () 
 describe("TV ↔ Canal — vínculo idempotente (Parte A + B, contrato §8)", () => {
   const foundation = () => read(`supabase/migrations/${TV_CANAL_FOUNDATION}`);
   const live = () => read(`supabase/migrations/${TV_CANAL_LIVE}`);
+  const operations = () => read(`supabase/migrations/${TV_STREAMING_OPERATIONS}`);
 
   it("reconcilia a fundação legada do staging sem apagar tabelas nem linhas", () => {
     const sql = foundation();
@@ -219,6 +220,24 @@ describe("TV ↔ Canal — vínculo idempotente (Parte A + B, contrato §8)", ()
     expect(foundationSql).toContain("'tv_view_events'");
     expect(liveSql).toContain("tablename IN ('tv_studio_rooms', 'tv_camera_sessions')");
     expect(liveSql).not.toMatch(/CREATE POLICY\s+\w+\s+ON\s+public\.tv_camera_sessions[\s\S]{0,100}TO\s+(?:PUBLIC|anon)/i);
+  });
+
+  it("remove versões legadas das RPCs antes de recriar contratos com novo retorno", () => {
+    const foundationSql = foundation();
+    const liveSql = live();
+    const operationsSql = operations();
+    for (const sql of [foundationSql, liveSql, operationsSql]) {
+      expect(sql).toContain("p.oid::regprocedure::text AS function_identity");
+      expect(sql).toContain("EXECUTE format('DROP FUNCTION %s', v_rpc.function_identity)");
+    }
+    expect(foundationSql).toContain("'get_tv_schedule'");
+    expect(foundationSql).toContain("DROP TRIGGER IF EXISTS tv_live_sessions_auto_publish");
+    expect(foundationSql).toContain("'tv_auto_publish_to_canal'");
+    expect(liveSql).toContain("'create_tv_studio_room'");
+    expect(liveSql).toContain("'join_tv_studio_as_camera'");
+    expect(operationsSql).toContain("'update_live_session_heartbeat'");
+    expect(operationsSql).toContain("CREATE OR REPLACE FUNCTION public.check_stale_live_sessions");
+    expect(operationsSql).toContain("GRANT EXECUTE ON FUNCTION public.check_stale_live_sessions(integer) TO service_role");
   });
 
   it("preserva o contrato legado útil e aceita os estados canônicos da direção", () => {
