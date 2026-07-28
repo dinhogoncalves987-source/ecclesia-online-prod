@@ -658,6 +658,355 @@ estava com RTMP/HLS confirmados e o Caddy já instalado (§22–24), **não foi 
   checkpoint inicial desta operação foi verificado por texto/transcript antes da indisponibilidade,
   mas o comando de criação da branch em si depende do shell).
 
+## 30. SONNET — Finalização do staging (continuação, pós-rotação do token)
+
+Sessão de continuação na branch `handoff/sonnet-staging-finalizacao-20260725`, após confirmação do
+usuário de que o Personal Access Token do Supabase exposto anteriormente **foi revogado e
+substituído**. Objetivo: concluir e comprovar TV Eclésia, Canal Eclésia, Chat e Login/OTP no
+staging, sem tocar em produção.
+
+### 30.1 Checkpoint e estado do branch
+
+- `git status --short --branch`: worktree limpo, branch `handoff/sonnet-staging-finalizacao-20260725`
+  com upstream configurado corretamente.
+- `git log -1`: `c9ae2a8 feat(secretaria): aprovar certificado e correcoes auditaveis` — **um commit
+  a mais** do que o esperado pelo checkpoint desta sessão (`9054568`). Esse commit foi aplicado por
+  outro processo/participante enquanto esta sessão estava pausada aguardando a rotação do token; não
+  foi tocado nesta sessão (inclui a migration `20260803110000_institutional_certificate_corrections.sql`,
+  explicitamente fora de escopo por instrução do usuário).
+- Nenhuma alteração local pendente foi perdida: todo o trabalho de código das seções anteriores
+  (§22–29) já estava commitado antes da pausa.
+
+### 30.2 MediaMTX — estabilidade
+
+- `docker compose ps` na VPS: `ecclesia-mediamtx` **Up 44–45 horas**, sem reinício, sem crash-loop,
+  usando a imagem fixada por digest (`bluenviron/mediamtx@sha256:08c837deb7...`).
+- Logs recentes mostram apenas tráfego de scanners externos (`invalid rtmp version`) e, após os
+  testes desta sessão, chamadas reais ao webhook de autenticação — nenhum vazamento de segredo nos
+  logs.
+
+### 30.3 Teste RTMP — autenticação dinâmica por webhook (real, executado)
+
+Testes executados via FFmpeg real, direto na VPS (`127.0.0.1:1935`), contra a autenticação HTTP
+dinâmica (`authHTTPAddress` → Edge Function `validate-tv-stream-key`) configurada nas seções
+anteriores:
+
+| Teste | Resultado | Evidência |
+|---|---|---|
+| Publish sem `user`/`pass` (anônimo) | **RECUSADO** | Log MediaMTX: `authentication failed: server replied with code 401: {"ok":false,"error":"missing_key"}` |
+| Publish com `user`/`pass` inválidos (chave inexistente no banco) | **RECUSADO** | Log MediaMTX: `authentication failed: server replied with code 401: {"ok":false}` |
+| Publish com chave **válida** (fluxo positivo) | **BLOQUEADO — não executado** | Ver §30.7 |
+
+Isso comprova, com evidência real de log (não apenas código lido), que o MediaMTX está de fato
+chamando a Edge Function a cada tentativa de publish e recusando corretamente os dois casos
+negativos, sem revelar detalhes do motivo da recusa a quem tenta publicar.
+
+### 30.4 Teste HLS — leitura pública sem autenticação
+
+`curl` local à VPS em `http://127.0.0.1:8888/live/<uuid-inexistente>/index.m3u8` retornou `302`
+(não `401`), confirmando que a ação de leitura (`read`) continua na lista `authHTTPExclude` e não
+passa pelo webhook de autenticação — ou seja, a leitura HLS permanece pública como projetado,
+independente da chave de publicação.
+
+### 30.5 DNS/HTTPS `live.ecclesiabr.online` — ainda bloqueado (inalterado)
+
+Reverificado nesta sessão: `getent hosts live.ecclesiabr.online` na VPS não resolve nada, e
+`curl https://live.ecclesiabr.online/` falha com `Couldn't resolve host` (curl exit 6). O domínio
+**continua sem apontar** para `134.209.208.169`. Isso é um bloqueio externo (DNS fora do controle
+deste agente) já registrado em sessão anterior e ainda não resolvido — Caddy já está instalado e
+configurado na VPS, pronto para emitir certificado assim que o DNS for corrigido.
+
+### 30.6 Bloqueio de acesso de escrita ao banco de staging
+
+Duas tentativas de obter uma via seguray de escrita direta no banco de staging para criar um
+`tv_live_session`/`tv_stream_key` de teste real (sem tocar em `.env*` nem revelar segredos):
+
+- `npx supabase db query --linked -f <script>.sql` → `401 Unauthorized`
+  (`LegacyDbConfigLoginRoleStatusError`).
+- `npx supabase db dump --linked ...` → mesmo erro `401` (`LegacyDbConfigLoginRoleStatusError`).
+
+Adicionalmente, **o token de acesso do CLI ficou totalmente inválido para a Management API** depois
+da rotação (confirmado com `npx supabase functions list` e `npx supabase secrets list`, ambos
+retornando `401 Unauthorized`). Isso significa que a CLI local não foi re-autenticada com o novo
+token após a revogação do antigo — bloqueio que **impediu qualquer nova chamada de Management API**
+nesta sessão (deploy de função, `secrets set`, `secrets list`, `db query`) a partir deste ponto. As
+seis alterações já publicadas em sessão anterior a este ponto (3 Edge Functions +
+`MEDIAMTX_WEBHOOK_SECRET` + `TV_HLS_PUBLIC_BASE_URL`) **permanecem ativas em staging** — apenas
+novas chamadas ficaram bloqueadas.
+
+**Ação necessária do usuário**: rodar `npx supabase login` (ou configurar `SUPABASE_ACCESS_TOKEN`)
+localmente com o novo token, fora deste chat, para desbloquear novas operações de Management API.
+
+### 30.7 Teste RTMP positivo (chave válida) — `IMPLEMENTADO, MAS NÃO HOMOLOGADO NO SERVIÇO REAL`
+
+Sem acesso a `service_role`, a credenciais de administrador de staging, a Docker local (para subir
+um Supabase descartável e testar via app real) ou a uma via de escrita direta no banco (§30.6), não
+foi possível criar com segurança um `tv_channel`/`tv_live_session`/`tv_stream_key` real de teste
+para exercitar o caminho **positivo** da autenticação (chave válida aceita, RTMP publica com
+sucesso, heartbeat atualiza, encerramento funciona). O código dos RPCs
+(`validate_and_start_tv_stream`, `update_live_session_heartbeat`, `stop_tv_stream_by_session`) e da
+Edge Function foi revisado e está logicamente correto, mas **este caminho permanece não homologado
+com um sinal RTMP real** nesta sessão. Não forjei dado nem declarei sucesso sem evidência.
+
+### 30.8 R2 e LiveKit — bloqueados pela mesma causa (§30.6)
+
+Auditoria de variáveis (`R2_*`, `LIVEKIT_*`) e teste de upload real ficaram bloqueados porque
+`secrets list`/qualquer chamada de Management API retorna `401` após a rotação do token. Estado:
+**IMPLEMENTADO (Edge Functions já publicadas em sessão anterior), MAS NÃO HOMOLOGADO NO SERVIÇO REAL
+nesta sessão** por indisponibilidade de acesso à Management API.
+
+### 30.9 Canal Eclésia — confirmação independente (sem mock)
+
+`rg canalMockData src` → **0 ocorrências** fora do próprio arquivo `src/lib/canalMockData.ts`
+(confirmado nesta sessão, reafirmando o resultado do §28).
+
+### 30.10 Chat/OTP — revisão de código e testes existentes
+
+- `supabase/migrations/20260802090000_internal_chat_identity_hardening.sql`: confirma, por leitura
+  direta do SQL, um **trigger de banco** (`_internal_threads_reject_self_conversation`,
+  `BEFORE INSERT/UPDATE ON internal_threads`) que rejeita com exceção
+  (`self_thread_not_allowed`) qualquer thread direta onde o membro selecionado seja igual ao usuário
+  autenticado que a está criando — bloqueio de auto-conversa aplicado no banco, não apenas no
+  frontend (não pode ser contornado por um cliente malicioso).
+- `src/lib/memberLoginOtp.ts`: revisado linha a linha. O fluxo de verificação
+  (`verifyMemberLoginOtp`) nunca monta uma sessão manualmente — sempre finaliza com
+  `supabase.auth.verifyOtp({ email, token_hash, type: "magiclink" })`, o SDK oficial. O teste manual
+  administrativo (`adminGenerateManualTestOtp`) exige a RPC `admin_generate_manual_test_otp`
+  (capability própria, `transport_mode = 'manual_test'`), gera um código por vez, e o código só é
+  retornado nesta resposta — nunca persistido em texto puro nem logado.
+- Testes automatizados relevantes já existentes e **passando** nesta sessão (ver §30.11):
+  `src/lib/memberLoginOtp.test.ts` (11 testes), `src/config/tvCanalOtpMigrations.test.ts`
+  (42 testes), `src/config/internalChatIdentityHardening` (coberto dentro da suíte de migrations).
+- Não foi enviado nenhum código real a nenhum membro nesta sessão; o transporte de WhatsApp
+  permanece desligado (`disabled`/`manual_test` apenas).
+
+### 30.11 Validação executada nesta sessão (resultados reais)
+
+| Comando | Resultado |
+|---|---|
+| `npx vitest run` | ✅ **60 arquivos de teste, 1051 testes — todos passando** |
+| `npx tsc --noEmit -p tsconfig.app.json` | ❌ **292 erros** — ver §30.12 (causa raiz identificada: `types.ts` desatualizado, não é bug de lógica) |
+| `npx eslint <29 arquivos alterados desde o checkpoint a78c992>` | ✅ **0 erros, 1 warning pré-existente** (fast-refresh, cosmético, em `CanalChannel.tsx`) |
+| `git diff --check` | ✅ sem saída (sem erro de whitespace; worktree sem diff pendente) |
+| `npm run build:staging` | ✅ **build concluído com sucesso** (`✓ built in 48.44s`, PWA gerado com 126 entradas) — exigiu definir em memória de processo (nunca gravado em arquivo) as variáveis não-secretas documentadas em `.env.staging.example` mas ausentes do `.env.staging` real local (`VITE_APP_ENV`, `SUPABASE_PRODUCTION_REF`, `SUPABASE_STAGING_REF`, `VITE_EXPECTED_SUPABASE_PROJECT_REF`, `OFFICIAL_PRODUCTION_DOMAIN`) — todos identificadores públicos de projeto, não segredos |
+| `npm run verify:production-bundle` | ✅ **"nenhum módulo staging-only encontrado no build de produção"** (rebuild de produção interno ao script, 83 arquivos verificados) |
+
+**Achado colateral**: o `.env.staging` real local está incompleto em relação ao seu próprio
+`.env.staging.example` (faltam `VITE_APP_ENV`, `SUPABASE_PRODUCTION_REF`, `SUPABASE_STAGING_REF`,
+`VITE_EXPECTED_SUPABASE_PROJECT_REF`, `OFFICIAL_PRODUCTION_DOMAIN`, `VITE_TV_HLS_BASE_URL`,
+`VITE_LIVEKIT_URL`, `VITE_R2_PUBLIC_URL`, `VITE_TV_RTMP_BASE_URL`) — provavelmente porque
+`scripts/check-environment.mjs` é um script novo (apareceu como `??` no `git status` desta operação)
+adicionado depois da última vez que alguém atualizou esse arquivo local. Nenhum arquivo `.env*` foi
+alterado nesta sessão; as variáveis ausentes foram apenas definidas em memória do processo do shell
+para permitir o teste de build, usando exclusivamente valores já documentados como públicos/não
+secretos no `.env.staging.example` versionado.
+
+### 30.12 `tsc` — causa raiz real dos 292 erros (não são bugs de lógica introduzidos nesta operação)
+
+Investigação confirmou que a esmagadora maioria dos erros de TypeScript vem de
+**`src/integrations/supabase/types.ts` desatualizado** em relação a migrations já existentes no
+repositório — algumas antigas (`20260616100000_administrative_requests.sql`), outras mais recentes
+(`20260802120000_tv_canal_foundation.sql`, `20260802130000_tv_canal_live_production.sql`). Exemplos
+confirmados por grep direto nas migrations (não suposição): as tabelas/RPCs `tv_live_sessions`,
+`administrative_requests`, `create_tv_studio_room`, `disconnect_camera`,
+`update_camera_heartbeat`, `track_tv_view_event`, `admin_set_platform_role` **existem de fato no
+banco** (via migration), mas **não aparecem em `types.ts`**, fazendo o compilador tratar essas
+tabelas/RPCs como inexistentes.
+
+Isso afeta tanto arquivos de escopo desta operação (`useLiveKitStudio.ts`, `useStudioCameras.ts`,
+`useTvViewer.ts`, `canalEcclesia.ts`, `cameraFailover.ts`, `TvStudioCamera.tsx`) quanto arquivos
+totalmente fora de escopo (`Membros.tsx`, `Oracoes.tsx`, `SolicitacoesAdministrativas.tsx`,
+`SuperAdmin.tsx`, `campaignImages.ts`) — confirmando que é um problema estrutural do repositório, não
+algo introduzido por esta sessão.
+
+**Importante**: como o Postgrest real conversa com o schema real do banco (não com `types.ts`), isso
+é um problema de **checagem estática apenas** — as chamadas devem funcionar em runtime — mas
+representa uma perda real de segurança de tipos que deveria ser corrigida antes de qualquer
+promoção. Não foi possível corrigir nesta sessão porque:
+- não há Docker disponível localmente para subir um Supabase descartável e rodar
+  `supabase gen types typescript --local` (caminho explicitamente sancionado pela instrução);
+- o acesso à Management API está bloqueado (§30.6), impedindo
+  `supabase gen types typescript --linked`;
+- **por instrução explícita, tipos não podem ser forjados manualmentre** — não foram feitas edições
+  manuais em `types.ts`.
+
+**Recomendação para o Codex/próxima sessão**: assim que a CLI for re-autenticada (§30.6), rodar
+`npx supabase gen types typescript --linked --project-id qkiiwopkbcslquyfhdec > src/integrations/supabase/types.ts`
+e then re-rodar `tsc` para confirmar se os 292 erros somem.
+
+### 30.13 Pendências reais ao final desta sessão
+
+1. DNS de `live.ecclesiabr.online` continua sem apontar para a VPS (bloqueio externo, fora do
+   controle deste agente).
+2. CLI do Supabase local precisa ser re-autenticada com o novo token (`npx supabase login`) para
+   desbloquear qualquer nova operação de Management API (funções, secrets, geração de tipos).
+3. `src/integrations/supabase/types.ts` precisa ser regenerado contra o schema real de staging
+   assim que a CLI for reautenticada (ou via Supabase local com Docker).
+4. Teste RTMP positivo (chave válida aceita) continua **IMPLEMENTADO, MAS NÃO HOMOLOGADO NO SERVIÇO
+   REAL** — requer uma via seguray de escrita no banco de staging (service role, admin de staging,
+   ou Supabase local) para criar um `tv_live_session`/`tv_stream_key` de teste.
+5. R2 (upload real) e LiveKit (sala/token real) continuam **IMPLEMENTADOS, MAS NÃO HOMOLOGADOS NO
+   SERVIÇO REAL** — bloqueados pela mesma causa do item 2.
+6. `.env.staging` local está incompleto frente ao seu próprio `.example` — recomenda-se completá-lo
+   fora deste chat (sem printar valores) para builds locais futuros não dependerem de variáveis
+   definidas manualmente em memória de processo.
+
+### 30.14 Regras respeitadas nesta sessão
+
+- Nenhum valor de arquivo `.env*` foi lido ou impresso neste chat (apenas nomes de variáveis, via
+  regex sobre nomes, nunca sobre valores).
+- Nenhum segredo apareceu em log, comando ou saída mostrada.
+- Nenhuma alteração em produção.
+- Nenhuma migration aplicada remotamente; nenhuma nova migration criada nesta sessão de
+  continuação (todas as migrations relevantes já existiam de sessões anteriores).
+- Nenhum deploy de Edge Function nesta sessão de continuação (bloqueado por §30.6; as publicações
+  já haviam ocorrido em sessão anterior).
+- Nenhum commit, push, PR ou deploy Vercel realizado.
+- Nenhuma mensagem/código OTP real enviado a membros; transporte de WhatsApp real permanece
+  desligado.
+
+---
+
+## 31. SONNET — Conclusão sem Management API (testes via aplicação real, chave pública anon)
+
+Sessão de continuação. Por instrução explícita do usuário, **nenhuma nova tentativa de
+`supabase login`/`logout`/`projects list` foi feita** nesta sessão (essas ações estão proibidas
+aqui). Toda a evidência abaixo foi obtida **através dos próprios fluxos da aplicação**, usando
+exclusivamente a chave pública `VITE_SUPABASE_PUBLISHABLE_KEY` (anon key, não-secreta, a mesma que o
+frontend já usa em produção/staging) — carregada silenciosamente em memória de processo a partir de
+`.env.staging` (nomes de variáveis lidos por regex; **nenhum valor foi impresso neste chat**), nunca
+via Management API, nunca via `service_role`.
+
+### 31.1 Git — preservação confirmada
+
+`git status --short --branch` no início desta sessão: worktree idêntico ao final da sessão anterior
+(apenas `docs/architecture/auditoria-tv-canal-chat-otp.md` modificado). `git log -1`: mesmo commit
+`c9ae2a8` — nada foi perdido, nenhuma alteração externa nova.
+
+### 31.2 MediaMTX / RTMP / HLS — reconfirmado nesta sessão (evidência fresca)
+
+- `docker compose ps`: `ecclesia-mediamtx` **Up 2 dias**, mesma imagem por digest, sem reinício.
+- Publish RTMP anônimo → **recusado**, log real: `authentication failed: server replied with code
+  401: {"ok":false,"error":"missing_key"}`.
+- Publish RTMP com chave inválida → **recusado**, log real: `authentication failed: server replied
+  with code 401: {"ok":false}`.
+- Leitura HLS sem autenticação → `302` (não `401`) — leitura pública confirmada novamente.
+- Container saudável após os testes.
+
+### 31.3 Descoberta nova: teste direto das Edge Functions via HTTPS (sem MediaMTX, sem sessão)
+
+Chamando cada função publicada diretamente por HTTPS com a anon key (sem `Authorization` de usuário
+autenticado, sem o segredo do webhook do MediaMTX), obtive evidência real e específica do estado de
+cada uma em staging:
+
+| Função | Status HTTP | Corpo da resposta | Interpretação |
+|---|---|---|---|
+| `validate-tv-stream-key` | `401` | `{"ok":false,"error":"unauthorized"}` | Publicada; recusa corretamente uma chamada sem o segredo do webhook (fail-closed confirmado por um segundo caminho, independente do MediaMTX) |
+| `update-tv-heartbeat` | `401` | `{"ok":false,"error":"unauthorized"}` | Publicada; mesmo fail-closed |
+| `get-r2-upload-url` | `503` | `{"ok":false,"error":"r2_not_configured"}` | **Publicada, mas R2 não está configurado em staging** (variáveis `R2_*` ausentes) — evidência direta e concreta, não suposição |
+| `create-livekit-room` | `401` | `{"error":"Autenticação necessária"}` | Publicada; exige JWT de usuário, como o código atual determina |
+| `create-livekit-token` | `200` | `{"mock":true,"token":null,"livekitUrl":null,"message":"LiveKit não configurado — modo demonstração ativo"}` | **ACHADO IMPORTANTE**: a versão publicada em staging é **mais antiga** que o código atual do repositório. O código atual (`supabase/functions/create-livekit-token/index.ts`) exige `studioRoomId`+`role` (400 se ausentes) e depois `Authorization: Bearer` (401 se ausente) **antes** de qualquer resposta — nunca devolveria um "mock" sem autenticação. A função publicada aceitou uma chamada vazia, sem autenticação, e devolveu 200 com um corpo simulado. **Precisa ser republicada em staging assim que a Management API for reautorizada.** |
+| `end-livekit-room` | `401` | `{"error":"Autenticação necessária"}` | Publicada; exige JWT, como esperado |
+| `verify-member-login-otp` | `404` | `{"code":"NOT_FOUND","message":"Requested function was not found"}` | **ACHADO IMPORTANTE**: esta função **não está publicada em staging**. O login por código está incompleto de ponta a ponta: o passo 1 (`request_member_login_otp`, RPC) funciona (ver §31.4), mas o passo 2 (verificar o código) não tem endpoint algum em staging hoje. |
+
+### 31.4 OTP — passo 1 testado ao vivo (RPC pública, chave anon)
+
+`public.request_member_login_otp(text)` tem `GRANT EXECUTE ... TO anon, authenticated` — pode ser
+chamada sem nenhuma sessão. Testes reais (dado de teste claramente fabricado, `+5500991234567`, DDD
+inexistente no Brasil — não corresponde a nenhum membro real):
+
+| Entrada | Resultado real |
+|---|---|
+| `"123"` (formato claramente inválido) | `{"ok":false,"error":"invalid_phone"}` |
+| `"+5500991234567"` (formato válido, sem membro correspondente) | `{"ok":false,"error":"member_not_found"}` |
+
+Nenhum membro real foi consultado por número real; nenhum OTP foi criado (a própria função nunca
+cria um desafio utilizável neste caminho, por design). **Resíduo não removível**: cada chamada grava
+uma linha em `member_otp_request_log` (número normalizado + resultado, para rate limit) — não há
+acesso de escrita ao banco nesta sessão para apagar essas 2 linhas; são inofensivas (número
+fabricado, sem nenhuma relação com pessoa real) e devem expirar/ser limpas em rotina futura de
+manutenção.
+
+`verify-member-login-otp` (passo 2) também foi chamada com dado fabricado (`phone: "+5500991234567",
+code: "000000"` e entrada malformada) — ambas retornaram `404 NOT_FOUND` porque a função **não está
+publicada** (ver §31.3), não porque a lógica rejeitou o código; portanto o passo 2 do login por
+código está **IMPLEMENTADO NO REPOSITÓRIO, MAS NÃO PUBLICADO EM STAGING**.
+
+### 31.5 Canal Eclésia — modelo de acesso confirmado (não é público)
+
+RLS de `ecclesia_channels`/`ecclesia_videos` concede `SELECT` apenas `TO authenticated` (nenhuma
+policy para `anon`) — confirmado por leitura direta da migration
+`20260802120000_tv_canal_foundation.sql`. Isso significa que o Canal Eclésia, no schema atual, é um
+**portal de membros autenticados por organização**, não uma vitrine pública tipo YouTube — visitante
+anônimo não lê nenhum vídeo/canal. Isso é consistente com o restante do produto (tudo dentro do
+`/admin`, escopo por organização) e não é uma falha; é uma característica do modelo atual que vale
+documentar explicitamente, pois não havia sido declarada antes.
+
+### 31.6 Único bloqueio real que permanece (não é diagnosticado de novo — apenas herdado)
+
+Os itens abaixo dependem de uma sessão autenticada com capability real (`tv.manage`,
+`tv.live_operate`, `canal.manage`) **ou** de acesso à Management API/`service_role` para provisionar
+um dado de teste (`tv_live_session`+`tv_stream_key` reais, ou um usuário de teste já vinculado a uma
+organização com a capability certa). Nenhuma rota de autoatendimento do produto permite obter isso
+sem convite tokenizado ou papel de super-admin (`Signup.tsx` cria um `auth.users` sem nenhuma
+organização; não existe RPC de auto-registro de organização; `join_organization_by_slug` aberto foi
+removido por segurança em `20260715141000_remove_open_slug_join.sql`). Criar um usuário via
+autoatendimento também deixaria um `auth.users` órfão que não poderia ser removido sem
+`service_role` — por isso essa via não foi usada.
+
+Isso é **um único bloqueio, com uma única causa raiz** (falta de acesso de escrita/administração no
+staging), que afeta os seguintes itens do pedido, todos permanecendo
+**IMPLEMENTADOS, MAS NÃO HOMOLOGADOS NO SERVIÇO REAL**:
+- RTMP com chave válida aceita (precisa de um `tv_stream_key` real).
+- Heartbeat/encerramento de transmissão de ponta a ponta (depende do publish válido acima).
+- Upload real no R2 (bloqueado adicionalmente por `r2_not_configured`, ver §31.3 — duplo bloqueio:
+  faltam segredos `R2_*` em staging **e** uma sessão com capability `canal.manage`/`tv.manage`).
+- Criação/token/encerramento real de sala LiveKit com credenciais reais (a função de token também
+  precisa ser republicada, ver §31.3).
+
+Não voltarei a investigar a causa do bloqueio de credenciais nesta sessão, conforme instruído.
+
+### 31.7 Chat — revisão confirmada (sem nova sessão necessária, sem dado novo criado)
+
+Reconfirmado por leitura direta do SQL (sem necessidade de sessão autenticada): o trigger
+`_internal_threads_reject_self_conversation` em `internal_threads` (BEFORE INSERT/UPDATE) continua
+presente e é a barreira real contra autoconversa — nenhuma alteração necessária, nenhum teste ao
+vivo adicional possível sem uma sessão autenticada real de dois membros distintos (que exigiria
+credenciais que não tenho).
+
+### 31.8 Validação executada nesta sessão (nova rodada completa)
+
+| Comando | Resultado |
+|---|---|
+| `npx vitest run` | ✅ 60 arquivos, **1051 testes passando** |
+| `npx tsc --noEmit -p tsconfig.app.json` | ❌ **292 erros, idêntico ao número da sessão anterior** — mesma causa raiz já documentada (§30.12, `types.ts` desatualizado); nenhuma regressão nova |
+| `npx eslint <23 arquivos alterados>` | ✅ 0 erros, 1 warning pré-existente (cosmético) |
+| `git diff --check` | ✅ sem saída |
+| `npm run build:staging` | ✅ `built in 35.20s`, PWA com 126 entradas |
+| `npm run verify:production-bundle` | ✅ "nenhum módulo staging-only encontrado no build de produção" |
+
+### 31.9 Dados temporários criados nesta sessão e status de remoção
+
+| Dado | Onde | Removido? |
+|---|---|---|
+| 2 linhas em `member_otp_request_log` (telefone fabricado `+5500991234567`, sem membro correspondente) | Banco de staging | **Não** — sem acesso de escrita ao banco nesta sessão; inofensivo (não corresponde a pessoa real) |
+| Scripts temporários `scripts/_tmp-otp-test.mjs`, `scripts/_tmp-otp-verify-test.mjs`, `scripts/_tmp-fn-probe.mjs` | Worktree local | **Sim** — apagados ao final de cada teste, nunca commitados |
+
+Nenhum `tv_channel`, `tv_live_session`, `tv_stream_key`, sala LiveKit, objeto R2, canal ou vídeo do
+Canal, ou thread de chat foi criado nesta sessão (todos dependiam do bloqueio de §31.6).
+
+### 31.10 Git status final desta sessão
+
+```
+## handoff/sonnet-staging-finalizacao-20260725...origin/handoff/sonnet-staging-finalizacao-20260725
+ M docs/architecture/auditoria-tv-canal-chat-otp.md
+```
+
+Nenhum commit, push, PR ou deploy Vercel. Nenhuma alteração em produção, em certificado, carteira ou
+na migration `20260803110000`. Nenhum segredo impresso ou gravado nesta sessão.
+
+---
+
 Todo o trabalho de código (Edge Functions, migration nova, correções de frontend, remoção de mock)
 foi feito e salvo em disco via ferramentas de arquivo (Read/Write/StrReplace/Grep), que não
 dependem do shell e continuaram funcionando normalmente — mas **nenhum destes itens foi
