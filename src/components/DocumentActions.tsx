@@ -85,6 +85,47 @@ function downloadBlob(blob: Blob, fileName: string) {
   URL.revokeObjectURL(url);
 }
 
+function createPdfFile(blob: Blob, fileName: string) {
+  return new File([blob], fileName, {
+    type: blob.type || "application/pdf",
+    lastModified: Date.now(),
+  });
+}
+
+function canShareFile(file: File) {
+  if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
+    return false;
+  }
+
+  if (typeof navigator.canShare !== "function") {
+    return true;
+  }
+
+  try {
+    return navigator.canShare({ files: [file] });
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Compartilha somente o arquivo. Alguns destinos do Windows/Android deixam de
+ * aceitar o PDF quando texto ou URL são enviados junto no mesmo payload.
+ * A escolha do aplicativo (WhatsApp, WhatsApp Business, Telegram etc.) é
+ * sempre feita pelo sistema operacional.
+ */
+async function sharePdfFile(file: File, title: string) {
+  if (!canShareFile(file)) return "unsupported" as const;
+
+  try {
+    await navigator.share({ files: [file], title });
+    return "shared" as const;
+  } catch (err) {
+    if ((err as DOMException)?.name === "AbortError") return "cancelled" as const;
+    return "failed" as const;
+  }
+}
+
 export function DocumentActions({
   actions = DEFAULT_ACTIONS,
   className,
@@ -144,19 +185,11 @@ export function DocumentActions({
       await withGenerating(async () => {
         const result = await onGeneratePdfBlob();
         if (result) {
-          const pdfFile = new File([result.blob], result.fileName, { type: "application/pdf" });
-          const canShareFiles =
-            typeof navigator.canShare === "function" && navigator.canShare({ files: [pdfFile] });
-
-          if (canShare && canShareFiles) {
-            try {
-              await navigator.share({ title: shareTitle, text: shareText, files: [pdfFile] });
-              return;
-            } catch (err) {
-              // Usuário cancelou → não mostrar erro
-              if ((err as DOMException)?.name === "AbortError") return;
-            }
-          }
+          const shareResult = await sharePdfFile(
+            createPdfFile(result.blob, result.fileName),
+            shareTitle,
+          );
+          if (shareResult === "shared" || shareResult === "cancelled") return;
 
           // Fallback: baixar PDF + copiar link de validação
           downloadBlob(result.blob, result.fileName);
@@ -164,8 +197,9 @@ export function DocumentActions({
             try { await navigator.clipboard.writeText(shareUrl); } catch { /* sem permissão */ }
           }
           toast.info(
-            "Seu navegador não permite compartilhar arquivos diretamente. " +
-            "O PDF foi baixado. O link de validação foi copiado."
+            shareUrl
+              ? "O PDF foi baixado e o link foi copiado. Escolha o arquivo na pasta Downloads para enviá-lo."
+              : "O PDF foi baixado. Escolha o arquivo na pasta Downloads para enviá-lo."
           );
           return;
         }
@@ -182,6 +216,15 @@ export function DocumentActions({
       try {
         await navigator.share({ title: shareTitle, text: shareText || shareTitle, url: shareUrl ?? window.location.href });
       } catch { /* cancelado */ }
+      return;
+    }
+
+    const fallbackText = [shareText || shareTitle, shareUrl].filter(Boolean).join("\n");
+    try {
+      await navigator.clipboard.writeText(fallbackText);
+      toast.success("Conteúdo copiado. Agora cole no aplicativo em que deseja compartilhar.");
+    } catch {
+      toast.error("Este navegador não oferece compartilhamento. Use o botão PDF para baixar o documento.");
     }
   };
 
@@ -199,20 +242,11 @@ export function DocumentActions({
         const result = await onGeneratePdfBlob();
 
         if (result) {
-          const pdfFile = new File([result.blob], result.fileName, { type: "application/pdf" });
-          const canShareFiles =
-            typeof navigator.canShare === "function" && navigator.canShare({ files: [pdfFile] });
-
-          if (canShare && canShareFiles) {
-            // Mobile com suporte a arquivos: share nativo (usuário pode escolher WhatsApp)
-            try {
-              await navigator.share({ title: shareTitle, text: whatsappText || shareTitle, files: [pdfFile] });
-              return;
-            } catch (err) {
-              if ((err as DOMException)?.name === "AbortError") return;
-              // Falhou: continua para wa.me
-            }
-          }
+          const shareResult = await sharePdfFile(
+            createPdfFile(result.blob, result.fileName),
+            shareTitle,
+          );
+          if (shareResult === "shared" || shareResult === "cancelled") return;
 
           // Desktop / sem suporte a arquivos: baixar PDF primeiro
           downloadBlob(result.blob, result.fileName);
@@ -220,7 +254,7 @@ export function DocumentActions({
 
         // Abrir WhatsApp com mensagem + aviso do PDF
         const notice = result
-          ? "\n\nO PDF da Carteira de Membro foi baixado. Por favor, anexe o arquivo ao enviar."
+          ? "\n\nO PDF foi baixado. Anexe o arquivo da pasta Downloads antes de enviar."
           : "";
         const text = encodeURIComponent((whatsappText || shareTitle) + notice);
         const waUrl = whatsappPhone ? `https://wa.me/${whatsappPhone}?text=${text}` : `https://wa.me/?text=${text}`;
@@ -249,7 +283,7 @@ export function DocumentActions({
         if (result) downloadBlob(result.blob, result.fileName);
 
         const note = result
-          ? "\n\n[O PDF da Carteira de Membro foi baixado. Por favor, anexe o arquivo a este e-mail antes de enviar.]"
+          ? "\n\n[O PDF foi baixado. Anexe o arquivo da pasta Downloads antes de enviar.]"
           : "";
         const subject = encodeURIComponent(emailSubject);
         const body = encodeURIComponent((emailBody || shareText || shareTitle) + note);
@@ -263,10 +297,7 @@ export function DocumentActions({
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 
-  const shownActions = actions.filter((a) => {
-    if (a === "share" && !canShare) return false;
-    return true;
-  });
+  const shownActions = actions;
 
   const btnProps = { size, variant, disabled: generating } as const;
 
@@ -294,7 +325,7 @@ export function DocumentActions({
           className="gap-1.5 text-green-700 border-green-300 hover:bg-green-50 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-950/30"
         >
           {generating ? <Loader2 size={14} className="animate-spin" /> : <WhatsAppIcon size={14} />}
-          WhatsApp
+          WhatsApp / Business
         </Button>
       )}
 
