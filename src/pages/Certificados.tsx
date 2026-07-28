@@ -178,7 +178,7 @@ export default function Certificados() {
         />
       )}
       <Dialog open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)}>
-        <DialogContent className="max-w-7xl">
+        <DialogContent className="max-h-[96dvh] w-[calc(100vw-0.75rem)] max-w-7xl gap-3 overflow-y-auto p-3 sm:w-full sm:gap-4 sm:p-6">
           <DialogHeader><DialogTitle>{selected?.title}</DialogTitle><DialogDescription>Pré-visualização do documento oficial em formato A4 paisagem.</DialogDescription></DialogHeader>
           {selected && selected.status !== "revogado" && (
             <div className="flex justify-end">

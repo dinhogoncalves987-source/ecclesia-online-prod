@@ -88,6 +88,25 @@ describe("CertificateDocument", () => {
     );
     expect(container.querySelector("[data-ecclesia-symbol]")).toHaveTextContent("Ω");
     expect(container.querySelector("svg.lucide-flame")).not.toBeInTheDocument();
+    const ornaments = container.querySelectorAll("[data-certificate-ornament]");
+    expect(ornaments).toHaveLength(4);
+    ornaments.forEach((ornament) => {
+      expect(ornament.tagName).toBe("IMG");
+      expect(ornament.getAttribute("src")).toContain("data:image/svg+xml");
+    });
+    expect(container.querySelector("[data-certificate-preview-viewport]")).toHaveClass(
+      "overflow-hidden",
+    );
+    expect(container.querySelector("[data-certificate-preview-viewport]")).not.toHaveClass(
+      "overflow-x-auto",
+    );
+    expect(container.querySelector("[data-certificate-preview-frame]")).toHaveStyle({
+      width: "1120px",
+      height: "792px",
+    });
+    expect(container.querySelector("[data-official-document-canvas]")).toHaveStyle({
+      transform: "scale(1)",
+    });
   });
 
   it("mantém o mesmo número e sinaliza a revisão corrigida", () => {

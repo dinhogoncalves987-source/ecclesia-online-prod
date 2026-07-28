@@ -13,7 +13,30 @@ export async function generateOfficialDocumentPdf(
     import("jspdf"),
   ]);
 
-  const images = Array.from(element.querySelectorAll("img"));
+  // A pré-visualização pode estar reduzida no celular. A captura usa uma
+  // cópia isolada no tamanho original para manter A4 nítido e impedir que
+  // overflow/transform do modal corte ornamentos ou outros elementos.
+  const captureHost = document.createElement("div");
+  captureHost.setAttribute("aria-hidden", "true");
+  captureHost.style.position = "fixed";
+  captureHost.style.left = "-20000px";
+  captureHost.style.top = "0";
+  captureHost.style.width = `${element.offsetWidth || 1120}px`;
+  captureHost.style.height = `${element.offsetHeight || 792}px`;
+  captureHost.style.overflow = "visible";
+  captureHost.style.pointerEvents = "none";
+
+  const captureElement = element.cloneNode(true) as HTMLElement;
+  captureElement.id = `${elementId}-pdf-capture`;
+  captureElement.style.position = "relative";
+  captureElement.style.left = "0";
+  captureElement.style.top = "0";
+  captureElement.style.transform = "none";
+  captureElement.style.transformOrigin = "top left";
+  captureHost.appendChild(captureElement);
+  document.body.appendChild(captureHost);
+
+  const images = Array.from(captureElement.querySelectorAll("img"));
   await Promise.all(images.map((image) => {
     if (image.complete) return Promise.resolve();
     return new Promise<void>((resolve) => {
@@ -22,27 +45,33 @@ export async function generateOfficialDocumentPdf(
     });
   }));
 
-  const canvas = await html2canvas(element, {
-    scale: 2,
-    useCORS: true,
-    backgroundColor: "#ffffff",
-    logging: false,
-  });
-  const pdf = new jsPDF({ orientation, unit: "mm", format: "a4" });
-  const pageWidth = orientation === "landscape" ? 297 : 210;
-  const pageHeight = orientation === "landscape" ? 210 : 297;
-  const ratio = Math.min(pageWidth / canvas.width, pageHeight / canvas.height);
-  const width = canvas.width * ratio;
-  const height = canvas.height * ratio;
-  pdf.addImage(
-    canvas.toDataURL("image/png"),
-    "PNG",
-    (pageWidth - width) / 2,
-    (pageHeight - height) / 2,
-    width,
-    height,
-    undefined,
-    "FAST",
-  );
-  return { blob: pdf.output("blob"), fileName };
+  try {
+    if (document.fonts?.ready) await document.fonts.ready;
+
+    const canvas = await html2canvas(captureElement, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+    });
+    const pdf = new jsPDF({ orientation, unit: "mm", format: "a4" });
+    const pageWidth = orientation === "landscape" ? 297 : 210;
+    const pageHeight = orientation === "landscape" ? 210 : 297;
+    const ratio = Math.min(pageWidth / canvas.width, pageHeight / canvas.height);
+    const width = canvas.width * ratio;
+    const height = canvas.height * ratio;
+    pdf.addImage(
+      canvas.toDataURL("image/png"),
+      "PNG",
+      (pageWidth - width) / 2,
+      (pageHeight - height) / 2,
+      width,
+      height,
+      undefined,
+      "FAST",
+    );
+    return { blob: pdf.output("blob"), fileName };
+  } finally {
+    captureHost.remove();
+  }
 }

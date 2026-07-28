@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { BookOpen } from "lucide-react";
 import { DocumentActions } from "@/components/DocumentActions";
@@ -8,6 +9,9 @@ import {
 } from "@/lib/officialDocuments";
 
 type CertificateView = InstitutionalCertificate | PublicInstitutionalCertificate;
+
+const CERTIFICATE_WIDTH = 1120;
+const CERTIFICATE_HEIGHT = Math.round(CERTIFICATE_WIDTH * 210 / 297);
 
 export type CertificateBranding = {
   name?: string | null;
@@ -111,6 +115,30 @@ export function CertificateDocument({
       ? "Coordenador do Curso"
       : certificate.second_signer_role || "Secretaria da Igreja";
   const revision = "revision" in certificate ? certificate.revision : 1;
+  const previewViewportRef = useRef<HTMLDivElement>(null);
+  const [previewScale, setPreviewScale] = useState(1);
+
+  useEffect(() => {
+    const viewport = previewViewportRef.current;
+    if (!viewport) return;
+
+    const updateScale = () => {
+      const availableWidth = viewport.clientWidth;
+      if (availableWidth <= 0) return;
+      setPreviewScale(Math.min(1, availableWidth / CERTIFICATE_WIDTH));
+    };
+
+    updateScale();
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateScale);
+      return () => window.removeEventListener("resize", updateScale);
+    }
+
+    const observer = new ResizeObserver(updateScale);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -127,17 +155,31 @@ export function CertificateDocument({
         />
       )}
 
-      <div className="overflow-x-auto rounded-xl border bg-muted/20 p-2">
-        <article
-          id={documentId}
-          aria-label={`Certificado de ${certificate.recipient_name}`}
-          className="relative mx-auto aspect-[297/210] w-[1120px] max-w-none overflow-hidden bg-[#fbfaf3] text-[#0b2851] shadow-sm"
+      <div
+        ref={previewViewportRef}
+        data-certificate-preview-viewport
+        className="w-full overflow-hidden rounded-xl border bg-muted/20 p-1 sm:p-2"
+      >
+        <div
+          data-certificate-preview-frame
+          className="relative mx-auto"
           style={{
-            fontFamily: "Arial, Helvetica, sans-serif",
-            backgroundImage:
-              "radial-gradient(circle at 50% 45%, rgba(184,143,51,0.08), transparent 38%), linear-gradient(120deg, rgba(255,255,255,0.88), rgba(247,244,230,0.94))",
+            width: `${CERTIFICATE_WIDTH * previewScale}px`,
+            height: `${CERTIFICATE_HEIGHT * previewScale}px`,
           }}
         >
+          <article
+            id={documentId}
+            aria-label={`Certificado de ${certificate.recipient_name}`}
+            data-official-document-canvas
+            className="absolute left-0 top-0 aspect-[297/210] w-[1120px] max-w-none origin-top-left overflow-hidden bg-[#fbfaf3] text-[#0b2851] shadow-sm"
+            style={{
+              transform: `scale(${previewScale})`,
+              fontFamily: "Arial, Helvetica, sans-serif",
+              backgroundImage:
+                "radial-gradient(circle at 50% 45%, rgba(184,143,51,0.08), transparent 38%), linear-gradient(120deg, rgba(255,255,255,0.88), rgba(247,244,230,0.94))",
+            }}
+          >
           <div className="pointer-events-none absolute inset-[13px] border-2 border-[#b78b2e]" />
           <div className="pointer-events-none absolute inset-[23px] border-2 border-[#102e58]" />
 
@@ -265,7 +307,8 @@ export function CertificateDocument({
               </div>
             </footer>
           </div>
-        </article>
+          </article>
+        </div>
       </div>
     </div>
   );
@@ -335,25 +378,40 @@ function CornerOrnament({
 }) {
   const placement = {
     "top-left": "left-[32px] top-[30px]",
-    "top-right": "right-[32px] top-[30px] scale-x-[-1]",
-    "bottom-left": "bottom-[30px] left-[32px] scale-y-[-1]",
-    "bottom-right": "bottom-[30px] right-[32px] scale-[-1]",
+    "top-right": "right-[32px] top-[30px]",
+    "bottom-left": "bottom-[30px] left-[32px]",
+    "bottom-right": "bottom-[30px] right-[32px]",
   }[position];
 
+  const transform = {
+    "top-left": "",
+    "top-right": "translate(100 0) scale(-1 1)",
+    "bottom-left": "translate(0 100) scale(1 -1)",
+    "bottom-right": "translate(100 100) scale(-1 -1)",
+  }[position];
+  const groupTransform = transform ? ` transform="${transform}"` : "";
+  const ornamentSvg = [
+    '<svg xmlns="http://www.w3.org/2000/svg" width="82" height="82" viewBox="0 0 100 100" fill="none">',
+    `<g${groupTransform} stroke="#b78b2e">`,
+    '<path d="M10 91C20 56 46 28 90 10" stroke-width="2.2" stroke-linecap="round"/>',
+    '<path d="M22 69C10 67 8 57 12 48C23 52 28 59 22 69Z" stroke-width="1.8"/>',
+    '<path d="M34 51C23 47 22 37 28 29C38 35 42 43 34 51Z" stroke-width="1.8"/>',
+    '<path d="M49 37C42 27 47 18 56 14C61 25 58 33 49 37Z" stroke-width="1.8"/>',
+    '<path d="M32 64C37 52 48 51 56 56C49 66 41 69 32 64Z" stroke-width="1.8"/>',
+    '<path d="M49 46C55 35 66 34 74 40C67 50 58 53 49 46Z" stroke-width="1.8"/>',
+    '<path d="M66 29C73 19 84 20 91 27C83 35 74 37 66 29Z" stroke-width="1.8"/>',
+    "</g></svg>",
+  ].join("");
+
   return (
-    <svg
+    <img
       aria-hidden="true"
-      viewBox="0 0 100 100"
-      className={`pointer-events-none absolute z-[2] size-[82px] text-[#b78b2e] ${placement}`}
-      fill="none"
-    >
-      <path d="M10 91C20 56 46 28 90 10" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-      <path d="M22 69C10 67 8 57 12 48C23 52 28 59 22 69Z" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M34 51C23 47 22 37 28 29C38 35 42 43 34 51Z" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M49 37C42 27 47 18 56 14C61 25 58 33 49 37Z" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M32 64C37 52 48 51 56 56C49 66 41 69 32 64Z" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M49 46C55 35 66 34 74 40C67 50 58 53 49 46Z" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M66 29C73 19 84 20 91 27C83 35 74 37 66 29Z" stroke="currentColor" strokeWidth="1.8" />
-    </svg>
+      alt=""
+      data-certificate-ornament={position}
+      width={82}
+      height={82}
+      src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(ornamentSvg)}`}
+      className={`pointer-events-none absolute z-[2] size-[82px] ${placement}`}
+    />
   );
 }
