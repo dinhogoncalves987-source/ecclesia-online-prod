@@ -141,6 +141,7 @@ export default function SolicitacoesAdministrativas() {
 
     if (error) {
       toast({ title: t("Erro ao carregar solicitações"), description: error.message, variant: "destructive" });
+      setLoading(false);
       return;
     }
     setRequests((data ?? []) as AdmRequest[]);
@@ -419,7 +420,7 @@ export default function SolicitacoesAdministrativas() {
 
       {/* Modal: Nova Solicitação */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-h-[90dvh] max-w-md overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{actionLabel}</DialogTitle>
           </DialogHeader>
@@ -478,7 +479,7 @@ export default function SolicitacoesAdministrativas() {
       {/* Modal: Detalhe da Solicitação */}
       <Dialog open={Boolean(detailRequest)} onOpenChange={(v) => !v && setDetailRequest(null)}>
         {detailRequest && (
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-h-[90dvh] max-w-md overflow-y-auto">
             <DialogHeader>
             <DialogTitle>{t(REQUEST_TYPE_LABELS[detailRequest.request_type])}</DialogTitle>
           </DialogHeader>

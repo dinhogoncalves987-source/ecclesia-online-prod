@@ -117,6 +117,7 @@ const ORG_SELECT = [
   "uses_intermediate_level", "uses_local_units",
   "has_operational_cashbox", "is_financially_autonomous",
   "financially_consolidates_to_id", "cnpj", "financial_policy_notes",
+  "short_name", "acronym", "pastor_president_name",
 ].join(",");
 
 function mapRowToChurch(org: Record<string, unknown>): Church {
@@ -156,6 +157,9 @@ function mapRowToChurch(org: Record<string, unknown>): Church {
     financially_consolidates_to_id:(org.financially_consolidates_to_id as string) ?? null,
     cnpj:                          (org.cnpj as string) ?? null,
     financial_policy_notes:        (org.financial_policy_notes as string) ?? null,
+    short_name:                    (org.short_name as string) ?? null,
+    acronym:                       (org.acronym as string) ?? null,
+    pastor_president_name:         (org.pastor_president_name as string) ?? null,
   };
 }
 
@@ -220,7 +224,7 @@ export function SupportContextProvider({ children }: { children: ReactNode }) {
           .eq("active", true)
           .maybeSingle();
         if (cancelled) return;
-        if (data) setActiveSupportOrg(mapRowToChurch(data as Record<string, unknown>));
+        if (data) setActiveSupportOrg(mapRowToChurch(data as unknown as Record<string, unknown>));
         else sessionStorage.removeItem(SUPPORT_ORG_KEY);
       } catch {
         sessionStorage.removeItem(SUPPORT_ORG_KEY);

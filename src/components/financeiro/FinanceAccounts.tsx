@@ -138,7 +138,7 @@ export function FinanceAccounts() {
   const { church } = useChurch();
   const { hasRole, hasCapability } = useRole();
   const canWriteFinance = hasCapability("finance.write")
-    || hasRole(["super_admin", "church_admin", "tesoureiro", "contador"]);
+    || hasRole(["super_admin", "church_admin", "tesoureiro"]);
   const fmt = (v: number) => formatFinanceCurrency(v, lang);
   const dateLoc = lang === "en" ? "en-US" : lang === "es" ? "es-MX" : "pt-BR";
   const [subTab, setSubTab] = useState<"payable" | "receivable">("payable");

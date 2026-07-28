@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      administrative_requests: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          id: string
+          internal_notes: string | null
+          member_id: string | null
+          organization_id: string
+          request_type: string
+          requester_name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          internal_notes?: string | null
+          member_id?: string | null
+          organization_id: string
+          request_type?: string
+          requester_name?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          internal_notes?: string | null
+          member_id?: string | null
+          organization_id?: string
+          request_type?: string
+          requester_name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "administrative_requests_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "administrative_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       access_invites: {
         Row: {
           accepted_at: string | null
@@ -963,6 +1023,86 @@ export type Database = {
         }
         Relationships: []
       }
+      group_messages: {
+        Row: {
+          author_user_id: string
+          body: string
+          created_at: string
+          group_id: string
+          id: string
+        }
+        Insert: {
+          author_user_id: string
+          body: string
+          created_at?: string
+          group_id: string
+          id?: string
+        }
+        Update: {
+          author_user_id?: string
+          body?: string
+          created_at?: string
+          group_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_messages_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schedule_assignments: {
+        Row: {
+          created_at: string
+          id: string
+          member_id: string
+          notes: string | null
+          role: string
+          schedule_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          member_id: string
+          notes?: string | null
+          role: string
+          schedule_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          member_id?: string
+          notes?: string | null
+          role?: string
+          schedule_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_assignments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_assignments_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schedules: {
         Row: {
           assigned_to: string | null
@@ -974,6 +1114,8 @@ export type Database = {
           notes: string | null
           organization_id: string
           schedule_date: string
+          schedule_time: string | null
+          status: string
           title: string
           updated_at: string
         }
@@ -987,6 +1129,8 @@ export type Database = {
           notes?: string | null
           organization_id: string
           schedule_date?: string
+          schedule_time?: string | null
+          status?: string
           title: string
           updated_at?: string
         }
@@ -1000,6 +1144,8 @@ export type Database = {
           notes?: string | null
           organization_id?: string
           schedule_date?: string
+          schedule_time?: string | null
+          status?: string
           title?: string
           updated_at?: string
         }
@@ -1251,6 +1397,7 @@ export type Database = {
           id: string
           is_visible: boolean | null
           organization_id: string
+          period: string | null
           starts_at: string | null
           title: string
           updated_at: string | null
@@ -1265,6 +1412,7 @@ export type Database = {
           id?: string
           is_visible?: boolean | null
           organization_id: string
+          period?: string | null
           starts_at?: string | null
           title: string
           updated_at?: string | null
@@ -1279,6 +1427,7 @@ export type Database = {
           id?: string
           is_visible?: boolean | null
           organization_id?: string
+          period?: string | null
           starts_at?: string | null
           title?: string
           updated_at?: string | null
@@ -2095,6 +2244,69 @@ export type Database = {
           },
         ]
       }
+      member_invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_user_id: string | null
+          congregation_id: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          invited_by: string | null
+          member_id: string
+          organization_id: string
+          role: string
+          sector_id: string | null
+          status: string
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_user_id?: string | null
+          congregation_id?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          member_id: string
+          organization_id: string
+          role?: string
+          sector_id?: string | null
+          status?: string
+          token?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_user_id?: string | null
+          congregation_id?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          member_id?: string
+          organization_id?: string
+          role?: string
+          sector_id?: string | null
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_invites_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_invites_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       members: {
         Row: {
           address: string | null
@@ -2153,6 +2365,7 @@ export type Database = {
           status: string
           street: string | null
           updated_at: string | null
+          user_id: string | null
           whatsapp: string | null
           zip_code: string | null
         }
@@ -2213,6 +2426,7 @@ export type Database = {
           status?: string
           street?: string | null
           updated_at?: string | null
+          user_id?: string | null
           whatsapp?: string | null
           zip_code?: string | null
         }
@@ -2273,6 +2487,7 @@ export type Database = {
           status?: string
           street?: string | null
           updated_at?: string | null
+          user_id?: string | null
           whatsapp?: string | null
           zip_code?: string | null
         }
@@ -6043,6 +6258,56 @@ export type Database = {
           },
         ]
       }
+      platform_support_audit_logs: {
+        Row: {
+          action: string
+          actor_platform_role: string | null
+          actor_user_id: string
+          created_at: string
+          entity_id: string | null
+          entity_table: string | null
+          id: string
+          metadata: Json | null
+          module_key: string | null
+          target_organization_id: string | null
+          ticket_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_platform_role?: string | null
+          actor_user_id: string
+          created_at?: string
+          entity_id?: string | null
+          entity_table?: string | null
+          id?: string
+          metadata?: Json | null
+          module_key?: string | null
+          target_organization_id?: string | null
+          ticket_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_platform_role?: string | null
+          actor_user_id?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_table?: string | null
+          id?: string
+          metadata?: Json | null
+          module_key?: string | null
+          target_organization_id?: string | null
+          ticket_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_support_audit_logs_target_organization_id_fkey"
+            columns: ["target_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       super_admins: {
         Row: {
           created_at: string | null
@@ -6063,7 +6328,26 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      member_directory: {
+        Row: {
+          administrative_role: string | null
+          baptized_at: string | null
+          city: string | null
+          congregation_id: string | null
+          email: string | null
+          full_name: string | null
+          id: string | null
+          joined_at: string | null
+          member_role: string | null
+          organization_id: string | null
+          phone: string | null
+          sector_id: string | null
+          state: string | null
+          status: string | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       admin_create_external_access_invite: {
@@ -6095,6 +6379,34 @@ export type Database = {
       admin_list_organization_access: {
         Args: { _target_organization_id: string }
         Returns: Json
+      }
+      accept_access_invite: {
+        Args: { _token: string }
+        Returns: Json
+      }
+      accept_member_invite: {
+        Args: { p_token: string; p_user_id: string }
+        Returns: Json
+      }
+      admin_set_platform_role: {
+        Args: { _new_role: string | null; _target_user_id: string }
+        Returns: Json
+      }
+      get_access_invite_by_token: {
+        Args: { _token: string }
+        Returns: Json
+      }
+      import_members_batch: {
+        Args: { p_organization_id: string; p_rows: Json }
+        Returns: Json
+      }
+      mark_internal_thread_delivered: {
+        Args: { _thread_id: string }
+        Returns: undefined
+      }
+      mark_internal_thread_read: {
+        Args: { _thread_id: string }
+        Returns: undefined
       }
       admin_revoke_access_invite: {
         Args: { _invite_id: string }

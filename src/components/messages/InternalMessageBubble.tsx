@@ -58,7 +58,8 @@ export function InternalMessageBubble({
     const result = await shareInternalMessage(message);
     if (result.ok && result.method === "clipboard") {
       toast({ title: t("Link copiado"), description: t("Cole em qualquer app para compartilhar.") });
-    } else if (!result.ok && result.error !== "cancelled") {
+    }
+    if ("error" in result && result.error !== "cancelled") {
       toast({
         title: t("Não foi possível compartilhar"),
         description: t("Seu navegador não tem suporte a compartilhamento nativo."),

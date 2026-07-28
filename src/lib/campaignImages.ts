@@ -128,7 +128,7 @@ export function mapCampaignTypeToCategory(type: string): CampaignImageCategory {
 
 /** Smarter category — title + description keywords override generic type mapping */
 export function inferCampaignImageCategory(
-  campaign: Pick<Campaign, "title" | "type" | "description">,
+  campaign: { title: string; type: string; description?: string },
 ): CampaignImageCategory {
   const title = campaign.title?.trim() ?? "";
   const description = campaign.description?.trim() ?? "";
@@ -180,7 +180,7 @@ function hashString(value: string): number {
 }
 
 function getCategoryImagePoolForCampaign(
-  campaign: Pick<Campaign, "title" | "type" | "description">,
+  campaign: { title: string; type: string; description?: string },
 ): string[] {
   const category = inferCampaignImageCategory(campaign);
   return resolveCategoryPool(category);
@@ -192,7 +192,7 @@ export function pickCoverManifestImage(type: string, seed: string): string | nul
 }
 
 export function pickCoverManifestImageForCampaign(
-  campaign: Pick<Campaign, "title" | "type" | "description">,
+  campaign: { title: string; type: string; description?: string },
   seed: string,
 ): string | null {
   const pool = getCategoryImagePoolForCampaign(campaign);
@@ -218,7 +218,7 @@ export function getLocalGalleryImages(
 }
 
 export function getLocalGalleryImagesForCampaign(
-  campaign: Pick<Campaign, "title" | "type" | "description">,
+  campaign: { title: string; type: string; description?: string },
   seed: string,
   maxSlots = 6,
   excludeUrl?: string | null,

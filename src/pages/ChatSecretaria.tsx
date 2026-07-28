@@ -169,7 +169,7 @@ export default function ChatSecretaria() {
     searchDebounce.current = setTimeout(async () => {
       setMemberSearching(true);
       const { data, error } = await supabase
-        .from("members")
+        .from("member_directory")
         .select("id, full_name, member_role")
         .eq("organization_id", church.id)
         .ilike("full_name", `%${memberSearch.trim()}%`)

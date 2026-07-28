@@ -91,7 +91,7 @@ export async function createMemberInvite(
   input: InviteCreateInput,
 ): Promise<{ data: InviteRecord | null; error: string | null }> {
   const { data, error } = await supabase
-    .from("member_invites" as never)
+    .from("member_invites")
     .insert({
       member_id:       input.memberId,
       organization_id: input.organizationId,
@@ -113,7 +113,7 @@ export async function getMemberInvites(
   memberId: string,
 ): Promise<{ data: InviteRecord[]; error: string | null }> {
   const { data, error } = await supabase
-    .from("member_invites" as never)
+    .from("member_invites")
     .select("id, token, member_id, organization_id, status, expires_at, created_at")
     .eq("member_id", memberId)
     .order("created_at", { ascending: false });
@@ -126,7 +126,7 @@ export async function getMemberInvites(
 
 export async function revokeMemberInvites(memberId: string): Promise<void> {
   await supabase
-    .from("member_invites" as never)
+    .from("member_invites")
     .update({ status: "revoked" })
     .eq("member_id", memberId)
     .eq("status", "pending");
@@ -202,7 +202,7 @@ async function fetchInviteByTokenOnce(
     return { data: null, error: "not_found", retriable: false };
   }
 
-  const result = normalizeRpcPayload(raw) as ({ ok: boolean; error?: string } & MemberInvitePublic) | null;
+  const result = normalizeRpcPayload(raw) as unknown as ({ ok: boolean; error?: string } & MemberInvitePublic) | null;
 
   if (!result) {
     console.error("[memberInvites] REST getInviteByToken unexpected response shape");

@@ -3,7 +3,6 @@ import {
   SeedGuardError,
   assertSafeToSeedStaging,
   extractProjectRefFromUrl,
-  // @ts-expect-error — módulo .mjs sem tipos declarados, consumido apenas em teste
 } from "../../scripts/lib/seedGuard.mjs";
 
 const STAGING_URL = "https://qkiiwopkbcslquyfhdec.supabase.co";

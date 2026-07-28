@@ -32,6 +32,7 @@ const ORG_SELECT = [
   "uses_intermediate_level", "uses_local_units",
   "has_operational_cashbox", "is_financially_autonomous",
   "financially_consolidates_to_id", "cnpj", "financial_policy_notes",
+  "short_name", "acronym", "pastor_president_name",
 ].join(",");
 
 function mapRow(org: Record<string, unknown>): Church {
@@ -70,6 +71,9 @@ function mapRow(org: Record<string, unknown>): Church {
     financially_consolidates_to_id:(org.financially_consolidates_to_id as string) ?? null,
     cnpj:                          (org.cnpj as string) ?? null,
     financial_policy_notes:        (org.financial_policy_notes as string) ?? null,
+    short_name:                    (org.short_name as string) ?? null,
+    acronym:                       (org.acronym as string) ?? null,
+    pastor_president_name:         (org.pastor_president_name as string) ?? null,
   };
 }
 
@@ -100,7 +104,7 @@ export function SupportOrganizationSelector({ open, onClose }: Props) {
     }
 
     const { data } = await dbQuery;
-    setResults((data ?? []).map((r) => mapRow(r as Record<string, unknown>)));
+    setResults((data ?? []).map((r) => mapRow(r as unknown as Record<string, unknown>)));
     setLoading(false);
   }, []);
 

@@ -150,7 +150,7 @@ async function fetchActiveOrganizations(
   }
 
   const { data, error } = await query;
-  return { organizations: (data || []) as OrganizationRow[], error };
+  return { organizations: (data || []) as unknown as OrganizationRow[], error };
 }
 
 export function ChurchProvider({ children }: { children: ReactNode }) {
@@ -270,7 +270,7 @@ export function ChurchProvider({ children }: { children: ReactNode }) {
     setChurch(activeChurch);
     setLoading(false);
     markBoot("church resolved");
-  }, [user, isPlatformUser, bootstrap, bootstrapLoading, bootstrapIsError, refetchBootstrap]);
+  }, [user, isPlatformUser, bootstrap, bootstrapLoading, bootstrapIsError]);
 
   useEffect(() => {
     fetchChurches();

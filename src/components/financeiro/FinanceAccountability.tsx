@@ -156,7 +156,7 @@ export function FinanceAccountability({ transactions }: Props) {
   const { t, lang } = useLanguage();
   const { church } = useChurch();
   const { hasRole, hasCapability } = useRole();
-  const canWriteFinance = hasCapability("finance.write") || hasRole(["super_admin", "church_admin", "tesoureiro", "contador"]);
+  const canWriteFinance = hasCapability("finance.write") || hasRole(["super_admin", "church_admin", "tesoureiro"]);
   const canApprove = hasCapability("finance.approve") || hasRole(["super_admin", "church_admin", "tesoureiro"]);
 
   const fmt = (v: number) => {

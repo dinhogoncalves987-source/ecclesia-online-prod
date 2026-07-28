@@ -1,7 +1,7 @@
 import { AdminLayout } from "@/components/AdminLayout";
 import { Heart, Plus, X, User, Clock, ChevronRight, Copy, Share2, CheckCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useChurch } from "@/hooks/useChurchContext";
@@ -44,7 +44,7 @@ export default function Oracoes() {
   const [filter, setFilter] = useState<"Todos" | "Ativo" | "Respondido">("Todos");
   const [markingAnswered, setMarkingAnswered] = useState(false);
 
-  const fetchRequests = async () => {
+  const fetchRequests = useCallback(async () => {
     if (!church) return;
     const { data, error } = await supabase
       .from("prayer_requests")
@@ -57,7 +57,7 @@ export default function Oracoes() {
     }
     setRequests((data as PrayerRequest[]) || []);
     setLoading(false);
-  };
+  }, [church, t, toast]);
 
   useEffect(() => {
     if (churchLoading) return;
@@ -66,13 +66,13 @@ export default function Oracoes() {
       return;
     }
     fetchRequests();
-  }, [church, churchLoading]);
+  }, [church, churchLoading, fetchRequests]);
 
   useEffect(() => {
-    if (!detailPrayer) return;
-    const updated = requests.find((r) => r.id === detailPrayer.id);
-    if (updated) setDetailPrayer(updated);
-    else setDetailPrayer(null);
+    setDetailPrayer((current) => {
+      if (!current) return current;
+      return requests.find((request) => request.id === current.id) ?? null;
+    });
   }, [requests]);
 
   const openDetail = (req: PrayerRequest) => setDetailPrayer(req);
@@ -131,7 +131,7 @@ export default function Oracoes() {
       description: description.trim() || null,
       is_private: isAnonymous,
       status: "Ativo",
-    } as Record<string, unknown>);
+    });
     if (error) {
       toast({ title: t("Erro"), description: error.message, variant: "destructive" });
       return;

@@ -121,6 +121,7 @@ export default function Documentos() {
 
   const handleDelete = async (id: string) => {
     if (!church) return;
+    if (!window.confirm(t("Remover este documento?"))) return;
     const { error } = await supabase
       .from("documents")
       .delete()

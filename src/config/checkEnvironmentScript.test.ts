@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-// @ts-expect-error — módulo .mjs sem tipos declarados, consumido apenas em teste
 import { runEnvironmentCheck } from "../../scripts/check-environment.mjs";
 
 const PROD_REF = "zsonukpxahaxffugavfu";

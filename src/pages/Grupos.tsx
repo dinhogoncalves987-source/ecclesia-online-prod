@@ -153,7 +153,7 @@ export default function Grupos() {
 
     if (group.leader_member_id) {
       const { data: leaderRow } = await supabase
-        .from("members")
+        .from("member_directory")
         .select("full_name")
         .eq("id", group.leader_member_id)
         .maybeSingle();
@@ -350,6 +350,7 @@ export default function Grupos() {
 
   const handleDelete = async (id: string) => {
     if (!church) return;
+    if (!window.confirm(t("Remover este grupo e seus vínculos?"))) return;
     const { error } = await supabase
       .from("groups")
       .delete()

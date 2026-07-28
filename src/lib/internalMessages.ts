@@ -372,7 +372,7 @@ async function enrichThreadParticipantNames(threads: InternalThread[]): Promise<
 
   if (memberIds.length > 0) {
     const { data: memberRows } = await supabase
-      .from("members")
+      .from("member_directory")
       .select("id, full_name, user_id")
       .in("id", memberIds);
 
@@ -492,7 +492,7 @@ export async function resolveMemberIdForUser(
   userId: string,
 ): Promise<string | null> {
   const { data } = await supabase
-    .from("members")
+    .from("member_directory")
     .select("id, user_id")
     .eq("organization_id", organizationId)
     .eq("user_id", userId)

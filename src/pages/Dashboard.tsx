@@ -87,7 +87,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { t, lang } = useLanguage();
   const { church, isMatriz } = useChurch();
-  const { canonicalRole, isAdmin, isSuperAdmin, role } = useRole();
+  const { canonicalRole, isAdmin, isSuperAdmin, role, canAccess, capabilities } = useRole();
   const { isPlatformUser, isSupportModeActive, activeSupportOrg, platformRole } = useSupportContext();
   const isMembro = canonicalRole === "member" || canonicalRole === "leader" || role === "membro" || role === "lider" || role === "obreiro";
   const canViewPlatformCampaigns = isSuperAdmin || canonicalRole === "member";
@@ -148,6 +148,7 @@ export default function Dashboard() {
   ]);
   const [superMetrics, setSuperMetrics] = useState<{ churches: number; users: number } | null>(null);
   const [upcomingEvents, setUpcomingEvents] = useState<{ id: string; title: string; date: string; time: string | null }[]>([]);
+  const [loadWarning, setLoadWarning] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showQuickEventModal, setShowQuickEventModal] = useState(false);
   const [savingQuickEvent, setSavingQuickEvent] = useState(false);
@@ -171,6 +172,7 @@ export default function Dashboard() {
       }
 
       if (!church) { setLoading(false); return; }
+      setLoadWarning(null);
 
       const now = new Date();
       const year = now.getFullYear();
@@ -200,6 +202,14 @@ export default function Dashboard() {
       const eventsThisMonthRes = await runScopedOrganizationQuery<Array<{ id: string }>>("events", church.id, query =>
         query.select("id").gte("starts_at", `${startDate}T00:00:00`).lte("starts_at", `${endDate}T23:59:59`)
       );
+      const failedSections = [
+        txRes.error ? t("financeiro") : null,
+        membersRes.error ? t("membros") : null,
+        eventsRes.error || eventsThisMonthRes.error ? t("agenda") : null,
+      ].filter((section): section is string => Boolean(section));
+      if (failedSections.length > 0) {
+        setLoadWarning(`${t("Não foi possível carregar")}: ${failedSections.join(", ")}.`);
+      }
       const eventsCount = (eventsThisMonthRes.data || []).length;
 
       const dateLocale = lang === "en" ? "en-US" : lang === "es" ? "es-MX" : "pt-BR";
@@ -210,10 +220,10 @@ export default function Dashboard() {
       };
 
       setMetrics([
-        { title: t("Receita do Mês"), value: fmt(receita), trend: "", icon: Wallet, href: "/admin/financeiro" },
-        { title: t("Despesas do Mês"), value: fmt(despesa), trend: "", icon: TrendingUp, href: "/admin/financeiro" },
-        { title: t("Membros Ativos"), value: activeMembers.toString(), icon: Users, href: "/admin/membros" },
-        { title: t("Eventos no Mês"), value: eventsCount.toString(), icon: Calendar, href: "/admin/agenda" },
+        { title: t("Receita do Mês"), value: txRes.error ? "—" : fmt(receita), trend: "", icon: Wallet, href: "/admin/financeiro" },
+        { title: t("Despesas do Mês"), value: txRes.error ? "—" : fmt(despesa), trend: "", icon: TrendingUp, href: "/admin/financeiro" },
+        { title: t("Membros Ativos"), value: membersRes.error ? "—" : activeMembers.toString(), icon: Users, href: "/admin/membros" },
+        { title: t("Eventos no Mês"), value: eventsThisMonthRes.error ? "—" : eventsCount.toString(), icon: Calendar, href: "/admin/agenda" },
       ]);
 
       setUpcomingEvents((eventsRes.data || []).map(e => ({
@@ -240,9 +250,15 @@ export default function Dashboard() {
       toast.error(t("Erro ao salvar"), { description: t("Preencha título, data e horário inicial") });
       return;
     }
-    setSavingQuickEvent(true);
     const startsAt = `${quickEvent.date}T${quickEvent.startTime}:00`;
     const endsAt = quickEvent.endTime ? `${quickEvent.date}T${quickEvent.endTime}:00` : null;
+    if (endsAt && new Date(endsAt).getTime() <= new Date(startsAt).getTime()) {
+      toast.error(t("Erro ao salvar"), {
+        description: t("O horário final deve ser posterior ao horário inicial"),
+      });
+      return;
+    }
+    setSavingQuickEvent(true);
     const { error } = await insertWithOrganizationScope("events", church.id, {
       created_by: user.id,
       title: quickEvent.title.trim(),
@@ -464,14 +480,19 @@ export default function Dashboard() {
       )}
 
       {/* Church metrics */}
+      {loadWarning && (
+        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {loadWarning}
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {metrics.map((m, i) => (
+        {metrics.filter((metric) => canAccess(metric.href)).map((m, i) => (
           <ExecutiveCard key={m.title} {...m} index={i} />
         ))}
       </div>
 
       {/* Matriz consolidated panel */}
-      {false && isMatriz && isAdmin && <MatrizDashboard />}
+      {isMatriz && canAccess("/admin/congregacoes") && <MatrizDashboard />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Events - clickable */}
@@ -549,13 +570,13 @@ export default function Dashboard() {
             { label: t("Financeiro"), desc: t("Controle financeiro e relatórios"), path: "/admin/financeiro", icon: Wallet },
             { label: t("Membros"), desc: t("Cadastro e gestão de membros"), path: "/admin/membros", icon: Users },
             { label: t("Agenda"), desc: t("Calendário e eventos da igreja"), path: "/admin/agenda", icon: Calendar },
-            ...(isAdmin ? [{
+            ...(canAccess("/admin/congregacoes") ? [{
               label: structureNavLabel().label,
               desc: structureNavLabel().desc,
               path: "/admin/congregacoes",
               icon: Building2,
             }] : []),
-          ].map((item, i) => (
+          ].filter((item) => canAccess(item.path)).map((item, i) => (
             <Link key={item.path} to={item.path}>
               <motion.div
                 initial={{ opacity: 0 }}
@@ -588,7 +609,7 @@ export default function Dashboard() {
               {orgDashboardSubtitle()}
             </p>
           </div>
-          {isAdmin && (
+          {(isSuperAdmin || capabilities.has("agenda.write")) && (
             <div className="flex gap-2">
               {isSuperAdmin && (
                 <Link to="/admin/super-admin" className="inline-flex items-center gap-1.5 px-4 py-2 bg-secondary text-foreground rounded-lg text-sm font-medium hover:bg-secondary/80 transition-opacity">

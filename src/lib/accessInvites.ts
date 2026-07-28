@@ -142,7 +142,7 @@ export async function getAccessInviteByToken(token: string): Promise<{
 }> {
   const { data, error } = await supabase.rpc("get_access_invite_by_token", { _token: token });
   if (error) return { data: null, error: error.message };
-  const result = data as { ok: boolean; error?: string } & AccessInvitePublic;
+  const result = data as unknown as { ok: boolean; error?: string } & AccessInvitePublic;
   if (!result.ok) return { data: null, error: result.error ?? "Convite inválido" };
   return {
     data: {

@@ -188,9 +188,10 @@ export default function Escalas() {
     const summaryBySchedule = new Map<string, AssignmentSummary>();
 
     if (ids.length > 0) {
-      const { data: assignmentRows, error: assignError } = await (supabase as unknown as {
-        from: (table: string) => ReturnType<typeof supabase.from>;
-      }).from("schedule_assignments").select("schedule_id, status").in("schedule_id", ids);
+      const { data: assignmentRows, error: assignError } = await supabase
+        .from("schedule_assignments")
+        .select("schedule_id, status")
+        .in("schedule_id", ids);
 
       if (assignError) {
         setLoadError(true);
@@ -226,9 +227,9 @@ export default function Escalas() {
     setDetailAssignmentsLoading(true);
     setDetailAssignmentsError(false);
 
-    const { data, error } = await (supabase as unknown as {
-      from: (table: string) => ReturnType<typeof supabase.from>;
-    }).from("schedule_assignments").select("id, schedule_id, member_id, role, status, notes, members(full_name)")
+    const { data, error } = await supabase
+      .from("schedule_assignments")
+      .select("id, schedule_id, member_id, role, status, notes, members(full_name)")
       .eq("schedule_id", scheduleId)
       .order("role", { ascending: true });
 
@@ -260,7 +261,7 @@ export default function Escalas() {
     if (!church) return;
     setMembersLoading(true);
     const { data, error } = await supabase
-      .from("members")
+      .from("member_directory")
       .select("id, full_name")
       .eq("organization_id", church.id)
       .eq("status", "Ativo")
@@ -414,9 +415,7 @@ export default function Escalas() {
     if (!detailSchedule || !assignmentForm.member_id || !assignmentForm.role.trim()) return;
     setDetailActionError(null);
 
-    const { error } = await (supabase as unknown as {
-      from: (table: string) => ReturnType<typeof supabase.from>;
-    }).from("schedule_assignments").insert({
+    const { error } = await supabase.from("schedule_assignments").insert({
       schedule_id: detailSchedule.id,
       member_id: assignmentForm.member_id,
       role: assignmentForm.role.trim(),
@@ -441,9 +440,10 @@ export default function Escalas() {
     if (!window.confirm(t("Remover escalado"))) return;
     setDetailActionError(null);
 
-    const { error } = await (supabase as unknown as {
-      from: (table: string) => ReturnType<typeof supabase.from>;
-    }).from("schedule_assignments").delete().eq("id", assignmentId);
+    const { error } = await supabase
+      .from("schedule_assignments")
+      .delete()
+      .eq("id", assignmentId);
 
     if (error) {
       setDetailActionError(error.message);
@@ -459,9 +459,10 @@ export default function Escalas() {
     if (!detailSchedule || !canWrite) return;
     setDetailActionError(null);
 
-    const { error } = await (supabase as unknown as {
-      from: (table: string) => ReturnType<typeof supabase.from>;
-    }).from("schedule_assignments").update({ status }).eq("id", assignment.id);
+    const { error } = await supabase
+      .from("schedule_assignments")
+      .update({ status })
+      .eq("id", assignment.id);
 
     if (error) {
       setDetailActionError(error.message);

@@ -95,7 +95,7 @@ export function RecommendationLetterForm({
     searchDebounce.current = setTimeout(async () => {
       setMemberSearching(true);
       const { data, error } = await supabase
-        .from("members")
+        .from("member_directory")
         .select("id, full_name, member_role, administrative_role, email, phone, baptized_at, joined_at, city, state, congregation_id, status")
         .eq("organization_id", organizationId)
         .ilike("full_name", `%${memberSearch.trim()}%`)

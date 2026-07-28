@@ -143,7 +143,13 @@ const isMissingOrganizationColumn = (error: unknown) => {
 // here so no caller needs to use unsafe casts.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyQueryBuilder = any;
-type SupabaseResult<T> = PromiseLike<{ data: T | null; error: unknown }>;
+type ScopedQueryError = {
+  code?: string;
+  details?: string;
+  hint?: string;
+  message: string;
+};
+type SupabaseResult<T> = PromiseLike<{ data: T | null; error: ScopedQueryError | null }>;
 type FilterableResult<T> = SupabaseResult<T> & {
   eq: (column: string, value: string) => SupabaseResult<T>;
 };

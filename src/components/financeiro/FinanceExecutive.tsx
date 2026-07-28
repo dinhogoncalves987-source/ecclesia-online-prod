@@ -35,6 +35,7 @@ import { FinanceDetailModal } from "@/components/financeiro/FinanceDetailModal";
  */
 
 type HierarchyRow = { id: string; name: string; level: string; revenue: number; share: number };
+type CenterChartRow = { name: string; actual: number; budgeted: number; pct: number };
 type CenterRow = { name: string; revenue: number; goal: number; pct: number };
 
 function useHierarchyRevenue() {
@@ -222,8 +223,8 @@ export function FinanceExecutive({ onTabChange, transactions }: Props) {
                   name={t("Realizado")}
                   radius={[0, 4, 4, 0]}
                   cursor="pointer"
-                  onClick={(data: CenterRow) => setSelectedCenter({ name: data.name, revenue: data.actual, goal: data.budgeted, pct: data.pct })}
-                  onMouseEnter={(data: CenterRow) => setActiveBar(data.name)}
+                  onClick={(data: CenterChartRow) => setSelectedCenter({ name: data.name, revenue: data.actual, goal: data.budgeted, pct: data.pct })}
+                  onMouseEnter={(data: CenterChartRow) => setActiveBar(data.name)}
                   onMouseLeave={() => setActiveBar(null)}
                 >
                   {centerPerformance.map((entry) => (

@@ -815,6 +815,53 @@ export default function Membros() {
     }
   };
 
+  const removeUploadedMemberAssets = async (
+    memberId: string,
+    photoUrl: string | null,
+    civilDocumentUrl: string | null,
+  ) => {
+    const removals: Promise<unknown>[] = [];
+
+    if (photoFile && photoUrl) {
+      const photoPath = (() => {
+        try {
+          const url = new URL(photoUrl);
+          const marker = "/storage/v1/object/public/avatars/";
+          const markerIndex = url.pathname.indexOf(marker);
+          return markerIndex >= 0
+            ? decodeURIComponent(url.pathname.slice(markerIndex + marker.length))
+            : null;
+        } catch {
+          return null;
+        }
+      })();
+      if (photoPath) {
+        removals.push(supabase.storage.from("avatars").remove([photoPath]));
+      }
+    }
+
+    if (civilDocumentFile && civilDocumentUrl) {
+      removals.push(supabase.storage.from("member-documents").remove([civilDocumentUrl]));
+    }
+
+    if (removals.length > 0) {
+      await Promise.allSettled(removals);
+    }
+
+    const { error } = await supabase
+      .from("members")
+      .delete()
+      .eq("id", memberId)
+      .eq("organization_id", church?.id ?? "");
+
+    if (error) {
+      console.error("[Membros] failed to compensate incomplete member creation:", error.message);
+      toast.error(t("O cadastro não foi concluído e precisa de revisão administrativa."), {
+        description: t("Nenhum novo cadastro deve ser iniciado até esta pendência ser conferida."),
+      });
+    }
+  };
+
   const openCivilDocument = async () => {
   if (civilDocumentFile) {
     const localUrl = URL.createObjectURL(civilDocumentFile);
@@ -1223,16 +1270,15 @@ export default function Membros() {
         const photoUrl  = await uploadPhotoIfNeeded(newId);
         const civilDocumentUrl = await uploadCivilDocumentIfNeeded(newId);
         const allSaved = await saveFullMember(newId, photoUrl, civilDocumentUrl);
-        if (allSaved) {
-          toast.success(t("Membro cadastrado com sucesso!"));
-        } else {
-          toast.warning(t("O membro foi criado, mas os arquivos enviados precisam ser conferidos na edição."));
+        if (!allSaved) {
+          await removeUploadedMemberAssets(newId, photoUrl, civilDocumentUrl);
+          return;
         }
 
         // Família e endereços adicionados antes do membro existir ficaram em
-        // fila local (pendingFamilyEntries/pendingAddressEntries) — agora que
-        // o membro tem id, gravamos em lote. Falhas aqui não desfazem a
-        // criação do membro (best-effort, com aviso claro ao usuário).
+        // fila local (pendingFamilyEntries/pendingAddressEntries). Se qualquer
+        // parte falhar, compensamos o cadastro inteiro para não deixar uma
+        // ficha parcialmente gravada que pareça concluída na interface.
         if (pendingFamilyEntries.length > 0) {
           const { error: familyErr } = await supabase.from("member_family").insert(
             pendingFamilyEntries.map(entry => ({
@@ -1249,8 +1295,10 @@ export default function Membros() {
             })),
           );
           if (familyErr) {
-            console.warn("[Membros] pending family insert failed:", familyErr.message);
-            toast.warning(t("Membro criado, mas houve erro ao salvar os familiares. Adicione-os novamente editando o membro."));
+            console.error("[Membros] pending family insert failed:", familyErr.message);
+            await removeUploadedMemberAssets(newId, photoUrl, civilDocumentUrl);
+            toast.error(t("Cadastro cancelado porque os dados familiares não puderam ser salvos."));
+            return;
           }
         }
         if (pendingAddressEntries.length > 0) {
@@ -1272,11 +1320,14 @@ export default function Membros() {
             })),
           );
           if (addressErr) {
-            console.warn("[Membros] pending address insert failed:", addressErr.message);
-            toast.warning(t("Membro criado, mas houve erro ao salvar endereços adicionais. Adicione-os novamente editando o membro."));
+            console.error("[Membros] pending address insert failed:", addressErr.message);
+            await removeUploadedMemberAssets(newId, photoUrl, civilDocumentUrl);
+            toast.error(t("Cadastro cancelado porque os endereços não puderam ser salvos."));
+            return;
           }
         }
 
+        toast.success(t("Membro cadastrado com sucesso!"));
         await reloadMembers();
         if (openWallet) {
           const saved = members.find(m => m.id === newId) || { ...(form as Member), id: newId, photo_url: photoUrl, civil_document_url: civilDocumentUrl };
@@ -1351,36 +1402,77 @@ export default function Membros() {
   ];
 
   const memberTemplate = [
-    { name: "João Silva",  member_code: "0001", cpf: "000.000.000-01", phone: "(11) 99999-0001", role: "Diácono", email: "joao@email.com",  status: "Ativo" },
-    { name: "Maria Souza", member_code: "0002", cpf: "000.000.000-02", phone: "(11) 99999-0002", role: "Membro",  email: "maria@email.com", status: "Ativo" },
+    { name: "João Silva",  member_code: "0001", cpf: "529.982.247-25", phone: "(11) 99999-0001", role: "Diácono", email: "joao@email.com",  status: "Ativo" },
+    { name: "Maria Souza", member_code: "0002", cpf: "111.444.777-35", phone: "(11) 99999-0002", role: "Membro",  email: "maria@email.com", status: "Ativo" },
   ];
 
   const handleBulkImport = async (rows: Record<string, string>[]) => {
     if (!user || !church) return { success: 0, errors: 0 };
-    let success = 0, errors = 0;
-    for (const row of rows) {
-      if (!row.name || !row.cpf || !row.phone) { errors++; continue; }
-      const status = row.status && isMemberStatus(row.status) ? row.status : "Ativo";
-      const { error } = await insertWithOrganizationScope("members", church.id, {
-        created_by: user.id,
-        full_name: row.name,
-        member_code: row.member_code?.trim() || null,
-        member_role: row.role || "Membro",
-        cpf: row.cpf || null,
-        phone: row.phone || null,
-        email: row.email || null,
-        joined_at: new Date().toISOString().split("T")[0],
-        status,
+    if (rows.length === 0) return { success: 0, errors: 0 };
+
+    const { data: currentMembers, error: lookupError } = await supabase
+      .from("members")
+      .select("cpf")
+      .eq("organization_id", church.id)
+      .not("cpf", "is", null);
+
+    if (lookupError) {
+      toast.error(t("Não foi possível validar os CPFs antes da importação."), {
+        description: lookupError.message,
       });
-      if (error) {
-        console.warn("[Membros] bulk import row failed:", String((error as { message?: string }).message || ""));
-        errors++;
-      } else {
-        success++;
-      }
+      return { success: 0, errors: rows.length };
     }
-    if (success > 0) await reloadMembers();
-    return { success, errors };
+
+    const knownCpfs = new Set(
+      (currentMembers ?? [])
+        .map(member => (member.cpf ?? "").replace(/\D/g, ""))
+        .filter(Boolean),
+    );
+
+    const prepared: Record<string, string | null>[] = [];
+    for (const row of rows) {
+      if (!row.name?.trim() || !row.phone?.trim()) {
+        toast.error(t("Importação cancelada: todas as linhas precisam de nome, CPF e telefone."));
+        return { success: 0, errors: rows.length };
+      }
+
+      const cpfCheck = checkCpfForManualSave(row.cpf, knownCpfs);
+      if ("reason" in cpfCheck) {
+        toast.error(t("Importação cancelada: há CPF inválido ou repetido no arquivo."));
+        return { success: 0, errors: rows.length };
+      }
+      knownCpfs.add(cpfCheck.normalized);
+
+      prepared.push({
+        name: row.name.trim(),
+        member_code: row.member_code?.trim() || null,
+        cpf: cpfCheck.normalized,
+        phone: row.phone.trim(),
+        role: row.role?.trim() || "Membro",
+        email: row.email?.trim() || null,
+        status: row.status && isMemberStatus(row.status) ? row.status : "Ativo",
+      });
+    }
+
+    const { data, error } = await supabase.rpc("import_members_batch", {
+      p_organization_id: church.id,
+      p_rows: prepared,
+    });
+
+    if (error) {
+      console.error("[Membros] atomic bulk import failed:", error.message);
+      toast.error(t("A importação inteira foi cancelada; nenhum membro foi gravado."), {
+        description: error.message,
+      });
+      return { success: 0, errors: rows.length };
+    }
+
+    const result = data && typeof data === "object" && !Array.isArray(data)
+      ? data as { success?: number; errors?: number }
+      : {};
+    const success = result.success ?? prepared.length;
+    await reloadMembers();
+    return { success, errors: result.errors ?? 0 };
   };
 
   // ── Stats ────────────────────────────────────────────────────────────────────

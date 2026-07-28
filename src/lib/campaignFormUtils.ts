@@ -1,4 +1,5 @@
 import type { Campaign, CampaignPriority, CampaignType } from "@/lib/campaignsDemo";
+export type { CampaignPriority };
 
 export type CampaignDbStatus = "draft" | "active" | "paused" | "closed" | "archived";
 

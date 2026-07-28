@@ -127,7 +127,8 @@
     "20260802130000_tv_canal_live_production.sql",
     "20260803000000_tv_streaming_operational_rpcs.sql",
     "20260803110000_institutional_certificate_corrections.sql",
-    "20260803120000_member_schema_neutrality.sql"
+    "20260803120000_member_schema_neutrality.sql",
+    "20260803130000_gestao_release_security_convergence.sql"
   ],
   "staging_feature": [],
   "staging_only": [

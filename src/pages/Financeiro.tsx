@@ -59,6 +59,11 @@ export default function Financeiro() {
   const [transactions, setTransactions] = useState<TreasuryTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>(TABS[0]?.key ?? "treasury");
+  const navigateToTab = (tab: string) => {
+    if (ALL_TABS.some(candidate => candidate.key === tab)) {
+      setActiveTab(tab as TabKey);
+    }
+  };
 
   // ── Tab scroll state ────────────────────────────────────────────────────
   const tabsRef = useRef<HTMLDivElement>(null);
@@ -185,7 +190,7 @@ export default function Financeiro() {
         )}
         {/* Demais abas — todas lazy-loaded, todas com dados reais (Fases A-H). */}
         <Suspense fallback={null}>
-          {activeTab === "executive" && <FinanceExecutive onTabChange={setActiveTab} transactions={transactions} />}
+          {activeTab === "executive" && <FinanceExecutive onTabChange={navigateToTab} transactions={transactions} />}
           {activeTab === "tithes" && <FinanceTithesOfferings transactions={transactions} />}
           {activeTab === "campaigns" && <FinanceCampaigns />}
           {activeTab === "accounts" && <FinanceAccounts />}
@@ -193,7 +198,7 @@ export default function Financeiro() {
           {activeTab === "assets" && <FinanceAssets />}
           {activeTab === "accountability" && <FinanceAccountability transactions={transactions} />}
           {activeTab === "audit" && <FinanceAudit />}
-          {activeTab === "intelligence" && <FinanceIntelligence onTabChange={setActiveTab} transactions={transactions} />}
+          {activeTab === "intelligence" && <FinanceIntelligence onTabChange={navigateToTab} transactions={transactions} />}
         </Suspense>
       </div>
     </AdminLayout>

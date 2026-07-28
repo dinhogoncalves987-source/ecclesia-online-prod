@@ -56,6 +56,16 @@ function titleFromFileName(name: string): string {
   return name.replace(/\.[^.]+$/, "").trim() || name;
 }
 
+function storagePathFromValue(value: string | null): string | null {
+  if (!value) return null;
+  if (!/^https?:\/\//i.test(value)) return value;
+  const marker = "/storage/v1/object/public/assemblies/";
+  const markerIndex = value.indexOf(marker);
+  return markerIndex >= 0
+    ? decodeURIComponent(value.slice(markerIndex + marker.length))
+    : null;
+}
+
 function DescriptionContent({ text }: { text: string }) {
   const lines = text.split("\n");
   return (
@@ -86,9 +96,10 @@ function DescriptionContent({ text }: { text: string }) {
 export default function AssembleiaGeral() {
   const { user } = useAuth();
   const { church, loading: churchLoading } = useChurch();
-  const { isAdmin } = useRole();
+  const { hasCapability } = useRole();
   const { toast } = useToast();
   const { t, lang } = useLanguage();
+  const canManage = hasCapability("documents.write");
 
   const dateLoc = lang === "en" ? enUS : lang === "es" ? es : ptBR;
 
@@ -140,39 +151,48 @@ export default function AssembleiaGeral() {
     return !!attFile;
   };
 
-  const fetchAssemblies = async () => {
+  const fetchAssemblies = useCallback(async () => {
     if (!church) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("assemblies")
       .select("*")
       .eq("organization_id", church.id)
       .order("assembly_date", { ascending: false });
+    if (error) {
+      toast({ title: t("Erro ao carregar assembleias"), description: error.message, variant: "destructive" });
+      setLoading(false);
+      return;
+    }
     if (data) {
-      const filtered = isAdmin ? data : data.filter((a: Assembly) => a.is_visible);
+      const filtered = canManage ? data : data.filter((a: Assembly) => a.is_visible);
       setAssemblies(filtered as Assembly[]);
     }
     setLoading(false);
-  };
+  }, [canManage, church, t, toast]);
 
   useEffect(() => {
     if (churchLoading) return;
     if (!church) { setLoading(false); return; }
     fetchAssemblies();
-  }, [church, churchLoading, isAdmin]);
+  }, [church, churchLoading, fetchAssemblies]);
 
   useEffect(() => {
-    if (!detailAssembly) return;
-    const updated = assemblies.find((a) => a.id === detailAssembly.id);
-    if (updated) setDetailAssembly(updated);
-    else setDetailAssembly(null);
+    setDetailAssembly((current) => {
+      if (!current) return current;
+      return assemblies.find((assembly) => assembly.id === current.id) ?? null;
+    });
   }, [assemblies]);
 
   const fetchAttachments = async (assemblyId: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("assembly_attachments")
       .select("*")
       .eq("assembly_id", assemblyId)
       .order("created_at", { ascending: true });
+    if (error) {
+      toast({ title: t("Erro ao carregar anexos"), description: error.message, variant: "destructive" });
+      return;
+    }
     if (data) {
       setAttachments((prev) => ({ ...prev, [assemblyId]: data as Attachment[] }));
     }
@@ -239,7 +259,7 @@ export default function AssembleiaGeral() {
           assembly_date: formDate,
           youtube_url: formYoutube.trim() || null,
           is_visible: formIsVisible,
-        } as Record<string, unknown>)
+        })
         .eq("id", editingId)
         .eq("organization_id", church.id);
       if (error) {
@@ -261,7 +281,7 @@ export default function AssembleiaGeral() {
       assembly_date: formDate,
       youtube_url: formYoutube.trim() || null,
       is_visible: false,
-    } as Record<string, unknown>);
+    });
     if (error) {
       toast({ title: t("Erro"), description: error.message, variant: "destructive" });
       return;
@@ -288,6 +308,17 @@ export default function AssembleiaGeral() {
 
   const deleteAssembly = async (id: string) => {
     if (!church) return;
+    if (!window.confirm(t("Remover esta assembleia e todos os seus anexos?"))) return;
+
+    const { data: storedAttachments, error: attachmentsError } = await supabase
+      .from("assembly_attachments")
+      .select("file_url")
+      .eq("assembly_id", id);
+    if (attachmentsError) {
+      toast({ title: t("Erro"), description: attachmentsError.message, variant: "destructive" });
+      return;
+    }
+
     const { error } = await supabase
       .from("assemblies")
       .delete()
@@ -296,6 +327,20 @@ export default function AssembleiaGeral() {
     if (error) {
       toast({ title: t("Erro"), description: error.message, variant: "destructive" });
       return;
+    }
+
+    const paths = (storedAttachments ?? [])
+      .map((attachment) => storagePathFromValue(attachment.file_url))
+      .filter((path): path is string => Boolean(path));
+    if (paths.length > 0) {
+      const { error: storageError } = await supabase.storage.from("assemblies").remove(paths);
+      if (storageError) {
+        toast({
+          title: t("Assembleia removida"),
+          description: t("Os registros foram removidos, mas alguns arquivos exigem limpeza administrativa."),
+          variant: "destructive",
+        });
+      }
     }
     if (detailAssembly?.id === id) closeDetail();
     toast({ title: t("Assembleia removida") });
@@ -325,6 +370,7 @@ export default function AssembleiaGeral() {
     setUploading(true);
 
     let fileUrl: string | null = null;
+    let uploadedPath: string | null = null;
 
     if (attFile && attType !== "video") {
       const ext = attFile.name.split(".").pop();
@@ -337,8 +383,8 @@ export default function AssembleiaGeral() {
         setUploading(false);
         return;
       }
-      const { data: urlData } = supabase.storage.from("assemblies").getPublicUrl(path);
-      fileUrl = urlData.publicUrl;
+      uploadedPath = path;
+      fileUrl = path;
     }
 
     const { error } = await supabase.from("assembly_attachments").insert({
@@ -348,9 +394,12 @@ export default function AssembleiaGeral() {
       file_url: fileUrl,
       file_type: attFile ? attFile.name.split(".").pop() : null,
       youtube_url: attType === "video" ? attYoutube.trim() || null : null,
-    } as Record<string, unknown>);
+    });
 
     if (error) {
+      if (uploadedPath) {
+        await supabase.storage.from("assemblies").remove([uploadedPath]);
+      }
       toast({ title: t("Erro"), description: error.message, variant: "destructive" });
     } else {
       toast({ title: t("Anexo adicionado!") });
@@ -365,13 +414,46 @@ export default function AssembleiaGeral() {
   };
 
   const deleteAttachment = async (att: Attachment) => {
+    if (!window.confirm(t("Remover este anexo?"))) return;
     const { error } = await supabase.from("assembly_attachments").delete().eq("id", att.id);
     if (error) {
       toast({ title: t("Erro"), description: error.message, variant: "destructive" });
       return;
     }
+    const storagePath = storagePathFromValue(att.file_url);
+    if (storagePath) {
+      const { error: storageError } = await supabase.storage.from("assemblies").remove([storagePath]);
+      if (storageError) {
+        toast({
+          title: t("Anexo removido"),
+          description: t("O registro foi removido, mas o arquivo exige limpeza administrativa."),
+          variant: "destructive",
+        });
+      }
+    }
     toast({ title: t("Anexo removido") });
     fetchAttachments(att.assembly_id);
+  };
+
+  const openAttachment = async (att: Attachment) => {
+    if (!att.file_url) return;
+    const storagePath = storagePathFromValue(att.file_url);
+    if (!storagePath) {
+      window.open(att.file_url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    const { data, error } = await supabase.storage
+      .from("assemblies")
+      .createSignedUrl(storagePath, 60);
+    if (error || !data?.signedUrl) {
+      toast({
+        title: t("Erro ao abrir anexo"),
+        description: error?.message ?? t("Não foi possível gerar o acesso seguro."),
+        variant: "destructive",
+      });
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   };
 
   const getYoutubeEmbedUrl = (url: string) => {
@@ -516,15 +598,14 @@ export default function AssembleiaGeral() {
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
               {att.file_url && (
-                <a
-                  href={att.file_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => void openAttachment(att)}
                   className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-primary hover:bg-background transition-colors"
                 >
                   <Download size={14} />
                   <span className="hidden sm:inline">{t("Baixar")}</span>
-                </a>
+                </button>
               )}
               {att.youtube_url && (
                 <a
@@ -537,7 +618,7 @@ export default function AssembleiaGeral() {
                   <span className="hidden sm:inline">{t("Abrir vídeo")}</span>
                 </a>
               )}
-              {isAdmin && (
+              {canManage && (
                 <button
                   type="button"
                   onClick={() => deleteAttachment(att)}
@@ -573,7 +654,7 @@ export default function AssembleiaGeral() {
               shareText={t("Atas e registros das assembleias")}
               size="sm"
             />
-            {isAdmin && (
+            {canManage && (
               <button
                 onClick={openCreateForm}
                 className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
@@ -593,7 +674,7 @@ export default function AssembleiaGeral() {
             </div>
             <h3 className="font-serif text-lg font-semibold text-foreground mb-1">{t("Nenhuma assembleia registrada")}</h3>
             <p className="text-sm text-muted-foreground max-w-xs mb-5">{t("Registre assembleias gerais com atas, relatórios e vídeos para consulta da comunidade.")}</p>
-            {isAdmin && (
+            {canManage && (
               <button onClick={openCreateForm} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
                 <Plus size={16} />{t("Registrar Assembleia")}
               </button>
@@ -643,7 +724,7 @@ export default function AssembleiaGeral() {
                     )}
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    {isAdmin && (
+                    {canManage && (
                       <>
                         <button
                           onClick={(e) => { e.stopPropagation(); toggleVisibility(assembly); }}
@@ -734,7 +815,7 @@ export default function AssembleiaGeral() {
                     >
                       <Share2 size={14} /> {t("Compartilhar")}
                     </button>
-                    {isAdmin && (
+                    {canManage && (
                       <>
                         <button
                           type="button"
@@ -793,7 +874,7 @@ export default function AssembleiaGeral() {
                       <h3 className="text-sm font-semibold text-foreground">{t("Anexos e Documentos")}</h3>
                     </div>
                     <AnimatePresence>
-                      {showAttForm && isAdmin && (
+                      {showAttForm && canManage && (
                         <motion.div
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: "auto", opacity: 1 }}

@@ -6,6 +6,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 
 export type AuditAction =
   | "support_context_selected"
@@ -20,7 +21,14 @@ export type AuditAction =
   | "support_ticket_resolved"
   | "support_ticket_closed"
   | "platform_access_updated"
-  | "support_presence_changed";
+  | "support_presence_changed"
+  | "update_department"
+  | "create_department"
+  | "create_agent"
+  | "update_agent"
+  | "deactivate_agent"
+  | "resolve_ticket"
+  | "transfer_ticket";
 
 interface AuditPayload {
   action: AuditAction;
@@ -49,7 +57,7 @@ export async function logSupportAudit(payload: AuditPayload): Promise<void> {
       action:                 payload.action,
       entity_table:           payload.entityTable ?? null,
       entity_id:              payload.entityId ?? null,
-      metadata:               payload.metadata ?? null,
+      metadata:               (payload.metadata ?? null) as Json | null,
     });
   } catch {
     // Auditoria não deve quebrar o fluxo principal

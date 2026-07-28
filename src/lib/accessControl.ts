@@ -14,6 +14,7 @@ export const ACCESS_PERMISSION_KEYS = [
   "access.manage",
   "organization.manage",
   "members.read",
+  "members.sensitive.read",
   "members.write",
   "members.invite",
   // Acesso a ocorrências/histórico pastoral marcados como confidenciais
@@ -166,7 +167,7 @@ export const ACCESS_RESPONSIBILITIES: readonly AccessResponsibilityDefinition[] 
     description: "Opera membros, documentos, agenda, comunicação, solicitações e chat da secretaria.",
     category: "secretariat",
     permissions: [
-      "members.read", "members.write", "members.invite", "documents.read",
+      "members.read", "members.sensitive.read", "members.write", "members.invite", "documents.read",
       "documents.write", "agenda.read", "agenda.write", "communications.read",
       "communications.write", "requests.read", "requests.manage", "chat.secretaria",
     ],
@@ -179,7 +180,7 @@ export const ACCESS_RESPONSIBILITIES: readonly AccessResponsibilityDefinition[] 
     description: "Apoia a secretaria em membros, documentos, agenda e solicitações.",
     category: "secretariat",
     permissions: [
-      "members.read", "members.write", "members.invite", "documents.read",
+      "members.read", "members.sensitive.read", "members.write", "members.invite", "documents.read",
       "documents.write", "agenda.read", "agenda.write", "requests.read",
       "requests.manage", "chat.secretaria",
     ],
@@ -218,7 +219,7 @@ export const ACCESS_RESPONSIBILITIES: readonly AccessResponsibilityDefinition[] 
     label: "Operador de membros",
     description: "Trabalha exclusivamente no cadastro e na validação de membros.",
     category: "secretariat",
-    permissions: ["members.read", "members.write", "members.invite"],
+    permissions: ["members.read", "members.sensitive.read", "members.write", "members.invite"],
     inheritsToDescendants: false,
     governance: false,
   },
@@ -398,7 +399,7 @@ export const RESPONSIBILITY_CATEGORY_LABELS: Record<ResponsibilityCategory, stri
 
 export const ROUTE_ACCESS_PERMISSIONS: Partial<Record<string, AccessPermission>> = {
   "/admin/financeiro": "finance.read",
-  "/admin/membros": "members.read",
+  "/admin/membros": "members.sensitive.read",
   "/admin/grupos": "groups.read",
   "/admin/documentos": "documents.read",
   "/admin/gerenciar-acessos": "access.manage",

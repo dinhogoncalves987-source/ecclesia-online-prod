@@ -82,10 +82,13 @@ function resolveEventTimes(dateStr: string, startTimeRaw: string, endTimeRaw: st
   const startTime = normalizeTimeInput(startTimeRaw);
   if (!startTime) return null;
   const endTime = normalizeTimeInput(endTimeRaw) || addHoursToTime(startTime, 1);
-  return {
+  const result = {
     starts_at: buildIsoDateTime(dateStr, startTime),
     ends_at: buildIsoDateTime(dateStr, endTime),
   };
+  return new Date(result.ends_at).getTime() > new Date(result.starts_at).getTime()
+    ? result
+    : null;
 }
 
 function timeFromIso(iso: string): string {
@@ -295,7 +298,7 @@ export default function Agenda() {
     }
     const times = resolveEventTimes(newEvent.date, newEvent.startTime, newEvent.endTime);
     if (!times) {
-      toast.error(t("Erro ao salvar"), { description: t("Horário inicial inválido") });
+      toast.error(t("Erro ao salvar"), { description: t("O horário final deve ser posterior ao horário inicial") });
       return;
     }
     setSaving(true);
@@ -327,7 +330,7 @@ export default function Agenda() {
     if (!editingEvent || !church || !editForm.title.trim() || !editForm.date || !editForm.startTime) return;
     const times = resolveEventTimes(editForm.date, editForm.startTime, editForm.endTime);
     if (!times) {
-      toast.error(t("Erro ao salvar"), { description: t("Horário inicial inválido") });
+      toast.error(t("Erro ao salvar"), { description: t("O horário final deve ser posterior ao horário inicial") });
       return;
     }
     setSaving(true);

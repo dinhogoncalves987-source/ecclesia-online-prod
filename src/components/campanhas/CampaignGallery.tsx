@@ -56,7 +56,7 @@ function buildGalleryEntries(campaign: Campaign, media: CampaignMediaItem[]): Ga
       const url = resolveMediaItemUrl(item);
       return url && !url.endsWith(".svg") ? { url, originalUrl: url, mediaItem: item } : null;
     })
-    .filter((e): e is GalleryEntry => e !== null);
+    .filter((e): e is NonNullable<typeof e> => e !== null);
 
   if (realEntries.length > 0) return realEntries;
 

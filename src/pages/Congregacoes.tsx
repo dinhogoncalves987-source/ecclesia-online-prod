@@ -7,7 +7,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { getPublicAppUrl } from "@/lib/publicUrl";
-import { normalizeOrganizationType } from "@/lib/organizationHierarchy";
+import { normalizeOrganizationType, type OrgType } from "@/lib/organizationHierarchy";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import {
   AlertCircle,
@@ -264,7 +264,7 @@ function newUnitArticle(label: string): "Novo" | "Nova" {
 
 export default function Congregacoes() {
   const { user }                                     = useAuth();
-  const { isAdmin, hasCapability, loading: roleLoading } = useRole();
+  const { hasCapability, loading: roleLoading } = useRole();
   const { church, isMatriz, refetch: refetchChurch } = useChurch();
   const { t }                            = useLanguage();
   const navigate                         = useNavigate();
@@ -537,13 +537,14 @@ export default function Congregacoes() {
     if (!fraterna.name.trim() || !church?.id) return;
     setSavingFraterna(true);
     try {
-      await supabase.from("organization_affiliations" as never).insert({
+      const { error } = await supabase.from("organization_affiliations" as never).insert({
         organization_id:  church.id,
         name:             fraterna.name.trim(),
         description:      fraterna.description || null,
         affiliation_type: fraterna.affiliation_type || "fraterna",
         is_active:        true,
       } as never);
+      if (error) throw error;
       await loadFraternas();
       setShowFraterna(false);
       setFraterna({ name: "", description: "", affiliation_type: "fraterna" });
@@ -725,7 +726,12 @@ export default function Congregacoes() {
       .replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
   const insertOrganizationType = (overrideType?: OrgType): "international_convention" | "national_convention" | "state_convention" | "matriz" | "setor" | "subsede" | "congregacao" | null => {
-    if (overrideType) return overrideType;
+    if (overrideType) {
+      const normalized = normalizeOrganizationType(overrideType);
+      if (normalized === "convencao") return "state_convention";
+      if (normalized === "sede") return "matriz";
+      return normalized;
+    }
     if (isInternationalContext) {
       return church?.hierarchy_model === "international_flexible"
         ? "matriz"
@@ -790,6 +796,7 @@ export default function Congregacoes() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!window.confirm(t("Excluir esta unidade da estrutura?"))) return;
     const { error } = await supabase.from("organizations").delete().eq("id", id);
     if (error) toast({ title: t("Erro ao excluir"), description: error.message, variant: "destructive" });
     else { toast({ title: t("Unidade excluída.") }); void loadChildOrganizations(); }
@@ -909,7 +916,7 @@ export default function Congregacoes() {
   };
 
   // ── Guard ──────────────────────────────────────────────────────────────────
-  if (!roleLoading && !isAdmin) return <Navigate to="/admin" replace />;
+  if (!roleLoading && !canManageOrganizations) return <Navigate to="/admin" replace />;
 
   const showStructureConfig = (isMatriz || isConvencaoContext || isNationalContext) && canManageOrganizations;
 

@@ -257,7 +257,7 @@ export default function SuperAdmin() {
     });
 
     const noticesRes = await supabase.from("platform_announcements" as any).select("*").order("created_at", { ascending: false });
-    setNotices((noticesRes.data as PlatformNotice[]) || []);
+    setNotices((noticesRes.data as unknown as PlatformNotice[]) || []);
 
     setLoading(false);
   }, []);
@@ -271,7 +271,7 @@ export default function SuperAdmin() {
 
     if (!depts) { setDeptLoading(false); return; }
 
-    const deptsWithCounts = await Promise.all((depts as Department[]).map(async (d) => {
+    const deptsWithCounts = await Promise.all((depts as unknown as Department[]).map(async (d) => {
       const [agentsCount, ticketsCount] = await Promise.all([
         supabase.from("platform_support_agent_departments" as any)
           .select("id", { count: "exact", head: true }).eq("department_id", d.id),
@@ -302,7 +302,7 @@ export default function SuperAdmin() {
         .select("is_primary, department:platform_support_departments(*)")
         .eq("agent_user_id", p.user_id);
 
-      const deptData = (deptLinks || []) as { is_primary: boolean; department: Department }[];
+      const deptData = (deptLinks || []) as unknown as { is_primary: boolean; department: Department }[];
       const allDepts = deptData.map(d => d.department).filter(Boolean);
       const primaryDept = deptData.find(d => d.is_primary)?.department || allDepts[0] || null;
 
@@ -487,12 +487,22 @@ export default function SuperAdmin() {
     if (editingDept) {
       const { error } = await supabase.from("platform_support_departments" as any).update(payload as any).eq("id", editingDept.id);
       if (error) { toast.error(error.message); return; }
-      await logSupportAudit(user!.id, "update_department", null, null, "departments", { dept_id: editingDept.id, name: deptForm.name });
+      await logSupportAudit({
+        actorUserId: user!.id,
+        action: "update_department",
+        moduleKey: "departments",
+        metadata: { dept_id: editingDept.id, name: deptForm.name },
+      });
       toast.success(t("Departamento atualizado!"));
     } else {
       const { error } = await supabase.from("platform_support_departments" as any).insert(payload as any);
       if (error) { toast.error(error.message); return; }
-      await logSupportAudit(user!.id, "create_department", null, null, "departments", { slug, name: deptForm.name });
+      await logSupportAudit({
+        actorUserId: user!.id,
+        action: "create_department",
+        moduleKey: "departments",
+        metadata: { slug, name: deptForm.name },
+      });
       toast.success(t("Departamento criado!"));
     }
 
@@ -560,8 +570,11 @@ export default function SuperAdmin() {
       }
     }
 
-    await logSupportAudit(user!.id, "create_agent", null, null, "team", {
-      target_user_id: existing.user_id, role: agentForm.platform_role,
+    await logSupportAudit({
+      actorUserId: user!.id,
+      action: "create_agent",
+      moduleKey: "team",
+      metadata: { target_user_id: existing.user_id, role: agentForm.platform_role },
     });
 
     toast.success(`${t("Agente")} ${existing.full_name || agentForm.email} ${t("configurado com sucesso!")}`);
@@ -582,7 +595,12 @@ export default function SuperAdmin() {
     });
     const ok = (data as { ok?: boolean; error?: string } | null)?.ok;
     if (error || !ok) { toast.error(error?.message ?? (data as { error?: string } | null)?.error ?? t("Falha ao atualizar a função")); return; }
-    await logSupportAudit(user!.id, "update_agent", null, null, "team", { target_user_id: userId, new_role: newRole });
+    await logSupportAudit({
+      actorUserId: user!.id,
+      action: "update_agent",
+      moduleKey: "team",
+      metadata: { target_user_id: userId, new_role: newRole },
+    });
     toast.success(t("Função atualizada!"));
     loadAgents();
   };
@@ -595,7 +613,12 @@ export default function SuperAdmin() {
     const ok = (data as { ok?: boolean; error?: string } | null)?.ok;
     if (error || !ok) { toast.error(error?.message ?? (data as { error?: string } | null)?.error ?? t("Falha ao remover o agente")); return; }
     await supabase.from("platform_support_agent_departments" as any).delete().eq("agent_user_id", userId);
-    await logSupportAudit(user!.id, "deactivate_agent", null, null, "team", { target_user_id: userId });
+    await logSupportAudit({
+      actorUserId: user!.id,
+      action: "deactivate_agent",
+      moduleKey: "team",
+      metadata: { target_user_id: userId },
+    });
     toast.success(`${name || t("Agente")} ${t("removido da equipe da plataforma")}`);
     loadAgents();
   };
@@ -624,7 +647,12 @@ export default function SuperAdmin() {
       ticket_id: ticketId, actor_user_id: user!.id, event_type: "status_change",
       payload: { from: "in_progress", to: "resolved" },
     } as any);
-    await logSupportAudit(user!.id, "resolve_ticket", null, null, "chamados", { ticket_id: ticketId });
+    await logSupportAudit({
+      actorUserId: user!.id,
+      action: "resolve_ticket",
+      moduleKey: "chamados",
+      ticketId,
+    });
     toast.success(t("Chamado resolvido!"));
     loadTickets();
   };
@@ -644,8 +672,12 @@ export default function SuperAdmin() {
       ticket_id: transferModal.ticketId, actor_user_id: user!.id, event_type: "transfer",
       payload: { department_id: transferForm.department_id, note: transferForm.note },
     } as any);
-    await logSupportAudit(user!.id, "transfer_ticket", null, null, "chamados", {
-      ticket_id: transferModal.ticketId, to_dept: transferForm.department_id,
+    await logSupportAudit({
+      actorUserId: user!.id,
+      action: "transfer_ticket",
+      moduleKey: "chamados",
+      ticketId: transferModal.ticketId,
+      metadata: { to_dept: transferForm.department_id },
     });
     toast.success(t("Chamado transferido!"));
     setTransferModal(null);

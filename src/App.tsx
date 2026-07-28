@@ -47,7 +47,6 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 
 import SharePublic from "./pages/SharePublic";
-import ValidarMembro from "./pages/ValidarMembro";
 import ConviteMembro from "./pages/ConviteMembro";
 import ConviteAcesso from "./pages/ConviteAcesso";
 
@@ -193,7 +192,6 @@ const App = () => (
               <Route path="/validar/carta/:token" element={<ValidarCarta />} />
               <Route path="/validar/transferencia/:token" element={<ValidarTransferencia />} />
               <Route path="/validar/certificado/:token" element={<ValidarCertificado />} />
-              <Route path="/validar-membro/:id" element={<ValidarMembro />} />
               <Route path="/convite-membro/:token" element={<ConviteMembro />} />
               <Route path="/convite-acesso/:token" element={<ConviteAcesso />} />
 
