@@ -56,19 +56,6 @@ import NotFound from "./pages/NotFound";
 
 
 
-// FASE 6 (separação de bundle por build) — `import.meta.env.VITE_APP_ENV` é
-// substituído por um literal de string pelo próprio Vite em tempo de build
-// (mesmo mecanismo usado por `process.env.NODE_ENV` no ecossistema React
-// para eliminar código de dev em produção). Isso torna esta comparação uma
-// expressão constante ANTES do Rollup fazer o tree-shaking do módulo — nos
-// branches abaixo (`IS_STAGING_BUILD ? lazy(() => import(...)) : null`), o
-// branch morto (incluindo a chamada `import()`) nunca é adicionado ao grafo
-// de módulos de um build de produção, então o chunk correspondente nunca é
-// emitido em `dist/`. Ver scripts/verify-production-bundle.mjs (teste de
-// artefato que falha se algum desses chunks aparecer em produção) e
-// src/config/modules.ts (mesma allowlist, aplicada em runtime ao menu/rota).
-const IS_STAGING_BUILD = import.meta.env.VITE_APP_ENV === "staging";
-
 // Admin — lazy loaded (not needed until user navigates), sempre disponíveis
 // em produção e staging (allowlist urgente de produção — ver modules.ts).
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -113,8 +100,7 @@ const ModoPorteiro = lazy(() => import("./pages/ModoPorteiro"));
 // Bíblia/IA foi promovida para availability: "both" em src/config/modules.ts
 // (CORREÇÃO 2026-07-17 — não depende de nenhuma tabela/migration ainda não
 // promovida, é um chat de IA sem escrita no banco). Por isso é carregada
-// sempre, igual aos outros módulos "both" acima — nunca condicionada a
-// IS_STAGING_BUILD.
+// sempre, igual aos outros módulos "both" acima.
 const Biblia = lazy(() => import("./pages/Biblia"));
 
 // Culto & Louvor, Campanhas, Cartas de Recomendação e Relatórios foram
@@ -124,7 +110,7 @@ const Biblia = lazy(() => import("./pages/Biblia"));
 // e Relatorios.tsx já consulta members/transactions/events/prayer_requests/
 // groups/documents reais via runScopedOrganizationQuery — nenhum depende de
 // dado fictício para funcionar). Carregados sempre, iguais aos módulos
-// "both" acima — nunca condicionados a IS_STAGING_BUILD.
+// "both" acima.
 const CultoLouvor = lazy(() => import("./pages/CultoLouvor"));
 
 const CultoBiblioteca = lazy(() => import("./pages/culto/BibliotecaMusicas"));
@@ -141,38 +127,14 @@ const CartasRecomendacao = lazy(() => import("./pages/CartasRecomendacao"));
 
 const Relatorios = lazy(() => import("./pages/Relatorios"));
 
-// Marketplace e Comunidade permanecem staging-only de propósito: são telas
-// 100% de maquete (catálogo/feed fixos no código-fonte), sem nenhuma tabela
-// ou consulta real no Supabase — habilitá-las mostraria dado fictício para
-// igrejas reais. Ver src/config/modules.ts.
-const Marketplace = IS_STAGING_BUILD ? lazy(() => import("./pages/Marketplace")) : null;
-
-const Comunidade = IS_STAGING_BUILD ? lazy(() => import("./pages/Comunidade")) : null;
-
-// OPERAÇÃO 2 (Discipulado) — staging-only: as migrations discipleship_* AINDA
-// NÃO foram aplicadas em nenhum banco (ver
-// docs/architecture/operacao-2-discipulado.md). Mesma técnica de tree-shaking
-// condicional usada por Marketplace/Comunidade acima — o chunk da página não
-// é emitido no build de produção.
-const Discipulado = IS_STAGING_BUILD ? lazy(() => import("./pages/Discipulado")) : null;
-
-// OPERAÇÃO 3 (Teologia) — staging-only: as migrations theology_* AINDA NÃO
-// foram aplicadas em nenhum banco (ver docs/architecture/operacao-3-teologia.md).
-// Mesma técnica de tree-shaking condicional do Discipulado.
-const Teologia = IS_STAGING_BUILD ? lazy(() => import("./pages/Teologia")) : null;
-
-// OPERAÇÃO 4 (Missões) — staging-only: as migrations missions_* AINDA NÃO
-// foram aplicadas em nenhum banco (ver docs/architecture/operacao-4-missoes.md).
-// Mesma técnica de tree-shaking condicional do Discipulado/Teologia.
-const Missoes = IS_STAGING_BUILD ? lazy(() => import("./pages/Missoes")) : null;
-
-// OPERAÇÃO 5 (Documentos Oficiais) — staging-only durante homologação das
-// migrations 20260801*. Inclui Carta de Transferência, Central de
-// Certificados e as duas páginas públicas dos QR permanentes.
-const CartasTransferencia = IS_STAGING_BUILD ? lazy(() => import("./pages/CartasTransferencia")) : null;
-const Certificados = IS_STAGING_BUILD ? lazy(() => import("./pages/Certificados")) : null;
-const ValidarTransferencia = IS_STAGING_BUILD ? lazy(() => import("./pages/ValidarTransferencia")) : null;
-const ValidarCertificado = IS_STAGING_BUILD ? lazy(() => import("./pages/ValidarCertificado")) : null;
+// Funcionalidades fora desta release ficam desativadas IGUALMENTE nos dois
+// ambientes. O desenvolvimento continua em branch/preview própria.
+// Documentos oficiais foram homologados e acompanham a mesma release no
+// staging e na produção.
+const CartasTransferencia = lazy(() => import("./pages/CartasTransferencia"));
+const Certificados = lazy(() => import("./pages/Certificados"));
+const ValidarTransferencia = lazy(() => import("./pages/ValidarTransferencia"));
+const ValidarCertificado = lazy(() => import("./pages/ValidarCertificado"));
 
 // CORREÇÃO 2026-07-20: "devotional" foi promovido de volta para "both" em
 // src/config/modules.ts — a página pública de compartilhamento do
@@ -229,8 +191,8 @@ const App = () => (
 
               <Route path="/share" element={<SharePublic />} />
               <Route path="/validar/carta/:token" element={<ValidarCarta />} />
-              <Route path="/validar/transferencia/:token" element={ValidarTransferencia ? <ValidarTransferencia /> : <NotFound />} />
-              <Route path="/validar/certificado/:token" element={ValidarCertificado ? <ValidarCertificado /> : <NotFound />} />
+              <Route path="/validar/transferencia/:token" element={<ValidarTransferencia />} />
+              <Route path="/validar/certificado/:token" element={<ValidarCertificado />} />
               <Route path="/validar-membro/:id" element={<ValidarMembro />} />
               <Route path="/convite-membro/:token" element={<ConviteMembro />} />
               <Route path="/convite-acesso/:token" element={<ConviteAcesso />} />
@@ -271,9 +233,9 @@ const App = () => (
 
               <Route path="/admin/cartas-recomendacao" element={<ProtectedRoute><ModuleGate moduleId="recommendation-letters"><CartasRecomendacao /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/cartas-transferencia" element={<ProtectedRoute><ModuleGate moduleId="official-documents">{CartasTransferencia && <CartasTransferencia />}</ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/cartas-transferencia" element={<ProtectedRoute><ModuleGate moduleId="official-documents"><CartasTransferencia /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/certificados" element={<ProtectedRoute><ModuleGate moduleId="official-documents">{Certificados && <Certificados />}</ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/certificados" element={<ProtectedRoute><ModuleGate moduleId="official-documents"><Certificados /></ModuleGate></ProtectedRoute>} />
 
               <Route path="/admin/relatorios" element={<ProtectedRoute><ModuleGate moduleId="reports"><Relatorios /></ModuleGate></ProtectedRoute>} />
 
@@ -291,15 +253,15 @@ const App = () => (
 
               <Route path="/admin/configuracao-igreja" element={<ProtectedRoute><ConfiguracaoIgreja /></ProtectedRoute>} />
 
-              <Route path="/admin/marketplace" element={<ProtectedRoute><ModuleGate moduleId="marketplace">{Marketplace && <Marketplace />}</ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/marketplace" element={<ProtectedRoute><ModuleGate moduleId="marketplace"><NotFound /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/comunidade" element={<ProtectedRoute><ModuleGate moduleId="community">{Comunidade && <Comunidade />}</ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/comunidade" element={<ProtectedRoute><ModuleGate moduleId="community"><NotFound /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/discipulado" element={<ProtectedRoute><ModuleGate moduleId="discipleship">{Discipulado && <Discipulado />}</ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/discipulado" element={<ProtectedRoute><ModuleGate moduleId="discipleship"><NotFound /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/teologia" element={<ProtectedRoute><ModuleGate moduleId="theology">{Teologia && <Teologia />}</ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/teologia" element={<ProtectedRoute><ModuleGate moduleId="theology"><NotFound /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/missoes" element={<ProtectedRoute><ModuleGate moduleId="missions">{Missoes && <Missoes />}</ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/missoes" element={<ProtectedRoute><ModuleGate moduleId="missions"><NotFound /></ModuleGate></ProtectedRoute>} />
 
               {/* Global chat — accessible to all roles */}
               <Route path="/admin/chat" element={<ProtectedRoute><ChatSecretaria /></ProtectedRoute>} />

@@ -23,11 +23,11 @@ describe("Documentos Oficiais — migrations", () => {
     expect(digest(production)).toBe(digest(staging));
   });
 
-  it("classifies every official-document migration as staging_feature", () => {
+  it("classifies every official-document migration for both database environments", () => {
     const manifest = JSON.parse(read("supabase/migration-manifest.json")) as {
-      staging_feature: string[];
+      production_management: string[];
     };
-    for (const name of names) expect(manifest.staging_feature).toContain(name);
+    for (const name of names) expect(manifest.production_management).toContain(name);
   });
 
   it("extends canonical transfer/history/documents instead of duplicating people", () => {

@@ -58,11 +58,11 @@ describe("Discipulado — migrations existem em staging e produção com conteú
     );
   });
 
-  it("as 4 migrations estão listadas em supabase/migration-manifest.json como staging_feature (nenhuma aplicada)", () => {
+  it("as 4 migrations estão classificadas para promoção estrutural aos dois ambientes", () => {
     const manifest = JSON.parse(readFileSync(path.join(ROOT, "supabase", "migration-manifest.json"), "utf8"));
     for (const file of DISCIPLESHIP_MIGRATIONS) {
-      expect(manifest.staging_feature, `${file} deveria estar em staging_feature`).toContain(file);
-      for (const category of ["production_management", "staging_only", "historical", "mixed_needs_split"] as const) {
+      expect(manifest.production_management, `${file} deveria estar em production_management`).toContain(file);
+      for (const category of ["staging_feature", "staging_only", "historical", "mixed_needs_split"] as const) {
         expect(manifest[category], `${file} não deveria estar em ${category}`).not.toContain(file);
       }
     }

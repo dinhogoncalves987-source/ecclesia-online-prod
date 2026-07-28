@@ -7,10 +7,10 @@ import { validateCpf } from "@/lib/cpfValidation";
  *  - Cadastro manual comum: CPF é OBRIGATÓRIO, deve ter dígitos verificadores
  *    válidos, e não pode duplicar outro CPF já cadastrado na mesma
  *    organização.
- *  - A exceção de CPF pendente (`cpf_pending`) é reservada para a futura
- *    importação do sistema legado e NUNCA é setada pelo formulário manual —
- *    por isso esta função não aceita nem verifica esse flag: ela sempre
- *    valida como cadastro manual comum.
+ *  - A exceção de CPF pendente (`cpf_pending`) é reservada para registros
+ *    incompletos que aguardam revisão da Secretaria e NUNCA é setada pelo
+ *    formulário manual — por isso esta função sempre valida o cadastro
+ *    manual comum.
  */
 export type CpfCheckResult =
   | { ok: true; normalized: string }

@@ -22,6 +22,8 @@ export const PRODUCTION_BASELINE_FILE =
   "20260715170000_production_baseline_marker.sql";
 export const PRODUCTION_BASELINE_CONFIRMATION =
   "BASELINE_PRODUCTION_20260715";
+export const PRODUCTION_PROMOTION_CONFIRMATION =
+  "PROMOTE_IDENTICAL_SCHEMA_TO_PRODUCTION";
 
 export const TARGET_WORKDIRS = {
   production: "supabase-production",
@@ -128,5 +130,51 @@ export function assertProductionBaselineRequest({
     ref: resolved.ref,
     workdir: TARGET_WORKDIRS.production,
     migration: PRODUCTION_BASELINE_FILE,
+  };
+}
+
+/**
+ * Autoriza a promoção estrutural comum somente quando o pacote de produção
+ * foi previamente reconciliado: sem blockers, sem seeds e sem migration
+ * estrutural compartilhada ausente ou divergente.
+ */
+export function assertProductionPromotionRequest({
+  target,
+  action,
+  confirmation,
+  blockers,
+  includedStagingOnlyFiles,
+  missingSharedFiles,
+  divergentSharedFiles,
+}) {
+  const resolved = resolveTarget(target);
+
+  if (resolved.target !== "production" || action !== "promote") {
+    throw new GuardError("a ação promote existe somente para o alvo production");
+  }
+
+  if (confirmation !== PRODUCTION_PROMOTION_CONFIRMATION) {
+    throw new GuardError(
+      `confirmação inválida; use --confirm=${PRODUCTION_PROMOTION_CONFIRMATION}`,
+    );
+  }
+
+  const problems = [
+    ...(blockers ?? []).map((file) => `migration não promovível: ${file}`),
+    ...(includedStagingOnlyFiles ?? []).map((file) => `seed de staging no pacote: ${file}`),
+    ...(missingSharedFiles ?? []).map((file) => `migration estrutural sem espelho: ${file}`),
+    ...(divergentSharedFiles ?? []).map((file) => `migration estrutural divergente: ${file}`),
+  ];
+
+  if (problems.length > 0) {
+    throw new GuardError(
+      `promoção recusada por falha de paridade:\n- ${problems.join("\n- ")}`,
+    );
+  }
+
+  return {
+    target: resolved.target,
+    ref: resolved.ref,
+    workdir: TARGET_WORKDIRS.production,
   };
 }

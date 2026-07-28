@@ -2132,9 +2132,6 @@ export type Database = {
           incomplete_registration: boolean
           joined_at: string | null
           known_name: string | null
-          legacy_code: string | null
-          legacy_registration: string | null
-          legacy_source: string | null
           marital_status: string | null
           member_code: string | null
           member_role: string | null
@@ -2195,9 +2192,6 @@ export type Database = {
           incomplete_registration?: boolean
           joined_at?: string | null
           known_name?: string | null
-          legacy_code?: string | null
-          legacy_registration?: string | null
-          legacy_source?: string | null
           marital_status?: string | null
           member_code?: string | null
           member_role?: string | null
@@ -2258,9 +2252,6 @@ export type Database = {
           incomplete_registration?: boolean
           joined_at?: string | null
           known_name?: string | null
-          legacy_code?: string | null
-          legacy_registration?: string | null
-          legacy_source?: string | null
           marital_status?: string | null
           member_code?: string | null
           member_role?: string | null

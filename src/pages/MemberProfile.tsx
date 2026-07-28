@@ -38,9 +38,6 @@ type MemberProfileData = {
   known_name: string | null;
   photo_url: string | null;
   member_code: string | null;
-  legacy_code: string | null;
-  legacy_registration: string | null;
-  legacy_source: string | null;
   status: string;
   organization_id: string;
   sector_id: string | null;
@@ -85,7 +82,7 @@ type MemberProfileData = {
   spouse_name: string | null;
   // Notes
   notes: string | null;
-  // Flags de cadastro incompleto (só a futura importação do legado seta)
+  // Indicadores neutros de pendência cadastral
   incomplete_registration: boolean;
   cpf_pending: boolean;
   contact_pending: boolean;
@@ -522,14 +519,11 @@ export default function MemberProfile() {
         </CardContent>
       </Card>
 
-      {/* Identificadores */}
+      {/* Identificador interno definido pela própria igreja */}
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><Hash size={18} />{t("Identificadores")}</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-          <InfoRow label={t("Código Ecclesia")} value={member.member_code} mono />
-          <InfoRow label={t("Código legado")} value={member.legacy_code} mono />
-          <InfoRow label={t("Matrícula antiga")} value={member.legacy_registration} mono />
-          <InfoRow label={t("Origem legado")} value={member.legacy_source} />
+          <InfoRow label={t("Código interno da igreja")} value={member.member_code} mono />
         </CardContent>
       </Card>
 

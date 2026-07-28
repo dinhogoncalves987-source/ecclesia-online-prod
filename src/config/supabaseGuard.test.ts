@@ -2,8 +2,10 @@ import { describe, it, expect } from "vitest";
 import {
   PRODUCTION_BASELINE_CONFIRMATION,
   PRODUCTION_BASELINE_FILE,
+  PRODUCTION_PROMOTION_CONFIRMATION,
   TARGET_WORKDIRS,
   assertProductionBaselineRequest,
+  assertProductionPromotionRequest,
   assertLinkedProjectRef,
   resolveTarget,
 } from "../../scripts/lib/supabaseGuardCore.mjs";
@@ -138,15 +140,15 @@ describe("supabase-guard: baseline isolado de produção", () => {
 });
 
 describe("supabase-guard: migration manifest blockers", () => {
-  it("reports every staging_feature + staging_only + mixed entry as a production blocker", () => {
+  it("bloqueia schema exclusivo e arquivos mistos, mas não seeds de teste", () => {
     const manifest = loadMigrationManifest();
     const blockers = getUnresolvedProductionBlockers(manifest);
     expect(blockers.length).toBe(
-      manifest.staging_feature.length + manifest.staging_only.length + manifest.mixed_needs_split.length,
+      manifest.staging_feature.length + manifest.mixed_needs_split.length,
     );
     for (const entry of manifest.staging_feature) expect(blockers).toContain(entry);
-    for (const entry of manifest.staging_only) expect(blockers).toContain(entry);
     for (const entry of manifest.mixed_needs_split) expect(blockers).toContain(entry);
+    for (const entry of manifest.staging_only) expect(blockers).not.toContain(entry);
   });
 
   it("never lists a production_management entry as a blocker", () => {
@@ -155,5 +157,48 @@ describe("supabase-guard: migration manifest blockers", () => {
     for (const entry of manifest.production_management) {
       expect(blockers.has(entry)).toBe(false);
     }
+  });
+});
+
+describe("supabase-guard: promoção estrutural protegida", () => {
+  const validRequest = {
+    target: "production",
+    action: "promote",
+    confirmation: PRODUCTION_PROMOTION_CONFIRMATION,
+    blockers: [],
+    includedStagingOnlyFiles: [],
+    missingSharedFiles: [],
+    divergentSharedFiles: [],
+  };
+
+  it("autoriza somente produção com pacote idêntico e sem seeds", () => {
+    expect(assertProductionPromotionRequest(validRequest)).toEqual({
+      target: "production",
+      ref: "zsonukpxahaxffugavfu",
+      workdir: "supabase-production",
+    });
+  });
+
+  it("recusa confirmação ausente, staging ou ação genérica", () => {
+    expect(() =>
+      assertProductionPromotionRequest({ ...validRequest, confirmation: "" }),
+    ).toThrow(/confirmação inválida/i);
+    expect(() =>
+      assertProductionPromotionRequest({ ...validRequest, target: "staging" }),
+    ).toThrow(/somente.*production/i);
+    expect(() =>
+      assertProductionPromotionRequest({ ...validRequest, action: "push" }),
+    ).toThrow(/somente.*production/i);
+  });
+
+  it.each([
+    ["blockers", ["feature.sql"]],
+    ["includedStagingOnlyFiles", ["seed.sql"]],
+    ["missingSharedFiles", ["missing.sql"]],
+    ["divergentSharedFiles", ["divergent.sql"]],
+  ])("recusa promoção quando %s não está vazio", (field, files) => {
+    expect(() =>
+      assertProductionPromotionRequest({ ...validRequest, [field]: files }),
+    ).toThrow(/promoção recusada.*paridade/is);
   });
 });

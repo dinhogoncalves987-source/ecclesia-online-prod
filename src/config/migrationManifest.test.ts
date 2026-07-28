@@ -9,8 +9,9 @@ import { checkMigrationManifestGate } from "../../scripts/lib/migrationManifest.
  * (consumido por `scripts/supabase-guard.mjs`) cobre EXATAMENTE os arquivos
  * presentes em `supabase/migrations/` — nenhum arquivo real esquecido,
  * nenhuma entrada órfã no manifesto — e que o preflight de promoção para
- * produção bloqueia corretamente quando há migration staging_feature,
- * staging_only ou mixed_needs_split pendente.
+ * produção bloqueia corretamente quando há migration staging_feature ou
+ * mixed_needs_split pendente. Seeds staging_only não fazem parte do pacote
+ * estrutural de produção.
  *
  * Este teste é somente leitura: nunca aplica, move ou edita nenhuma
  * migration.
@@ -127,11 +128,11 @@ describe("checkMigrationManifestGate (preflight de promoção — Fase 7)", () =
     expect(result.reasons.join(" ")).toContain("20260526100000_staging_worship_tables.sql");
   });
 
-  it("bloqueia --target=production quando há migration staging_only pendente", () => {
+  it("não bloqueia --target=production por seeds staging_only", () => {
     const manifest = { staging_feature: [], staging_only: ["20260519200000_demo_seed.sql"], mixed_needs_split: [] };
     const result = checkMigrationManifestGate(manifest, "production");
-    expect(result.blocked).toBe(true);
-    expect(result.reasons.join(" ")).toContain("20260519200000_demo_seed.sql");
+    expect(result.blocked).toBe(false);
+    expect(result.reasons).toEqual([]);
   });
 
   it("bloqueia --target=production quando há migration mixed_needs_split pendente", () => {
@@ -148,12 +149,13 @@ describe("checkMigrationManifestGate (preflight de promoção — Fase 7)", () =
     expect(result.reasons).toEqual([]);
   });
 
-  it("o manifesto real bloquearia produção hoje (há features, seeds e arquivos mistos pendentes)", () => {
+  it("o manifesto real libera promoção estrutural e exclui somente seeds de teste", () => {
     const manifest = loadManifest();
     const result = checkMigrationManifestGate(manifest, "production");
-    // Este é o estado ESPERADO nesta fase: nenhuma migration staging-only ou
-    // mista foi resolvida/dividida ainda, então a promoção real para
-    // produção deve continuar bloqueada até uma ação manual futura.
-    expect(result.blocked).toBe(true);
+    expect(manifest.staging_feature).toEqual([]);
+    expect(manifest.mixed_needs_split).toEqual([]);
+    expect(manifest.staging_only.length).toBeGreaterThan(0);
+    expect(result.blocked).toBe(false);
+    expect(result.reasons).toEqual([]);
   });
 });

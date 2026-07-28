@@ -6,8 +6,6 @@ function makeMember(overrides: Partial<SearchableMember> = {}): SearchableMember
     full_name: "João da Silva",
     known_name: "Joãozinho",
     member_code: "0001",
-    legacy_code: "WT-9876",
-    legacy_registration: "MAT-555",
     cpf: "11144477735",
     member_role: "Diácono",
     administrative_role: "Nenhum",
@@ -37,14 +35,6 @@ describe("matchesMemberSearch", () => {
     expect(matchesMemberSearch(makeMember(), "0001")).toBe(true);
   });
 
-  it("encontra por código legado do Wintechi", () => {
-    expect(matchesMemberSearch(makeMember(), "wt-9876")).toBe(true);
-  });
-
-  it("encontra por matrícula antiga", () => {
-    expect(matchesMemberSearch(makeMember(), "mat-555")).toBe(true);
-  });
-
   it("encontra por CPF", () => {
     expect(matchesMemberSearch(makeMember(), "11144477735")).toBe(true);
   });
@@ -63,7 +53,7 @@ describe("matchesMemberSearch", () => {
   });
 
   it("lida com campos nulos sem lançar erro", () => {
-    const member = makeMember({ known_name: null, legacy_code: null, legacy_registration: null, cpf: null, email: null, phone: null, whatsapp: null });
+    const member = makeMember({ known_name: null, cpf: null, email: null, phone: null, whatsapp: null });
     expect(() => matchesMemberSearch(member, "silva")).not.toThrow();
     expect(matchesMemberSearch(member, "silva")).toBe(true);
     expect(matchesMemberSearch(member, "inexistente")).toBe(false);

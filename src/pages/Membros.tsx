@@ -3,6 +3,7 @@ import {
   Search, Plus, X, Trash2, Loader2, Upload, Pencil, CreditCard, Camera, ChevronRight,
   User, FileText, Phone, MapPin, Church, Briefcase, Users, BookOpen, Send, Building2,
   Shield,
+  type LucideIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -106,7 +107,7 @@ type SubOrg = { id: string; name: string; organization_type: string };
 
 type FamilyEntry = {
   id: string;
-  relation: FamilyRelation | string;
+  relation: FamilyRelation;
   full_name: string;
   related_member_id: string | null;
   birth_date: string | null;
@@ -261,7 +262,7 @@ const EMPTY_FORM: Omit<Member, "id"> = {
 type Tab = {
   id: string;
   label: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
+  icon: LucideIcon;
   short: string;
 };
 
@@ -1131,7 +1132,7 @@ export default function Membros() {
         .filter(Boolean),
     );
     const cpfCheck = checkCpfForManualSave(form.cpf, existingCpfs);
-    if (!cpfCheck.ok) {
+    if ("reason" in cpfCheck) {
       toast.error(t(CPF_CHECK_MESSAGES[cpfCheck.reason]));
       setActiveTab("pessoal");
       return;

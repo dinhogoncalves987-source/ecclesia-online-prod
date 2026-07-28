@@ -2,11 +2,14 @@
 /**
  * scripts/verify-production-bundle.mjs
  *
- * FASE 6 (separação de código por build) — teste de artefato: constrói um
- * build de PRODUÇÃO real (via `vite build --mode production`, com as MESMAS
- * validações de scripts/check-environment.mjs) e falha (exit code 1) se
- * qualquer nome/import de módulo staging-only aparecer nos arquivos gerados
- * em `dist/`.
+ * Teste de artefato: constrói um build de PRODUÇÃO real (via
+ * `vite build --mode production`, com as MESMAS validações de
+ * scripts/check-environment.mjs) e falha (exit code 1) se o código executável
+ * de qualquer módulo desabilitado aparecer nos arquivos gerados em `dist/`.
+ *
+ * Os identificadores do registro central podem aparecer: staging e produção
+ * usam o mesmo código e a mesma lista de módulos. O que não pode entrar é o
+ * chunk/página de uma funcionalidade ainda desabilitada nos dois ambientes.
  *
  * Não usa nenhum segredo real: os project refs (zsonukpxahaxffugavfu /
  * qkiiwopkbcslquyfhdec) são identificadores PÚBLICOS (ver
@@ -39,10 +42,8 @@ const PRODUCTION_REF = "zsonukpxahaxffugavfu";
 const STAGING_REF = "qkiiwopkbcslquyfhdec";
 const OFFICIAL_DOMAIN = "ecclesiabr.online";
 
-// Termos que NUNCA podem aparecer em um bundle de produção — nomes de
-// arquivo/rota/componente/flag exclusivos de módulos staging-only (ver
-// src/config/modules.ts, availability: "staging") ou explicitamente citados
-// na FASE 6 (Bíblia, TV, Canal Ecclésia, campanhas demo, cartas, comunidade).
+// Termos que NUNCA podem aparecer no código executável do bundle — nomes de
+// arquivo/componente exclusivos de módulos desabilitados nos dois ambientes.
 // Escritos aqui no case original (mais fácil de revisar/digitar sem erro) e
 // convertidos para minúsculas em código — a comparação em si é sempre
 // case-insensitive sobre o CONTEÚDO dos arquivos gerados (não sobre nomes de
@@ -119,8 +120,6 @@ const FORBIDDEN_TERMS_SOURCE = [
   // nenhum dado fictício exibido ao usuário. Ver src/config/modules.ts.
   "pages/Marketplace",
   "pages/Comunidade",
-  "tv-digital",
-  "canal-ecclesia",
   "CanalEcclesia",
   // OPERAÇÃO 2 (Discipulado, 2026-07-29) — staging-only enquanto as
   // migrations discipleship_* não forem aplicadas em nenhum ambiente (ver
@@ -138,11 +137,8 @@ const FORBIDDEN_TERMS_SOURCE = [
   // src/config/modules.ts e docs/architecture/operacao-4-missoes.md).
   // Mesmo padrão de tree-shaking condicional do Discipulado/Teologia.
   "pages/Missoes",
-  // OPERAÇÃO 5 (Documentos Oficiais) — staging-only durante homologação.
-  "pages/CartasTransferencia",
-  "pages/Certificados",
-  "pages/ValidarTransferencia",
-  "pages/ValidarCertificado",
+  // Documentos Oficiais foram homologados e pertencem à mesma release de
+  // staging e produção. Portanto não são termos proibidos neste artefato.
 ];
 const FORBIDDEN_TERMS = FORBIDDEN_TERMS_SOURCE.map((term) => term.toLowerCase());
 

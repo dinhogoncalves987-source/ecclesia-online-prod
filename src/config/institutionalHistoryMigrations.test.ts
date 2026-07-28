@@ -301,11 +301,11 @@ describe("Operação 1 — member_organization_history (vínculo organizacional 
 });
 
 describe("Operação 1 — manifesto de migrations", () => {
-  it("as 5 migrations estão classificadas em staging_feature", () => {
+  it("as 5 migrations estão classificadas para promoção estrutural aos dois ambientes", () => {
     const manifestPath = path.join(ROOT, "supabase", "migration-manifest.json");
-    const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { staging_feature: string[] };
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { production_management: string[] };
     for (const file of OPERATION1_MIGRATIONS) {
-      expect(manifest.staging_feature, `${file} ausente de staging_feature`).toContain(file);
+      expect(manifest.production_management, `${file} ausente de production_management`).toContain(file);
     }
   });
 });

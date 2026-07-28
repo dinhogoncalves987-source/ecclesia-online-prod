@@ -11,8 +11,36 @@ verify_jwt = false
 [functions.daily-devotional]
 verify_jwt = false
 
+# O membro ainda não possui sessão durante a confirmação do código. A Edge
+# Function valida o código pela RPC interna (hash, expiração, limite de
+# tentativas e consumo único).
+[functions.verify-member-login-otp]
+verify_jwt = false
+
 # send-chat-push recebe o JWT REAL do remetente (nunca a publishable key) —
 # precisa do gateway validando o JWT antes mesmo do código da função rodar
 # (defesa em profundidade, além da checagem própria em index.ts).
 [functions.send-chat-push]
+verify_jwt = true
+
+# Webhooks da VPS MediaMTX autenticam com segredo compartilhado validado
+# dentro das funções; não recebem JWT de usuário.
+[functions.validate-tv-stream-key]
+verify_jwt = false
+
+[functions.update-tv-heartbeat]
+verify_jwt = false
+
+# Operações iniciadas no navegador exigem JWT real no gateway e também fazem
+# validação de capability no código da função.
+[functions.create-livekit-room]
+verify_jwt = true
+
+[functions.create-livekit-token]
+verify_jwt = true
+
+[functions.end-livekit-room]
+verify_jwt = true
+
+[functions.get-r2-upload-url]
 verify_jwt = true
