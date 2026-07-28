@@ -23,6 +23,7 @@ describe("MemberWalletCard — identidade visual", () => {
       <MemberWalletCard
         member={member}
         churchName="Congregação Central"
+        churchAcronym="IEAD"
         churchLogoUrl="https://example.com/logo.png"
       />,
     );
@@ -38,6 +39,10 @@ describe("MemberWalletCard — identidade visual", () => {
     fireEvent.click(screen.getByRole("button", { name: /verso/i }));
     expect(container.querySelector("#wallet-card-back [data-wallet-watermark]")).toBeTruthy();
     expect(container.querySelector("[data-wallet-preview]")).toHaveClass("max-w-sm");
+    expect(container.querySelector("[data-wallet-church-acronym]")).toHaveTextContent("IEAD");
+    expect(screen.queryByText("Nome completo")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Função:/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("Membro").length).toBeGreaterThan(0);
   });
 
   it("keeps the wallet usable when the organization has no logo", () => {
@@ -47,5 +52,17 @@ describe("MemberWalletCard — identidade visual", () => {
 
     expect(container.querySelectorAll("[data-wallet-watermark]")).toHaveLength(0);
     expect(screen.getAllByText("Edson G Roquete").length).toBeGreaterThan(0);
+  });
+
+  it("gera uma sigla curta quando a igreja ainda não configurou a própria sigla", () => {
+    const { container } = render(
+      <MemberWalletCard
+        member={member}
+        churchName="Assembleia de Deus Caxias do Sul"
+        churchLogoUrl={null}
+      />,
+    );
+
+    expect(container.querySelector("[data-wallet-church-acronym]")).toHaveTextContent("ADCS");
   });
 });

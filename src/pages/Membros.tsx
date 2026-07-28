@@ -2536,6 +2536,7 @@ export default function Membros() {
             <MemberWalletCard
               member={toWalletMember(walletMember)}
               churchName={church?.name ?? "Igreja"}
+              churchAcronym={church?.acronym}
               churchCity={church?.city ?? undefined}
               churchState={church?.state ?? undefined}
               churchLogoUrl={church?.logo_url ?? null}

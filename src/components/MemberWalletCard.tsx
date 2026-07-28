@@ -40,6 +40,7 @@ export type WalletMember = {
 type Props = {
   member: WalletMember;
   churchName: string;
+  churchAcronym?: string | null;
   churchCity?: string;
   churchState?: string;
   churchLogoUrl?: string | null;
@@ -48,6 +49,20 @@ type Props = {
 
 function initials(name: string) {
   return name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+}
+
+function organizationInitials(name: string) {
+  const ignoredWords = new Set(["a", "as", "da", "das", "de", "do", "dos", "e", "em"]);
+  const initialsValue = name
+    .trim()
+    .split(/\s+/)
+    .filter((word) => word && !ignoredWords.has(word.toLocaleLowerCase("pt-BR")))
+    .map((word) => word[0])
+    .join("")
+    .slice(0, 8)
+    .toLocaleUpperCase("pt-BR");
+
+  return initialsValue || "IGREJA";
 }
 
 function memberCode(id: string) {
@@ -84,15 +99,15 @@ const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
 // ── Frente ────────────────────────────────────────────────────────────────────
 
 function CardFront({
-  id, member, churchName, churchCity, churchState, churchLogoUrl, code, issueDate, validUntil, qrValue, pdfQrPlaceholder,
+  id, member, churchName, churchAcronym, churchLogoUrl, code, issueDate, validUntil, qrValue, pdfQrPlaceholder,
 }: {
   id: string; member: WalletMember; churchName: string;
-  churchCity?: string; churchState?: string; churchLogoUrl?: string | null;
+  churchAcronym?: string | null; churchLogoUrl?: string | null;
   code: string; issueDate: string; validUntil: string; qrValue: string; pdfQrPlaceholder?: string;
 }) {
   const statusInfo = STATUS_BADGE[member.status] ?? STATUS_BADGE.Ativo;
   const roleLabel  = ROLE_LABEL[member.member_role ?? ""] ?? member.member_role ?? "Membro";
-  const churchDisplay = [churchName, churchCity && churchState ? `${churchCity} - ${churchState}` : (churchCity || churchState)].filter(Boolean).join("\n");
+  const churchDisplay = churchAcronym?.trim() || organizationInitials(churchName);
 
   return (
     <div
@@ -130,7 +145,12 @@ function CardFront({
                 {!churchLogoUrl && <Shield size={9} className="text-blue-300" />}
                 <span className="text-[8px] font-bold tracking-[0.18em] text-blue-200 uppercase">Carteira de Membro</span>
               </div>
-              <p className="max-w-[170px] whitespace-pre-line text-[10px] leading-tight text-slate-300 line-clamp-2">{churchDisplay}</p>
+              <p
+                data-wallet-church-acronym
+                className="text-[10px] font-semibold uppercase leading-tight tracking-[0.14em] text-slate-300"
+              >
+                {churchDisplay}
+              </p>
             </div>
           </div>
           <span className={cn("flex-shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider", statusInfo.cls)}>
@@ -152,11 +172,8 @@ function CardFront({
               </div>
             )}
             <div className="pb-0.5">
-              <p className="text-[9px] uppercase tracking-wide text-slate-400">Nome completo</p>
-              <p className="mt-0.5 text-[12px] font-bold leading-tight text-white">{member.full_name}</p>
-              <p className="mt-1 text-[9px] text-slate-300">
-                <span className="text-slate-500">Função:</span> {roleLabel}
-              </p>
+              <p className="text-[12px] font-bold leading-tight text-white">{member.full_name}</p>
+              <p className="mt-1 text-[9px] font-medium text-slate-300">{roleLabel}</p>
               {member.administrative_role && member.administrative_role !== "Nenhum" && (
                 <p className="text-[9px] text-slate-300">
                   <span className="text-slate-500">Cargo:</span> {member.administrative_role}
@@ -288,7 +305,7 @@ function CardBack({
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
-export function MemberWalletCard({ member, churchName, churchCity, churchState, churchLogoUrl, onClose }: Props) {
+export function MemberWalletCard({ member, churchName, churchAcronym, churchCity, churchState, churchLogoUrl, onClose }: Props) {
   const [showBack, setShowBack] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
@@ -428,7 +445,7 @@ export function MemberWalletCard({ member, churchName, churchCity, churchState, 
     }
   };
 
-  const cardProps = { member, churchName, churchCity, churchState, churchLogoUrl, code, issueDate, validUntil, qrValue };
+  const cardProps = { member, churchName, churchAcronym, churchLogoUrl, code, issueDate, validUntil, qrValue };
 
   return (
     <div className="flex flex-col items-center gap-4 py-2">

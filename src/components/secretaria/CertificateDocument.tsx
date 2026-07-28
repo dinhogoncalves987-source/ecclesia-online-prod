@@ -1,5 +1,5 @@
 import { QRCodeSVG } from "qrcode.react";
-import { BookOpen, Flame } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import { DocumentActions } from "@/components/DocumentActions";
 import { generateOfficialDocumentPdf } from "@/lib/officialDocumentPdf";
 import {
@@ -76,15 +76,6 @@ function certificateStatement(certificate: CertificateView) {
 
       return `concluiu com aproveitamento ${course}${workload}${period}.`;
     }
-  }
-}
-
-function validationLabel(validationUrl: string) {
-  if (!validationUrl) return "";
-  try {
-    return `${new URL(validationUrl).host}/validar`;
-  } catch {
-    return validationUrl;
   }
 }
 
@@ -178,7 +169,12 @@ export function CertificateDocument({
                   />
                 ) : (
                   <div className="flex h-[104px] w-[104px] items-center justify-center rounded-full border-2 border-[#b78b2e] text-[#b78b2e]">
-                    <Flame size={54} strokeWidth={1.3} />
+                    <span
+                      className="text-[54px] leading-none"
+                      style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+                    >
+                      Ω
+                    </span>
                   </div>
                 )}
               </div>
@@ -246,9 +242,8 @@ export function CertificateDocument({
                     <div className="border border-[#b78b2e] bg-white p-2">
                       <QRCodeSVG value={validationUrl} size={82} level="M" />
                     </div>
-                    <p className="mt-1 text-[10px] leading-tight text-[#102e58]">
-                      Valide em<br />
-                      <span className="font-semibold">{validationLabel(validationUrl)}</span>
+                    <p className="mt-1 text-[10px] font-semibold leading-tight text-[#102e58]">
+                      Valide em Ecclesia
                     </p>
                   </>
                 ) : (
@@ -267,7 +262,6 @@ export function CertificateDocument({
                   Certificado nº <span className="font-semibold">{certificate.certificate_number || "EM RASCUNHO"}</span>
                   {revision > 1 ? <span className="ml-2 text-[10px]">(revisão {revision})</span> : null}
                 </p>
-                {validationUrl ? <p>Valide em {validationLabel(validationUrl)}</p> : null}
               </div>
             </footer>
           </div>
@@ -316,9 +310,18 @@ function AuthenticitySeal() {
           "repeating-conic-gradient(from 0deg, #d6ad50 0deg 4deg, #f0d88b 4deg 8deg)",
       }}
     >
-      <div className="flex size-full flex-col items-center justify-center rounded-full border-2 border-[#916921] bg-[radial-gradient(circle,#f5e4a9_0%,#d5a646_68%,#b3832d_100%)]">
-        <span className="text-[11px] font-bold uppercase tracking-[0.14em]">Autêntico</span>
-        <Flame className="my-0.5" size={34} strokeWidth={1.5} />
+      <div
+        data-authenticity-seal-content
+        className="flex size-full flex-col items-center justify-center rounded-full border-2 border-[#916921] px-2 py-1.5 bg-[radial-gradient(circle,#f5e4a9_0%,#d5a646_68%,#b3832d_100%)]"
+      >
+        <span
+          data-ecclesia-symbol
+          className="text-[30px] font-semibold leading-[0.8]"
+          style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+        >
+          Ω
+        </span>
+        <span className="mt-1 text-[11px] font-bold uppercase tracking-[0.14em]">Autêntico</span>
         <span className="text-[11px] font-bold uppercase tracking-[0.14em]">Ecclesia</span>
       </div>
     </div>

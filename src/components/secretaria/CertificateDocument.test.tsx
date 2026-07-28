@@ -82,6 +82,12 @@ describe("CertificateDocument", () => {
     expect(container.querySelector("[data-certificate-footer-meta]")).not.toHaveClass(
       "-bottom-[34px]",
     );
+    expect(screen.getByText("Valide em Ecclesia")).toBeInTheDocument();
+    expect(container.querySelector("[data-certificate-footer-meta]")).not.toHaveTextContent(
+      "Valide em",
+    );
+    expect(container.querySelector("[data-ecclesia-symbol]")).toHaveTextContent("Ω");
+    expect(container.querySelector("svg.lucide-flame")).not.toBeInTheDocument();
   });
 
   it("mantém o mesmo número e sinaliza a revisão corrigida", () => {
