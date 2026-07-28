@@ -47,9 +47,6 @@ type Member = {
   full_name: string;
   known_name: string | null;
   member_code: string | null;
-  legacy_code: string | null;
-  legacy_registration: string | null;
-  legacy_source: string | null;
   member_role: string | null;
   administrative_role: string | null;
   status: string;
@@ -208,9 +205,6 @@ const EMPTY_FORM: Omit<Member, "id"> = {
   full_name: "",
   known_name: "",
   member_code: "",
-  legacy_code: "",
-  legacy_registration: "",
-  legacy_source: "",
   member_role: "Membro",
   administrative_role: "Nenhum",
   status: "Ativo",
@@ -318,6 +312,7 @@ function MemberAvatar({ member, size = "sm" }: { member: Pick<Member, "full_name
     </div>
   );
 }
+
 
 function FormInput({
   label, value, onChange, type = "text", placeholder, required, disabled,
@@ -880,9 +875,6 @@ export default function Membros() {
       full_name:         m.full_name,
       known_name:        m.known_name || "",
       member_code:       m.member_code || "",
-      legacy_code:       m.legacy_code || "",
-      legacy_registration: m.legacy_registration || "",
-      legacy_source:     m.legacy_source || "",
       member_role:       m.member_role || "Membro",
       administrative_role: m.administrative_role || "Nenhum",
       status:            isMemberStatus(m.status) ? m.status : "Ativo",
@@ -1015,9 +1007,6 @@ export default function Membros() {
     return {
       photo_url:          photoUrl,
       member_code:        form.member_code?.trim() || null,
-      legacy_code:        form.legacy_code?.trim() || null,
-      legacy_registration: form.legacy_registration?.trim() || null,
-      legacy_source:      form.legacy_source || null,
       known_name:         form.known_name?.trim() || null,
       birth_place:        form.birth_place?.trim() || null,
       nationality:        form.nationality?.trim() || null,
@@ -1352,7 +1341,7 @@ export default function Membros() {
 
   const memberFields = [
     { key: "name",         label: t("Nome"),              required: true },
-    { key: "member_code",  label: t("Código do Membro") },
+    { key: "member_code",  label: t("Código interno da igreja") },
     { key: "cpf",          label: t("CPF"),               required: true },
     { key: "phone",        label: t("Telefone"),          required: true },
     { key: "role",         label: t("Função") },
@@ -1458,7 +1447,7 @@ export default function Membros() {
                 module="member"
                 fields={[
                   { key: "name", label: t("Nome"), required: true },
-                  { key: "member_code", label: t("Código do Membro") },
+                  { key: "member_code", label: t("Código interno da igreja") },
                   { key: "role", label: t("Função"), options: ["Pastor", "Diácono", "Diaconisa", "Obreiro", "Membro"] },
                   { key: "phone", label: t("Telefone") },
                   { key: "email", label: t("E-mail") },
@@ -1741,10 +1730,10 @@ export default function Membros() {
       <AnimatePresence>
         {modalOpen && (
           <Dialog open={modalOpen} onOpenChange={open => { if (!open) closeModal(); }}>
-            <DialogContent className="max-w-2xl w-full p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
+            <DialogContent className="w-[calc(100vw-1rem)] max-w-5xl p-0 gap-0 overflow-hidden max-h-[calc(100dvh-1rem)] sm:max-h-[90vh] flex flex-col">
 
             {/* Modal header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border/50 flex-shrink-0 pr-12">
+            <div className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-4 border-b border-border/50 flex-shrink-0 pr-12">
               <div>
                 <h2 className="font-serif text-lg">{isNewMember ? "Cadastrar Membro" : "Editar Membro"}</h2>
                 {!isNewMember && form.full_name && (
@@ -1754,7 +1743,7 @@ export default function Membros() {
             </div>
 
               {/* Tabs nav */}
-              <div className="flex border-b border-border/50 overflow-x-auto flex-shrink-0 bg-background">
+              <div className="grid grid-cols-4 md:grid-cols-8 border-b border-border/50 flex-shrink-0 bg-background">
                 {TABS.map(tab => {
                   const Icon = tab.icon;
                   return (
@@ -1765,22 +1754,22 @@ export default function Membros() {
                           setActiveTab(tab.id);
                         }
                       }}
-                      className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                      className={`min-w-0 flex items-center justify-center gap-1 px-1.5 py-2.5 sm:px-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
                         activeTab === tab.id
                           ? "border-primary text-primary"
                           : "border-transparent text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       <Icon size={13} className="flex-shrink-0" />
-                      <span className="hidden sm:inline">{tab.label}</span>
-                      <span className="sm:hidden">{tab.short}</span>
+                      <span className="hidden xl:inline truncate">{tab.label}</span>
+                      <span className="xl:hidden truncate">{tab.short}</span>
                     </button>
                   );
                 })}
               </div>
 
               {/* Tab content */}
-              <div className="overflow-y-auto flex-1 px-5 py-5">
+              <div className="min-w-0 overflow-y-auto flex-1 px-4 py-4 sm:px-5 sm:py-5">
 
                 {/* ── Tab 1: Dados Pessoais ── */}
                 {activeTab === "pessoal" && (
@@ -1829,10 +1818,10 @@ export default function Membros() {
                       </div>
                       <FormInput label="Nome conhecido" value={form.known_name || ""} onChange={v => setField("known_name", v)} placeholder="Como a pessoa é chamada no dia a dia" />
                       <FormInput
-                        label="Código do Membro"
+                        label="Código interno da igreja"
                         value={form.member_code || ""}
                         onChange={v => setField("member_code", v)}
-                        placeholder={t("Opcional — use o código do sistema anterior, se houver")}
+                        placeholder={t("Opcional — identificador usado pela própria igreja")}
                       />
                       <FormInput label="Data de nascimento" value={form.birth_date || ""} onChange={v => setField("birth_date", v)} type="date" />
                       <FormSelect label="Sexo" value={form.gender || ""} onChange={v => setField("gender", v)} options={GENDER_OPTIONS} />
@@ -1845,24 +1834,11 @@ export default function Membros() {
                       <FormInput label="Profissão" value={form.profession || ""} onChange={v => setField("profession", v)} placeholder="Profissão" />
                     </div>
 
-                    {/* Identificadores de sistema legado — só aparecem para quem for
-                        importar/corrigir um cadastro vindo de outro sistema (Wintechi
-                        etc). Continuam opcionais no cadastro manual comum. */}
-                    <div className="border-t border-border/50 pt-4 space-y-3">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Identificadores de sistema anterior (opcional)
+                    {(form.incomplete_registration || form.cpf_pending || form.contact_pending || form.requires_review) && (
+                      <p className="border-t border-border/50 pt-4 text-xs text-amber-600 dark:text-amber-400">
+                        ⚠️ Este cadastro possui pendências de validação. Essas marcações não podem ser alteradas manualmente.
                       </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <FormInput label="Código legado (ex.: Wintechi)" value={form.legacy_code || ""} onChange={v => setField("legacy_code", v)} placeholder="Código no sistema anterior" />
-                        <FormInput label="Matrícula antiga" value={form.legacy_registration || ""} onChange={v => setField("legacy_registration", v)} placeholder="Matrícula no sistema anterior" />
-                        <FormInput label="Origem do registro" value={form.legacy_source || ""} onChange={v => setField("legacy_source", v)} placeholder="Ex.: wintechi" />
-                      </div>
-                      {(form.incomplete_registration || form.cpf_pending || form.contact_pending || form.requires_review) && (
-                        <p className="text-xs text-amber-600 dark:text-amber-400">
-                          ⚠️ Este cadastro veio de uma importação de legado com pendências. Essas marcações não podem ser alteradas manualmente.
-                        </p>
-                      )}
-                    </div>
+                    )}
                   </div>
                 )}
 
@@ -2430,9 +2406,9 @@ export default function Membros() {
               </div>
 
               {/* Modal footer */}
-              <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-border/50 bg-background flex-shrink-0">
+              <div className="flex flex-col gap-3 px-4 py-3 border-t border-border/50 bg-background flex-shrink-0 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
                 {/* Tab navigation arrows */}
-                <div className="flex items-center gap-1">
+                <div className="flex w-full items-center justify-between gap-1 sm:w-auto sm:justify-start">
                   <button
                     type="button"
                     onClick={() => {
@@ -2463,7 +2439,7 @@ export default function Membros() {
                   </button>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
                   {!isNewMember && (
                     <>
                       {canAccess("/admin/gerenciar-acessos") && (
