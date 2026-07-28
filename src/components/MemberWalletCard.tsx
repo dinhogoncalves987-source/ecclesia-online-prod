@@ -109,7 +109,8 @@ function CardFront({
           alt=""
           aria-hidden="true"
           crossOrigin="anonymous"
-          className="pointer-events-none absolute left-1/2 top-1/2 h-[72%] w-[62%] -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.16] mix-blend-screen"
+          data-wallet-watermark
+          className="pointer-events-none absolute left-1/2 top-1/2 h-[72%] w-[62%] -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.14] grayscale invert contrast-[1.65] mix-blend-screen"
         />
       )}
 
@@ -127,12 +128,12 @@ function CardFront({
             <div>
               <div className="flex items-center gap-1.5 mb-0.5">
                 {!churchLogoUrl && <Shield size={9} className="text-blue-300" />}
-                <span className="text-[7px] font-bold tracking-[0.18em] text-blue-200 uppercase">Carteira de Membro</span>
+                <span className="text-[8px] font-bold tracking-[0.18em] text-blue-200 uppercase">Carteira de Membro</span>
               </div>
-              <p className="text-[9px] text-slate-300 leading-tight max-w-[55%] line-clamp-2 whitespace-pre-line">{churchDisplay}</p>
+              <p className="max-w-[170px] whitespace-pre-line text-[10px] leading-tight text-slate-300 line-clamp-2">{churchDisplay}</p>
             </div>
           </div>
-          <span className={cn("text-[7px] font-bold tracking-wider px-1.5 py-0.5 rounded-full uppercase flex-shrink-0", statusInfo.cls)}>
+          <span className={cn("flex-shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider", statusInfo.cls)}>
             {statusInfo.label}
           </span>
         </div>
@@ -151,18 +152,18 @@ function CardFront({
               </div>
             )}
             <div className="pb-0.5">
-              <p className="text-[8px] text-slate-400 uppercase tracking-wide">Nome completo</p>
-              <p className="text-white font-bold text-[10px] leading-tight mt-0.5">{member.full_name}</p>
-              <p className="text-slate-400 text-[8px] mt-1">
+              <p className="text-[9px] uppercase tracking-wide text-slate-400">Nome completo</p>
+              <p className="mt-0.5 text-[12px] font-bold leading-tight text-white">{member.full_name}</p>
+              <p className="mt-1 text-[9px] text-slate-300">
                 <span className="text-slate-500">Função:</span> {roleLabel}
               </p>
               {member.administrative_role && member.administrative_role !== "Nenhum" && (
-                <p className="text-slate-400 text-[8px]">
+                <p className="text-[9px] text-slate-300">
                   <span className="text-slate-500">Cargo:</span> {member.administrative_role}
                 </p>
               )}
               {member.congregation && (
-                <p className="text-slate-400 text-[8px]">
+                <p className="text-[9px] text-slate-300">
                   <span className="text-slate-500">Congregação:</span> {member.congregation}
                 </p>
               )}
@@ -185,16 +186,16 @@ function CardFront({
 
         <div className="flex items-center justify-between border-t border-slate-700/50 pt-1.5">
           <div>
-            <p className="text-[6px] text-slate-500 uppercase tracking-wide">Matrícula</p>
-            <p className="text-[8px] text-slate-300 font-mono tracking-widest">Nº {code}</p>
+            <p className="text-[7px] uppercase tracking-wide text-slate-500">Matrícula</p>
+            <p className="font-mono text-[9px] tracking-widest text-slate-200">Nº {code}</p>
           </div>
           <div className="text-right">
-            <p className="text-[6px] text-slate-500 uppercase tracking-wide">Emissão</p>
-            <p className="text-[8px] text-slate-300 font-mono">{issueDate}</p>
+            <p className="text-[7px] uppercase tracking-wide text-slate-500">Emissão</p>
+            <p className="font-mono text-[9px] text-slate-200">{issueDate}</p>
           </div>
           <div className="text-right">
-            <p className="text-[6px] text-slate-500 uppercase tracking-wide">Validade</p>
-            <p className="text-[8px] text-slate-300 font-mono">{validUntil}</p>
+            <p className="text-[7px] uppercase tracking-wide text-slate-500">Validade</p>
+            <p className="font-mono text-[9px] text-slate-200">{validUntil}</p>
           </div>
         </div>
       </div>
@@ -229,7 +230,8 @@ function CardBack({
           alt=""
           aria-hidden="true"
           crossOrigin="anonymous"
-          className="pointer-events-none absolute left-1/2 top-1/2 h-[70%] w-[60%] -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.14] mix-blend-screen"
+          data-wallet-watermark
+          className="pointer-events-none absolute left-1/2 top-1/2 h-[70%] w-[60%] -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.12] grayscale invert contrast-[1.65] mix-blend-screen"
         />
       )}
 
@@ -342,9 +344,8 @@ export function MemberWalletCard({ member, churchName, churchCity, churchState, 
 
   const issueDate  = format(new Date(), "dd/MM/yyyy", { locale: ptBR });
   const validUntil = format(new Date(new Date().setFullYear(new Date().getFullYear() + 1)), "dd/MM/yyyy", { locale: ptBR });
-  // Código informado pela igreja (migrado do sistema antigo) tem prioridade;
-  // sem ele, mantém a matrícula técnica gerada a partir do id — ver DEC-001
-  // / migration 20260717190000_members_add_member_code.sql.
+  // O código interno definido pela própria igreja tem prioridade. Sem ele,
+  // mantém a matrícula técnica gerada a partir do identificador do cadastro.
   const code           = member.member_code?.trim() || memberCode(member.id);
 
   const qrValue = qrState === "ready" && qrToken
@@ -437,14 +438,14 @@ export function MemberWalletCard({ member, churchName, churchCity, churchState, 
       </div>
 
       {/* Card visível (frente ou verso) */}
-      <div className="w-full max-w-xs">
+      <div data-wallet-preview className="w-full max-w-sm">
         {showBack
           ? <CardBack id="wallet-card-back"  {...{ member, churchName, churchLogoUrl }} />
           : <CardFront id="wallet-card-front" {...cardProps} />}
       </div>
 
       {/* Dynamic QR controls */}
-      <div className="flex flex-col items-center gap-2 w-full max-w-xs">
+      <div className="flex w-full max-w-sm flex-col items-center gap-2">
         {qrState === "idle" && (
           <button
             type="button"

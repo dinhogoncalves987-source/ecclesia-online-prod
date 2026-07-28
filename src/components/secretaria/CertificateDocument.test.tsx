@@ -75,7 +75,13 @@ describe("CertificateDocument", () => {
       "src",
       certificate.organization_logo_url,
     );
-    expect(container.querySelector("svg[height='78']")).toBeInTheDocument();
+    expect(container.querySelector("[data-certificate-watermark]")).toHaveClass(
+      "mix-blend-multiply",
+    );
+    expect(container.querySelector("svg[height='82']")).toBeInTheDocument();
+    expect(container.querySelector("[data-certificate-footer-meta]")).not.toHaveClass(
+      "-bottom-[34px]",
+    );
   });
 
   it("mantém o mesmo número e sinaliza a revisão corrigida", () => {
@@ -88,5 +94,37 @@ describe("CertificateDocument", () => {
 
     expect(screen.getByText("(revisão 2)")).toBeInTheDocument();
     expect(screen.getByText(/CERT-2026-000184/)).toBeInTheDocument();
+  });
+
+  it("usa a identidade atual da igreja no painel administrativo", () => {
+    const { container } = render(
+      <CertificateDocument
+        certificate={{
+          ...certificate,
+          organization_name: "Nome antigo",
+          organization_logo_url: null,
+        }}
+        branding={{
+          name: "Igreja Matriz Atual",
+          logoUrl: "https://cdn.example.org/logo-atual.png",
+          city: "Caxias do Sul",
+          state: "RS",
+        }}
+        showActions={false}
+      />,
+    );
+
+    expect(container.querySelector("[data-certificate-brand-name]")).toHaveTextContent(
+      "Igreja Matriz Atual",
+    );
+    expect(container.querySelector("[data-certificate-logo]")).toHaveAttribute(
+      "src",
+      "https://cdn.example.org/logo-atual.png",
+    );
+    expect(container.querySelector("[data-certificate-watermark]")).toHaveAttribute(
+      "src",
+      "https://cdn.example.org/logo-atual.png",
+    );
+    expect(screen.queryByText("Nome antigo")).not.toBeInTheDocument();
   });
 });

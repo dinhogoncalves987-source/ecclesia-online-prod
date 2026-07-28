@@ -27,15 +27,17 @@ describe("MemberWalletCard — identidade visual", () => {
       />,
     );
 
-    const watermarks = container.querySelectorAll('img[aria-hidden="true"]');
+    const watermarks = container.querySelectorAll("[data-wallet-watermark]");
     expect(watermarks.length).toBeGreaterThanOrEqual(3);
     watermarks.forEach((watermark) => {
       expect(watermark).toHaveAttribute("src", "https://example.com/logo.png");
       expect(watermark).toHaveAttribute("crossorigin", "anonymous");
+      expect(watermark).toHaveClass("grayscale", "invert", "mix-blend-screen");
     });
 
     fireEvent.click(screen.getByRole("button", { name: /verso/i }));
-    expect(container.querySelector("#wallet-card-back img[aria-hidden='true']")).toBeTruthy();
+    expect(container.querySelector("#wallet-card-back [data-wallet-watermark]")).toBeTruthy();
+    expect(container.querySelector("[data-wallet-preview]")).toHaveClass("max-w-sm");
   });
 
   it("keeps the wallet usable when the organization has no logo", () => {
@@ -43,7 +45,7 @@ describe("MemberWalletCard — identidade visual", () => {
       <MemberWalletCard member={member} churchName="Congregação Central" churchLogoUrl={null} />,
     );
 
-    expect(container.querySelectorAll('img[aria-hidden="true"]')).toHaveLength(0);
+    expect(container.querySelectorAll("[data-wallet-watermark]")).toHaveLength(0);
     expect(screen.getAllByText("Edson G Roquete").length).toBeGreaterThan(0);
   });
 });

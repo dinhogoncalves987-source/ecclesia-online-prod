@@ -2532,7 +2532,7 @@ export default function Membros() {
       {/* Wallet modal */}
       {walletMember && (
         <Dialog open={!!walletMember} onOpenChange={open => { if (!open) setWalletMember(null); }}>
-          <DialogContent className="max-w-sm">
+          <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto">
             <MemberWalletCard
               member={toWalletMember(walletMember)}
               churchName={church?.name ?? "Igreja"}

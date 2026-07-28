@@ -1,5 +1,5 @@
 import { QRCodeSVG } from "qrcode.react";
-import { BookOpen, Flame, Wheat } from "lucide-react";
+import { BookOpen, Flame } from "lucide-react";
 import { DocumentActions } from "@/components/DocumentActions";
 import { generateOfficialDocumentPdf } from "@/lib/officialDocumentPdf";
 import {
@@ -8,6 +8,13 @@ import {
 } from "@/lib/officialDocuments";
 
 type CertificateView = InstitutionalCertificate | PublicInstitutionalCertificate;
+
+export type CertificateBranding = {
+  name?: string | null;
+  logoUrl?: string | null;
+  city?: string | null;
+  state?: string | null;
+};
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "—";
@@ -84,9 +91,11 @@ function validationLabel(validationUrl: string) {
 export function CertificateDocument({
   certificate,
   showActions = true,
+  branding,
 }: {
   certificate: CertificateView;
   showActions?: boolean;
+  branding?: CertificateBranding;
 }) {
   const documentId = `certificate-document-${certificate.id}`;
   const token = "public_token" in certificate ? certificate.public_token : null;
@@ -95,7 +104,11 @@ export function CertificateDocument({
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-zA-Z0-9-]+/g, "-") + ".pdf";
-  const locality = [certificate.organization_city, certificate.organization_state].filter(Boolean).join(" - ");
+  const organizationName = branding?.name?.trim() || certificate.organization_name;
+  const organizationLogoUrl = branding?.logoUrl?.trim() || certificate.organization_logo_url;
+  const organizationCity = branding?.city?.trim() || certificate.organization_city;
+  const organizationState = branding?.state?.trim() || certificate.organization_state;
+  const locality = [organizationCity, organizationState].filter(Boolean).join(" - ");
   const recipient = certificate.secondary_recipient_name
     ? `${certificate.recipient_name} e ${certificate.secondary_recipient_name}`
     : certificate.recipient_name;
@@ -142,26 +155,26 @@ export function CertificateDocument({
           <CornerOrnament position="bottom-left" />
           <CornerOrnament position="bottom-right" />
 
-          {certificate.organization_logo_url && (
+          {organizationLogoUrl && (
             <img
-              src={certificate.organization_logo_url}
+              src={organizationLogoUrl}
               alt=""
               crossOrigin="anonymous"
               data-certificate-watermark
-              className="pointer-events-none absolute left-1/2 top-[54%] max-h-[61%] max-w-[53%] -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.075] grayscale-[20%]"
+              className="pointer-events-none absolute left-1/2 top-[53%] max-h-[64%] max-w-[55%] -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.08] saturate-50 mix-blend-multiply"
             />
           )}
 
-          <div className="relative z-10 flex h-full flex-col px-[78px] pb-[47px] pt-[54px] text-center">
-            <header className="grid min-h-[116px] grid-cols-[210px_1fr_165px] items-center gap-5">
+          <div className="relative z-10 flex h-full flex-col px-[82px] pb-[42px] pt-[48px] text-center">
+            <header className="grid min-h-[110px] grid-cols-[205px_1fr_155px] items-center gap-5">
               <div className="flex justify-center">
-                {certificate.organization_logo_url ? (
+                {organizationLogoUrl ? (
                   <img
-                    src={certificate.organization_logo_url}
+                    src={organizationLogoUrl}
                     crossOrigin="anonymous"
-                    alt={`Logo ${certificate.organization_name}`}
+                    alt={`Logo ${organizationName}`}
                     data-certificate-logo
-                    className="h-[112px] w-[190px] object-contain"
+                    className="h-[106px] w-[190px] object-contain"
                   />
                 ) : (
                   <div className="flex h-[104px] w-[104px] items-center justify-center rounded-full border-2 border-[#b78b2e] text-[#b78b2e]">
@@ -172,10 +185,11 @@ export function CertificateDocument({
 
               <div className="self-center">
                 <p
+                  data-certificate-brand-name
                   className="mx-auto max-w-[600px] text-[32px] font-semibold uppercase leading-[1.15] tracking-[0.075em] text-[#102e58]"
                   style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
                 >
-                  {certificate.organization_name}
+                  {organizationName}
                 </p>
                 <GoldDivider className="mx-auto mt-3 w-[440px]" />
               </div>
@@ -183,7 +197,7 @@ export function CertificateDocument({
               <AuthenticitySeal />
             </header>
 
-            <main className="mt-2 flex min-h-0 flex-1 flex-col items-center">
+            <main className="mt-1 flex min-h-0 flex-1 flex-col items-center">
               <h1
                 className="text-[68px] font-normal uppercase leading-none tracking-[0.055em] text-[#0b2d5c]"
                 style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
@@ -215,22 +229,22 @@ export function CertificateDocument({
               </p>
 
               <p className="mt-auto text-[17px] text-[#102e58]">
-                {certificate.location || locality || certificate.organization_name}, {formatDate(certificate.event_date)}
+                {certificate.location || locality || organizationName}, {formatDate(certificate.event_date)}
               </p>
             </main>
 
-            <footer className="relative mt-9 grid grid-cols-[1fr_1fr_160px] items-end gap-10">
+            <footer className="mt-7 grid grid-cols-[1fr_1fr_150px] grid-rows-[auto_auto] items-end gap-x-8 gap-y-3">
               <Signature
                 name={certificate.signer_name}
                 role={certificate.signer_role || "Pastor Presidente"}
               />
               <Signature name={certificate.second_signer_name} role={secondRole} />
 
-              <div className="flex min-h-[112px] flex-col items-center justify-end">
+              <div className="col-start-3 row-span-2 row-start-1 flex min-h-[112px] flex-col items-center justify-end">
                 {validationUrl ? (
                   <>
                     <div className="border border-[#b78b2e] bg-white p-2">
-                      <QRCodeSVG value={validationUrl} size={78} level="M" />
+                      <QRCodeSVG value={validationUrl} size={82} level="M" />
                     </div>
                     <p className="mt-1 text-[10px] leading-tight text-[#102e58]">
                       Valide em<br />
@@ -244,7 +258,10 @@ export function CertificateDocument({
                 )}
               </div>
 
-              <div className="pointer-events-none absolute -bottom-[34px] left-1/2 -translate-x-1/2 whitespace-nowrap text-[13px] leading-[1.55] text-[#102e58]">
+              <div
+                data-certificate-footer-meta
+                className="col-span-2 row-start-2 text-[12px] leading-[1.45] text-[#102e58]"
+              >
                 <GoldDivider className="mx-auto mb-1 w-[150px]" />
                 <p>
                   Certificado nº <span className="font-semibold">{certificate.certificate_number || "EM RASCUNHO"}</span>
@@ -273,7 +290,7 @@ function GoldDivider({ className = "" }: { className?: string }) {
 function Signature({ name, role }: { name: string | null | undefined; role: string }) {
   return (
     <div className="text-center text-[#102e58]">
-      <GoldDivider className="mx-auto w-[245px]" />
+      <GoldDivider className="mx-auto w-[220px]" />
       {name ? (
         <p
           className="mt-1 text-[15px] font-semibold leading-tight"
@@ -314,18 +331,26 @@ function CornerOrnament({
   position: "top-left" | "top-right" | "bottom-left" | "bottom-right";
 }) {
   const placement = {
-    "top-left": "left-[30px] top-[24px] -rotate-[42deg]",
-    "top-right": "right-[30px] top-[24px] rotate-[42deg] scale-x-[-1]",
-    "bottom-left": "bottom-[24px] left-[30px] rotate-[42deg] scale-y-[-1]",
-    "bottom-right": "bottom-[24px] right-[30px] -rotate-[42deg] scale-[-1]",
+    "top-left": "left-[32px] top-[30px]",
+    "top-right": "right-[32px] top-[30px] scale-x-[-1]",
+    "bottom-left": "bottom-[30px] left-[32px] scale-y-[-1]",
+    "bottom-right": "bottom-[30px] right-[32px] scale-[-1]",
   }[position];
 
   return (
-    <Wheat
+    <svg
       aria-hidden="true"
-      className={`pointer-events-none absolute z-[2] text-[#b78b2e] ${placement}`}
-      size={84}
-      strokeWidth={1.25}
-    />
+      viewBox="0 0 100 100"
+      className={`pointer-events-none absolute z-[2] size-[82px] text-[#b78b2e] ${placement}`}
+      fill="none"
+    >
+      <path d="M10 91C20 56 46 28 90 10" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M22 69C10 67 8 57 12 48C23 52 28 59 22 69Z" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M34 51C23 47 22 37 28 29C38 35 42 43 34 51Z" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M49 37C42 27 47 18 56 14C61 25 58 33 49 37Z" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M32 64C37 52 48 51 56 56C49 66 41 69 32 64Z" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M49 46C55 35 66 34 74 40C67 50 58 53 49 46Z" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M66 29C73 19 84 20 91 27C83 35 74 37 66 29Z" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
   );
 }

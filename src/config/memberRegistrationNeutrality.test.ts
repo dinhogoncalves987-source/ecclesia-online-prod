@@ -29,6 +29,7 @@ describe("cadastro de membros neutro e responsivo", () => {
       "Origem do registro",
       "Wintechi",
       "sistema anterior",
+      "sistema antigo",
       "importação de legado",
     ]) {
       expect(source).not.toContain(forbiddenText);
@@ -68,6 +69,12 @@ describe("cadastro de membros neutro e responsivo", () => {
     );
     expect(source).not.toContain(
       'flex border-b border-border/50 overflow-x-auto flex-shrink-0 bg-background',
+    );
+  });
+
+  it("abre a carteira em uma área legível sem ultrapassar a tela", () => {
+    expect(source).toContain(
+      'max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto',
     );
   });
 });

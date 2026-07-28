@@ -194,7 +194,17 @@ export default function Certificados() {
               </Button>
             </div>
           )}
-          {selected && <CertificateDocument certificate={selected} />}
+          {selected && (
+            <CertificateDocument
+              certificate={selected}
+              branding={{
+                name: church.name,
+                logoUrl: church.logo_url,
+                city: church.city,
+                state: church.state,
+              }}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </AdminLayout>
