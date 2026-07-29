@@ -299,6 +299,7 @@ export type Database = {
       }
       finance_account_categories: {
         Row: {
+          accounting_group_id: string | null
           code: string
           created_at: string
           id: string
@@ -310,6 +311,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          accounting_group_id?: string | null
           code: string
           created_at?: string
           id?: string
@@ -321,6 +323,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          accounting_group_id?: string | null
           code?: string
           created_at?: string
           id?: string
@@ -333,7 +336,55 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_fac_accounting_group"
+            columns: ["accounting_group_id"]
+            isOneToOne: false
+            referencedRelation: "finance_accounting_groups"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "finance_account_categories_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_accounting_groups: {
+        Row: {
+          code: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          organization_id: string | null
+          type: string | null
+          updated_at: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          organization_id?: string | null
+          type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          organization_id?: string | null
+          type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_accounting_groups_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -566,6 +617,97 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "finance_cost_centers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_document_types: {
+        Row: {
+          code: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          organization_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          organization_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          organization_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_document_types_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_import_batches: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          error_report: Json | null
+          failed_rows: number
+          finished_at: string | null
+          id: string
+          imported_rows: number
+          organization_id: string
+          source_file_name: string | null
+          source_type: string
+          status: string
+          total_rows: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          error_report?: Json | null
+          failed_rows?: number
+          finished_at?: string | null
+          id?: string
+          imported_rows?: number
+          organization_id: string
+          source_file_name?: string | null
+          source_type?: string
+          status?: string
+          total_rows?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          error_report?: Json | null
+          failed_rows?: number
+          finished_at?: string | null
+          id?: string
+          imported_rows?: number
+          organization_id?: string
+          source_file_name?: string | null
+          source_type?: string
+          status?: string
+          total_rows?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_import_batches_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -1162,23 +1304,43 @@ export type Database = {
       transactions: {
         Row: {
           account_category_id: string | null
+          accounting_date: string | null
+          accounting_group_id: string | null
           amount: number
+          asaas_customer_id: string | null
+          asaas_payment_id: string | null
           campaign_id: string | null
           category: string
+          collector_name: string | null
+          congregation_id: string | null
+          contributor_document: string | null
+          contributor_name: string | null
           cost_center_id: string | null
           created_at: string
           created_by: string | null
           date: string
           description: string
+          district_id: string | null
+          document_number: string | null
+          document_type_id: string | null
+          external_reference: string | null
           financial_account_id: string | null
           id: string
+          import_batch_id: string | null
+          issue_date: string | null
+          legacy_record_number: string | null
           notes: string | null
           organization_id: string
+          origin: string
           payment_method: string | null
+          period_label: string | null
           receipt_url: string | null
           responsible_id: string | null
           source_module: string | null
           status: string
+          supplier_beneficiary_document: string | null
+          supplier_beneficiary_name: string | null
+          treasurer_name: string | null
           type: string
           updated_at: string
           updated_by: string | null
@@ -1186,23 +1348,43 @@ export type Database = {
         }
         Insert: {
           account_category_id?: string | null
+          accounting_date?: string | null
+          accounting_group_id?: string | null
           amount: number
+          asaas_customer_id?: string | null
+          asaas_payment_id?: string | null
           campaign_id?: string | null
           category: string
+          collector_name?: string | null
+          congregation_id?: string | null
+          contributor_document?: string | null
+          contributor_name?: string | null
           cost_center_id?: string | null
           created_at?: string
           created_by?: string | null
           date?: string
           description: string
+          district_id?: string | null
+          document_number?: string | null
+          document_type_id?: string | null
+          external_reference?: string | null
           financial_account_id?: string | null
           id?: string
+          import_batch_id?: string | null
+          issue_date?: string | null
+          legacy_record_number?: string | null
           notes?: string | null
           organization_id: string
+          origin?: string
           payment_method?: string | null
+          period_label?: string | null
           receipt_url?: string | null
           responsible_id?: string | null
           source_module?: string | null
           status?: string
+          supplier_beneficiary_document?: string | null
+          supplier_beneficiary_name?: string | null
+          treasurer_name?: string | null
           type: string
           updated_at?: string
           updated_by?: string | null
@@ -1210,29 +1392,63 @@ export type Database = {
         }
         Update: {
           account_category_id?: string | null
+          accounting_date?: string | null
+          accounting_group_id?: string | null
           amount?: number
+          asaas_customer_id?: string | null
+          asaas_payment_id?: string | null
           campaign_id?: string | null
           category?: string
+          collector_name?: string | null
+          congregation_id?: string | null
+          contributor_document?: string | null
+          contributor_name?: string | null
           cost_center_id?: string | null
           created_at?: string
           created_by?: string | null
           date?: string
           description?: string
+          district_id?: string | null
+          document_number?: string | null
+          document_type_id?: string | null
+          external_reference?: string | null
           financial_account_id?: string | null
           id?: string
+          import_batch_id?: string | null
+          issue_date?: string | null
+          legacy_record_number?: string | null
           notes?: string | null
           organization_id?: string
+          origin?: string
           payment_method?: string | null
+          period_label?: string | null
           receipt_url?: string | null
           responsible_id?: string | null
           source_module?: string | null
           status?: string
+          supplier_beneficiary_document?: string | null
+          supplier_beneficiary_name?: string | null
+          treasurer_name?: string | null
           type?: string
           updated_at?: string
           updated_by?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_transactions_accounting_group"
+            columns: ["accounting_group_id"]
+            isOneToOne: false
+            referencedRelation: "finance_accounting_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_transactions_congregation"
+            columns: ["congregation_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "transactions_account_category_id_fkey"
             columns: ["account_category_id"]
@@ -1241,10 +1457,31 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fk_transactions_district"
+            columns: ["district_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_transactions_document_type"
+            columns: ["document_type_id"]
+            isOneToOne: false
+            referencedRelation: "finance_document_types"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "transactions_cost_center_id_fkey"
             columns: ["cost_center_id"]
             isOneToOne: false
             referencedRelation: "finance_cost_centers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_transactions_import_batch"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "finance_import_batches"
             referencedColumns: ["id"]
           },
           {
@@ -6400,6 +6637,10 @@ export type Database = {
         Args: { p_organization_id: string; p_rows: Json }
         Returns: Json
       }
+      import_finance_transactions_bulk: {
+        Args: { p_rows: Json }
+        Returns: Json
+      }
       mark_internal_thread_delivered: {
         Args: { _thread_id: string }
         Returns: undefined
@@ -6598,6 +6839,10 @@ export type Database = {
       }
       revoke_institutional_certificate: {
         Args: { p_certificate_id: string; p_reason: string }
+        Returns: undefined
+      }
+      delete_draft_institutional_certificate: {
+        Args: { p_certificate_id: string }
         Returns: undefined
       }
       update_institutional_certificate: {

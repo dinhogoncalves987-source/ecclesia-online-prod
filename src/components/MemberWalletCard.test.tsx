@@ -1,6 +1,12 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MemberWalletCard, type WalletMember } from "./MemberWalletCard";
+
+const { rpcMock } = vi.hoisted(() => ({ rpcMock: vi.fn() }));
+
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: { rpc: rpcMock },
+}));
 
 vi.mock("@/components/DocumentActions", () => ({
   DocumentActions: () => <div data-testid="document-actions" />,
@@ -64,5 +70,31 @@ describe("MemberWalletCard — identidade visual", () => {
     );
 
     expect(container.querySelector("[data-wallet-church-acronym]")).toHaveTextContent("ADCS");
+  });
+
+  it("amplia automaticamente o QR seguro para leitura por scanner", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: {
+        token: "token-seguro-de-teste",
+        expires_at: new Date(Date.now() + 300_000).toISOString(),
+      },
+      error: null,
+    });
+
+    const { container } = render(
+      <MemberWalletCard member={member} churchName="Congregação Central" churchLogoUrl={null} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Gerar QR seguro" }));
+
+    expect(await screen.findByRole("dialog", { name: "QR Code seguro ampliado" })).toBeInTheDocument();
+    const expandedQr = container.querySelector("[data-member-qr-expanded] div svg");
+    expect(expandedQr).toHaveAttribute("width", "288");
+    expect(screen.getByRole("button", { name: "Fechar QR ampliado" })).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "QR Code seguro ampliado" })).toHaveStyle({ opacity: "0" });
+    });
   });
 });

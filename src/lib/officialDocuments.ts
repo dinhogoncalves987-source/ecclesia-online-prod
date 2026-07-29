@@ -379,6 +379,15 @@ export async function revokeInstitutionalCertificate(
   return normalizeRpcError(error);
 }
 
+export async function deleteDraftInstitutionalCertificate(
+  certificateId: string,
+): Promise<Error | null> {
+  const { error } = await supabase.rpc("delete_draft_institutional_certificate", {
+    p_certificate_id: certificateId,
+  });
+  return normalizeRpcError(error);
+}
+
 export async function getPublicInstitutionalCertificate(
   token: string,
 ): Promise<ServiceResult<PublicInstitutionalCertificate | null>> {

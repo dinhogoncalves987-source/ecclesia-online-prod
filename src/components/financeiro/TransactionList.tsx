@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Plus, X, Loader2, Upload, Sparkles, Download, Trash2, Edit2, Lock } from "lucide-react";
+import { Search, Plus, X, Loader2, Upload, Sparkles, Download, Trash2, Edit2, Lock, ChevronDown } from "lucide-react";
 import { downloadCSVRaw } from "@/lib/docExport";
 import { AnimatePresence, motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useChurch } from "@/hooks/useChurchContext";
 import { useRole } from "@/hooks/useRole";
@@ -12,7 +13,15 @@ import { BulkImportModal } from "@/components/BulkImportModal";
 import { AIImportModal } from "@/components/AIImportModal";
 import { SpreadsheetImportModal } from "@/components/financeiro/SpreadsheetImportModal";
 import { OperationalAssistant } from "@/components/OperationalAssistant";
-import { insertWithOrganizationScope, runScopedOrganizationQuery } from "@/lib/organizationScope";
+import { getOrganizationScopeIds, insertWithOrganizationScope, runScopedOrganizationQuery } from "@/lib/organizationScope";
+import {
+  buildManualTransactionPayload,
+  createEmptyManualTransactionDraft,
+  parseManualTransactionAmount,
+  type ManualTransactionDraft,
+} from "@/lib/financeManualPayload";
+import { buildFinanceCsv } from "@/lib/financeCsv";
+import { buildGenericFinanceImportPayload } from "@/lib/importers/financeImportPayload";
 import {
   DEFAULT_ACCOUNT_CATEGORIES,
   DEFAULT_COST_CENTERS,
@@ -22,7 +31,9 @@ import {
   isExpense,
   type FinanceAccount,
   type FinanceAccountCategory,
+  type FinanceAccountingGroup,
   type FinanceCostCenter,
+  type FinanceDocumentType,
   type FinanceMonthlyClosing,
   type TreasuryTransaction,
 } from "@/lib/finance";
@@ -47,6 +58,7 @@ const makeDateFormatter = (lang: string) => (d: string) => {
 const today = () => new Date().toISOString().split("T")[0];
 
 const getText = (value: unknown) => (typeof value === "string" ? value : "");
+type OrganizationOption = { id: string; name: string; organization_type: string | null };
 
 export function TransactionList({
   transactions,
@@ -68,28 +80,22 @@ export function TransactionList({
   const [accountCategories, setAccountCategories] = useState<FinanceAccountCategory[]>(DEFAULT_ACCOUNT_CATEGORIES);
   const [costCenters, setCostCenters] = useState<FinanceCostCenter[]>(DEFAULT_COST_CENTERS);
   const [financialAccounts, setFinancialAccounts] = useState<FinanceAccount[]>(DEFAULT_FINANCIAL_ACCOUNTS);
+  const [accountingGroups, setAccountingGroups] = useState<FinanceAccountingGroup[]>([]);
+  const [documentTypes, setDocumentTypes] = useState<FinanceDocumentType[]>([]);
+  const [organizationOptions, setOrganizationOptions] = useState<OrganizationOption[]>([]);
   const [closings, setClosings] = useState<FinanceMonthlyClosing[]>([]);
+  const [treasurySetupReady, setTreasurySetupReady] = useState(false);
   const [filterType, setFilterType] = useState<"all" | "Entrada" | "Saida">("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "Pendente" | "Confirmado" | "Pago">("all");
   const [filterCategory, setFilterCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [showAccountingDetails, setShowAccountingDetails] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [newTx, setNewTx] = useState({
-    desc: "",
-    type: "Entrada" as "Entrada" | "Saida",
-    value: "",
-    category: DEFAULT_ACCOUNT_CATEGORIES[0].name,
-    accountCategoryId: "",
-    costCenterId: "",
-    financialAccountId: "",
-    paymentMethod: "PIX",
-    receiptUrl: "",
-    notes: "",
-    date: today(),
-    status: "Pendente",
-  });
+  const [newTx, setNewTx] = useState<ManualTransactionDraft>(() =>
+    createEmptyManualTransactionDraft({ category: DEFAULT_ACCOUNT_CATEGORIES[0].name }),
+  );
   const [showImport, setShowImport] = useState(false);
   const [showAIImport, setShowAIImport] = useState(false);
   const [showSpreadsheetImport, setShowSpreadsheetImport] = useState(false);
@@ -98,9 +104,19 @@ export function TransactionList({
 
   useEffect(() => {
     if (!church) return;
+    setTreasurySetupReady(false);
+    setAccountCategories(DEFAULT_ACCOUNT_CATEGORIES);
+    setCostCenters(DEFAULT_COST_CENTERS);
+    setFinancialAccounts(DEFAULT_FINANCIAL_ACCOUNTS);
+    setAccountingGroups([]);
+    setDocumentTypes([]);
+    setOrganizationOptions([]);
+    setClosings([]);
+    setNewTx(createEmptyManualTransactionDraft({ category: DEFAULT_ACCOUNT_CATEGORIES[0].name }));
 
     const loadTreasurySetup = async () => {
-      const [categoryResult, centerResult, accountResult, closingResult] = await Promise.all([
+      const scopeIds = await getOrganizationScopeIds(church.id);
+      const [categoryResult, centerResult, accountResult, closingResult, groupResult, documentResult, orgResult] = await Promise.all([
         runScopedOrganizationQuery<FinanceAccountCategory[]>("finance_account_categories", church.id, query =>
           query.select("*").eq("is_active", true).order("code"),
         ),
@@ -113,26 +129,86 @@ export function TransactionList({
         runScopedOrganizationQuery<FinanceMonthlyClosing[]>("finance_monthly_closings", church.id, query =>
           query.select("*").order("month", { ascending: false }),
         ),
+        supabase
+          .from("finance_accounting_groups")
+          .select("*")
+          .eq("is_active", true)
+          .or(`organization_id.is.null,organization_id.eq.${church.id}`)
+          .order("code"),
+        supabase
+          .from("finance_document_types")
+          .select("*")
+          .eq("is_active", true)
+          .or(`organization_id.is.null,organization_id.eq.${church.id}`)
+          .order("code"),
+        supabase
+          .from("organizations")
+          .select("id, name, organization_type")
+          .in("id", scopeIds)
+          .eq("active", true)
+          .order("name"),
       ]);
 
-      if (categoryResult.data?.length) setAccountCategories(categoryResult.data);
-      if (centerResult.data?.length) setCostCenters(centerResult.data);
-      if (accountResult.data?.length) setFinancialAccounts(accountResult.data);
-      if (closingResult.data?.length) setClosings(closingResult.data);
+      if (
+        categoryResult.error
+        || centerResult.error
+        || accountResult.error
+        || closingResult.error
+        || groupResult.error
+        || documentResult.error
+        || orgResult.error
+      ) {
+        toast.error(t("Não foi possível carregar toda a estrutura financeira. Tente novamente."));
+        return;
+      }
+
+      const loadedCategories = categoryResult.data?.length ? categoryResult.data : DEFAULT_ACCOUNT_CATEGORIES;
+      const loadedCenters = centerResult.data?.length ? centerResult.data : DEFAULT_COST_CENTERS;
+      const loadedAccounts = accountResult.data?.length ? accountResult.data : DEFAULT_FINANCIAL_ACCOUNTS;
+      setAccountCategories(loadedCategories);
+      setCostCenters(loadedCenters);
+      setFinancialAccounts(loadedAccounts);
+      setClosings(closingResult.data ?? []);
+      setAccountingGroups((groupResult.data ?? []) as unknown as FinanceAccountingGroup[]);
+      setDocumentTypes((documentResult.data ?? []) as unknown as FinanceDocumentType[]);
+      setOrganizationOptions((orgResult.data ?? []) as OrganizationOption[]);
+      setNewTx(createEmptyManualTransactionDraft({
+        category: loadedCategories[0]?.name || "Dizimos",
+        accountCategoryId: loadedCategories[0]?.id || "",
+        costCenterId: loadedCenters[0]?.id || "",
+        financialAccountId: loadedAccounts[0]?.id || "",
+      }));
+      setTreasurySetupReady(true);
     };
 
-    loadTreasurySetup();
-  }, [church]);
+    loadTreasurySetup().catch(() => toast.error(t("Não foi possível carregar a estrutura financeira.")));
+  }, [church, t]);
 
   const closedMonths = useMemo(() => new Set(closings.map(c => c.month)), [closings]);
-  const isClosed = (date: string) => closedMonths.has(getTransactionMonth(date));
+  const isClosed = (date: string) => !treasurySetupReady || closedMonths.has(getTransactionMonth(date));
 
   const financeFields = [
-                { key: "description", label: t("Descrição"), required: true },
+    { key: "legacy_record_number", label: t("Registro nº") },
+    { key: "period_label", label: t("Período") },
+    { key: "date", label: t("Data contábil (AAAA-MM-DD)"), required: true },
+    { key: "issue_date", label: t("Data de emissão (AAAA-MM-DD)") },
+    { key: "description", label: t("Descrição"), required: true },
     { key: "amount", label: t("Valor"), required: true },
     { key: "type", label: t("Tipo (Entrada/Saída)"), required: true },
-    { key: "category", label: t("Categoria"), required: true },
-    { key: "date", label: t("Data (AAAA-MM-DD)") },
+    { key: "accounting_group", label: t("Grupo contábil") },
+    { key: "category", label: t("Conta contábil / categoria"), required: true },
+    { key: "cost_center", label: t("Centro de custo") },
+    { key: "financial_account", label: t("Conta financeira / portador") },
+    { key: "document_type", label: t("Tipo de documento") },
+    { key: "document_number", label: t("Número do documento") },
+    { key: "supplier_beneficiary_name", label: t("Fornecedor/beneficiário") },
+    { key: "supplier_beneficiary_document", label: t("CPF/CNPJ do fornecedor") },
+    { key: "contributor_name", label: t("Contribuinte") },
+    { key: "contributor_document", label: t("CPF/CNPJ do contribuinte") },
+    { key: "district", label: t("Distrito / Subdistrito") },
+    { key: "congregation", label: t("Congregação") },
+    { key: "collector_name", label: t("Coletor") },
+    { key: "treasurer_name", label: t("Tesoureiro") },
     { key: "payment_method", label: t("Forma de pagamento") },
     { key: "receipt_url", label: t("Comprovante") },
     { key: "notes", label: t("Observações") },
@@ -156,42 +232,39 @@ export function TransactionList({
 
   const handleBulkImport = async (rows: Record<string, string>[]) => {
     if (!user || !church || !canWriteFinance) return { success: 0, errors: rows.length };
+    if (!treasurySetupReady) return { success: 0, errors: rows.length };
     let success = 0;
     let errors = 0;
 
-    for (const row of rows) {
-      const amount = parseFloat(row.amount?.replace(/[^\d.,]/g, "").replace(",", ".")) || 0;
-      const date = row.date || today();
-      if (!row.description || amount <= 0 || isClosed(date)) {
-        errors++;
+    const payloads = rows.map(row => buildGenericFinanceImportPayload(row, church.id, {
+      accountCategories,
+      costCenters,
+      financialAccounts,
+      accountingGroups,
+      documentTypes,
+      organizations: organizationOptions,
+    }));
+    errors += payloads.filter(payload => !payload).length;
+    const validPayloads = payloads.filter(
+      (payload): payload is Record<string, unknown> => Boolean(payload),
+    );
+
+    for (let index = 0; index < validPayloads.length; index += 200) {
+      const batch = validPayloads.slice(index, index + 200);
+      const { data, error } = await supabase.rpc("import_finance_transactions_bulk", {
+        p_rows: batch as Json,
+      });
+      if (error) {
+        errors += batch.length;
         continue;
       }
-
-      const type = row.type?.toLowerCase().includes("sai") ? "Saida" : "Entrada";
-      const category = row.category || (type === "Entrada" ? "Dizimos" : "Administrativo");
-      const categoryRef = accountCategories.find(c => c.name === category);
-      const centerRef = costCenters[0];
-      const accountRef = financialAccounts[0];
-
-      const { error } = await insertWithOrganizationScope("transactions", church.id, {
-        user_id: user.id,
-        created_by: user.id,
-        responsible_id: user.id,
-        description: row.description,
-        type,
-        amount,
-        category,
-        account_category_id: categoryRef?.id || null,
-        cost_center_id: centerRef?.id || null,
-        financial_account_id: accountRef?.id || null,
-        payment_method: row.payment_method || "PIX",
-        receipt_url: row.receipt_url || null,
-        notes: row.notes || null,
-        status: "Pendente",
-        date,
-      });
-      if (error) errors++;
-      else success++;
+      const result = (data ?? {}) as {
+        inserted?: number;
+        failed?: number;
+        skipped_closed_month?: number;
+      };
+      success += Number(result.inserted ?? 0);
+      errors += Number(result.failed ?? 0) + Number(result.skipped_closed_month ?? 0);
     }
 
     if (success > 0) await reloadTransactions();
@@ -203,7 +276,14 @@ export function TransactionList({
     if (filterType !== "all" && normalizedType !== filterType) return false;
     if (filterStatus !== "all" && tx.status !== filterStatus) return false;
     if (filterCategory !== "all" && tx.category !== filterCategory) return false;
-    if (searchQuery && !tx.description.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    const searchable = [
+      tx.description,
+      tx.document_number,
+      tx.legacy_record_number,
+      tx.supplier_beneficiary_name,
+      tx.contributor_name,
+    ].filter(Boolean).join(" ").toLowerCase();
+    if (searchQuery && !searchable.includes(searchQuery.toLowerCase())) return false;
     return true;
   });
 
@@ -212,38 +292,29 @@ export function TransactionList({
 
   const addOrUpdateTransaction = async () => {
     if (!canWriteFinance) return;
+    if (!treasurySetupReady) {
+      toast.error(t("A estrutura financeira ainda não está disponível."));
+      return;
+    }
     if (!newTx.desc || !newTx.value || !newTx.category || !user || !church) return;
     if (isClosed(newTx.date)) {
       toast.error(t("Período fechado para edição"));
       return;
     }
 
-    const raw = newTx.value.replace(/[^\d,.]/g, "").replace(",", ".");
-    const amount = parseFloat(raw) || 0;
+    const amount = parseManualTransactionAmount(newTx.value);
     if (amount <= 0) return;
     setSaving(true);
 
-    const payload = {
-      description: newTx.desc,
-      type: newTx.type,
-      amount,
-      category: newTx.category,
-      account_category_id: newTx.accountCategoryId || null,
-      cost_center_id: newTx.costCenterId || null,
-      financial_account_id: newTx.financialAccountId || null,
-      responsible_id: user.id,
-      payment_method: newTx.paymentMethod,
-      receipt_url: newTx.receiptUrl || null,
-      notes: newTx.notes || null,
-      status: newTx.status,
-      date: newTx.date || today(),
-      updated_by: user.id,
-    };
+    const payload = buildManualTransactionPayload(newTx, user.id, {
+      preserveOrigin: Boolean(editingId),
+    });
+    let saved = false;
 
     if (editingId) {
       const { error } = await supabase
-        .from("transactions")
-        .update(payload)
+        .from("transactions" as never)
+        .update(payload as never)
         .eq("id", editingId)
         .eq("organization_id", church.id);
 
@@ -252,6 +323,7 @@ export function TransactionList({
       } else {
         setTransactions(transactions.map(tx => tx.id === editingId ? { ...tx, ...payload } : tx));
         toast.success(t("Lançamento atualizado!"));
+        saved = true;
       }
     } else {
       const { data, error } = await insertWithOrganizationScope<TreasuryTransaction>("transactions", church.id, {
@@ -265,29 +337,23 @@ export function TransactionList({
       } else if (data) {
         setTransactions([data, ...transactions]);
         toast.success(t("Lançamento salvo!"));
+        saved = true;
       }
     }
 
-    resetForm();
     setSaving(false);
+    if (saved) resetForm();
   };
 
   const resetForm = () => {
     const firstCategory = accountCategories[0];
-    setNewTx({
-      desc: "",
-      type: "Entrada",
-      value: "",
+    setNewTx(createEmptyManualTransactionDraft({
       category: firstCategory?.name || "Dizimos",
       accountCategoryId: firstCategory?.id || "",
       costCenterId: costCenters[0]?.id || "",
       financialAccountId: financialAccounts[0]?.id || "",
-      paymentMethod: "PIX",
-      receiptUrl: "",
-      notes: "",
-      date: today(),
-      status: "Pendente",
-    });
+    }));
+    setShowAccountingDetails(false);
     setShowForm(false);
     setEditingId(null);
   };
@@ -299,7 +365,7 @@ export function TransactionList({
       return;
     }
 
-    setNewTx({
+    setNewTx(createEmptyManualTransactionDraft({
       desc: tx.description,
       type: isExpense(tx.type) ? "Saida" : "Entrada",
       value: String(tx.amount),
@@ -312,7 +378,22 @@ export function TransactionList({
       notes: tx.notes || "",
       date: tx.date,
       status: getText(tx.status) || "Pendente",
-    });
+      legacyRecordNumber: tx.legacy_record_number || "",
+      periodLabel: tx.period_label || "",
+      issueDate: tx.issue_date || tx.date,
+      documentTypeId: tx.document_type_id || "",
+      documentNumber: tx.document_number || "",
+      supplierBeneficiaryName: tx.supplier_beneficiary_name || "",
+      supplierBeneficiaryDocument: tx.supplier_beneficiary_document || "",
+      contributorName: tx.contributor_name || "",
+      contributorDocument: tx.contributor_document || "",
+      accountingGroupId: tx.accounting_group_id || "",
+      congregationId: tx.congregation_id || "",
+      districtId: tx.district_id || "",
+      collectorName: tx.collector_name || "",
+      treasurerName: tx.treasurer_name || "",
+    }));
+    setShowAccountingDetails(true);
     setEditingId(tx.id);
     setShowForm(true);
   };
@@ -323,6 +404,7 @@ export function TransactionList({
       toast.error(t("Período fechado para edição"));
       return;
     }
+    if (!window.confirm(t("Remover este lançamento financeiro? Esta ação não poderá ser desfeita."))) return;
 
     const { error } = await supabase.from("transactions").delete().eq("id", tx.id).eq("organization_id", church.id);
     if (error) toast.error(t("Erro ao remover"));
@@ -352,17 +434,45 @@ export function TransactionList({
   };
 
   const exportCSV = () => {
-    const header = "Data,Descricao,Tipo,Categoria,Centro de custo,Conta,Forma,Valor,Status,Comprovante,Observacoes\n";
-    const rows = filtered.map(tx => {
-      const center = costCenters.find(c => c.id === tx.cost_center_id)?.name || "";
-      const account = financialAccounts.find(a => a.id === tx.financial_account_id)?.name || "";
-      return `${tx.date},"${tx.description}",${tx.type},${tx.category || ""},"${center}","${account}",${tx.payment_method || ""},${tx.amount},${tx.status},"${tx.receipt_url || ""}","${tx.notes || ""}"`;
-    }).join("\n");
-    downloadCSVRaw(header + rows, `tesouraria_${today()}.csv`);
+    downloadCSVRaw(buildFinanceCsv(filtered, {
+      costCenters,
+      financialAccounts,
+      accountingGroups,
+      documentTypes,
+      organizations: organizationOptions,
+    }), `tesouraria_${today()}.csv`);
     toast.success(t("Exportado!"));
   };
 
   const categories = [...new Set(accountCategories.map(c => c.name).concat(transactions.map(tx => tx.category || "")).filter(Boolean))];
+  const expectedCategoryType = newTx.type === "Entrada" ? "receita" : "despesa";
+  const visibleAccountingGroups = accountingGroups.filter(group =>
+    !group.type || group.type === expectedCategoryType,
+  );
+  const categoriesByType = accountCategories.filter(category => category.type === expectedCategoryType);
+  const visibleAccountCategories = newTx.accountingGroupId
+    ? categoriesByType.filter(category =>
+      !category.accounting_group_id || category.accounting_group_id === newTx.accountingGroupId,
+    )
+    : categoriesByType;
+  const districts = organizationOptions.filter(org =>
+    ["distrito", "setor", "subdistrito", "subsede"].includes((org.organization_type || "").toLowerCase()),
+  );
+  const congregations = organizationOptions.filter(org =>
+    ["congregacao", "congregação", "igreja_local"].includes((org.organization_type || "").toLowerCase()),
+  );
+
+  const updateTransactionType = (type: "Entrada" | "Saida") => {
+    const categoryType = type === "Entrada" ? "receita" : "despesa";
+    const firstCategory = accountCategories.find(category => category.type === categoryType);
+    setNewTx(current => ({
+      ...current,
+      type,
+      accountingGroupId: "",
+      accountCategoryId: firstCategory?.id || "",
+      category: firstCategory?.name || (type === "Entrada" ? "Receita" : "Despesa"),
+    }));
+  };
 
   return (
     <div className="space-y-4">
@@ -435,7 +545,7 @@ export function TransactionList({
                   className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
                 <input placeholder={t("Valor")} value={newTx.value} onChange={e => setNewTx({ ...newTx, value: e.target.value })}
                   className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
-                <select value={newTx.type} onChange={e => setNewTx({ ...newTx, type: e.target.value as "Entrada" | "Saida" })}
+                <select value={newTx.type} onChange={e => updateTransactionType(e.target.value as "Entrada" | "Saida")}
                   className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring">
                   <option value="Entrada">{t("Entrada")}</option>
                   <option value="Saida">{t("Saída")}</option>
@@ -444,7 +554,7 @@ export function TransactionList({
                   const selected = accountCategories.find(c => c.id === e.target.value);
                   setNewTx({ ...newTx, accountCategoryId: e.target.value, category: selected?.name || newTx.category });
                 }} className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-                  {accountCategories.map(c => <option key={c.id || c.code} value={c.id || ""}>{c.code} - {t(c.name)}</option>)}
+                  {visibleAccountCategories.map(c => <option key={c.id || c.code} value={c.id || ""}>{c.code} - {t(c.name)}</option>)}
                 </select>
                 <select value={newTx.costCenterId} onChange={e => setNewTx({ ...newTx, costCenterId: e.target.value })}
                   className="px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring">
@@ -473,6 +583,121 @@ export function TransactionList({
                 <textarea placeholder={t("Observações")} value={newTx.notes} onChange={e => setNewTx({ ...newTx, notes: e.target.value })}
                   className="sm:col-span-2 px-3 py-2.5 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring min-h-[42px]" />
               </div>
+              <button
+                type="button"
+                onClick={() => setShowAccountingDetails(current => !current)}
+                className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                aria-expanded={showAccountingDetails}
+              >
+                <ChevronDown size={16} className={`transition-transform ${showAccountingDetails ? "rotate-180" : ""}`} />
+                {t("Dados contábeis complementares")}
+              </button>
+              <AnimatePresence initial={false}>
+                {showAccountingDetails && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 border-t border-border/50 pt-4">
+                      <label className="space-y-1 text-xs text-muted-foreground">
+                        <span>{t("Registro nº")}</span>
+                        <input value={newTx.legacyRecordNumber} onChange={e => setNewTx({ ...newTx, legacyRecordNumber: e.target.value })}
+                          className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm text-foreground" />
+                      </label>
+                      <label className="space-y-1 text-xs text-muted-foreground">
+                        <span>{t("Período")}</span>
+                        <input placeholder="Ex.: JUL/26" value={newTx.periodLabel} onChange={e => setNewTx({ ...newTx, periodLabel: e.target.value })}
+                          className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm text-foreground" />
+                      </label>
+                      <label className="space-y-1 text-xs text-muted-foreground">
+                        <span>{t("Data de emissão")}</span>
+                        <input type="date" value={newTx.issueDate} onChange={e => setNewTx({ ...newTx, issueDate: e.target.value })}
+                          className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm text-foreground" />
+                      </label>
+                      <label className="space-y-1 text-xs text-muted-foreground">
+                        <span>{t("Tipo de documento")}</span>
+                        <select value={newTx.documentTypeId} onChange={e => setNewTx({ ...newTx, documentTypeId: e.target.value })}
+                          className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm text-foreground">
+                          <option value="">{t("Selecionar")}</option>
+                          {documentTypes.map(item => <option key={item.id} value={item.id}>{item.code ? `${item.code} - ` : ""}{item.name}</option>)}
+                        </select>
+                      </label>
+                      <label className="space-y-1 text-xs text-muted-foreground">
+                        <span>{t("Número do documento")}</span>
+                        <input value={newTx.documentNumber} onChange={e => setNewTx({ ...newTx, documentNumber: e.target.value })}
+                          className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm text-foreground" />
+                      </label>
+                      <label className="space-y-1 text-xs text-muted-foreground">
+                        <span>{t("Grupo contábil")}</span>
+                        <select value={newTx.accountingGroupId} onChange={e => {
+                          const groupId = e.target.value;
+                          const firstCategory = accountCategories.find(category =>
+                            category.type === expectedCategoryType
+                            && (!groupId || category.accounting_group_id === groupId),
+                          );
+                          setNewTx({
+                            ...newTx,
+                            accountingGroupId: groupId,
+                            accountCategoryId: firstCategory?.id || "",
+                            category: firstCategory?.name || newTx.category,
+                          });
+                        }} className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm text-foreground">
+                          <option value="">{t("Selecionar")}</option>
+                          {visibleAccountingGroups.map(item => <option key={item.id} value={item.id}>{item.code ? `${item.code} - ` : ""}{item.name}</option>)}
+                        </select>
+                      </label>
+                      <label className="space-y-1 text-xs text-muted-foreground">
+                        <span>{t("Fornecedor/beneficiário")}</span>
+                        <input value={newTx.supplierBeneficiaryName} onChange={e => setNewTx({ ...newTx, supplierBeneficiaryName: e.target.value })}
+                          className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm text-foreground" />
+                      </label>
+                      <label className="space-y-1 text-xs text-muted-foreground">
+                        <span>{t("CPF/CNPJ do fornecedor")}</span>
+                        <input value={newTx.supplierBeneficiaryDocument} onChange={e => setNewTx({ ...newTx, supplierBeneficiaryDocument: e.target.value })}
+                          className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm text-foreground" />
+                      </label>
+                      <label className="space-y-1 text-xs text-muted-foreground">
+                        <span>{t("Contribuinte")}</span>
+                        <input value={newTx.contributorName} onChange={e => setNewTx({ ...newTx, contributorName: e.target.value })}
+                          className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm text-foreground" />
+                      </label>
+                      <label className="space-y-1 text-xs text-muted-foreground">
+                        <span>{t("CPF/CNPJ do contribuinte")}</span>
+                        <input value={newTx.contributorDocument} onChange={e => setNewTx({ ...newTx, contributorDocument: e.target.value })}
+                          className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm text-foreground" />
+                      </label>
+                      <label className="space-y-1 text-xs text-muted-foreground">
+                        <span>{t("Distrito / Subdistrito")}</span>
+                        <select value={newTx.districtId} onChange={e => setNewTx({ ...newTx, districtId: e.target.value })}
+                          className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm text-foreground">
+                          <option value="">{t("Selecionar")}</option>
+                          {districts.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                        </select>
+                      </label>
+                      <label className="space-y-1 text-xs text-muted-foreground">
+                        <span>{t("Congregação")}</span>
+                        <select value={newTx.congregationId} onChange={e => setNewTx({ ...newTx, congregationId: e.target.value })}
+                          className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm text-foreground">
+                          <option value="">{t("Selecionar")}</option>
+                          {congregations.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                        </select>
+                      </label>
+                      <label className="space-y-1 text-xs text-muted-foreground">
+                        <span>{t("Coletor")}</span>
+                        <input value={newTx.collectorName} onChange={e => setNewTx({ ...newTx, collectorName: e.target.value })}
+                          className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm text-foreground" />
+                      </label>
+                      <label className="space-y-1 text-xs text-muted-foreground">
+                        <span>{t("Tesoureiro")}</span>
+                        <input value={newTx.treasurerName} onChange={e => setNewTx({ ...newTx, treasurerName: e.target.value })}
+                          className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm text-foreground" />
+                      </label>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               <button onClick={addOrUpdateTransaction} disabled={saving || isClosed(newTx.date)}
                 className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 inline-flex items-center gap-2">
                 {saving && <Loader2 size={14} className="animate-spin" />}

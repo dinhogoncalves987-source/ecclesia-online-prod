@@ -41,7 +41,7 @@ export interface MappedTransaction {
   period_label?: string | null;
   legacy_record_number?: string | null;
   notes?: string | null;
-  origin: "confiadcs";
+  origin: "spreadsheet";
   status: "Confirmado";
 }
 
@@ -87,7 +87,7 @@ export function parseDateToISO(raw: string | number | undefined | null): string 
   if (isoMatch) return toISO(+isoMatch[1], +isoMatch[2], +isoMatch[3]);
 
   // Brasileiro dd/mm/yyyy ou d/m/yyyy ou dd-mm-yyyy ou dd.mm.yyyy (opcionalmente com hora)
-  const dmyMatch = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})(?:\s.*)?$/);
+  const dmyMatch = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})(?:\s.*)?$/);
   if (dmyMatch) {
     let y = +dmyMatch[3];
     if (y < 100) y += y < 50 ? 2000 : 1900;
@@ -106,14 +106,18 @@ export function parseDateToISO(raw: string | number | undefined | null): string 
 
 // ── Utilitários de valor e tipo ────────────────────────────────────────────────
 
-function parseAmount(raw: string): number | null {
+export function parseAmount(raw: string): number | null {
   if (!raw) return null;
-  // Remove símbolos de moeda, mantém dígitos, vírgula e ponto
   const cleaned = raw.replace(/[^\d,.-]/g, "");
-  // Converte separador decimal brasileiro
-  const normalized = cleaned.includes(",") && !cleaned.includes(".")
-    ? cleaned.replace(",", ".")
-    : cleaned.replace(/\./g, "").replace(",", ".");
+  const lastComma = cleaned.lastIndexOf(",");
+  const lastDot = cleaned.lastIndexOf(".");
+  const decimalSeparator = lastComma > lastDot ? "," : ".";
+  const separatorIndex = Math.max(lastComma, lastDot);
+  const decimalDigits = separatorIndex >= 0 ? cleaned.length - separatorIndex - 1 : 0;
+  const hasDecimalPart = separatorIndex >= 0 && decimalDigits > 0 && decimalDigits <= 2;
+  const normalized = hasDecimalPart
+    ? `${cleaned.slice(0, separatorIndex).replace(/[.,]/g, "")}.${cleaned.slice(separatorIndex + 1)}`
+    : cleaned.replace(/[.,]/g, "");
   const n = parseFloat(normalized);
   return isNaN(n) || n <= 0 ? null : n;
 }
@@ -152,13 +156,6 @@ export function mapConfiadcsRows(
 ): { valid: MappedTransaction[]; invalid: InvalidRow[] } {
   const colMap = buildColumnMap(headerRow);
 
-  if (import.meta.env.DEV) {
-    console.log("[CONFIADCS] headers normalizados:", headerRow.map(h => ({
-      original: h,
-      mapeado: Array.from(colMap.entries()).find(([, idx]) => idx === headerRow.indexOf(h))?.[0] ?? "(não mapeado)",
-    })));
-  }
-
   const get = (row: string[], key: string): string =>
     colMap.has(key) ? (row[colMap.get(key)!] ?? "").trim() : "";
 
@@ -179,15 +176,6 @@ export function mapConfiadcsRows(
     const parsedTimestamp = parseDateToISO(rawTimestamp);
 
     const finalDate = parsedDate ?? parsedIssue ?? parsedTimestamp;
-
-    if (import.meta.env.DEV && idx === 0) {
-      console.log("[CONFIADCS] primeira linha normalizada:", {
-        accounting_date: rawDate,
-        issue_date: rawIssueDate,
-        timestamp: rawTimestamp,
-        finalDate,
-      });
-    }
 
     if (!finalDate) {
       invalid.push({
@@ -287,17 +275,10 @@ export function mapConfiadcsRows(
       period_label,
       legacy_record_number,
       notes: noteParts.join(" | ") || null,
-      origin: "confiadcs",
+      origin: "spreadsheet",
       status: "Confirmado",
     });
   });
-
-  if (import.meta.env.DEV) {
-    console.log(`[CONFIADCS] Resultado: ${valid.length} válidas, ${invalid.length} inválidas`);
-    if (invalid.length > 0) {
-      console.log("[CONFIADCS] Primeiros 3 erros:", invalid.slice(0, 3));
-    }
-  }
 
   return { valid, invalid };
 }

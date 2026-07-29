@@ -10,7 +10,8 @@
 
 import { useRef, useState, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { ChevronLeft, ChevronRight, Shield, QrCode, RefreshCw, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Shield, QrCode, RefreshCw, Loader2, X } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DocumentActions } from "@/components/DocumentActions";
@@ -100,10 +101,12 @@ const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
 
 function CardFront({
   id, member, churchName, churchAcronym, churchLogoUrl, code, issueDate, validUntil, qrValue, pdfQrPlaceholder,
+  onQrClick,
 }: {
   id: string; member: WalletMember; churchName: string;
   churchAcronym?: string | null; churchLogoUrl?: string | null;
   code: string; issueDate: string; validUntil: string; qrValue: string; pdfQrPlaceholder?: string;
+  onQrClick?: () => void;
 }) {
   const statusInfo = STATUS_BADGE[member.status] ?? STATUS_BADGE.Ativo;
   const roleLabel  = ROLE_LABEL[member.member_role ?? ""] ?? member.member_role ?? "Membro";
@@ -186,19 +189,31 @@ function CardFront({
               )}
             </div>
           </div>
-          <div className="bg-white rounded-lg p-1 flex-shrink-0 shadow">
-            {pdfQrPlaceholder ? (
-              <div className="w-[40px] h-[40px] flex items-center justify-center p-0.5">
-                <span className="text-[5px] text-slate-500 text-center leading-tight">{pdfQrPlaceholder}</span>
-              </div>
-            ) : qrValue ? (
-              <QRCodeSVG value={qrValue} size={40} level="M" />
-            ) : (
-              <div className="w-[40px] h-[40px] flex items-center justify-center">
-                <QrCode size={16} className="text-slate-300" />
-              </div>
-            )}
-          </div>
+          {qrValue && onQrClick ? (
+            <motion.button
+              layoutId="member-secure-qr"
+              type="button"
+              onClick={onQrClick}
+              aria-label="Ampliar QR Code seguro"
+              className="flex-shrink-0 rounded-lg bg-white p-1 shadow transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            >
+              <QRCodeSVG value={qrValue} size={40} level="H" marginSize={1} />
+            </motion.button>
+          ) : (
+            <div className="bg-white rounded-lg p-1 flex-shrink-0 shadow">
+              {pdfQrPlaceholder ? (
+                <div className="w-[40px] h-[40px] flex items-center justify-center p-0.5">
+                  <span className="text-[5px] text-slate-500 text-center leading-tight">{pdfQrPlaceholder}</span>
+                </div>
+              ) : qrValue ? (
+                <QRCodeSVG value={qrValue} size={40} level="H" marginSize={1} />
+              ) : (
+                <div className="w-[40px] h-[40px] flex items-center justify-center">
+                  <QrCode size={16} className="text-slate-300" />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between border-t border-slate-700/50 pt-1.5">
@@ -315,6 +330,7 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
   const [qrExpiresAt, setQrExpiresAt] = useState<string | null>(null);
   const [qrError, setQrError] = useState<string | null>(null);
   const [qrTimeLeft, setQrTimeLeft] = useState(0);
+  const [qrExpanded, setQrExpanded] = useState(false);
 
   // ── Countdown timer ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -328,6 +344,24 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [qrState, qrExpiresAt]);
+
+  useEffect(() => {
+    if (!qrExpanded) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setQrExpanded(false);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [qrExpanded]);
+
+  useEffect(() => {
+    if (qrState === "expired") setQrExpanded(false);
+  }, [qrState]);
 
   const formatTimeLeft = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -350,6 +384,7 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
       setQrExpiresAt(payload.expires_at);
       setQrTimeLeft(300);
       setQrState("ready");
+      setQrExpanded(true);
     } catch {
       setQrError("Não foi possível gerar o QR seguro agora.");
       setQrState("error");
@@ -458,7 +493,7 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
       <div data-wallet-preview className="w-full max-w-sm">
         {showBack
           ? <CardBack id="wallet-card-back"  {...{ member, churchName, churchLogoUrl }} />
-          : <CardFront id="wallet-card-front" {...cardProps} />}
+          : <CardFront id="wallet-card-front" {...cardProps} onQrClick={() => setQrExpanded(true)} />}
       </div>
 
       {/* Dynamic QR controls */}
@@ -490,6 +525,13 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
             <span className={`text-xs font-mono font-semibold ${qrTimeLeft <= 60 ? "text-red-500" : "text-foreground"}`}>
               {formatTimeLeft(qrTimeLeft)}
             </span>
+            <button
+              type="button"
+              onClick={() => setQrExpanded(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-emerald-600/30 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-600/10 dark:text-emerald-400"
+            >
+              <QrCode size={14} /> Abrir QR em tela cheia
+            </button>
           </div>
         )}
 
@@ -576,6 +618,55 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
       {generatingPdf && (
         <p className="text-xs text-muted-foreground animate-pulse">Gerando PDF da carteira...</p>
       )}
+
+      <AnimatePresence>
+        {qrExpanded && qrValue && (
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label="QR Code seguro ampliado"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setQrExpanded(false);
+            }}
+          >
+            <motion.div
+              data-member-qr-expanded
+              layoutId="member-secure-qr"
+              className="relative flex w-full max-w-sm flex-col items-center rounded-3xl bg-white p-5 text-slate-950 shadow-2xl sm:p-7"
+              transition={{ type: "spring", stiffness: 260, damping: 26 }}
+            >
+              <button
+                type="button"
+                onClick={() => setQrExpanded(false)}
+                aria-label="Fechar QR ampliado"
+                className="absolute right-3 top-3 rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+              >
+                <X size={20} />
+              </button>
+              <p className="pr-8 text-center text-sm font-semibold">Carteira de {member.full_name}</p>
+              <p className="mb-4 mt-1 text-center text-xs text-slate-500">
+                Aponte o leitor para o código. Ele expira em {formatTimeLeft(qrTimeLeft)}.
+              </p>
+              <div className="rounded-2xl border-4 border-emerald-600/20 bg-white p-3">
+                <QRCodeSVG
+                  value={qrValue}
+                  size={288}
+                  level="H"
+                  marginSize={2}
+                  className="h-auto w-full max-w-[288px]"
+                />
+              </div>
+              <p className="mt-4 text-center text-xs font-medium text-emerald-700">
+                QR seguro para validação no modo porteiro
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {onClose && (
         <button

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,11 +10,67 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    const authorization = req.headers.get("Authorization") ?? "";
+    const jwt = authorization.replace(/^Bearer\s+/i, "").trim();
+    if (!jwt) {
+      return new Response(JSON.stringify({ error: "Autenticação obrigatória." }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error("Supabase auth environment is not configured");
+    }
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${jwt}` } },
+      auth: { persistSession: false },
+    });
+    const { data: userData, error: userError } = await authClient.auth.getUser(jwt);
+    if (userError || !userData.user) {
+      return new Response(JSON.stringify({ error: "Sessão inválida ou expirada." }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { fileContent, fileType, targetModule, fields } = await req.json();
+    const fieldList = Array.isArray(fields) ? fields as unknown[] : [];
+    const validFields = fieldList.every(field => {
+      if (!field || typeof field !== "object") return false;
+      const candidate = field as { key?: unknown; label?: unknown; required?: unknown };
+      return typeof candidate.key === "string"
+        && candidate.key.length > 0
+        && candidate.key.length <= 80
+        && typeof candidate.label === "string"
+        && candidate.label.length > 0
+        && candidate.label.length <= 120
+        && (candidate.required === undefined || typeof candidate.required === "boolean");
+    });
+    if (
+      typeof fileContent !== "string"
+      || fileContent.length === 0
+      || fileContent.length > 200_000
+      || typeof targetModule !== "string"
+      || targetModule.length > 80
+      || fieldList.length === 0
+      || fieldList.length > 80
+      || !validFields
+    ) {
+      return new Response(JSON.stringify({ error: "Arquivo ou mapeamento inválido." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const fieldsDesc = fields.map((f: any) => `- ${f.key} (${f.label})${f.required ? ' [OBRIGATÓRIO]' : ''}`).join("\n");
+    const fieldsDesc = fieldList.map(field => {
+      const safe = field as { key: string; label: string; required?: boolean };
+      return `- ${safe.key} (${safe.label})${safe.required ? " [OBRIGATÓRIO]" : ""}`;
+    }).join("\n");
 
     const systemPrompt = `Você é um assistente especializado em extrair dados estruturados de documentos.
 O usuário vai enviar o conteúdo de um arquivo (texto de CSV, PDF, ou descrição de imagem) e você deve extrair os dados para o módulo "${targetModule}".

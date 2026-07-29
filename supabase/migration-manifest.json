@@ -128,7 +128,8 @@
     "20260803000000_tv_streaming_operational_rpcs.sql",
     "20260803110000_institutional_certificate_corrections.sql",
     "20260803120000_member_schema_neutrality.sql",
-    "20260803130000_gestao_release_security_convergence.sql"
+    "20260803130000_gestao_release_security_convergence.sql",
+    "20260803140000_gestao_release_qa_fixes.sql"
   ],
   "staging_feature": [],
   "staging_only": [

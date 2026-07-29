@@ -7,11 +7,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X, Upload, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { useChurch } from "@/hooks/useChurchContext";
 import { useAuth } from "@/hooks/useAuth";
 import { readSpreadsheet, readSheetByName } from "@/lib/importers/spreadsheetReader";
 import { mapConfiadcsRows, type AuxLookup, type MappedTransaction } from "@/lib/importers/financeConfiadcsMapper";
+import { buildFinanceImportPayload } from "@/lib/importers/financeImportPayload";
 import { buildColumnMap } from "@/lib/importers/headerNormalizer";
+import { getOrganizationScopeIds } from "@/lib/organizationScope";
 
 const BATCH_SIZE = 200;
 const PREVIEW_ROWS = 20;
@@ -24,58 +27,64 @@ interface Props {
   onImported?: () => void | Promise<void>;
 }
 
-// ── Payload que a RPC recebe ──────────────────────────────────────────────────
-
-function buildTxPayload(
-  tx: MappedTransaction,
-  organizationId: string,
-  userId: string,
-): Record<string, unknown> {
-  const payload: Record<string, unknown> = {
-    organization_id: organizationId,
-    user_id: userId,
-    created_by: userId,
-    date: tx.date,
-    amount: tx.amount,
-    type: tx.type,
-    category: tx.category,
-    description: tx.description,
-    status: tx.status,
-    source_module: "confiadcs_import",
-    notes: tx.notes ?? null,
-    account_category_id: tx.account_category_id ?? null,
-    financial_account_id: tx.financial_account_id ?? null,
-  };
-  // Remove campos undefined
-  return Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined));
-}
-
 // ── Aux data ─────────────────────────────────────────────────────────────────
 
 async function loadAuxData(orgId: string): Promise<AuxLookup> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const safe = async (fn: () => Promise<{ data: any[] | null }>): Promise<any[]> => {
-    try { const r = await fn(); return r.data ?? []; } catch { return []; }
-  };
-
-  const [accountingGroups, accountCategories, documentTypes, financialAccounts, orgs] =
+  const scopeIds = await getOrganizationScopeIds(orgId);
+  const [accountingGroupsResult, accountCategoriesResult, documentTypesResult, financialAccountsResult, orgsResult] =
     await Promise.all([
-      safe(() => supabase.from("finance_accounting_groups" as never).select("id, name").eq("organization_id", orgId) as never),
-      safe(() => supabase.from("finance_account_categories" as never).select("id, name, code").eq("organization_id", orgId) as never),
-      safe(() => supabase.from("finance_document_types" as never).select("id, name, code").eq("organization_id", orgId) as never),
-      safe(() => supabase.from("finance_accounts" as never).select("id, name") as never),
-      safe(() => supabase.from("organizations").select("id, name, organization_type").eq("active", true) as never),
+      supabase
+        .from("finance_accounting_groups")
+        .select("id, name, code")
+        .eq("is_active", true)
+        .or(`organization_id.is.null,organization_id.eq.${orgId}`),
+      supabase
+        .from("finance_account_categories")
+        .select("id, name, code")
+        .eq("organization_id", orgId)
+        .eq("is_active", true),
+      supabase
+        .from("finance_document_types")
+        .select("id, name, code")
+        .eq("is_active", true)
+        .or(`organization_id.is.null,organization_id.eq.${orgId}`),
+      supabase
+        .from("finance_accounts")
+        .select("id, name")
+        .eq("organization_id", orgId)
+        .eq("is_active", true),
+      supabase
+        .from("organizations")
+        .select("id, name, organization_type")
+        .in("id", scopeIds)
+        .eq("active", true),
     ]);
 
-  const orgsArr = orgs as { id: string; name: string; organization_type: string | null }[];
+  const failedLookup = [
+    accountingGroupsResult,
+    accountCategoriesResult,
+    documentTypesResult,
+    financialAccountsResult,
+    orgsResult,
+  ].find(result => result.error);
+  if (failedLookup?.error) {
+    throw new Error(`Não foi possível carregar as referências financeiras: ${failedLookup.error.message}`);
+  }
+
+  const orgsArr = (orgsResult.data ?? []) as { id: string; name: string; organization_type: string | null }[];
   const congregations = orgsArr.filter(o => o.organization_type === "congregacao" || o.organization_type === "congregação");
-  const districts = orgsArr.filter(o => o.organization_type === "setor" || o.organization_type === "distrito");
+  const districts = orgsArr.filter(o =>
+    o.organization_type === "setor"
+    || o.organization_type === "distrito"
+    || o.organization_type === "subdistrito"
+    || o.organization_type === "subsede"
+  );
 
   return {
-    accountingGroups: accountingGroups as AuxLookup["accountingGroups"],
-    accountCategories: accountCategories as AuxLookup["accountCategories"],
-    documentTypes: documentTypes as AuxLookup["documentTypes"],
-    financialAccounts: financialAccounts as AuxLookup["financialAccounts"],
+    accountingGroups: (accountingGroupsResult.data ?? []) as AuxLookup["accountingGroups"],
+    accountCategories: (accountCategoriesResult.data ?? []) as AuxLookup["accountCategories"],
+    documentTypes: (documentTypesResult.data ?? []) as AuxLookup["documentTypes"],
+    financialAccounts: (financialAccountsResult.data ?? []) as AuxLookup["financialAccounts"],
     congregations,
     districts,
   };
@@ -101,21 +110,31 @@ export function SpreadsheetImportModal({ open, onClose, onImported }: Props) {
   const [doneResult, setDoneResult] = useState<{ success: number; failed: number } | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [auxError, setAuxError] = useState<string | null>(null);
   const [auxData, setAuxData] = useState<AuxLookup | null>(null);
+  const [auxOrganizationId, setAuxOrganizationId] = useState<string | null>(null);
   const [loadingFile, setLoadingFile] = useState(false);
 
   useEffect(() => {
-    if (open && church && !auxData) {
-      loadAuxData(church.id).then(setAuxData).catch(console.error);
+    if (open && church && auxOrganizationId !== church.id) {
+      setAuxError(null);
+      setAuxData(null);
+      loadAuxData(church.id)
+        .then(data => {
+          setAuxData(data);
+          setAuxOrganizationId(church.id);
+        })
+        .catch(error => setAuxError(error instanceof Error ? error.message : "Erro ao carregar referências financeiras."));
     }
-  }, [open, church, auxData]);
+  }, [open, church, auxOrganizationId]);
 
   useEffect(() => {
     if (!open) {
       setStep("file"); setFile(null); setSheetNames([]); setSelectedSheet("");
       setRawRows([]); setHeaderRowIndex(0); setMapped([]); setInvalidSample([]);
       setTotalRows(0); setProgress(0); setDoneResult(null);
-      setFileError(null); setImportError(null); setLoadingFile(false);
+      setFileError(null); setImportError(null); setAuxError(null); setLoadingFile(false);
+      setAuxData(null); setAuxOrganizationId(null);
     }
   }, [open]);
 
@@ -181,22 +200,17 @@ export function SpreadsheetImportModal({ open, onClose, onImported }: Props) {
 
     for (let i = 0; i < mapped.length; i += BATCH_SIZE) {
       const chunk = mapped.slice(i, i + BATCH_SIZE);
-      const toInsert = chunk.map(tx => buildTxPayload(tx, church.id, user.id));
-
-      if (i === 0 && import.meta.env.DEV) {
-        console.log("[SpreadsheetImport] Lote 1 payload:", toInsert[0]);
-      }
+      const toInsert = chunk.map(tx => buildFinanceImportPayload(tx, church.id, user.id));
 
       const { data, error } = await supabase.rpc(
-        "import_finance_transactions_bulk" as never,
-        { p_rows: toInsert } as never
+        "import_finance_transactions_bulk",
+        { p_rows: toInsert as Json }
       );
 
       if (error) {
         const msg = [error.message, error.details, error.hint].filter(Boolean).join(" | ") || "Erro na RPC.";
-        console.error("[SpreadsheetImport] Erro RPC:", error);
         setImportError(msg);
-        failed += mapped.length - success;
+        failed += chunk.length;
         break;
       }
 
@@ -206,21 +220,15 @@ export function SpreadsheetImportModal({ open, onClose, onImported }: Props) {
       };
 
       if (result.error) {
-        console.error("[SpreadsheetImport] Erro retornado pela RPC:", result.error);
         setImportError(result.error);
-        failed += mapped.length - success;
+        failed += chunk.length;
         break;
       }
 
       const inserted = Number(result?.inserted ?? 0);
 
-      if (import.meta.env.DEV) {
-        console.log(`[SpreadsheetImport] Lote ${Math.floor(i / BATCH_SIZE) + 1}: enviado=${toInsert.length} confirmado=${inserted}`);
-      }
-
       if (inserted !== toInsert.length) {
         const msg = `O banco confirmou apenas ${inserted} de ${toInsert.length} lançamentos neste lote.`;
-        console.warn("[SpreadsheetImport]", msg);
         setImportError(msg);
         success += inserted;
         failed += toInsert.length - inserted;
@@ -231,7 +239,8 @@ export function SpreadsheetImportModal({ open, onClose, onImported }: Props) {
       setProgress(Math.round(((i + chunk.length) / mapped.length) * 100));
     }
 
-    setDoneResult({ success, failed: failed + (mapped.length - success - (failed > 0 ? 0 : 0)) });
+    const notProcessed = Math.max(0, mapped.length - success - failed);
+    setDoneResult({ success, failed: failed + notProcessed });
     setStep("done");
     if (success > 0) {
       await onImported?.();
@@ -267,6 +276,12 @@ export function SpreadsheetImportModal({ open, onClose, onImported }: Props) {
             <X size={16} />
           </button>
         </div>
+
+        {auxError && (
+          <div className="mx-6 mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {auxError}
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto">
           {/* STEP: file */}

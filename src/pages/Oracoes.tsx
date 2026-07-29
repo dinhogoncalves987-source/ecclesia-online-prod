@@ -163,6 +163,7 @@ export default function Oracoes() {
 
   const handleDelete = async (id: string) => {
     if (!church) return;
+    if (!window.confirm(t("Remover este pedido de oração? Esta ação não poderá ser desfeita."))) return;
     const { error } = await supabase
       .from("prayer_requests")
       .delete()

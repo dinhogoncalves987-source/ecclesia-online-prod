@@ -44,3 +44,8 @@ verify_jwt = true
 
 [functions.get-r2-upload-url]
 verify_jwt = true
+
+# Importações com IA podem conter dados pessoais e financeiros. O gateway
+# exige JWT real e a função reconfirma o usuário antes de enviar conteúdo.
+[functions.ai-import]
+verify_jwt = true

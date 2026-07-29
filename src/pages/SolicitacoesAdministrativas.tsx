@@ -196,6 +196,12 @@ export default function SolicitacoesAdministrativas() {
   };
 
   const handleStatusChange = async (req: AdmRequest, newStatus: RequestStatus) => {
+    if (
+      newStatus === "rejeitada"
+      && !window.confirm(t("Rejeitar esta solicitação? Essa decisão ficará registrada no histórico."))
+    ) {
+      return;
+    }
     setChangingStatus(req.id);
     const update: Partial<AdmRequest> = { status: newStatus };
     if (newStatus === "concluida" || newStatus === "rejeitada") {

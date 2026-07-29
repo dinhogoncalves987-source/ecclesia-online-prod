@@ -4,6 +4,7 @@ import { Sparkles, X, Upload, Loader2, CheckCircle2, AlertCircle, FileText, Imag
 import { useLanguage } from "@/hooks/useLanguage";
 import { environment } from "@/config/environment";
 import { getEdgeFunctionUrl } from "@/lib/edgeFetch";
+import { supabase } from "@/integrations/supabase/client";
 
 type AIImportModalProps = {
   open: boolean;
@@ -55,12 +56,18 @@ export function AIImportModal({ open, onClose, onImport, fields, title, moduleNa
       const content = await readFileAsText(file);
       const isImage = file.type.startsWith("image/");
       const fileType = isImage ? "imagem (base64)" : file.name.split(".").pop() || "texto";
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        throw new Error(t("Sua sessão expirou. Entre novamente para usar a importação com IA."));
+      }
 
       const resp = await fetch(getEdgeFunctionUrl("ai-import"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${environment.supabasePublishableKey}`,
+          Authorization: `Bearer ${accessToken}`,
+          apikey: environment.supabasePublishableKey,
         },
         body: JSON.stringify({
           fileContent: isImage ? `[Imagem em base64: ${content.slice(0, 5000)}...]` : content.slice(0, 15000),

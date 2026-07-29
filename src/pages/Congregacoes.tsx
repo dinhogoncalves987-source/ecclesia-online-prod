@@ -758,8 +758,11 @@ export default function Congregacoes() {
     };
     if (editingId) {
       const { error } = await supabase.from("organizations").update(payload).eq("id", editingId);
-      if (error) toast({ title: t("Erro ao atualizar"), description: error.message, variant: "destructive" });
-      else toast({ title: t("Dados da unidade atualizados.") });
+      if (error) {
+        toast({ title: t("Erro ao atualizar"), description: error.message, variant: "destructive" });
+        return;
+      }
+      toast({ title: t("Dados da unidade atualizados.") });
     } else {
       const orgType = insertOrganizationType(insertChildType ?? undefined);
       if (!orgType) {
@@ -770,14 +773,19 @@ export default function Congregacoes() {
         ...payload, slug: generateSlug(form.name) + "-" + Date.now().toString(36),
         parent_id: church!.id, organization_type: orgType, active: true,
       });
-      if (error) toast({ title: `${t("Erro ao criar")} ${childSingular.toLowerCase()}`, description: error.message, variant: "destructive" });
-      else {
+      if (error) {
+        toast({
+          title: `${t("Erro ao criar")} ${childSingular.toLowerCase()}`,
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
       const unitLabel = orgType === "state_convention" ? nationalSingular
         : orgType === "setor" ? intermediateSingular
         : orgType === "subsede" ? t("Subsede")
         : orgType === "matriz" ? municipalSingular : localSingular;
-        toast({ title: `${unitLabel} ${t("criado(a).")}` });
-      }
+      toast({ title: `${unitLabel} ${t("criado(a).")}` });
     }
     setForm(EMPTY_ORG_FORM); setShowForm(false); setEditingId(null); setInsertChildType(null);
     void loadChildOrganizations();
@@ -796,10 +804,17 @@ export default function Congregacoes() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm(t("Excluir esta unidade da estrutura?"))) return;
-    const { error } = await supabase.from("organizations").delete().eq("id", id);
-    if (error) toast({ title: t("Erro ao excluir"), description: error.message, variant: "destructive" });
-    else { toast({ title: t("Unidade excluída.") }); void loadChildOrganizations(); }
+    if (!window.confirm(t("Remover esta unidade da estrutura ativa? O histórico será preservado."))) return;
+    const { error } = await supabase
+      .from("organizations")
+      .update({ active: false, unit_status: "Arquivada" })
+      .eq("id", id);
+    if (error) {
+      toast({ title: t("Erro ao remover"), description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: t("Unidade removida da estrutura ativa."), description: t("O histórico institucional foi preservado.") });
+    void loadChildOrganizations();
   };
 
   // ── Modal (unidade local) ──────────────────────────────────────────────────

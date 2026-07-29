@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Award, Eye, FilePlus2, Loader2, Pencil, Search, Send, ShieldX } from "lucide-react";
+import { Award, Eye, FilePlus2, Loader2, Pencil, Search, Send, ShieldX, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminLayout } from "@/components/AdminLayout";
 import { CertificateDocument } from "@/components/secretaria/CertificateDocument";
@@ -13,6 +13,7 @@ import { useChurch } from "@/hooks/useChurchContext";
 import {
   CERTIFICATE_TYPE_LABELS,
   createInstitutionalCertificate,
+  deleteDraftInstitutionalCertificate,
   issueInstitutionalCertificate,
   listAcademicCertificateCandidates,
   listInstitutionalCertificates,
@@ -46,6 +47,11 @@ export default function Certificados() {
   const [selected, setSelected] = useState<InstitutionalCertificate | null>(null);
   const [editing, setEditing] = useState<InstitutionalCertificate | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<{
+    kind: "revoke" | "delete";
+    certificate: InstitutionalCertificate;
+  } | null>(null);
+  const [revokeReason, setRevokeReason] = useState("");
 
   const load = useCallback(async () => {
     if (!church?.id) return;
@@ -78,14 +84,28 @@ export default function Certificados() {
     setBusyId(null);
   };
 
-  const revoke = async (certificate: InstitutionalCertificate) => {
-    const reason = window.prompt("Informe o motivo da revogação:");
-    if (!reason?.trim()) return;
+  const confirmCertificateAction = async () => {
+    if (!confirmation) return;
+    const { certificate, kind } = confirmation;
+    if (kind === "revoke" && !revokeReason.trim()) {
+      toast.error("Informe o motivo da revogação.");
+      return;
+    }
     setBusyId(certificate.id);
-    const revokeError = await revokeInstitutionalCertificate(certificate.id, reason);
-    if (revokeError) toast.error(revokeError.message);
-    else {
-      toast.success("Certificado revogado. O QR continuará exibindo o estado real do documento.");
+    const actionError = kind === "revoke"
+      ? await revokeInstitutionalCertificate(certificate.id, revokeReason.trim())
+      : await deleteDraftInstitutionalCertificate(certificate.id);
+    if (actionError) {
+      toast.error(actionError.message);
+    } else {
+      toast.success(
+        kind === "revoke"
+          ? "Certificado revogado. O QR continuará exibindo o estado real do documento."
+          : "Rascunho excluído com segurança.",
+      );
+      if (selected?.id === certificate.id) setSelected(null);
+      setConfirmation(null);
+      setRevokeReason("");
       await load();
     }
     setBusyId(null);
@@ -150,7 +170,28 @@ export default function Certificados() {
                       <Button size="sm" disabled={busyId === certificate.id} onClick={() => void issue(certificate)}><Send size={15} className="mr-1" /> Emitir</Button>
                     )}
                     {certificate.status === "emitido" && (
-                      <Button size="sm" variant="ghost" disabled={busyId === certificate.id} onClick={() => void revoke(certificate)}><ShieldX size={15} className="mr-1" /> Revogar</Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={busyId === certificate.id}
+                        onClick={() => {
+                          setRevokeReason("");
+                          setConfirmation({ kind: "revoke", certificate });
+                        }}
+                      >
+                        <ShieldX size={15} className="mr-1" /> Revogar
+                      </Button>
+                    )}
+                    {certificate.status === "rascunho" && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        disabled={busyId === certificate.id}
+                        onClick={() => setConfirmation({ kind: "delete", certificate })}
+                      >
+                        <Trash2 size={15} className="mr-1" /> Excluir rascunho
+                      </Button>
                     )}
                   </div>
                 </CardContent>
@@ -205,6 +246,63 @@ export default function Certificados() {
               }}
             />
           )}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={Boolean(confirmation)}
+        onOpenChange={(open) => {
+          if (open || busyId) return;
+          setConfirmation(null);
+          setRevokeReason("");
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {confirmation?.kind === "revoke" ? "Revogar certificado" : "Excluir rascunho"}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmation?.kind === "revoke"
+                ? "A revogação preserva o histórico e faz o QR Code informar que o documento deixou de ser válido."
+                : "O rascunho ainda não possui validade oficial e será removido definitivamente."}
+            </DialogDescription>
+          </DialogHeader>
+          {confirmation?.kind === "revoke" && (
+            <div className="space-y-2">
+              <label htmlFor="certificate-revocation-reason" className="text-sm font-medium">
+                Motivo da revogação
+              </label>
+              <textarea
+                id="certificate-revocation-reason"
+                value={revokeReason}
+                onChange={(event) => setRevokeReason(event.target.value)}
+                rows={3}
+                autoFocus
+                placeholder="Ex.: documento emitido com informação incorreta"
+                className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              />
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={Boolean(busyId)}
+              onClick={() => {
+                setConfirmation(null);
+                setRevokeReason("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={Boolean(busyId) || (confirmation?.kind === "revoke" && !revokeReason.trim())}
+              onClick={() => void confirmCertificateAction()}
+            >
+              {busyId && <Loader2 className="mr-2 animate-spin" size={16} />}
+              {confirmation?.kind === "revoke" ? "Confirmar revogação" : "Excluir rascunho"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </AdminLayout>
