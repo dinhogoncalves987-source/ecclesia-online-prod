@@ -46,6 +46,7 @@ verify_jwt = true
 verify_jwt = true
 
 # Importações com IA podem conter dados pessoais e financeiros. O gateway
-# exige JWT real e a função reconfirma o usuário antes de enviar conteúdo.
+# legado fica desligado; a função exige e reconfirma o access token atual com
+# supabase.auth.getUser(jwt), compatível com as chaves JWT novas.
 [functions.ai-import]
-verify_jwt = true
+verify_jwt = false

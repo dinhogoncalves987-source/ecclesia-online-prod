@@ -91,6 +91,6 @@ describe("fechamento da homologação da Gestão", () => {
     expect(modal).not.toContain("Authorization: `Bearer ${environment.supabasePublishableKey}`");
     expect(edgeFunction).toContain("authClient.auth.getUser(jwt)");
     expect(edgeFunction).toContain("Autenticação obrigatória.");
-    expect(config).toContain("[functions.ai-import]\nverify_jwt = true");
+    expect(config).toContain("[functions.ai-import]\nverify_jwt = false");
   });
 });
