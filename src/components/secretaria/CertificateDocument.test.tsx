@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { CertificateDocument } from "./CertificateDocument";
 import type { InstitutionalCertificate } from "@/lib/officialDocuments";
@@ -100,12 +100,15 @@ describe("CertificateDocument", () => {
     expect(container.querySelector("[data-certificate-preview-viewport]")).not.toHaveClass(
       "overflow-x-auto",
     );
-    expect(container.querySelector("[data-certificate-preview-frame]")).toHaveStyle({
-      width: "1120px",
-      height: "792px",
-    });
+    const previewFrame = container.querySelector(
+      "[data-certificate-preview-frame]",
+    ) as HTMLDivElement;
+    const renderedWidth = Number.parseFloat(previewFrame.style.width);
+    const renderedHeight = Number.parseFloat(previewFrame.style.height);
+    expect(renderedWidth).toBeLessThanOrEqual(Math.min(1120, window.innerWidth));
+    expect(renderedHeight / renderedWidth).toBeCloseTo(792 / 1120, 4);
     expect(container.querySelector("[data-official-document-canvas]")).toHaveStyle({
-      transform: "scale(1)",
+      transform: `scale(${renderedWidth / 1120})`,
     });
   });
 
@@ -151,5 +154,51 @@ describe("CertificateDocument", () => {
       "https://cdn.example.org/logo-atual.png",
     );
     expect(screen.queryByText("Nome antigo")).not.toBeInTheDocument();
+  });
+
+  it("reduz a folha inteira à largura real do celular sem recortar o certificado", () => {
+    const originalInnerWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 375,
+    });
+
+    const { container } = render(
+      <CertificateDocument certificate={certificate} showActions={false} />,
+    );
+    const viewport = container.querySelector(
+      "[data-certificate-preview-viewport]",
+    ) as HTMLDivElement;
+    Object.defineProperty(viewport, "clientWidth", {
+      configurable: true,
+      value: 1120,
+    });
+    vi.spyOn(viewport, "getBoundingClientRect").mockReturnValue({
+      width: 1120,
+      height: 792,
+      top: 0,
+      right: 1120,
+      bottom: 792,
+      left: 0,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+
+    expect(container.querySelector("[data-certificate-preview-frame]")).toHaveStyle({
+      width: "375px",
+    });
+    expect(container.querySelector("[data-official-document-canvas]")).toHaveStyle({
+      transform: `scale(${375 / 1120})`,
+    });
+
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: originalInnerWidth,
+    });
   });
 });

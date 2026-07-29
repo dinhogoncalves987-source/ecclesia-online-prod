@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { BookOpen } from "lucide-react";
 import { DocumentActions } from "@/components/DocumentActions";
@@ -118,30 +118,56 @@ export function CertificateDocument({
   const previewViewportRef = useRef<HTMLDivElement>(null);
   const [previewScale, setPreviewScale] = useState(1);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const viewport = previewViewportRef.current;
     if (!viewport) return;
 
     const updateScale = () => {
-      const availableWidth = viewport.clientWidth;
+      const styles = window.getComputedStyle(viewport);
+      const horizontalPadding =
+        Number.parseFloat(styles.paddingLeft || "0")
+        + Number.parseFloat(styles.paddingRight || "0");
+      const screenWidth = window.visualViewport?.width || window.innerWidth;
+      const availableWidth = Math.max(
+        1,
+        Math.min(
+          viewport.clientWidth || Number.POSITIVE_INFINITY,
+          viewport.getBoundingClientRect().width || Number.POSITIVE_INFINITY,
+          screenWidth,
+        ) - horizontalPadding,
+      );
       if (availableWidth <= 0) return;
       setPreviewScale(Math.min(1, availableWidth / CERTIFICATE_WIDTH));
     };
 
     updateScale();
+    const frame = window.requestAnimationFrame(updateScale);
+    window.addEventListener("resize", updateScale);
+    window.addEventListener("orientationchange", updateScale);
+    window.visualViewport?.addEventListener("resize", updateScale);
 
     if (typeof ResizeObserver === "undefined") {
-      window.addEventListener("resize", updateScale);
-      return () => window.removeEventListener("resize", updateScale);
+      return () => {
+        window.cancelAnimationFrame(frame);
+        window.removeEventListener("resize", updateScale);
+        window.removeEventListener("orientationchange", updateScale);
+        window.visualViewport?.removeEventListener("resize", updateScale);
+      };
     }
 
     const observer = new ResizeObserver(updateScale);
     observer.observe(viewport);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", updateScale);
+      window.removeEventListener("orientationchange", updateScale);
+      window.visualViewport?.removeEventListener("resize", updateScale);
+    };
   }, []);
 
   return (
-    <div className="space-y-4">
+    <div className="w-full min-w-0 max-w-full space-y-4 overflow-hidden">
       {showActions && (
         <DocumentActions
           printElementId={documentId}
@@ -158,7 +184,7 @@ export function CertificateDocument({
       <div
         ref={previewViewportRef}
         data-certificate-preview-viewport
-        className="w-full overflow-hidden rounded-xl border bg-muted/20 p-1 sm:p-2"
+        className="w-full min-w-0 max-w-full overflow-hidden rounded-xl border bg-muted/20 p-1 sm:p-2"
       >
         <div
           data-certificate-preview-frame
