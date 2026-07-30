@@ -18,6 +18,8 @@ const ENABLED: readonly ModuleId[] = [
   "official-documents",
   "finance.treasury",
   "finance.accounts",
+  "tv-digital",
+  "canal-ecclesia",
 ];
 
 const DEFERRED: readonly ModuleId[] = [
@@ -26,8 +28,6 @@ const DEFERRED: readonly ModuleId[] = [
   "discipleship",
   "theology",
   "missions",
-  "tv-digital",
-  "canal-ecclesia",
 ];
 
 describe("paridade de módulos entre staging e produção", () => {
@@ -50,6 +50,13 @@ describe("paridade de módulos entre staging e produção", () => {
     expect(isRouteEnabled("/admin/cartas-transferencia", "production")).toBe(true);
     expect(isRouteEnabled("/admin/certificados", "staging")).toBe(true);
     expect(isRouteEnabled("/admin/certificados", "production")).toBe(true);
+  });
+
+  it("mantém TV Digital e Canal Eclésia e suas rotas nos dois ambientes", () => {
+    for (const path of ["/admin/tv", "/tv", "/canal", "/video"]) {
+      expect(isRouteEnabled(path, "staging")).toBe(true);
+      expect(isRouteEnabled(path, "production")).toBe(true);
+    }
   });
 
   it("mantém as rotas adiadas fechadas nos dois ambientes", () => {

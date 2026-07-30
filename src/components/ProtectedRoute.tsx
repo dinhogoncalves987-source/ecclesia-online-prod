@@ -23,6 +23,9 @@ const MEMBER_ACCESSIBLE_PATHS = [
   "/admin/marketplace",
   "/admin/comunidade",
   "/admin/carteira-ecclesia",
+  "/tv",
+  "/canal",
+  "/video",
 ];
 
 // Ordered list of candidate landing routes. When the user lands on a route

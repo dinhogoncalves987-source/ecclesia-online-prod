@@ -194,33 +194,51 @@ Nenhuma dessas proteções foi configurada remotamente nesta tarefa (requer
 acesso de administração do repositório no GitHub, fora do escopo desta
 execução local).
 
-## 5. TV Digital / Canal Ecclésia — stage-only, restauração futura
+## 5. TV Digital / Canal Ecclésia — restaurados em 2026-07-30
 
-TV Digital e Canal Ecclésia pertencem ao produto e continuam preservados
-integralmente na branch histórica `staging-tv-canal`. Nesta integração
-(`revisao-integrada-2026-07-15`) **nenhum arquivo foi copiado** dessa branch
-— apenas os identificadores de módulo (`tv-digital`, `canal-ecclesia`) foram
-registrados em `src/config/modules.ts` como `availability: "staging"`, para
-que a allowlist já os classifique corretamente quando forem restaurados.
+**Atualização 2026-07-30:** o procedimento abaixo foi executado na branch
+`feature/tv-canal-restauracao-20260730` (criada a partir da branch de
+homologação da Gestão). O frontend (páginas `Tv*`/`Canal*`, componentes
+`src/components/tv/`, `src/components/canal/`, hooks `useTvViewer`/
+`useLiveKitStudio`, libs `tvDigital.ts`/`canalEcclesia.ts`) foi restaurado a
+partir do estado já homologado em 2026-07-28 (commit `589d28a`, branch
+histórica `handoff/sonnet-staging-finalizacao-20260725`), que por sua vez
+incorporava todo o trabalho de `staging-tv-canal` mais as correções
+posteriores de RPC/schema. `tv-digital` e `canal-ecclesia` foram promovidos
+para `availability: "both"` em `src/config/modules.ts` — o backend
+(migrations `20260802120000_tv_canal_foundation.sql`,
+`20260802130000_tv_canal_live_production.sql`,
+`20260803000000_tv_streaming_operational_rpcs.sql`) já estava classificado
+como `production_management` desde antes desta restauração.
 
-Procedimento de restauração proposto (a executar depois da revisão do
-Alfred/Codex, fora desta tarefa):
+Pendências reais antes de qualquer uso ao vivo em produção (infraestrutura,
+não código):
 
-1. Criar a nova branch `staging` a partir de `main` (ou da branch de
-   integração aprovada).
-2. Trazer o código de TV Digital/Canal Ecclésia de `staging-tv-canal` para a
-   nova `staging` de forma controlada (cherry-pick/merge revisado dos
-   commits relevantes — não um merge cego da branch inteira).
-3. Se a restauração tiver sido feita anteriormente via um commit de revert
-   (mencionado no contexto desta tarefa), desfazer esse revert de forma
-   controlada (`git revert <hash-do-revert>`), nunca reescrevendo histórico.
-4. Adicionar as rotas/menu correspondentes em `App.tsx`/`AdminLayout.tsx`
-   envolvidas em `<ModuleGate moduleId="tv-digital">` /
-   `moduleId="canal-ecclesia"` — o registro em `src/config/modules.ts` já
-   está pronto para isso.
-5. Validar em staging antes de considerar qualquer promoção futura para
-   produção (que exigiria adicionar esses módulos à allowlist de produção
-   explicitamente, com aprovação).
+- Provisionar o servidor de ingest MediaMTX (`infra/tv-media-server/`) e
+  configurar DNS/TLS para o endpoint RTMP/HLS.
+- Configurar as credenciais reais de LiveKit (estúdio multicâmera) e
+  Cloudflare R2 (armazenamento do Canal Eclésia) nos secrets do Supabase de
+  staging e produção — ver `supabase/functions/create-livekit-room`,
+  `create-livekit-token`, `end-livekit-room`, `get-r2-upload-url`.
+- Validar o fluxo completo (transmissão real, upload, playback) em staging
+  com as credenciais reais antes de liberar para uso institucional.
+- Revisar os pontos ainda simulados/placeholder documentados em
+  `docs/architecture/auditoria-tv-canal-chat-otp.md` (ex.: "preparar
+  computador" do Estúdio Eclésia, Kit de Apoio).
+
+Histórico do procedimento originalmente proposto (mantido para referência):
+
+1. ~~Criar a nova branch `staging` a partir de `main`~~ — restaurado direto
+   na branch de trabalho da Gestão em vez de uma branch `staging` dedicada.
+2. ~~Trazer o código de `staging-tv-canal`~~ — feito via o commit já
+   homologado `589d28a`, mais completo que `staging-tv-canal` sozinho.
+3. Não havia commit de revert a desfazer — o código só não tinha sido
+   trazido de volta para esta branch ainda.
+4. Rotas/menu adicionados em `App.tsx`/`AdminLayout.tsx`/`useRole.tsx`
+   (`MODULE_ACCESS`) com `<ModuleGate moduleId="tv-digital">` /
+   `moduleId="canal-ecclesia">`.
+5. Validação funcional completa em staging (com credenciais reais de
+   LiveKit/R2/MediaMTX) ainda pendente — ver lista de pendências acima.
 
 ## 6. Resumo do fluxo proposto
 

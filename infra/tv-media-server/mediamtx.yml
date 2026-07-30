@@ -1,0 +1,77 @@
+# ============================================================================
+# MediaMTX v1.x — Configuração Ecclesia TV Digital
+# Documentação: https://github.com/bluenviron/mediamtx
+# ============================================================================
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+logLevel: info
+logDestinations: [stdout]
+
+# ── API interna (para health checks e controle programático) ─────────────────
+api: yes
+apiAddress: :9997
+
+# ── Métricas Prometheus ──────────────────────────────────────────────────────
+metrics: yes
+metricsAddress: :9998
+
+# ── RTMP: recebe stream do OBS/celular ───────────────────────────────────────
+rtmp: yes
+rtmpAddress: :1935
+rtmpEncryption: no            # RTMPS requer certificado; ativar em produção
+
+# ── RTSP ─────────────────────────────────────────────────────────────────────
+rtsp: yes
+rtspAddress: :8554
+
+# ── WebRTC (preview em browser sem player externo) ──────────────────────────
+webrtc: yes
+webrtcAddress: :8889
+
+# ── HLS: gerado automaticamente para cada stream ─────────────────────────────
+hls: yes
+hlsAddress: :8888
+hlsAlwaysRemux: no
+hlsVariant: lowLatency          # lowLatency = segmentos de ~1s, melhor para ao vivo
+hlsSegmentCount: 7              # manter 7 segmentos em memória (~7s de buffer)
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+hlsSegmentMaxSize: 50MB
+hlsAllowOrigin: "*"             # permitir CORS para o player HLS.js
+hlsDirectory: /hls              # salvar segmentos no volume Docker
+hlsEncryption: no               # ativar AES-128 em produção se necessário
+
+# ── Paths: define um template para todos os streams de ingest ────────────────
+# Cada transmissão OBS usa: rtmp://servidor/live/STREAM_KEY
+# O MediaMTX roteia como path "live/{stream_key}"
+
+pathDefaults:
+  # Gravar automaticamente cada stream ao vivo
+  record: yes
+  recordPath:            /recordings/%path/%Y-%m-%d_%H-%M-%S.mp4
+  recordFormat:          fmp4                   # fragmentado MP4, fácil de processar
+  recordSegmentDuration: 3600s                  # segmentar a cada hora
+  recordDeleteAfter:     0s                     # não deletar; o script de upload cuida disso
+
+  # ── Hooks ────────────────────────────────────────────────────────────────
+  # on_publish: chamado quando o OBS/celular conecta e começa a enviar vídeo
+  runOnPublish: >-
+    /scripts/on_publish.sh $MTX_PATH $MTX_SOURCE_TYPE
+  runOnPublishRestart: yes      # re-chamar se o script falhar
+
+  # on_unpublish: chamado quando a transmissão termina (OBS para ou perde conexão)
+  runOnUnpublish: >-
+    /scripts/on_unpublish.sh $MTX_PATH $MTX_SOURCE_TYPE
+  runOnUnpublishRestart: no
+
+  # on_read: chamado quando um viewer abre o player
+  # runOnRead: /scripts/on_read.sh $MTX_PATH
+
+paths:
+  # Path genérico para ingest: live/{qualquer_stream_key}
+  "live/~([a-z0-9_]+)$":
+    source: publisher
+
+  # Path de teste sem autenticação (remover em produção)
+  "test":
+    source: publisher

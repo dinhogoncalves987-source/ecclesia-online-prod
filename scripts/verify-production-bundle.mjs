@@ -120,7 +120,13 @@ const FORBIDDEN_TERMS_SOURCE = [
   // nenhum dado fictício exibido ao usuário. Ver src/config/modules.ts.
   "pages/Marketplace",
   "pages/Comunidade",
-  "CanalEcclesia",
+  // "CanalEcclesia" e as páginas de TV Digital removidos em 2026-07-30
+  // (RESTAURAÇÃO — ver src/config/modules.ts): backend (migrations
+  // 20260802120000_tv_canal_foundation.sql/20260802130000_tv_canal_live_production.sql/
+  // 20260803000000_tv_streaming_operational_rpcs.sql) já classificado como
+  // production_management, e as páginas passaram a availability: "both" —
+  // agora DEVEM aparecer no bundle de produção, igual à Bíblia/Culto.
+  //
   // OPERAÇÃO 2 (Discipulado, 2026-07-29) — staging-only enquanto as
   // migrations discipleship_* não forem aplicadas em nenhum ambiente (ver
   // src/config/modules.ts e docs/architecture/operacao-2-discipulado.md).

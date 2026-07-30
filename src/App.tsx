@@ -126,6 +126,29 @@ const CartasRecomendacao = lazy(() => import("./pages/CartasRecomendacao"));
 
 const Relatorios = lazy(() => import("./pages/Relatorios"));
 
+// TV Digital e Canal Eclésia foram promovidos para availability: "both" em
+// src/config/modules.ts — backend (migrations 20260802*/20260803000000 e as
+// edge functions de LiveKit/R2/heartbeat) já homologado e classificado como
+// production_management em supabase/migration-manifest.json. Carregados
+// sempre, iguais aos outros módulos "both" acima.
+const TvHome = lazy(() => import("./pages/TvHome"));
+const TvChannel = lazy(() => import("./pages/TvChannel"));
+const TvAdmin = lazy(() => import("./pages/admin/TvAdmin"));
+const TvCanais = lazy(() => import("./pages/admin/TvCanais"));
+const TvProgramacao = lazy(() => import("./pages/admin/TvProgramacao"));
+const TvAoVivo = lazy(() => import("./pages/admin/TvAoVivo"));
+const TvBiblioteca = lazy(() => import("./pages/admin/TvBiblioteca"));
+const TvConfiguracoes = lazy(() => import("./pages/admin/TvConfiguracoes"));
+const TvStudioCamera = lazy(() => import("./pages/TvStudioCamera"));
+
+const CanalHome = lazy(() => import("./pages/CanalHome"));
+const CanalChannel = lazy(() => import("./pages/CanalChannel"));
+const VideoPlayer = lazy(() => import("./pages/VideoPlayer"));
+const CanalUpload = lazy(() => import("./pages/CanalUpload"));
+const CanalPlaylists = lazy(() => import("./pages/CanalPlaylists"));
+const CanalCreateChannel = lazy(() => import("./pages/CanalCreateChannel"));
+const CanalMyChannel = lazy(() => import("./pages/CanalMyChannel"));
+
 // Funcionalidades fora desta release ficam desativadas IGUALMENTE nos dois
 // ambientes. O desenvolvimento continua em branch/preview própria.
 // Documentos oficiais foram homologados e acompanham a mesma release no
@@ -236,6 +259,27 @@ const App = () => (
               <Route path="/admin/certificados" element={<ProtectedRoute><ModuleGate moduleId="official-documents"><Certificados /></ModuleGate></ProtectedRoute>} />
 
               <Route path="/admin/relatorios" element={<ProtectedRoute><ModuleGate moduleId="reports"><Relatorios /></ModuleGate></ProtectedRoute>} />
+
+              {/* TV Digital */}
+              <Route path="/tv" element={<ProtectedRoute><ModuleGate moduleId="tv-digital"><TvHome /></ModuleGate></ProtectedRoute>} />
+              <Route path="/tv/:channelSlug" element={<ProtectedRoute><ModuleGate moduleId="tv-digital"><TvChannel /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/tv" element={<ProtectedRoute><ModuleGate moduleId="tv-digital"><TvAdmin /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/tv/canais" element={<ProtectedRoute><ModuleGate moduleId="tv-digital"><TvCanais /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/tv/programacao" element={<ProtectedRoute><ModuleGate moduleId="tv-digital"><TvProgramacao /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/tv/ao-vivo" element={<ProtectedRoute><ModuleGate moduleId="tv-digital"><TvAoVivo /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/tv/biblioteca" element={<ProtectedRoute><ModuleGate moduleId="tv-digital"><TvBiblioteca /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/tv/configuracoes" element={<ProtectedRoute><ModuleGate moduleId="tv-digital"><TvConfiguracoes /></ModuleGate></ProtectedRoute>} />
+              {/* Acesso de câmera do estúdio: operador entra via link/QR dedicado, sem exigir sessão administrativa completa. */}
+              <Route path="/tv/studio/:roomId/camera" element={<ModuleGate moduleId="tv-digital"><TvStudioCamera /></ModuleGate>} />
+
+              {/* Canal Eclésia (vídeo sob demanda) */}
+              <Route path="/canal" element={<ProtectedRoute><ModuleGate moduleId="canal-ecclesia"><CanalHome /></ModuleGate></ProtectedRoute>} />
+              <Route path="/canal/upload" element={<ProtectedRoute><ModuleGate moduleId="canal-ecclesia"><CanalUpload /></ModuleGate></ProtectedRoute>} />
+              <Route path="/canal/playlists" element={<ProtectedRoute><ModuleGate moduleId="canal-ecclesia"><CanalPlaylists /></ModuleGate></ProtectedRoute>} />
+              <Route path="/canal/criar" element={<ProtectedRoute><ModuleGate moduleId="canal-ecclesia"><CanalCreateChannel /></ModuleGate></ProtectedRoute>} />
+              <Route path="/canal/meu-canal" element={<ProtectedRoute><ModuleGate moduleId="canal-ecclesia"><CanalMyChannel /></ModuleGate></ProtectedRoute>} />
+              <Route path="/canal/:slug" element={<ProtectedRoute><ModuleGate moduleId="canal-ecclesia"><CanalChannel /></ModuleGate></ProtectedRoute>} />
+              <Route path="/video/:id" element={<ProtectedRoute><ModuleGate moduleId="canal-ecclesia"><VideoPlayer /></ModuleGate></ProtectedRoute>} />
 
               <Route path="/admin/escalas" element={<ProtectedRoute><Escalas /></ProtectedRoute>} />
 

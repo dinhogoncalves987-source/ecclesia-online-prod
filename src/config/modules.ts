@@ -99,6 +99,24 @@ const ENABLED_MODULES: readonly ModuleDefinition[] = [
   { id: "finance.audit", availability: "both", label: "Financeiro — Auditoria" },
   { id: "finance.intelligence", availability: "both", label: "Financeiro — Inteligência" },
   { id: "official-documents", availability: "both", label: "Documentos Oficiais" },
+
+  // RESTAURAÇÃO 2026-07-30 — TV Digital e Canal Eclésia. Backend real e
+  // homologado desde antes desta restauração: migrations
+  // 20260802120000_tv_canal_foundation.sql, 20260802130000_tv_canal_live_production.sql
+  // e 20260803000000_tv_streaming_operational_rpcs.sql já classificadas como
+  // production_management em supabase/migration-manifest.json (espelhadas
+  // em supabase-production/), e as edge functions de LiveKit/R2/heartbeat
+  // (create-livekit-room, create-livekit-token, end-livekit-room,
+  // get-r2-upload-url, update-tv-heartbeat, validate-tv-stream-key) já
+  // presentes em supabase/functions/. O frontend havia sido removido do
+  // código-fonte durante a separação da release de Gestão — restaurado a
+  // partir do estado homologado em 2026-07-28 (branch histórica
+  // handoff/sonnet-staging-finalizacao-20260725, commit 589d28a). Ainda
+  // pendente: infraestrutura externa de ingest (MediaMTX, ver
+  // infra/tv-media-server/) e credenciais reais de LiveKit/Cloudflare R2 —
+  // ver docs/architecture/auditoria-tv-canal-chat-otp.md.
+  { id: "tv-digital", availability: "both", label: "TV Digital" },
+  { id: "canal-ecclesia", availability: "both", label: "Canal Eclésia" },
 ] as const;
 
 const DEFERRED_MODULES: readonly ModuleDefinition[] = [
@@ -107,8 +125,6 @@ const DEFERRED_MODULES: readonly ModuleDefinition[] = [
   { id: "discipleship", availability: "disabled", label: "Discipulado" },
   { id: "theology", availability: "disabled", label: "Teologia" },
   { id: "missions", availability: "disabled", label: "Missões" },
-  { id: "tv-digital", availability: "disabled", label: "TV Digital" },
-  { id: "canal-ecclesia", availability: "disabled", label: "Canal Eclésia" },
 ] as const;
 
 /** Registro idêntico nos dois ambientes. */
@@ -154,6 +170,10 @@ const ROUTE_MODULE_MAP: Readonly<Record<string, ModuleId>> = {
   "/admin/missoes": "missions",
   "/admin/cartas-transferencia": "official-documents",
   "/admin/certificados": "official-documents",
+  "/admin/tv": "tv-digital",
+  "/tv": "tv-digital",
+  "/canal": "canal-ecclesia",
+  "/video": "canal-ecclesia",
 };
 
 export function isRouteEnabled(path: string, appEnv?: "production" | "staging"): boolean {
