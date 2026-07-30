@@ -4,7 +4,8 @@
  * Único ponto do sistema que transforma "código de telefone comprovado" em
  * uma sessão real do Supabase Auth. Chamado PELO PRÓPRIO MEMBRO, antes de
  * estar autenticado (ver supabase/config.toml — verify_jwt = false para esta
- * função), com { phone, code }.
+ * função), com { phone, code } no login normal ou
+ * { invite_token, phone, code } na ativação manual enviada pela Secretaria.
  *
  * Por que isto precisa de uma Edge Function (e não só das RPCs da migration
  * 20260802100000_member_login_otp_foundation.sql):
@@ -88,31 +89,42 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const phone = typeof body?.phone === "string" ? body.phone : "";
     const code = typeof body?.code === "string" ? body.code : "";
+    const inviteToken = typeof body?.invite_token === "string" ? body.invite_token.trim() : "";
     if (!phone.trim() || !code.trim()) {
       return jsonResponse({ ok: false, error: "missing_phone_or_code" }, 400);
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    // Fail-closed de defesa em profundidade: mesmo que a RPC de verificação
+    // Fail-closed de defesa em profundidade para login espontâneo. Convite
+    // manual usa um desafio próprio, já autorizado por um responsável e
+    // vinculado ao token de convite; por isso não depende do transport_mode
+    // global (e continua sem qualquer envio automático).
     // por algum motivo aceitasse um desafio órfão, esta função nunca emite
     // sessão se o transporte estiver 'disabled' (produção, por padrão).
-    const { data: settings, error: settingsError } = await adminClient
-      .from("member_otp_settings")
-      .select("transport_mode")
-      .limit(1)
-      .maybeSingle();
-    if (settingsError) {
-      return jsonResponse({ ok: false, error: "settings_unavailable" }, 500);
-    }
-    if (!settings || settings.transport_mode === "disabled") {
-      return jsonResponse({ ok: false, error: "otp_disabled" }, 403);
+    if (!inviteToken) {
+      const { data: settings, error: settingsError } = await adminClient
+        .from("member_otp_settings")
+        .select("transport_mode")
+        .limit(1)
+        .maybeSingle();
+      if (settingsError) {
+        return jsonResponse({ ok: false, error: "settings_unavailable" }, 500);
+      }
+      if (!settings || settings.transport_mode === "disabled") {
+        return jsonResponse({ ok: false, error: "otp_disabled" }, 403);
+      }
     }
 
-    const { data: verifyResult, error: verifyError } = await adminClient.rpc(
-      "_verify_member_login_otp_internal",
-      { p_phone: phone, p_code: code },
-    );
+    const { data: verifyResult, error: verifyError } = inviteToken
+      ? await adminClient.rpc(
+          "_verify_member_invite_otp_internal",
+          { p_invite_token: inviteToken, p_phone: phone, p_code: code },
+        )
+      : await adminClient.rpc(
+          "_verify_member_login_otp_internal",
+          { p_phone: phone, p_code: code },
+        );
     if (verifyError) {
       console.error("verify-member-login-otp: _verify_member_login_otp_internal error", verifyError.message);
       return jsonResponse({ ok: false, error: "verification_failed" }, 500);

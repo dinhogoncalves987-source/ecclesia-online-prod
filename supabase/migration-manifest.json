@@ -130,7 +130,9 @@
     "20260803120000_member_schema_neutrality.sql",
     "20260803130000_gestao_release_security_convergence.sql",
     "20260803140000_gestao_release_qa_fixes.sql",
-    "20260803150000_member_required_contacts.sql"
+    "20260803150000_member_required_contacts.sql",
+    "20260803160000_member_invite_manual_whatsapp_otp.sql",
+    "20260803170000_internal_calls_foundation.sql"
   ],
   "staging_feature": [],
   "staging_only": [

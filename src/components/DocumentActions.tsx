@@ -42,6 +42,8 @@ export type DocumentActionsProps = {
    * Quando fornecido, Share / WhatsApp / Email usam o arquivo real.
    */
   onGeneratePdfBlob?: () => Promise<{ blob: Blob; fileName: string } | null>;
+  /** Impressão especializada. Evita imprimir o modal ou a página inteira. */
+  onPrint?: () => void | Promise<void>;
   /** Notifica o pai quando a geração começa/termina (útil para spinner externo). */
   onGeneratingChange?: (v: boolean) => void;
   size?: "sm" | "default";
@@ -139,6 +141,7 @@ export function DocumentActions({
   emailBody = "",
   onGeneratePdf,
   onGeneratePdfBlob,
+  onPrint,
   onGeneratingChange,
   size = "sm",
   variant = "outline",
@@ -158,7 +161,13 @@ export function DocumentActions({
     }
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    if (onPrint) {
+      await withGenerating(async () => {
+        await onPrint();
+      });
+      return;
+    }
     if (printElementId) isolatePrint(printElementId);
     else window.print();
   };
@@ -171,11 +180,11 @@ export function DocumentActions({
       await withGenerating(async () => {
         const result = await onGeneratePdfBlob();
         if (result) downloadBlob(result.blob, result.fileName);
-        else handlePrint();
+        else await handlePrint();
       });
       return;
     }
-    handlePrint();
+    await handlePrint();
   };
 
   // ── Compartilhar: Web Share API com arquivo PDF ─────────────────────────
@@ -337,8 +346,15 @@ export function DocumentActions({
       )}
 
       {shownActions.includes("print") && (
-        <Button type="button" size={size} variant={variant} onClick={handlePrint} className="gap-1.5">
-          <Printer size={14} />
+        <Button
+          type="button"
+          size={size}
+          variant={variant}
+          disabled={generating}
+          onClick={() => void handlePrint()}
+          className="gap-1.5"
+        >
+          {generating ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
           Imprimir
         </Button>
       )}

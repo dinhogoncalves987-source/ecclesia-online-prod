@@ -3,12 +3,13 @@
  * Shown after creating a new member when they have a phone/whatsapp number.
  * Generates an invite token and offers WhatsApp + copy-link options.
  */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { X, MessageCircle, Copy, Clock, CheckCircle2, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
   createMemberInvite,
+  generateManualMemberInviteOtp,
   revokeMemberInvites,
   buildInviteUrl,
   buildWhatsappLink,
@@ -30,11 +31,7 @@ interface Props {
   invitedBy?:     string;
   /** Phone OR WhatsApp number (raw, will be sanitised). */
   phone?:         string | null;
-  /**
-   * Registered e-mail of the member — required to generate the digital invite.
-   * The invite binds the Auth account to this fixed e-mail, so without it the
-   * invite cannot be created.
-   */
+  /** Mantido somente para compatibilidade com chamadas antigas do componente. */
   email?:         string | null;
 }
 
@@ -44,16 +41,19 @@ export function MemberInviteModal({
   open, onClose,
   memberId, memberName, organizationId, churchName,
   sectorId, congregationId, invitedBy,
-  phone, email,
+  phone,
 }: Props) {
   const { t, lang } = useLanguage();
   const [invite, setInvite]     = useState<InviteRecord | null>(null);
   const [loading, setLoading]   = useState(false);
+  const [openingWhatsapp, setOpeningWhatsapp] = useState(false);
   const [copied, setCopied]     = useState(false);
-
-  const hasEmail = !!email && email.trim().length > 0;
+  const generationInFlightRef = useRef(false);
+  const hasPhone = Boolean(phone?.trim());
 
   const generate = useCallback(async () => {
+    if (generationInFlightRef.current) return;
+    generationInFlightRef.current = true;
     setLoading(true);
     try {
       const { data, error } = await createMemberInvite({
@@ -71,14 +71,15 @@ export function MemberInviteModal({
       setInvite(data);
     } finally {
       setLoading(false);
+      generationInFlightRef.current = false;
     }
   }, [memberId, organizationId, sectorId, congregationId, invitedBy, t]);
 
   useEffect(() => {
-    // The invite binds the Auth account to the member's registered e-mail —
-    // without an e-mail there is nothing to bind, so we never generate it.
-    if (open && !invite && hasEmail) generate();
-  }, [open, invite, hasEmail, generate]);
+    // Criar o registro não envia mensagem. O código só nasce depois do clique
+    // explícito em "Preparar no WhatsApp Business".
+    if (open && !invite && hasPhone) generate();
+  }, [open, invite, hasPhone, generate]);
 
   const inviteUrl = invite ? buildInviteUrl(invite.token) : "";
 
@@ -94,10 +95,25 @@ export function MemberInviteModal({
     }
   };
 
-  const handleWhatsApp = () => {
-    if (!invite || !phone) return;
-    const waLink = buildWhatsappLink(phone, memberName, churchName, inviteUrl);
-    window.open(waLink, "_blank", "noopener,noreferrer");
+  const handleWhatsApp = async () => {
+    if (!invite || !phone || openingWhatsapp) return;
+    setOpeningWhatsapp(true);
+    try {
+      const otp = await generateManualMemberInviteOtp(invite.id);
+      if (!otp.ok || !otp.code) {
+        toast.error(t("Não foi possível preparar o código de acesso"), {
+          description: otp.error ?? t("Tente novamente"),
+        });
+        return;
+      }
+      const waLink = buildWhatsappLink(phone, memberName, churchName, inviteUrl, otp.code);
+      window.open(waLink, "_blank", "noopener,noreferrer");
+      toast.success(t("Mensagem preparada"), {
+        description: t("Revise e confirme o envio no WhatsApp Business."),
+      });
+    } finally {
+      setOpeningWhatsapp(false);
+    }
   };
 
   const handleRegenerate = async () => {
@@ -128,11 +144,13 @@ export function MemberInviteModal({
           <div>
             <div className="flex items-center gap-2 mb-0.5">
               <CheckCircle2 size={18} className="text-emerald-500" />
-              <h2 className="font-serif text-base font-semibold">{t("Membro cadastrado com sucesso")}</h2>
+              <DialogTitle className="font-serif text-base font-semibold">
+                {t("Membro cadastrado com sucesso")}
+              </DialogTitle>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <DialogDescription className="text-xs text-muted-foreground">
               {t("Envie o link de ativação para que o membro crie o acesso ao aplicativo.")}
-            </p>
+            </DialogDescription>
           </div>
           <button
             onClick={onClose}
@@ -145,18 +163,18 @@ export function MemberInviteModal({
         {/* Body */}
         <div className="px-5 py-5 space-y-4">
 
-          {/* Blocked: member has no registered e-mail */}
-          {!hasEmail && (
+          {/* Blocked: member has no registered WhatsApp/phone */}
+          {!hasPhone && (
             <div className="flex flex-col items-center text-center gap-2 py-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-4">
               <AlertTriangle size={22} className="text-amber-600 dark:text-amber-400" />
               <p className="text-sm text-amber-800 dark:text-amber-300">
-                {t("Cadastre um e-mail para este membro antes de enviar o convite digital.")}
+                {t("Cadastre o WhatsApp ou telefone deste membro antes de preparar o acesso.")}
               </p>
             </div>
           )}
 
           {/* Loading state */}
-          {hasEmail && loading && (
+          {hasPhone && loading && (
             <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground">
               <Loader2 size={18} className="animate-spin" />
               <span className="text-sm">{t("Gerando convite...")}</span>
@@ -164,7 +182,7 @@ export function MemberInviteModal({
           )}
 
           {/* Invite ready */}
-          {hasEmail && !loading && invite && (
+          {hasPhone && !loading && invite && (
             <>
               {/* Link preview */}
               <div className="bg-muted/40 rounded-lg px-3 py-2.5">
@@ -186,19 +204,21 @@ export function MemberInviteModal({
 
               {/* Actions */}
               <div className="space-y-2 pt-1">
-                {phone ? (
-                  <button
-                    onClick={handleWhatsApp}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#25D366] text-white rounded-lg text-sm font-medium hover:bg-[#1ebe5b] transition-colors"
-                  >
-                    <MessageCircle size={16} />
-                    {t("Enviar pelo WhatsApp")}
-                  </button>
-                ) : (
-                  <p className="text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 text-center">
-                    {t("Este membro não possui telefone cadastrado. Copie o link e envie manualmente.")}
-                  </p>
-                )}
+                <button
+                  onClick={handleWhatsApp}
+                  disabled={openingWhatsapp}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#25D366] text-white rounded-lg text-sm font-medium hover:bg-[#1ebe5b] disabled:opacity-60 transition-colors"
+                >
+                  {openingWhatsapp
+                    ? <Loader2 size={16} className="animate-spin" />
+                    : <MessageCircle size={16} />}
+                  {openingWhatsapp
+                    ? t("Preparando código...")
+                    : t("Preparar no WhatsApp Business")}
+                </button>
+                <p className="text-[11px] text-center text-muted-foreground">
+                  {t("Nada é enviado automaticamente. Você revisa e confirma no WhatsApp.")}
+                </p>
 
                 <button
                   onClick={handleCopy}

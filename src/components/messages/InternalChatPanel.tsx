@@ -3,8 +3,9 @@ import { InternalChatHeader } from "@/components/messages/InternalChatHeader";
 import { InternalChatLockedFooter } from "@/components/messages/InternalChatLockedFooter";
 import { InternalMessageComposer } from "@/components/messages/InternalMessageComposer";
 import { InternalMessageList } from "@/components/messages/InternalMessageList";
-import { JitsiCallModal, type JitsiCallMode } from "@/components/messages/JitsiCallModal";
+import { JitsiCallModal } from "@/components/messages/JitsiCallModal";
 import { useInternalMessages } from "@/hooks/useInternalMessages";
+import { useInternalCall } from "@/hooks/useInternalCall";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useRole } from "@/hooks/useRole";
@@ -50,14 +51,21 @@ export function InternalChatPanel({
   const { t } = useLanguage();
   const { toast } = useToast();
   const { canonicalRole } = useRole();
+  const { startCall, busy: callBusy, activeCall } = useInternalCall();
   const [threadBusy, setThreadBusy] = useState(false);
   const [pendingMessages, setPendingMessages] = useState<InternalMessage[]>([]);
-  const [callOpen, setCallOpen] = useState(false);
-  const [callMode, setCallMode] = useState<JitsiCallMode>("voice");
+  const [meetingOpen, setMeetingOpen] = useState(false);
 
   // Determina se a thread é individual (1:1) ou de grupo/tópico
-  const isDirect = Boolean(thread?.memberId && thread?.participantName);
-  const participantLabel = thread?.participantName ?? null;
+  const isDirect = Boolean(
+    thread?.source === "secretariat"
+    && thread.memberId
+    && thread.participantUserId
+    && currentUserId
+    && thread.participantUserId !== currentUserId,
+  );
+  const canCall = Boolean(thread && isDirect && !callBusy && !activeCall);
+  const isMeeting = Boolean(thread?.source === "meeting" && thread.callRoomToken);
 
   const senderRole = isStaff ? (canonicalRole ?? "leader") : "member";
 
@@ -171,41 +179,35 @@ export function InternalChatPanel({
         isStaff={isStaff}
         showBack={showBack}
         onBack={onBack}
-        onVoiceCall={thread && isStaff && thread.callRoomToken ? () => { setCallMode("voice"); setCallOpen(true); } : undefined}
-        onVideoCall={thread && isStaff && thread.callRoomToken ? () => { setCallMode("video"); setCallOpen(true); } : undefined}
+        showCallActions={isDirect}
+        onVoiceCall={thread && canCall ? () => { void startCall(thread, "voice"); } : undefined}
+        onVideoCall={thread && canCall ? () => { void startCall(thread, "video"); } : undefined}
+        onJoinMeeting={thread && isMeeting ? () => setMeetingOpen(true) : undefined}
       />
 
-      {/* Modal Jitsi — apenas para staff com thread ativa e token de sala seguro */}
-      {thread && isStaff && thread.callRoomToken && (
+      {/* Reunião de grupo explícita. Nunca é aberta pelos botões 1:1. */}
+      {thread && isMeeting && thread.callRoomToken && (
         <JitsiCallModal
-          open={callOpen}
-          onClose={() => setCallOpen(false)}
+          open={meetingOpen}
+          onClose={() => setMeetingOpen(false)}
           organizationId={organizationId}
           threadId={thread.id}
           callRoomToken={thread.callRoomToken}
-          mode={callMode}
+          mode="video"
+          displayName={
+            (user?.user_metadata as Record<string, string> | undefined)?.full_name
+            || user?.email?.split("@")[0]
+            || "Participante"
+          }
+          callTitle={`Reunião: ${thread.subject}`}
           onBlocked={() => {
-            setCallOpen(false);
+            setMeetingOpen(false);
             toast({
               title: t("Já existe uma chamada em andamento"),
-              description: t("Encerre a chamada atual antes de iniciar outra."),
+              description: t("Encerre a chamada atual antes de entrar na reunião."),
               variant: "destructive",
             });
           }}
-          displayName={
-            (user?.user_metadata as Record<string, string> | undefined)?.full_name ||
-            user?.email?.split("@")[0] ||
-            "Participante"
-          }
-          callTitle={
-            isDirect && participantLabel
-              ? callMode === "video"
-                ? `Videochamada com ${participantLabel}`
-                : `Ligação com ${participantLabel}`
-              : callMode === "video"
-                ? "Reunião Ecclesia"
-                : "Chamada Ecclesia"
-          }
         />
       )}
 

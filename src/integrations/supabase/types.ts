@@ -2037,6 +2037,119 @@ export type Database = {
           },
         ]
       }
+      internal_call_signals: {
+        Row: {
+          call_id: string
+          created_at: string
+          id: number
+          payload: Json
+          recipient_user_id: string
+          sender_user_id: string
+          signal_type: string
+        }
+        Insert: {
+          call_id: string
+          created_at?: string
+          id?: number
+          payload: Json
+          recipient_user_id: string
+          sender_user_id: string
+          signal_type: string
+        }
+        Update: {
+          call_id?: string
+          created_at?: string
+          id?: number
+          payload?: Json
+          recipient_user_id?: string
+          sender_user_id?: string
+          signal_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internal_call_signals_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "internal_calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      internal_calls: {
+        Row: {
+          answered_at: string | null
+          callee_avatar_url: string | null
+          callee_name: string
+          callee_user_id: string
+          caller_avatar_url: string | null
+          caller_name: string
+          caller_user_id: string
+          created_at: string
+          end_reason: string | null
+          ended_at: string | null
+          id: string
+          mode: string
+          organization_id: string
+          started_at: string
+          status: string
+          thread_id: string
+          updated_at: string
+        }
+        Insert: {
+          answered_at?: string | null
+          callee_avatar_url?: string | null
+          callee_name: string
+          callee_user_id: string
+          caller_avatar_url?: string | null
+          caller_name: string
+          caller_user_id: string
+          created_at?: string
+          end_reason?: string | null
+          ended_at?: string | null
+          id?: string
+          mode: string
+          organization_id: string
+          started_at?: string
+          status?: string
+          thread_id: string
+          updated_at?: string
+        }
+        Update: {
+          answered_at?: string | null
+          callee_avatar_url?: string | null
+          callee_name?: string
+          callee_user_id?: string
+          caller_avatar_url?: string | null
+          caller_name?: string
+          caller_user_id?: string
+          created_at?: string
+          end_reason?: string | null
+          ended_at?: string | null
+          id?: string
+          mode?: string
+          organization_id?: string
+          started_at?: string
+          status?: string
+          thread_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internal_calls_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "internal_threads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "internal_calls_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       internal_messages: {
         Row: {
           body: string | null
@@ -6605,6 +6718,10 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_generate_member_invite_otp: {
+        Args: { p_invite_id: string }
+        Returns: Json
+      }
       admin_list_access_invites: {
         Args: { _target_organization_id: string }
         Returns: Json
@@ -6639,6 +6756,26 @@ export type Database = {
       }
       import_finance_transactions_bulk: {
         Args: { p_rows: Json }
+        Returns: Json
+      }
+      send_internal_call_signal: {
+        Args: {
+          _call_id: string
+          _payload: Json
+          _signal_type: string
+        }
+        Returns: number
+      }
+      start_internal_call: {
+        Args: { _mode: string; _thread_id: string }
+        Returns: Json
+      }
+      transition_internal_call: {
+        Args: {
+          _action: string
+          _call_id: string
+          _reason?: string | null
+        }
         Returns: Json
       }
       mark_internal_thread_delivered: {

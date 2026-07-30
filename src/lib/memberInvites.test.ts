@@ -1,11 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const signInWithOtpMock = vi.fn();
+const verifyOtpMock = vi.fn();
 const rpcMock = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
-    auth: { signInWithOtp: (...args: unknown[]) => signInWithOtpMock(...args) },
+    auth: {
+      signInWithOtp: (...args: unknown[]) => signInWithOtpMock(...args),
+      verifyOtp: (...args: unknown[]) => verifyOtpMock(...args),
+    },
     rpc: (...args: unknown[]) => rpcMock(...args),
   },
 }));
@@ -16,9 +20,12 @@ vi.mock("@/lib/publicUrl", () => ({
 
 import {
   acceptMemberInvite,
+  buildWhatsappLink,
   emailsMatch,
+  generateManualMemberInviteOtp,
   normalizeEmail,
   sendMemberInviteMagicLink,
+  verifyManualMemberInviteOtp,
 } from "./memberInvites";
 
 describe("memberInvites — e-mail helpers", () => {
@@ -51,6 +58,70 @@ describe("memberInvites — mailbox proof by magic link", () => {
     expect(arg.options.emailRedirectTo).toBe("https://app.example.com/convite-membro/tok-abc");
     expect(arg.options.shouldCreateUser).toBe(true);
     expect(arg).not.toHaveProperty("password");
+  });
+});
+
+describe("memberInvites — convite manual sem Meta", () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+    verifyOtpMock.mockReset();
+    vi.unstubAllGlobals();
+  });
+
+  it("monta um link wa.me com link e código sem chamar API da Meta", () => {
+    const link = buildWhatsappLink(
+      "(54) 99999-9999",
+      "Fulano",
+      "Igreja Teste",
+      "https://app.example.com/convite-membro/tok",
+      "123456",
+    );
+    expect(link).toMatch(/^https:\/\/wa\.me\/5554999999999\?text=/);
+    expect(decodeURIComponent(link)).toContain("Código de acesso: 123456");
+    expect(decodeURIComponent(link)).toContain("https://app.example.com/convite-membro/tok");
+    expect(link).not.toContain("graph.facebook.com");
+  });
+
+  it("gera o código pela RPC autenticada e nunca persiste o texto no cliente", async () => {
+    rpcMock.mockResolvedValue({
+      data: {
+        ok: true,
+        member_name: "Fulano",
+        phone_normalized: "5554999999999",
+        code: "123456",
+        expires_at: "2026-07-30T12:00:00Z",
+      },
+      error: null,
+    });
+
+    const result = await generateManualMemberInviteOtp("invite-1");
+    expect(rpcMock).toHaveBeenCalledWith("admin_generate_member_invite_otp", {
+      p_invite_id: "invite-1",
+    });
+    expect(result).toMatchObject({ ok: true, code: "123456" });
+  });
+
+  it("troca a prova validada pela sessão oficial do Supabase Auth", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        ok: true,
+        email: "otp-member-id@members.ecclesiaonline.internal",
+        token_hash: "hash",
+      }),
+    }));
+    verifyOtpMock.mockResolvedValue({
+      data: { user: { id: "user-1" } },
+      error: null,
+    });
+
+    const result = await verifyManualMemberInviteOtp("tok", "54999999999", "123456");
+    expect(verifyOtpMock).toHaveBeenCalledWith({
+      email: "otp-member-id@members.ecclesiaonline.internal",
+      token_hash: "hash",
+      type: "magiclink",
+    });
+    expect(result).toEqual({ ok: true, userId: "user-1" });
   });
 });
 

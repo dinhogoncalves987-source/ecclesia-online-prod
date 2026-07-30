@@ -396,75 +396,91 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
 
   const fileName = `CarteiraMembro-${member.full_name.replace(/\s+/g, "-")}.pdf`;
 
-  /** Renderiza frente + verso e devolve um Blob PDF sem salvar no disco. */
+  /** Captura exatamente as mesmas faces React exibidas na tela. */
+  const renderWalletCanvases = async () => {
+    const { default: html2canvas } = await import("html2canvas");
+    const frontEl = document.getElementById("wallet-pdf-front");
+    const backEl  = document.getElementById("wallet-pdf-back");
+    if (!frontEl || !backEl) throw new Error("Elementos do cartão não encontrados");
+
+    const images = Array.from(
+      new Set([...frontEl.querySelectorAll("img"), ...backEl.querySelectorAll("img")]),
+    );
+    await Promise.all(images.map(async (image) => {
+      if (!image.complete) {
+        await new Promise<void>((resolve) => {
+          image.addEventListener("load", () => resolve(), { once: true });
+          image.addEventListener("error", () => resolve(), { once: true });
+        });
+      }
+      try {
+        await image.decode();
+      } catch {
+        // O navegador pode não oferecer decode para algumas URLs antigas.
+      }
+    }));
+    if (document.fonts?.ready) await document.fonts.ready;
+
+    const captureOpts = {
+      scale: 4,
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: null,
+      logging: false,
+      width: frontEl.offsetWidth,
+      height: frontEl.offsetHeight,
+      windowWidth: frontEl.offsetWidth,
+      windowHeight: frontEl.offsetHeight,
+    };
+    const frontCanvas = await html2canvas(frontEl, captureOpts);
+    const backCanvas = await html2canvas(backEl, {
+      ...captureOpts,
+      width: backEl.offsetWidth,
+      height: backEl.offsetHeight,
+      windowWidth: backEl.offsetWidth,
+      windowHeight: backEl.offsetHeight,
+    });
+
+    return { frontCanvas, backCanvas };
+  };
+
+  /** Renderiza frente + verso em duas páginas no tamanho físico de cartão. */
   const generateWalletPdfBlob = async (): Promise<{ blob: Blob; fileName: string } | null> => {
     try {
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-        import("html2canvas"),
+      const [{ jsPDF }, { frontCanvas, backCanvas }] = await Promise.all([
         import("jspdf"),
+        renderWalletCanvases(),
       ]);
 
-      const frontEl = document.getElementById("wallet-pdf-front");
-      const backEl  = document.getElementById("wallet-pdf-back");
-      if (!frontEl || !backEl) throw new Error("Elementos do cartão não encontrados");
-
-      const images = Array.from(
-        new Set([...frontEl.querySelectorAll("img"), ...backEl.querySelectorAll("img")]),
-      );
-      await Promise.all(images.map(async (image) => {
-        if (!image.complete) {
-          await new Promise<void>((resolve) => {
-            image.addEventListener("load", () => resolve(), { once: true });
-            image.addEventListener("error", () => resolve(), { once: true });
-          });
-        }
-        try {
-          await image.decode();
-        } catch {
-          // O navegador pode não oferecer decode para algumas URLs antigas.
-        }
-      }));
-      if (document.fonts?.ready) await document.fonts.ready;
-
-      const captureOpts = {
-        scale: 4,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: null,
-        logging: false,
-        width: frontEl.offsetWidth,
-        height: frontEl.offsetHeight,
-        windowWidth: frontEl.offsetWidth,
-        windowHeight: frontEl.offsetHeight,
-      };
-      const frontCanvas = await html2canvas(frontEl, captureOpts);
-      const backCanvas  = await html2canvas(backEl, {
-        ...captureOpts,
-        width: backEl.offsetWidth,
-        height: backEl.offsetHeight,
-        windowWidth: backEl.offsetWidth,
-        windowHeight: backEl.offsetHeight,
+      const cardWidth = 85.6;
+      const cardHeight = 53.98;
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: [cardWidth, cardHeight],
+        compress: true,
       });
 
-      // Uma única folha A4 paisagem deixa o arquivo agradável no celular e
-      // preserva frente/verso no tamanho físico real para impressão e corte.
-      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const cardWidth = 85;
-      const cardHeight = 54;
-      const cardGap = 12;
-      const startX = (pageWidth - (cardWidth * 2 + cardGap)) / 2;
-      const startY = (pageHeight - cardHeight) / 2;
-
-      pdf.addImage(frontCanvas.toDataURL("image/png"), "PNG", startX, startY, cardWidth, cardHeight);
+      pdf.addImage(
+        frontCanvas.toDataURL("image/png"),
+        "PNG",
+        0,
+        0,
+        cardWidth,
+        cardHeight,
+        undefined,
+        "FAST",
+      );
+      pdf.addPage([cardWidth, cardHeight], "landscape");
       pdf.addImage(
         backCanvas.toDataURL("image/png"),
         "PNG",
-        startX + cardWidth + cardGap,
-        startY,
+        0,
+        0,
         cardWidth,
         cardHeight,
+        undefined,
+        "FAST",
       );
 
       return { blob: pdf.output("blob"), fileName };
@@ -474,11 +490,45 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
     }
   };
 
+  /**
+   * Imprime somente o PDF de duas páginas em tamanho de cartão. O documento
+   * aberto no diálogo de impressão não contém modal, botões ou cabeçalhos da
+   * aplicação.
+   */
+  const handlePrintWallet = async () => {
+    const result = await generateWalletPdfBlob();
+    if (!result) return;
+
+    const url = URL.createObjectURL(result.blob);
+    const iframe = document.createElement("iframe");
+    iframe.title = "Impressão da carteira de membro";
+    iframe.style.position = "fixed";
+    iframe.style.width = "1px";
+    iframe.style.height = "1px";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.border = "0";
+    iframe.src = url;
+    document.body.appendChild(iframe);
+
+    iframe.addEventListener("load", () => {
+      window.setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      }, 250);
+    }, { once: true });
+
+    window.setTimeout(() => {
+      iframe.remove();
+      URL.revokeObjectURL(url);
+    }, 60_000);
+  };
+
   const handleGeneratePdf = async () => {
     setGeneratingPdf(true);
     try {
       const result = await generateWalletPdfBlob();
-      if (!result) { window.print(); return; }
+      if (!result) return;
       const url = URL.createObjectURL(result.blob);
       const a = document.createElement("a");
       a.href = url;
@@ -622,6 +672,7 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
         actions={["pdf", "share", "whatsapp", "email", "print"]}
         onGeneratePdf={generatingPdf ? undefined : () => void handleGeneratePdf()}
         onGeneratePdfBlob={generatingPdf ? undefined : generateWalletPdfBlob}
+        onPrint={generatingPdf ? undefined : handlePrintWallet}
         onGeneratingChange={setGeneratingPdf}
       />
 

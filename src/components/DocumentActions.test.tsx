@@ -107,4 +107,22 @@ describe("DocumentActions", () => {
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith("https://example.test/validar");
     expect(toastMocks.info).toHaveBeenCalled();
   });
+
+  it("usa a impressão especializada quando o documento fornece esse fluxo", async () => {
+    const onPrint = vi.fn().mockResolvedValue(undefined);
+    const browserPrint = vi.spyOn(window, "print").mockImplementation(() => undefined);
+
+    render(
+      <DocumentActions
+        actions={["print"]}
+        printElementId="documento-visivel"
+        onPrint={onPrint}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Imprimir" }));
+
+    await waitFor(() => expect(onPrint).toHaveBeenCalledTimes(1));
+    expect(browserPrint).not.toHaveBeenCalled();
+  });
 });

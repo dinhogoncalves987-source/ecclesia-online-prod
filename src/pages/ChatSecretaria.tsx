@@ -17,6 +17,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useToast } from "@/hooks/use-toast";
 import {
   createSecretariatThread,
+  createMeetingThread,
   findOrCreateDirectThread,
   sendInternalMessage,
 } from "@/lib/internalMessageMutations";
@@ -130,13 +131,13 @@ export default function ChatSecretaria() {
     processedNotifThread.current = true;
     navigate(pathname, { replace: true });
 
-    void fetchThreadById(church.id, threadId).then((thread) => {
+    void fetchThreadById(church.id, threadId, user?.id).then((thread) => {
       if (thread) {
         setForcedThread(thread);
         setRefetchKey((k) => k + 1);
       }
     });
-  }, [location.search, church?.id, navigate, pathname]);
+  }, [location.search, church?.id, user?.id, navigate, pathname]);
 
   // tópico geral
   const [newSubject, setNewSubject] = useState("");
@@ -274,7 +275,7 @@ export default function ChatSecretaria() {
     setCreating(true);
 
     const subject = meetingName.trim();
-    const result = await createSecretariatThread(church.id, user.id, subject);
+    const result = await createMeetingThread(church.id, user.id, subject);
 
     if (!result.ok || !result.thread) {
       toast({ title: t("Erro ao criar reunião"), description: result.error, variant: "destructive" });
@@ -284,7 +285,7 @@ export default function ChatSecretaria() {
 
     // Mensagem de convite para a reunião
     await sendInternalMessage(church.id, result.thread.id, user.id, {
-      body: `📹 ${t("Reunião")} "${subject}" ${t("criada. Use os botões de ligação/vídeo para entrar na sala.")}`,
+      body: `📹 ${t("Reunião")} "${subject}" ${t("criada. Use o botão Entrar na reunião desta conversa.")}`,
       senderRole: isAdmin ? "admin" : "secretary",
     });
 
@@ -604,7 +605,7 @@ export default function ChatSecretaria() {
               <div className="flex items-start gap-2.5 p-3 bg-muted/40 rounded-md text-xs text-muted-foreground">
                 <Users size={14} className="flex-shrink-0 mt-0.5" />
                 <p>
-                  {t("Uma sala de videoconferência será criada automaticamente. Os participantes entram pela conversa usando os botões de chamada.")}
+                  {t("Uma sala de grupo será criada. Ligações de voz e vídeo individuais continuam separadas nas conversas diretas.")}
                 </p>
               </div>
             </div>

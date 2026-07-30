@@ -22,6 +22,8 @@ self.addEventListener("push", (event) => {
 
   const title = data.title || "Ecclesia Online";
   const threadId = data.threadId || null;
+  const callId = data.callId || null;
+  const isCall = data.kind === "call" && Boolean(callId);
 
   // Contador no ícone do app mesmo com o app/navegador totalmente fechado.
   // `setAppBadge` também existe em `self.registration` dentro do Service
@@ -38,9 +40,11 @@ self.addEventListener("push", (event) => {
       body: data.body || "Nova mensagem",
       icon: "/icons/icon-192.png",
       badge: "/icons/icon-192.png",
-      tag: threadId ? `ec-thread-${threadId}` : undefined,
-      renotify: Boolean(threadId),
-      data: { threadId },
+      tag: isCall ? `ec-call-${callId}` : (threadId ? `ec-thread-${threadId}` : undefined),
+      renotify: Boolean(threadId || callId),
+      requireInteraction: isCall,
+      vibrate: isCall ? [400, 200, 400, 200, 400] : [150],
+      data: { threadId, callId, kind: data.kind || "message" },
     }),
   );
 });
@@ -48,7 +52,10 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const threadId = event.notification.data && event.notification.data.threadId;
-  const targetUrl = threadId ? `/admin/chat?thread=${threadId}` : "/admin/chat";
+  const callId = event.notification.data && event.notification.data.callId;
+  const targetUrl = threadId
+    ? `/admin/chat?thread=${threadId}${callId ? `&call=${callId}` : ""}`
+    : "/admin/chat";
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {

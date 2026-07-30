@@ -82,8 +82,9 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const messageId: string | undefined = body?.messageId;
-    if (!messageId) {
-      return jsonResponse({ error: "messageId is required" }, 400);
+    const callId: string | undefined = body?.callId;
+    if ((!messageId && !callId) || (messageId && callId)) {
+      return jsonResponse({ error: "send exactly one of messageId or callId" }, 400);
     }
 
     // Client "no papel do usuário": RLS decide se ele pode mesmo ler esta mensagem.
@@ -97,65 +98,97 @@ serve(async (req) => {
     }
     const callerId = authData.user.id;
 
-    const { data: message, error: messageError } = await callerClient
-      .from("internal_messages")
-      .select("id, thread_id, sender_user_id, sender_role, message_type, body")
-      .eq("id", messageId)
-      .maybeSingle();
-
-    if (messageError || !message) {
-      // RLS bloqueou (ou a mensagem não existe) — nunca revelamos qual dos dois.
-      return jsonResponse({ error: "not_found_or_forbidden" }, 404);
-    }
-
-    if (message.sender_user_id !== callerId) {
-      return jsonResponse({ error: "forbidden: not the sender" }, 403);
-    }
-
-    const preview = messagePreview(message.message_type, message.body);
-    if (!preview) {
-      return jsonResponse({ sent: 0, skipped: "system_message" });
-    }
-
     // A partir daqui, service role — só para resolver destinatários e ler
     // inscrições de OUTROS usuários, o que a RLS de push_subscriptions
     // nunca permitiria para o client comum (cada um só vê a própria linha).
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    let recipientIds: string[] = [];
+    let title = "Ecclesia Online";
+    let preview = "";
+    let threadId: string | null = null;
+    let notificationCallId: string | null = null;
+    let notificationKind: "message" | "call" = "message";
 
-    const { data: recipientRows, error: recipientsError } = await adminClient.rpc(
-      "internal_thread_notification_recipients",
-      { _thread_id: message.thread_id, _sender_user_id: callerId },
-    );
-    if (recipientsError) {
-      return jsonResponse({ error: recipientsError.message }, 500);
+    if (callId) {
+      const { data: call, error: callError } = await callerClient
+        .from("internal_calls")
+        .select("id, thread_id, caller_user_id, callee_user_id, caller_name, mode, status")
+        .eq("id", callId)
+        .maybeSingle();
+
+      if (callError || !call) {
+        return jsonResponse({ error: "not_found_or_forbidden" }, 404);
+      }
+      if (call.caller_user_id !== callerId || call.status !== "ringing") {
+        return jsonResponse({ error: "forbidden: caller or status mismatch" }, 403);
+      }
+
+      recipientIds = [call.callee_user_id];
+      title = call.mode === "video"
+        ? `Videochamada de ${call.caller_name}`
+        : `Ligação de ${call.caller_name}`;
+      preview = call.mode === "video"
+        ? "Toque para atender a videochamada"
+        : "Toque para atender a ligação";
+      threadId = call.thread_id;
+      notificationCallId = call.id;
+      notificationKind = "call";
+    } else {
+      const { data: message, error: messageError } = await callerClient
+        .from("internal_messages")
+        .select("id, thread_id, sender_user_id, sender_role, message_type, body")
+        .eq("id", messageId as string)
+        .maybeSingle();
+
+      if (messageError || !message) {
+        // RLS bloqueou (ou a mensagem não existe) — nunca revelamos qual dos dois.
+        return jsonResponse({ error: "not_found_or_forbidden" }, 404);
+      }
+      if (message.sender_user_id !== callerId) {
+        return jsonResponse({ error: "forbidden: not the sender" }, 403);
+      }
+
+      const resolvedPreview = messagePreview(message.message_type, message.body);
+      if (!resolvedPreview) {
+        return jsonResponse({ sent: 0, skipped: "system_message" });
+      }
+      preview = resolvedPreview;
+      threadId = message.thread_id;
+
+      const [{ data: recipientRows, error: recipientsError }, { data: senderProfile }] = await Promise.all([
+        adminClient.rpc(
+          "internal_thread_notification_recipients",
+          { _thread_id: message.thread_id, _sender_user_id: callerId },
+        ),
+        adminClient
+          .from("profiles")
+          .select("full_name")
+          .eq("user_id", callerId)
+          .maybeSingle(),
+      ]);
+      if (recipientsError) {
+        return jsonResponse({ error: recipientsError.message }, 500);
+      }
+      recipientIds = (recipientRows ?? []).map((row: { user_id?: string } | string) =>
+        typeof row === "string" ? row : (row.user_id as string),
+      ).filter(Boolean);
+      title = senderProfile?.full_name
+        ? `Nova mensagem de ${senderProfile.full_name}`
+        : "Nova mensagem — Ecclesia Online";
     }
-    const recipientIds: string[] = (recipientRows ?? []).map((r: { user_id?: string } | string) =>
-      typeof r === "string" ? r : (r.user_id as string),
-    ).filter(Boolean);
 
     if (recipientIds.length === 0) {
       return jsonResponse({ sent: 0, skipped: "no_recipients" });
     }
 
-    const [{ data: subscriptions }, { data: senderProfile }] = await Promise.all([
-      adminClient
-        .from("push_subscriptions")
-        .select("id, user_id, endpoint, p256dh, auth_key")
-        .in("user_id", recipientIds),
-      adminClient
-        .from("profiles")
-        .select("full_name")
-        .eq("user_id", callerId)
-        .maybeSingle(),
-    ]);
+    const { data: subscriptions } = await adminClient
+      .from("push_subscriptions")
+      .select("id, user_id, endpoint, p256dh, auth_key")
+      .in("user_id", recipientIds);
 
     if (!subscriptions || subscriptions.length === 0) {
       return jsonResponse({ sent: 0, skipped: "no_subscriptions", recipients: recipientIds.length });
     }
-
-    const title = senderProfile?.full_name
-      ? `Nova mensagem de ${senderProfile.full_name}`
-      : "Nova mensagem — Ecclesia Online";
 
     const staleIds: string[] = [];
     let sent = 0;
@@ -170,7 +203,13 @@ serve(async (req) => {
         };
         const result = await sendWebPush(
           subscriptionKeys,
-          { title, body: preview, threadId: message.thread_id },
+          {
+            title,
+            body: preview,
+            threadId,
+            callId: notificationCallId,
+            kind: notificationKind,
+          },
           vapid,
           vapidSubject,
         );

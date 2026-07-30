@@ -10,6 +10,7 @@ export type InternalThreadSource =
   | "pastoral"
   | "finance"
   | "secretariat"
+  | "meeting"
   | "prayer"
   | "general";
 
@@ -252,7 +253,13 @@ export async function fetchThreadsBySource(
           .select("*")
           .order("last_message_at", { ascending: false, nullsFirst: false })
           .order("created_at", { ascending: false });
-        if (source) q = q.eq("source", source);
+        // Reuniões pertencem à caixa da Secretaria, mas têm source próprio
+        // para jamais serem confundidas com uma conversa individual 1:1.
+        if (source === "secretariat") {
+          q = q.in("source", ["secretariat", "meeting"]);
+        } else if (source) {
+          q = q.eq("source", source);
+        }
         if (campaignId) q = q.eq("campaign_id", campaignId);
         return q;
       },
@@ -286,7 +293,7 @@ export async function fetchThreadsBySource(
       if (hiddenIds.size > 0) threads = threads.filter((t) => !hiddenIds.has(t.id));
     }
 
-    await enrichThreadParticipantNames(threads);
+    await enrichThreadParticipantNames(threads, options.currentUserId);
     await enrichThreadPreviewsAndUnread(threads, options.currentUserId);
     return { threads, fromDatabase: true };
   } catch (err) {
@@ -366,7 +373,10 @@ export async function fetchThreadMessages(
  * código usava sempre created_by, o que fazia uma conversa direta iniciada
  * pela secretaria mostrar o próprio nome do atendente em vez do membro.
  */
-async function enrichThreadParticipantNames(threads: InternalThread[]): Promise<void> {
+export async function enrichThreadParticipantNames(
+  threads: InternalThread[],
+  currentUserId?: string | null,
+): Promise<void> {
   const memberIds = [...new Set(threads.map((t) => t.memberId).filter(Boolean))] as string[];
   const memberByThreadId = new Map<string, { full_name: string; user_id: string | null }>();
 
@@ -389,7 +399,8 @@ async function enrichThreadParticipantNames(threads: InternalThread[]): Promise<
 
   const resolvedUserIds = [...new Set([...memberByThreadId.values()].map((m) => m.user_id).filter(Boolean))] as string[];
   const createdByIds = [...new Set(threads.map((t) => t.createdBy).filter(Boolean))] as string[];
-  const allProfileIds = [...new Set([...resolvedUserIds, ...createdByIds])];
+  const assignedToIds = [...new Set(threads.map((t) => t.assignedTo).filter(Boolean))] as string[];
+  const allProfileIds = [...new Set([...resolvedUserIds, ...createdByIds, ...assignedToIds])];
 
   const profileById = new Map<string, { full_name: string; avatar_url: string | null; last_seen_at: string | null }>();
   if (allProfileIds.length > 0) {
@@ -408,12 +419,26 @@ async function enrichThreadParticipantNames(threads: InternalThread[]): Promise<
 
   for (const thread of threads) {
     const member = memberByThreadId.get(thread.id);
-    const resolvedUserId = member?.user_id ?? thread.createdBy ?? null;
+    const memberIsCurrentUser = Boolean(
+      currentUserId && member?.user_id && member.user_id === currentUserId,
+    );
+    const resolvedUserId = memberIsCurrentUser
+      ? (
+          [thread.assignedTo, thread.createdBy]
+            .find((candidate) => Boolean(candidate && candidate !== currentUserId))
+          ?? null
+        )
+      : (
+          member?.user_id
+          ?? [thread.assignedTo, thread.createdBy]
+            .find((candidate) => Boolean(candidate && candidate !== currentUserId))
+          ?? null
+        );
     const profile = resolvedUserId ? profileById.get(resolvedUserId) : undefined;
 
-    if (member) {
+    if (member && !memberIsCurrentUser) {
       thread.participantName = member.full_name;
-    } else if (thread.createdBy) {
+    } else if (resolvedUserId) {
       thread.participantName = profile?.full_name ?? "Membro";
     }
     thread.participantUserId = resolvedUserId;
@@ -505,6 +530,7 @@ export async function resolveMemberIdForUser(
 export async function fetchThreadById(
   organizationId: string,
   threadId: string,
+  currentUserId?: string | null,
 ): Promise<InternalThread | null> {
   try {
     const { data, error } = await supabase
@@ -516,7 +542,7 @@ export async function fetchThreadById(
 
     if (error || !data) return null;
     const thread = mapDbThreadToUi(data as DbInternalThreadRow);
-    await enrichThreadParticipantNames([thread]);
+    await enrichThreadParticipantNames([thread], currentUserId);
     return thread;
   } catch {
     return null;

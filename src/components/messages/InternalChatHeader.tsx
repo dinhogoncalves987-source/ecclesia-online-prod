@@ -1,4 +1,4 @@
-import { ArrowLeft, Phone, Video } from "lucide-react";
+import { ArrowLeft, Phone, Users, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/hooks/useLanguage";
 import { usePresenceStatus } from "@/hooks/usePresence";
@@ -20,6 +20,9 @@ type Props = {
   onReopenThread?: () => void;
   onVoiceCall?: () => void;
   onVideoCall?: () => void;
+  onJoinMeeting?: () => void;
+  /** Exibe ações somente em conversa direta; handler ausente = chamada ocupada. */
+  showCallActions?: boolean;
   busy?: boolean;
 };
 
@@ -27,11 +30,12 @@ export function InternalChatHeader({
   thread,
   title,
   subtitle,
-  isStaff = false,
   showBack = false,
   onBack,
   onVoiceCall,
   onVideoCall,
+  onJoinMeeting,
+  showCallActions = false,
 }: Props) {
   const { t, lang } = useLanguage();
   const { isOnline } = usePresenceStatus();
@@ -100,8 +104,20 @@ export function InternalChatHeader({
         ) : null}
       </div>
 
-      {/* Botões de chamada — apenas para staff */}
-      {isStaff && (
+      {onJoinMeeting && (
+        <button
+          type="button"
+          onClick={onJoinMeeting}
+          className="flex h-9 flex-shrink-0 items-center gap-2 rounded-full bg-primary px-3 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+          aria-label={t("Entrar na reunião")}
+        >
+          <Users size={16} />
+          <span className="hidden sm:inline">{t("Entrar na reunião")}</span>
+        </button>
+      )}
+
+      {/* Voz e vídeo são chamadas 1:1. Reuniões nunca entram por estes botões. */}
+      {showCallActions && (
         <div className="flex items-center gap-0.5 flex-shrink-0">
           <button
             type="button"

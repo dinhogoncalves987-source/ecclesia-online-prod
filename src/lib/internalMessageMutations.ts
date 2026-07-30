@@ -10,6 +10,7 @@ import {
   INTERNAL_MESSAGE_BUCKET,
   INTERNAL_VIDEO_MAX_BYTES,
   INTERNAL_VIDEO_MIME,
+  enrichThreadParticipantNames,
   mapDbAttachmentToUi,
   mapDbMessageToUi,
   mapDbThreadToUi,
@@ -115,7 +116,9 @@ export async function findOrCreateDirectThread(
   }
 
   if (existing) {
-    return { ok: true, thread: mapDbThreadToUi(existing as DbInternalThreadRow), isNew: false };
+    const thread = mapDbThreadToUi(existing as DbInternalThreadRow);
+    await enrichThreadParticipantNames([thread], userId);
+    return { ok: true, thread, isNew: false };
   }
 
   // Criar nova thread direta com o membro
@@ -140,7 +143,9 @@ export async function findOrCreateDirectThread(
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) return { ok: false, error: "missing_thread" };
 
-  return { ok: true, thread: mapDbThreadToUi(row as DbInternalThreadRow), isNew: true };
+  const thread = mapDbThreadToUi(row as DbInternalThreadRow);
+  await enrichThreadParticipantNames([thread], userId);
+  return { ok: true, thread, isNew: true };
 }
 
 /** Cria uma thread de secretaria com assunto/categoria fixos. */
@@ -169,6 +174,33 @@ export async function createSecretariatThread(
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) return { ok: false, error: "missing_thread" };
 
+  return { ok: true, thread: mapDbThreadToUi(row as DbInternalThreadRow) };
+}
+
+/** Cria uma reunião em grupo explícita; nunca é reutilizada como chamada 1:1. */
+export async function createMeetingThread(
+  organizationId: string,
+  userId: string,
+  subject: string,
+): Promise<{ ok: boolean; thread?: InternalThread; error?: string }> {
+  const { data, error } = await insertWithOrganizationScope<DbInternalThreadRow>(
+    "internal_threads",
+    organizationId,
+    {
+      created_by: userId,
+      subject: subject.trim() || "Reunião",
+      source: "meeting",
+      status: "open",
+      reply_enabled: true,
+    },
+    (query) => query.select("*").single(),
+  );
+
+  if (error) {
+    return { ok: false, error: String((error as { message?: string }).message ?? error) };
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return { ok: false, error: "missing_thread" };
   return { ok: true, thread: mapDbThreadToUi(row as DbInternalThreadRow) };
 }
 

@@ -23,6 +23,11 @@ verify_jwt = false
 [functions.send-chat-push]
 verify_jwt = true
 
+# Entrega somente credenciais TURN efêmeras para o usuário autenticado.
+# O segredo compartilhado do Coturn nunca sai da Edge Function.
+[functions.get-internal-call-ice]
+verify_jwt = true
+
 # Webhooks da VPS MediaMTX autenticam com segredo compartilhado validado
 # dentro das funções; não recebem JWT de usuário.
 [functions.validate-tv-stream-key]

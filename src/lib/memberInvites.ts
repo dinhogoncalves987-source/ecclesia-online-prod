@@ -70,15 +70,19 @@ export function buildWhatsappLink(
   memberName: string,
   churchName: string,
   inviteUrl: string,
+  accessCode?: string,
 ): string {
   const number = formatWhatsappNumber(phone);
   const text = [
     `Olá, ${memberName}!`,
     ``,
-    `Seu acesso ao Ecclesia Online foi criado.`,
+    `A Secretaria da ${churchName} preparou seu acesso ao Ecclesia Online.`,
     ``,
-    `Clique no link abaixo para ativar sua conta e criar sua senha:`,
+    `Abra o link abaixo e confirme o seu número de WhatsApp:`,
     inviteUrl,
+    ...(accessCode ? [``, `Código de acesso: ${accessCode}`] : []),
+    ``,
+    `Este código é pessoal e temporário. Não encaminhe para outra pessoa.`,
     ``,
     `Deus abençoe.`,
   ].join("\n");
@@ -120,6 +124,40 @@ export async function getMemberInvites(
 
   if (error) return { data: [], error: error.message };
   return { data: (data as unknown as InviteRecord[]) ?? [], error: null };
+}
+
+export type ManualInviteOtp = {
+  ok: boolean;
+  error?: string;
+  memberName?: string;
+  phoneNormalized?: string;
+  code?: string;
+  expiresAt?: string;
+};
+
+/**
+ * Gera um código temporário somente após clique explícito da Secretaria.
+ * A RPC devolve o texto puro uma única vez; persistência contém apenas hash.
+ */
+export async function generateManualMemberInviteOtp(inviteId: string): Promise<ManualInviteOtp> {
+  const { data, error } = await supabase.rpc("admin_generate_member_invite_otp", {
+    p_invite_id: inviteId,
+  });
+  if (error) return { ok: false, error: error.message };
+  const result = data as Record<string, unknown> | null;
+  if (!result || result.ok !== true) {
+    return {
+      ok: false,
+      error: typeof result?.error === "string" ? result.error : "otp_generation_failed",
+    };
+  }
+  return {
+    ok: true,
+    memberName: typeof result.member_name === "string" ? result.member_name : undefined,
+    phoneNormalized: typeof result.phone_normalized === "string" ? result.phone_normalized : undefined,
+    code: typeof result.code === "string" ? result.code : undefined,
+    expiresAt: typeof result.expires_at === "string" ? result.expires_at : undefined,
+  };
 }
 
 // ── Revoke all pending invites for a member ───────────────────────────────────
@@ -307,6 +345,61 @@ export async function acceptMemberInvite(
   }
 
   return result;
+}
+
+export type VerifyManualMemberInviteOtpResult = {
+  ok: boolean;
+  error?: string;
+  message?: string;
+  userId?: string;
+};
+
+/**
+ * Troca o código manual por sessão oficial do Supabase. A Edge Function
+ * confirma token + telefone + hash + expiração antes de criar/vincular Auth.
+ */
+export async function verifyManualMemberInviteOtp(
+  inviteToken: string,
+  phone: string,
+  code: string,
+): Promise<VerifyManualMemberInviteOtpResult> {
+  try {
+    const response = await fetch(
+      `${environment.supabaseUrl}/functions/v1/verify-member-login-otp`,
+      {
+        method: "POST",
+        headers: {
+          apikey: environment.supabasePublishableKey,
+          Authorization: `Bearer ${environment.supabasePublishableKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ invite_token: inviteToken, phone, code }),
+      },
+    );
+    const payload = await response.json().catch(() => null) as Record<string, unknown> | null;
+    if (!response.ok || !payload || payload.ok !== true) {
+      return {
+        ok: false,
+        error: typeof payload?.error === "string" ? payload.error : "verification_failed",
+      };
+    }
+
+    const email = typeof payload.email === "string" ? payload.email : "";
+    const tokenHash = typeof payload.token_hash === "string" ? payload.token_hash : "";
+    if (!email || !tokenHash) return { ok: false, error: "session_bridge_failed" };
+
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token_hash: tokenHash,
+      type: "magiclink",
+    });
+    if (error || !data.user) {
+      return { ok: false, error: "session_verification_failed", message: error?.message };
+    }
+    return { ok: true, userId: data.user.id };
+  } catch {
+    return { ok: false, error: "network_error" };
+  }
 }
 
 // ── Create account for a new member (official Supabase sign-up) ──────────────

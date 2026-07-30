@@ -16,6 +16,8 @@ import { useRole } from "@/hooks/useRole";
 import { useChurch } from "@/hooks/useChurchContext";
 import { useUnreadInternalMessages } from "@/hooks/useUnreadInternalMessages";
 import { PresenceProvider } from "@/hooks/usePresence";
+import { InternalCallProvider } from "@/hooks/useInternalCall";
+import { InternalCallOverlay } from "@/components/messages/InternalCallOverlay";
 import { useOwnProfile } from "@/hooks/useOwnProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { SupportModeBanner } from "@/components/platform/SupportModeBanner";
@@ -387,13 +389,15 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <PresenceProvider organizationId={church?.id} currentUserId={user?.id}>
-    <div
-      className={`min-h-screen bg-background flex lg:min-h-0 lg:overflow-hidden ${
-        environment.isStaging
-          ? "lg:h-[calc(100dvh-1.75rem)]"
-          : "lg:h-dvh"
-      }`}
-    >
+      <InternalCallProvider organizationId={church?.id} currentUserId={user?.id}>
+      <div
+        className={`min-h-screen bg-background flex lg:min-h-0 lg:overflow-hidden ${
+          environment.isStaging
+            ? "lg:h-[calc(100dvh-1.75rem)]"
+            : "lg:h-dvh"
+        }`}
+      >
+      <InternalCallOverlay />
       {/* Desktop Sidebar */}
       <aside
         className={`hidden lg:flex min-h-0 overflow-hidden flex-col shrink-0 bg-card shadow-executive transition-all duration-300 ${
@@ -756,7 +760,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           </>
         )}
       </AnimatePresence>
-    </div>
+      </div>
+      </InternalCallProvider>
     </PresenceProvider>
   );
 }

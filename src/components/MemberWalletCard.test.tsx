@@ -118,18 +118,12 @@ describe("MemberWalletCard — identidade visual", () => {
     });
   });
 
-  it("gera uma folha A4 única com frente e verso lado a lado no tamanho real", async () => {
+  it("gera frente e verso idênticos ao online em duas páginas no tamanho físico do cartão", async () => {
     const canvas = { toDataURL: vi.fn(() => "data:image/png;base64,teste") };
     html2canvasMock.mockResolvedValue(canvas);
     addImageMock.mockReset();
     addPageMock.mockReset();
     jsPdfMock.mockImplementation(() => ({
-      internal: {
-        pageSize: {
-          getWidth: () => 297,
-          getHeight: () => 210,
-        },
-      },
       addImage: addImageMock,
       addPage: addPageMock,
       output: vi.fn(() => new Blob(["pdf"], { type: "application/pdf" })),
@@ -152,12 +146,17 @@ describe("MemberWalletCard — identidade visual", () => {
     expect(jsPdfMock).toHaveBeenCalledWith({
       orientation: "landscape",
       unit: "mm",
-      format: "a4",
+      format: [85.6, 53.98],
+      compress: true,
     });
     expect(addImageMock).toHaveBeenCalledTimes(2);
-    expect(addImageMock.mock.calls[0].slice(1)).toEqual(["PNG", 57.5, 78, 85, 54]);
-    expect(addImageMock.mock.calls[1].slice(1)).toEqual(["PNG", 154.5, 78, 85, 54]);
-    expect(addPageMock).not.toHaveBeenCalled();
+    expect(addImageMock.mock.calls[0].slice(1)).toEqual([
+      "PNG", 0, 0, 85.6, 53.98, undefined, "FAST",
+    ]);
+    expect(addImageMock.mock.calls[1].slice(1)).toEqual([
+      "PNG", 0, 0, 85.6, 53.98, undefined, "FAST",
+    ]);
+    expect(addPageMock).toHaveBeenCalledWith([85.6, 53.98], "landscape");
     expect(screen.queryByText("Auxiliar")).not.toBeInTheDocument();
     expect(screen.getAllByText("Membro").length).toBeGreaterThan(0);
     const visibleFront = container.querySelector("#wallet-card-front") as HTMLElement;
@@ -176,5 +175,7 @@ describe("MemberWalletCard — identidade visual", () => {
         backgroundColor: null,
       }),
     );
+    expect(documentActionsProps.current?.onPrint).toBeTypeOf("function");
+    expect(documentActionsProps.current?.printElementId).toBe("wallet-card-front");
   });
 });

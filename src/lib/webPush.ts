@@ -122,3 +122,30 @@ export function triggerChatPush(messageId: string): void {
     }
   })();
 }
+
+/**
+ * Acorda o outro participante para uma chamada individual. A Edge Function
+ * confirma que o JWT pertence ao caller_user_id e notifica somente o
+ * callee_user_id registrado na chamada; o cliente nunca escolhe o destino.
+ */
+export function triggerInternalCallPush(callId: string): void {
+  void (async () => {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) return;
+
+      await fetch(`${environment.supabaseUrl}/functions/v1/send-chat-push`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          apikey: environment.supabasePublishableKey,
+        },
+        body: JSON.stringify({ callId }),
+      });
+    } catch {
+      // Realtime continua sendo a entrega principal enquanto o app está aberto.
+    }
+  })();
+}
