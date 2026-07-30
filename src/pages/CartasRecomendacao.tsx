@@ -10,7 +10,6 @@ import { format } from "date-fns";
 import { ptBR, enUS, es } from "date-fns/locale";
 
 import { AdminLayout } from "@/components/AdminLayout";
-import { DocumentActions } from "@/components/DocumentActions";
 import { useAuth } from "@/hooks/useAuth";
 import { useChurch } from "@/hooks/useChurchContext";
 import { useRole } from "@/hooks/useRole";
@@ -594,7 +593,7 @@ export default function CartasRecomendacao() {
               className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-40"
               onClick={() => setSelected(null)}
             />
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-1.5 sm:p-4">
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -731,7 +730,7 @@ export default function CartasRecomendacao() {
                 initial={{ opacity: 0, scale: 0.97 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.97 }}
-                className="w-full max-w-2xl bg-card rounded-2xl shadow-2xl flex flex-col max-h-[92vh]"
+                className="flex max-h-[96dvh] w-full min-w-0 max-w-6xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl"
               >
                 <div className="flex items-center justify-between px-5 py-4 border-b border-border/50 flex-shrink-0">
                   <div>
@@ -742,29 +741,16 @@ export default function CartasRecomendacao() {
                     <X size={18} />
                   </button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-5">
+                <div className="min-w-0 flex-1 overflow-y-auto p-1.5 sm:p-5">
                   <RecommendationLetterDocument
                     letter={selected}
                     approverLabel={approverLabel ?? undefined}
-                    onCopied={() => toast({ title: t("Link copiado!"), description: t("Link de validação copiado para a área de transferência.") })}
-                  />
-                </div>
-
-                {/* Ações do documento aprovado */}
-                <div className="flex-shrink-0 border-t border-border/50 px-5 py-3 bg-muted/20">
-                  <p className="text-[11px] text-muted-foreground mb-2">
-                    {t("Imprima, envie por WhatsApp ou Email para apresentar na igreja de destino.")}
-                  </p>
-                  <DocumentActions
-                    printElementId="recommendation-letter-document"
-                    shareTitle={`Carta de Recomendação — ${selected.memberName}`}
-                    shareText={`Carta de Recomendação emitida por ${selected.originChurchName ?? church?.name ?? "Ecclesia"} para ${selected.memberName}. Igreja destino: ${selected.destinationChurch} — ${selected.destinationCity}.`}
-                    shareUrl={`${window.location.origin}/validar/carta/${selected.publicToken ?? ""}`}
-                    whatsappText={`📜 *Carta de Recomendação*\n\nNome: ${selected.memberName}\nIgreja: ${selected.originChurchName ?? church?.name ?? "Ecclesia"}\nDestino: ${selected.destinationChurch} — ${selected.destinationCity}\n\n🔗 Validação: ${window.location.origin}/validar/carta/${selected.publicToken ?? ""}`}
-                    emailSubject={`Carta de Recomendação — ${selected.memberName}`}
-                    emailBody={`Carta de Recomendação emitida por ${selected.originChurchName ?? church?.name ?? "Ecclesia"}.\n\nNome: ${selected.memberName}\nDestino: ${selected.destinationChurch}, ${selected.destinationCity}\n\nLink de validação: ${window.location.origin}/validar/carta/${selected.publicToken ?? ""}`}
-                    actions={["share", "whatsapp", "email", "print"]}
-                    size="sm"
+                    branding={{
+                      name: church?.name,
+                      logoUrl: church?.logo_url,
+                      city: church?.city,
+                      state: church?.state,
+                    }}
                   />
                 </div>
               </motion.div>

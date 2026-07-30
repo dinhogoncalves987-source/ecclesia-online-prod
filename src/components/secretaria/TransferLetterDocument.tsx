@@ -1,9 +1,13 @@
+import { useLayoutEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { DocumentActions } from "@/components/DocumentActions";
 import { generateOfficialDocumentPdf } from "@/lib/officialDocumentPdf";
 import type { PublicTransferLetter, TransferLetter } from "@/lib/officialDocuments";
 
 type TransferView = TransferLetter | PublicTransferLetter;
+
+const DOCUMENT_WIDTH = 790;
+const DOCUMENT_HEIGHT = 1120;
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "—";
@@ -34,9 +38,52 @@ export function TransferLetterDocument({
     letter.destination_country,
   ].filter(Boolean).join(" — ");
   const logo = "organization_logo_url" in letter ? letter.organization_logo_url : null;
+  const previewViewportRef = useRef<HTMLDivElement>(null);
+  const [previewScale, setPreviewScale] = useState(1);
+
+  useLayoutEffect(() => {
+    const viewport = previewViewportRef.current;
+    if (!viewport) return;
+
+    const updateScale = () => {
+      const styles = window.getComputedStyle(viewport);
+      const horizontalPadding =
+        Number.parseFloat(styles.paddingLeft || "0")
+        + Number.parseFloat(styles.paddingRight || "0");
+      const screenWidth = window.visualViewport?.width || window.innerWidth;
+      const availableWidth = Math.max(
+        1,
+        Math.min(
+          viewport.clientWidth || Number.POSITIVE_INFINITY,
+          viewport.getBoundingClientRect().width || Number.POSITIVE_INFINITY,
+          screenWidth,
+        ) - horizontalPadding,
+      );
+      setPreviewScale(Math.min(1, availableWidth / DOCUMENT_WIDTH));
+    };
+
+    updateScale();
+    const frame = window.requestAnimationFrame(updateScale);
+    window.addEventListener("resize", updateScale);
+    window.addEventListener("orientationchange", updateScale);
+    window.visualViewport?.addEventListener("resize", updateScale);
+
+    const observer = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(updateScale);
+    observer?.observe(viewport);
+
+    return () => {
+      observer?.disconnect();
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", updateScale);
+      window.removeEventListener("orientationchange", updateScale);
+      window.visualViewport?.removeEventListener("resize", updateScale);
+    };
+  }, []);
 
   return (
-    <div className="space-y-4">
+    <div className="w-full min-w-0 max-w-full space-y-4 overflow-hidden">
       {showActions && (
         <DocumentActions
           printElementId={documentId}
@@ -50,12 +97,28 @@ export function TransferLetterDocument({
         />
       )}
 
-      <div className="overflow-x-auto rounded-xl border bg-muted/20 p-2">
-        <article
-          id={documentId}
-          className="relative mx-auto min-h-[1120px] min-w-[790px] max-w-[790px] overflow-hidden bg-white px-20 py-16 text-neutral-900 shadow-sm"
-          style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+      <div
+        ref={previewViewportRef}
+        data-transfer-preview-viewport
+        className="w-full min-w-0 max-w-full overflow-hidden rounded-xl border bg-muted/20 p-1 sm:p-2"
+      >
+        <div
+          data-transfer-preview-frame
+          className="relative mx-auto"
+          style={{
+            width: `${DOCUMENT_WIDTH * previewScale}px`,
+            height: `${DOCUMENT_HEIGHT * previewScale}px`,
+          }}
         >
+          <article
+            id={documentId}
+            data-transfer-document-canvas
+            className="absolute left-0 top-0 h-[1120px] w-[790px] max-w-none origin-top-left overflow-hidden bg-white px-20 py-16 text-neutral-900 shadow-sm"
+            style={{
+              transform: `scale(${previewScale})`,
+              fontFamily: "Georgia, 'Times New Roman', serif",
+            }}
+          >
           {logo && (
             <img
               src={logo}
@@ -110,7 +173,8 @@ export function TransferLetterDocument({
               {validationUrl && <QRCodeSVG value={validationUrl} size={92} level="M" />}
             </footer>
           </div>
-        </article>
+          </article>
+        </div>
       </div>
     </div>
   );

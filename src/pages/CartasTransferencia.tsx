@@ -178,7 +178,7 @@ export default function CartasTransferencia() {
         onCreated={load}
       />
       <Dialog open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)}>
-        <DialogContent className="max-w-6xl">
+        <DialogContent className="max-h-[96dvh] w-[calc(100vw-0.75rem)] max-w-6xl overflow-y-auto p-3 sm:w-full sm:p-6">
           <DialogHeader><DialogTitle>Carta de Transferência</DialogTitle><DialogDescription>Documento oficial pronto para impressão, PDF ou compartilhamento.</DialogDescription></DialogHeader>
           {selected && <TransferLetterDocument letter={selected} />}
         </DialogContent>
