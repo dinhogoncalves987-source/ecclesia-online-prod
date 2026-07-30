@@ -97,8 +97,7 @@ const navSections: NavSection[] = [
     separator: true,
     items: [
       { icon: Wallet, label: "Financeiro", path: "/admin/financeiro" },
-      // Formação e atuação institucional são operações próprias. Permanecem
-      // staging-only e são filtradas normalmente por isRouteEnabled().
+      // Formação e atuação institucional são operações próprias da gestão.
       { icon: Send, label: "Missões", path: "/admin/missoes" },
       { icon: Landmark, label: "Teologia", path: "/admin/teologia" },
       { icon: GraduationCap, label: "Discipulado", path: "/admin/discipulado" },

@@ -18,14 +18,14 @@ const ENABLED: readonly ModuleId[] = [
   "official-documents",
   "finance.treasury",
   "finance.accounts",
+  "discipleship",
+  "theology",
+  "missions",
 ];
 
 const DEFERRED: readonly ModuleId[] = [
   "marketplace",
   "community",
-  "discipleship",
-  "theology",
-  "missions",
   "tv-digital",
   "canal-ecclesia",
 ];
@@ -52,16 +52,24 @@ describe("paridade de módulos entre staging e produção", () => {
     expect(isRouteEnabled("/admin/certificados", "production")).toBe(true);
   });
 
-  it("mantém as rotas adiadas fechadas nos dois ambientes", () => {
+  it("mantém somente as rotas adiadas fechadas nos dois ambientes", () => {
     for (const path of [
       "/admin/marketplace",
       "/admin/comunidade",
+    ]) {
+      expect(isRouteEnabled(path, "staging")).toBe(false);
+      expect(isRouteEnabled(path, "production")).toBe(false);
+    }
+  });
+
+  it("mantém Discipulado, Teologia e Missões disponíveis nos dois ambientes", () => {
+    for (const path of [
       "/admin/discipulado",
       "/admin/teologia",
       "/admin/missoes",
     ]) {
-      expect(isRouteEnabled(path, "staging")).toBe(false);
-      expect(isRouteEnabled(path, "production")).toBe(false);
+      expect(isRouteEnabled(path, "staging")).toBe(true);
+      expect(isRouteEnabled(path, "production")).toBe(true);
     }
   });
 

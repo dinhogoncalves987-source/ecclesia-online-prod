@@ -126,10 +126,13 @@ const CartasRecomendacao = lazy(() => import("./pages/CartasRecomendacao"));
 
 const Relatorios = lazy(() => import("./pages/Relatorios"));
 
-// Funcionalidades fora desta release ficam desativadas IGUALMENTE nos dois
-// ambientes. O desenvolvimento continua em branch/preview própria.
-// Documentos oficiais foram homologados e acompanham a mesma release no
-// staging e na produção.
+// Módulos institucionais concluídos: fazem parte da mesma gestão em staging
+// e produção. A diferença entre os ambientes está somente em credenciais,
+// domínios e dados, nunca no código ou nas rotas disponíveis.
+const Discipulado = lazy(() => import("./pages/Discipulado"));
+const Teologia = lazy(() => import("./pages/Teologia"));
+const Missoes = lazy(() => import("./pages/Missoes"));
+
 const CartasTransferencia = lazy(() => import("./pages/CartasTransferencia"));
 const Certificados = lazy(() => import("./pages/Certificados"));
 const ValidarTransferencia = lazy(() => import("./pages/ValidarTransferencia"));
@@ -255,11 +258,11 @@ const App = () => (
 
               <Route path="/admin/comunidade" element={<ProtectedRoute><ModuleGate moduleId="community"><NotFound /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/discipulado" element={<ProtectedRoute><ModuleGate moduleId="discipleship"><NotFound /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/discipulado" element={<ProtectedRoute><ModuleGate moduleId="discipleship"><Discipulado /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/teologia" element={<ProtectedRoute><ModuleGate moduleId="theology"><NotFound /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/teologia" element={<ProtectedRoute><ModuleGate moduleId="theology"><Teologia /></ModuleGate></ProtectedRoute>} />
 
-              <Route path="/admin/missoes" element={<ProtectedRoute><ModuleGate moduleId="missions"><NotFound /></ModuleGate></ProtectedRoute>} />
+              <Route path="/admin/missoes" element={<ProtectedRoute><ModuleGate moduleId="missions"><Missoes /></ModuleGate></ProtectedRoute>} />
 
               {/* Global chat — accessible to all roles */}
               <Route path="/admin/chat" element={<ProtectedRoute><ChatSecretaria /></ProtectedRoute>} />

@@ -121,24 +121,8 @@ const FORBIDDEN_TERMS_SOURCE = [
   "pages/Marketplace",
   "pages/Comunidade",
   "CanalEcclesia",
-  // OPERAÇÃO 2 (Discipulado, 2026-07-29) — staging-only enquanto as
-  // migrations discipleship_* não forem aplicadas em nenhum ambiente (ver
-  // src/config/modules.ts e docs/architecture/operacao-2-discipulado.md).
-  // Mesmo padrão de tree-shaking condicional de Marketplace/Comunidade —
-  // App.tsx só faz `import("./pages/Discipulado")` quando IS_STAGING_BUILD.
-  "pages/Discipulado",
-  // OPERAÇÃO 3 (Teologia, 2026-07-30) — staging-only enquanto as migrations
-  // theology_* não forem aplicadas em nenhum ambiente (ver
-  // src/config/modules.ts e docs/architecture/operacao-3-teologia.md).
-  // Mesmo padrão de tree-shaking condicional do Discipulado.
-  "pages/Teologia",
-  // OPERAÇÃO 4 (Missões, 2026-07-31) — staging-only enquanto as migrations
-  // missions_* não forem aplicadas em nenhum ambiente (ver
-  // src/config/modules.ts e docs/architecture/operacao-4-missoes.md).
-  // Mesmo padrão de tree-shaking condicional do Discipulado/Teologia.
-  "pages/Missoes",
-  // Documentos Oficiais foram homologados e pertencem à mesma release de
-  // staging e produção. Portanto não são termos proibidos neste artefato.
+  // Discipulado, Teologia, Missões e Documentos Oficiais pertencem à gestão
+  // homologada e devem acompanhar o mesmo bundle nos dois ambientes.
 ];
 const FORBIDDEN_TERMS = FORBIDDEN_TERMS_SOURCE.map((term) => term.toLowerCase());
 

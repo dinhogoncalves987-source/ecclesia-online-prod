@@ -99,14 +99,14 @@ const ENABLED_MODULES: readonly ModuleDefinition[] = [
   { id: "finance.audit", availability: "both", label: "Financeiro — Auditoria" },
   { id: "finance.intelligence", availability: "both", label: "Financeiro — Inteligência" },
   { id: "official-documents", availability: "both", label: "Documentos Oficiais" },
+  { id: "discipleship", availability: "both", label: "Discipulado" },
+  { id: "theology", availability: "both", label: "Teologia" },
+  { id: "missions", availability: "both", label: "Missões" },
 ] as const;
 
 const DEFERRED_MODULES: readonly ModuleDefinition[] = [
   { id: "marketplace", availability: "disabled", label: "Marketplace" },
   { id: "community", availability: "disabled", label: "Comunidade" },
-  { id: "discipleship", availability: "disabled", label: "Discipulado" },
-  { id: "theology", availability: "disabled", label: "Teologia" },
-  { id: "missions", availability: "disabled", label: "Missões" },
   { id: "tv-digital", availability: "disabled", label: "TV Digital" },
   { id: "canal-ecclesia", availability: "disabled", label: "Canal Eclésia" },
 ] as const;

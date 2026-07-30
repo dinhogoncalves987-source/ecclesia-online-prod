@@ -407,14 +407,11 @@ export const ROUTE_ACCESS_PERMISSIONS: Partial<Record<string, AccessPermission>>
   "/admin/chat-secretaria": "chat.secretaria",
   "/admin/solicitacoes": "requests.read",
   "/admin/porteiro": "gatekeeper.use",
-  // OPERAÇÃO 2 (Discipulado) — staging-only (ver src/config/modules.ts);
-  // gate de rota real, independente do módulo estar ou não visível no menu.
+  // OPERAÇÃO 2 (Discipulado) — gate de rota real por capability.
   "/admin/discipulado": "discipleship.read",
-  // OPERAÇÃO 3 (Teologia) — staging-only (ver src/config/modules.ts); mesmo
-  // gate de rota real por capability, fail-closed.
+  // OPERAÇÃO 3 (Teologia) — mesmo gate fail-closed.
   "/admin/teologia": "theology.read",
-  // OPERAÇÃO 4 (Missões) — staging-only (ver src/config/modules.ts); mesmo
-  // gate de rota real por capability, fail-closed.
+  // OPERAÇÃO 4 (Missões) — mesmo gate fail-closed.
   "/admin/missoes": "missions.read",
 };
 

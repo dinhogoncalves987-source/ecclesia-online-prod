@@ -6,6 +6,19 @@
 - Escopo: Gestão administrativa. TV e Canal Eclésia não fazem parte desta release.
 - Regra de promoção: staging primeiro; produção somente após homologação e autorização.
 
+## Correção de escopo — 2026-07-30
+
+Discipulado, Teologia e Missões são módulos operacionais da gestão e não
+possuíam autorização para serem removidos ou ocultados. A configuração que os
+marcava como `disabled` foi corrigida:
+
+- os três módulos voltaram ao registro habilitado comum a staging e produção;
+- as rotas voltaram a carregar as páginas reais, nunca `NotFound`;
+- os itens continuam posicionados depois de Financeiro e antes de Relatórios;
+- as permissões por capability continuam fail-closed;
+- TV Digital e Canal Eclésia permanecem fora desta release;
+- um teste de regressão agora bloqueia nova remoção silenciosa desses módulos.
+
 ## Consolidação do QA
 
 O relatório exploratório do Sonnet foi confrontado com a versão atual do
