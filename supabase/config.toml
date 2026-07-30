@@ -17,16 +17,17 @@ verify_jwt = false
 [functions.verify-member-login-otp]
 verify_jwt = false
 
-# send-chat-push recebe o JWT REAL do remetente (nunca a publishable key) —
-# precisa do gateway validando o JWT antes mesmo do código da função rodar
-# (defesa em profundidade, além da checagem própria em index.ts).
+# send-chat-push recebe o JWT REAL do remetente (nunca a publishable key) e
+# reconfirma o usuário via auth.getUser(). O gateway legado fica desligado
+# para ser compatível com as chaves JWT atuais do projeto.
 [functions.send-chat-push]
-verify_jwt = true
+verify_jwt = false
 
-# Entrega somente credenciais TURN efêmeras para o usuário autenticado.
-# O segredo compartilhado do Coturn nunca sai da Edge Function.
+# Entrega credenciais TURN efêmeras somente a participante de chamada ativa.
+# A função reconfirma o access token via auth.getUser(); o gateway legado
+# fica desligado para aceitar o verificador JWT atual.
 [functions.get-internal-call-ice]
-verify_jwt = true
+verify_jwt = false
 
 # Webhooks da VPS MediaMTX autenticam com segredo compartilhado validado
 # dentro das funções; não recebem JWT de usuário.

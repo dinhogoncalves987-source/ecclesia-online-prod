@@ -56,6 +56,8 @@ export function InternalCallOverlay() {
     muted,
     cameraEnabled,
     relayConfigured,
+    relayRequired,
+    relayInUse,
     acceptCall,
     rejectCall,
     cancelCall,
@@ -169,9 +171,13 @@ export function InternalCallOverlay() {
             )}
 
             <div className="mt-auto w-full max-w-md">
-              {relayConfigured === false && isActive && connectionState !== "connected" && (
-                <p className="mb-4 rounded-xl bg-amber-500/15 px-3 py-2 text-center text-xs text-amber-100">
-                  Conexão direta. O relay próprio ainda não está configurado para redes restritas.
+              {isActive
+                && connectionState === "connected"
+                && relayConfigured
+                && relayRequired
+                && relayInUse === false && (
+                <p className="mb-4 rounded-xl bg-red-500/15 px-3 py-2 text-center text-xs text-red-100">
+                  A conexão segura da chamada não foi confirmada.
                 </p>
               )}
 

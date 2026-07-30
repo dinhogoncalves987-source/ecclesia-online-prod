@@ -51,6 +51,7 @@ describe("chat moderno — chamadas individuais e reuniões separadas", () => {
     const hook = read("src/hooks/useInternalCall.tsx");
     const overlay = read("src/components/messages/InternalCallOverlay.tsx");
     const ice = read("supabase/functions/get-internal-call-ice/index.ts");
+    const config = read("supabase/config.toml");
 
     expect(hook).toContain("new RTCPeerConnection");
     expect(hook).toContain("navigator.mediaDevices.getUserMedia");
@@ -60,8 +61,33 @@ describe("chat moderno — chamadas individuais e reuniões separadas", () => {
     expect(overlay).toContain("Recusar chamada");
     expect(overlay).toContain("Trocar câmera");
     expect(ice).toContain("TURN_SHARED_SECRET");
+    expect(ice).toContain("TURN_ALLOWED_ORIGINS");
+    expect(ice).toContain("TURN_FORCE_RELAY");
+    expect(ice).toContain('.from("internal_calls")');
+    expect(ice).toContain('"turn_not_configured"');
     expect(ice).toContain('{ name: "HMAC", hash: "SHA-1" }');
     expect(ice).not.toContain("stun.l.google");
     expect(ice).not.toContain("meet.jit.si");
+
+    expect(hook).toContain('iceTransportPolicy: iceConfig.relayRequired ? "relay" : "all"');
+    expect(hook).toContain("selectedCandidateUsesRelay");
+    expect(config).toContain("[functions.get-internal-call-ice]\nverify_jwt = false");
+    expect(config).toContain("[functions.send-chat-push]\nverify_jwt = false");
+  });
+
+  it("entrega um pacote operacional próprio e sem segredos versionados", () => {
+    const compose = read("infra/coturn/docker-compose.yml");
+    const template = read("infra/coturn/turnserver.conf.template");
+    const renderer = read("infra/coturn/render-config.sh");
+    const ignored = read("infra/coturn/.gitignore");
+
+    expect(compose).toContain("coturn/coturn:4.14.0-r0");
+    expect(compose).toContain("read_only: true");
+    expect(compose).toContain("network_mode: host");
+    expect(template).toContain("use-auth-secret");
+    expect(template).toContain("static-auth-secret=__TURN_SHARED_SECRET__");
+    expect(template).toContain("denied-peer-ip=10.0.0.0-10.255.255.255");
+    expect(renderer).toContain("Nenhum segredo foi exibido.");
+    expect(ignored).toContain("turn.env");
   });
 });

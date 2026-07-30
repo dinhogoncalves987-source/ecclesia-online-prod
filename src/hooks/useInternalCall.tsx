@@ -39,6 +39,8 @@ type InternalCallContextValue = {
   muted: boolean;
   cameraEnabled: boolean;
   relayConfigured: boolean | null;
+  relayRequired: boolean;
+  relayInUse: boolean | null;
   startCall: (thread: InternalThread, mode: InternalCallMode) => Promise<void>;
   acceptCall: () => Promise<void>;
   rejectCall: () => Promise<void>;
@@ -63,7 +65,36 @@ function humanCallError(error: unknown): string {
   if (message.includes("NotAllowedError")) return "Permita o uso do microfone e da câmera para continuar.";
   if (message.includes("NotFoundError")) return "Nenhum microfone ou câmera compatível foi encontrado.";
   if (message.includes("direct_thread_not_found_or_forbidden")) return "Esta conversa não permite chamada individual.";
+  if (message.includes("turn_not_configured")) return "O servidor seguro de chamadas ainda não foi configurado.";
+  if (message.includes("turn_credentials_unavailable")) return "O servidor seguro de chamadas está indisponível.";
+  if (message.includes("active_call_not_found")) return "A chamada expirou antes de estabelecer a conexão.";
   return "Não foi possível iniciar a chamada agora.";
+}
+
+async function selectedCandidateUsesRelay(peer: RTCPeerConnection): Promise<boolean | null> {
+  const stats = await peer.getStats();
+  let selectedPairId: string | undefined;
+  let selectedLocalCandidateId: string | undefined;
+
+  stats.forEach((report) => {
+    if (report.type === "transport" && typeof report.selectedCandidatePairId === "string") {
+      selectedPairId = report.selectedCandidatePairId;
+    }
+    if (report.type === "candidate-pair" && report.selected === true) {
+      selectedPairId = report.id;
+    }
+  });
+
+  if (selectedPairId) {
+    const pair = stats.get(selectedPairId);
+    if (pair && typeof pair.localCandidateId === "string") {
+      selectedLocalCandidateId = pair.localCandidateId;
+    }
+  }
+  if (!selectedLocalCandidateId) return null;
+
+  const candidate = stats.get(selectedLocalCandidateId);
+  return candidate?.candidateType === "relay";
 }
 
 export function InternalCallProvider({
@@ -84,6 +115,8 @@ export function InternalCallProvider({
   const [muted, setMuted] = useState(false);
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const [relayConfigured, setRelayConfigured] = useState<boolean | null>(null);
+  const [relayRequired, setRelayRequired] = useState(true);
+  const [relayInUse, setRelayInUse] = useState<boolean | null>(null);
 
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -109,6 +142,7 @@ export function InternalCallProvider({
     setRemoteStream(null);
     setMuted(false);
     setCameraEnabled(true);
+    setRelayInUse(null);
     setConnectionState("idle");
     processedSignalIdsRef.current.clear();
     queuedCandidatesRef.current = [];
@@ -159,11 +193,13 @@ export function InternalCallProvider({
     call: InternalCall,
     stream: MediaStream,
   ): Promise<RTCPeerConnection> => {
-    const iceConfig = await fetchInternalCallIceConfiguration();
+    const iceConfig = await fetchInternalCallIceConfiguration(call.id);
     setRelayConfigured(iceConfig.relayConfigured);
+    setRelayRequired(iceConfig.relayRequired);
 
     const peer = new RTCPeerConnection({
       iceServers: iceConfig.iceServers,
+      iceTransportPolicy: iceConfig.relayRequired ? "relay" : "all",
       iceCandidatePoolSize: iceConfig.relayConfigured ? 8 : 0,
     });
     peerRef.current = peer;
@@ -193,6 +229,9 @@ export function InternalCallProvider({
       switch (peer.connectionState) {
         case "connected":
           setConnectionState("connected");
+          void selectedCandidateUsesRelay(peer)
+            .then((usingRelay) => setRelayInUse(usingRelay))
+            .catch(() => setRelayInUse(null));
           break;
         case "disconnected":
           setConnectionState("reconnecting");
@@ -534,6 +573,8 @@ export function InternalCallProvider({
     muted,
     cameraEnabled,
     relayConfigured,
+    relayRequired,
+    relayInUse,
     startCall,
     acceptCall,
     rejectCall,
@@ -552,6 +593,8 @@ export function InternalCallProvider({
     muted,
     cameraEnabled,
     relayConfigured,
+    relayRequired,
+    relayInUse,
     startCall,
     acceptCall,
     rejectCall,

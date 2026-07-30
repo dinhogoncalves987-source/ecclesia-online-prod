@@ -1,0 +1,21 @@
+services:
+  coturn:
+    image: coturn/coturn:4.14.0-r0
+    restart: unless-stopped
+    network_mode: host
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1770
+      - /var/tmp:size=16m,mode=1770
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./state/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    command:
+      - -c
+      - /etc/coturn/turnserver.conf

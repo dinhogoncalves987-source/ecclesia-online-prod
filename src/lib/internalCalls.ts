@@ -67,6 +67,7 @@ export type InternalCallSignal = {
 export type InternalCallIceConfiguration = {
   iceServers: RTCIceServer[];
   relayConfigured: boolean;
+  relayRequired: boolean;
 };
 
 export function mapInternalCall(row: DbInternalCall): InternalCall {
@@ -193,10 +194,12 @@ export async function fetchPendingInternalCallSignals(
 
 /**
  * Obtém credenciais TURN temporárias do relay próprio da Eclésia.
- * Se o servidor ainda não estiver configurado, retorna lista vazia e o
- * WebRTC tenta conexão direta; nunca usa Google/Jitsi silenciosamente.
+ * A credencial só é emitida para participante de chamada ativa. A release
+ * exige relay próprio e nunca usa Google/Jitsi nem fallback silencioso.
  */
-export async function fetchInternalCallIceConfiguration(): Promise<InternalCallIceConfiguration> {
+export async function fetchInternalCallIceConfiguration(
+  callId: string,
+): Promise<InternalCallIceConfiguration> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new Error("authentication_required");
@@ -208,22 +211,27 @@ export async function fetchInternalCallIceConfiguration(): Promise<InternalCallI
       apikey: environment.supabasePublishableKey,
       "Content-Type": "application/json",
     },
-    body: "{}",
+    body: JSON.stringify({ callId }),
   });
 
   if (!response.ok) {
-    // A chamada ainda pode funcionar em conexão direta dentro da mesma rede
-    // ou entre NATs permissivos. A ausência temporária da Edge/TURN nunca
-    // transforma o botão de ligar em erro antes mesmo de tentar o WebRTC.
-    return { iceServers: [], relayConfigured: false };
+    const result = await response.json().catch(() => ({})) as { error?: string };
+    if (result.error === "turn_not_configured") throw new Error("turn_not_configured");
+    if (result.error === "active_call_not_found") throw new Error("active_call_not_found");
+    throw new Error("turn_credentials_unavailable");
   }
 
   const result = await response.json().catch(() => ({})) as {
     iceServers?: RTCIceServer[];
     relayConfigured?: boolean;
+    relayRequired?: boolean;
   };
+  if (!Array.isArray(result.iceServers) || result.iceServers.length === 0) {
+    throw new Error("turn_not_configured");
+  }
   return {
-    iceServers: Array.isArray(result.iceServers) ? result.iceServers : [],
+    iceServers: result.iceServers,
     relayConfigured: result.relayConfigured === true,
+    relayRequired: result.relayRequired !== false,
   };
 }
