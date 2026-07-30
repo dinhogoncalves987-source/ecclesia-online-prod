@@ -66,6 +66,11 @@ describe("RecommendationLetterDocument", () => {
     );
     expect(container.querySelector("[data-recommendation-document-canvas]")).toHaveClass(
       "bg-[#fbfaf3]",
+      "pb-20",
+    );
+    expect(container.querySelector("[data-recommendation-footer]")).toHaveClass(
+      "shrink-0",
+      "mt-auto",
     );
   });
 

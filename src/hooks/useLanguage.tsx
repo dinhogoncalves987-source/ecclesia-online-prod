@@ -2096,6 +2096,16 @@ const translations: Record<string, Record<Lang, string>> = {
   "E-mail é obrigatório": { pt: "E-mail é obrigatório", en: "E-mail is required", es: "El correo es obligatorio" },
   "E-mail obrigatório": { pt: "E-mail obrigatório", en: "E-mail required", es: "Correo obligatorio" },
   "E-mail reenviado!": { pt: "E-mail reenviado!", en: "E-mail resent!", es: "¡Correo reenviado!" },
+  "Use somente o e-mail mais recente. Ao reenviar, o link anterior deixa de funcionar.": {
+    pt: "Use somente o e-mail mais recente. Ao reenviar, o link anterior deixa de funcionar.",
+    en: "Use only the most recent e-mail. Resending makes the previous link stop working.",
+    es: "Use solamente el correo más reciente. Al reenviar, el enlace anterior deja de funcionar.",
+  },
+  "Não foi possível reenviar o link seguro agora. Tente novamente.": {
+    pt: "Não foi possível reenviar o link seguro agora. Tente novamente.",
+    en: "The secure link could not be resent right now. Please try again.",
+    es: "No se pudo reenviar el enlace seguro ahora. Inténtelo de nuevo.",
+  },
   "Ecclesia · Sistema de validação": { pt: "Ecclesia · Sistema de validação", en: "Ecclesia · Verification system", es: "Ecclesia · Sistema de verificación" },
   "Ecclesia Online": { pt: "Ecclesia Online", en: "Ecclesia Online", es: "Ecclesia Online" },
   "Ecclesia Online — Plataforma de Gestão Pastoral": { pt: "Ecclesia Online — Plataforma de Gestão Pastoral", en: "Ecclesia Online — Pastoral Management Platform", es: "Ecclesia Online — Plataforma de Gestión Pastoral" },

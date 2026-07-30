@@ -77,4 +77,17 @@ describe("cadastro de membros neutro e responsivo", () => {
       'max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto',
     );
   });
+
+  it("exige os contatos necessários para cadastro e convite", () => {
+    expect(source).toContain(
+      '<FormInput label="Telefone" value={form.phone || ""} onChange={v => setField("phone", v)} required',
+    );
+    expect(source).toContain(
+      '<FormInput label="WhatsApp" value={form.whatsapp || ""} onChange={v => setField("whatsapp", v)} required',
+    );
+    expect(source).toContain(
+      '<FormInput label="E-mail" value={form.email || ""} onChange={v => setField("email", v)} required',
+    );
+    expect(source).toContain("checkRequiredMemberContacts(form)");
+  });
 });

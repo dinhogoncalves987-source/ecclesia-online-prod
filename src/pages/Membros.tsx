@@ -39,7 +39,12 @@ import {
   getCivilDocLabel,
 } from "@/lib/secretariaConstants";
 import { matchesMemberSearch } from "@/lib/memberSearch";
-import { checkCpfForManualSave, CPF_CHECK_MESSAGES } from "@/lib/memberFormValidation";
+import {
+  checkCpfForManualSave,
+  checkRequiredMemberContacts,
+  CPF_CHECK_MESSAGES,
+  MEMBER_CONTACT_CHECK_MESSAGES,
+} from "@/lib/memberFormValidation";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -1034,7 +1039,7 @@ export default function Membros() {
     member_role: form.member_role || "Membro",
     status:      form.status,
     phone:       form.phone?.trim()  || null,
-    email:       form.email?.trim()  || null,
+    email:       form.email?.trim().toLowerCase() || null,
     notes:       form.notes?.trim()  || null,
     joined_at:   form.joined_at      || null,
     baptized_at: form.baptized_at    || null,
@@ -1123,8 +1128,9 @@ export default function Membros() {
     }
 
     if (fromTabId === "contato") {
-      if (!form.phone?.trim()) {
-        toast.error(t("Informe o telefone antes de continuar."));
+      const contactCheck = checkRequiredMemberContacts(form);
+      if (!contactCheck.ok) {
+        toast.error(t(MEMBER_CONTACT_CHECK_MESSAGES[contactCheck.reason]));
         return false;
       }
     }
@@ -1140,8 +1146,9 @@ export default function Membros() {
       setActiveTab("pessoal");
       return;
     }
-    if (!form.phone?.trim()) {
-      toast.error(t("Informe o telefone antes de salvar."));
+    const contactCheck = checkRequiredMemberContacts(form);
+    if (!contactCheck.ok) {
+      toast.error(t(MEMBER_CONTACT_CHECK_MESSAGES[contactCheck.reason]));
       setActiveTab("contato");
       return;
     }
@@ -1396,14 +1403,15 @@ export default function Membros() {
     { key: "member_code",  label: t("Código interno da igreja") },
     { key: "cpf",          label: t("CPF"),               required: true },
     { key: "phone",        label: t("Telefone"),          required: true },
+    { key: "whatsapp",     label: t("WhatsApp"),          required: true },
     { key: "role",         label: t("Função") },
-    { key: "email",        label: t("E-mail") },
+    { key: "email",        label: t("E-mail"),            required: true },
     { key: "status",       label: t("Status") },
   ];
 
   const memberTemplate = [
-    { name: "João Silva",  member_code: "0001", cpf: "529.982.247-25", phone: "(11) 99999-0001", role: "Diácono", email: "joao@email.com",  status: "Ativo" },
-    { name: "Maria Souza", member_code: "0002", cpf: "111.444.777-35", phone: "(11) 99999-0002", role: "Membro",  email: "maria@email.com", status: "Ativo" },
+    { name: "João Silva",  member_code: "0001", cpf: "529.982.247-25", phone: "(11) 3333-0001", whatsapp: "(11) 99999-0001", role: "Diácono", email: "joao@email.com",  status: "Ativo" },
+    { name: "Maria Souza", member_code: "0002", cpf: "111.444.777-35", phone: "(11) 99999-0002", whatsapp: "(11) 99999-0002", role: "Membro",  email: "maria@email.com", status: "Ativo" },
   ];
 
   const handleBulkImport = async (rows: Record<string, string>[]) => {
@@ -1431,8 +1439,13 @@ export default function Membros() {
 
     const prepared: Record<string, string | null>[] = [];
     for (const row of rows) {
-      if (!row.name?.trim() || !row.phone?.trim()) {
-        toast.error(t("Importação cancelada: todas as linhas precisam de nome, CPF e telefone."));
+      const contactCheck = checkRequiredMemberContacts({
+        phone: row.phone,
+        whatsapp: row.whatsapp,
+        email: row.email,
+      });
+      if (!row.name?.trim() || !row.cpf?.trim() || !contactCheck.ok) {
+        toast.error(t("Importação cancelada: nome, CPF, telefone, WhatsApp e e-mail são obrigatórios."));
         return { success: 0, errors: rows.length };
       }
 
@@ -1448,8 +1461,9 @@ export default function Membros() {
         member_code: row.member_code?.trim() || null,
         cpf: cpfCheck.normalized,
         phone: row.phone.trim(),
+        whatsapp: row.whatsapp.trim(),
         role: row.role?.trim() || "Membro",
-        email: row.email?.trim() || null,
+        email: row.email.trim().toLowerCase(),
         status: row.status && isMemberStatus(row.status) ? row.status : "Ativo",
       });
     }
@@ -1542,14 +1556,40 @@ export default function Membros() {
                   { key: "name", label: t("Nome"), required: true },
                   { key: "member_code", label: t("Código interno da igreja") },
                   { key: "role", label: t("Função"), options: ["Pastor", "Diácono", "Diaconisa", "Obreiro", "Membro"] },
-                  { key: "phone", label: t("Telefone") },
-                  { key: "email", label: t("E-mail") },
+                  { key: "cpf", label: t("CPF"), required: true },
+                  { key: "phone", label: t("Telefone"), required: true },
+                  { key: "whatsapp", label: t("WhatsApp"), required: true },
+                  { key: "email", label: t("E-mail"), required: true },
                 ]}
                 onConfirm={async data => {
                   if (!data.name || !user || !church) throw new Error(t("Nome obrigatório"));
+                  const contactCheck = checkRequiredMemberContacts({
+                    phone: data.phone,
+                    whatsapp: data.whatsapp,
+                    email: data.email,
+                  });
+                  if (!contactCheck.ok) {
+                    throw new Error(t(MEMBER_CONTACT_CHECK_MESSAGES[contactCheck.reason]));
+                  }
+                  const { data: cpfRows, error: cpfLookupError } = await supabase
+                    .from("members")
+                    .select("cpf")
+                    .eq("organization_id", church.id)
+                    .not("cpf", "is", null);
+                  if (cpfLookupError) throw new Error(cpfLookupError.message);
+                  const existingCpfs = new Set(
+                    (cpfRows ?? [])
+                      .map(row => (row.cpf ?? "").replace(/\D/g, ""))
+                      .filter(Boolean),
+                  );
+                  const cpfCheck = checkCpfForManualSave(data.cpf, existingCpfs);
+                  if (!cpfCheck.ok) throw new Error(t(CPF_CHECK_MESSAGES[cpfCheck.reason]));
                   const { error } = await insertWithOrganizationScope("members", church.id, {
                     created_by: user.id, full_name: data.name, member_code: data.member_code?.trim() || null, member_role: data.role || "Membro",
-                    phone: data.phone || null, email: data.email || null,
+                    cpf: cpfCheck.normalized,
+                    phone: data.phone.trim(),
+                    whatsapp: data.whatsapp.trim(),
+                    email: data.email.trim().toLowerCase(),
                     joined_at: new Date().toISOString().split("T")[0], status: "Ativo",
                   });
                   if (error) throw new Error(String((error as { message?: string }).message || ""));
@@ -1557,7 +1597,16 @@ export default function Membros() {
                   toast.success(t("Membro cadastrado!"));
                 }}
                 onEdit={data => {
-                  setForm({ ...EMPTY_FORM, full_name: data.name || "", member_code: data.member_code || "", member_role: data.role || "Membro", phone: data.phone || "", email: data.email || "" });
+                  setForm({
+                    ...EMPTY_FORM,
+                    full_name: data.name || "",
+                    member_code: data.member_code || "",
+                    member_role: data.role || "Membro",
+                    cpf: data.cpf || "",
+                    phone: data.phone || "",
+                    whatsapp: data.whatsapp || "",
+                    email: data.email || "",
+                  });
                   setIsNewMember(true); setEditingId(null); setActiveTab("pessoal"); setModalOpen(true);
                 }}
               />
@@ -2063,9 +2112,9 @@ export default function Membros() {
                 {activeTab === "contato" && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormInput label="Telefone" value={form.phone || ""} onChange={v => setField("phone", v)} required placeholder="(00) 00000-0000" type="tel" />
-                    <FormInput label="WhatsApp" value={form.whatsapp || ""} onChange={v => setField("whatsapp", v)} placeholder="(00) 00000-0000" type="tel" />
+                    <FormInput label="WhatsApp" value={form.whatsapp || ""} onChange={v => setField("whatsapp", v)} required placeholder="(00) 00000-0000" type="tel" />
                     <div className="sm:col-span-2">
-                      <FormInput label="E-mail" value={form.email || ""} onChange={v => setField("email", v)} placeholder="email@exemplo.com" type="email" />
+                      <FormInput label="E-mail" value={form.email || ""} onChange={v => setField("email", v)} required placeholder="email@exemplo.com" type="email" />
                     </div>
                   </div>
                 )}
@@ -2575,6 +2624,12 @@ export default function Membros() {
                         type="button"
                         onClick={() => {
                           if (!editingId) return;
+                          const contactCheck = checkRequiredMemberContacts(form);
+                          if (!contactCheck.ok) {
+                            toast.error(t(MEMBER_CONTACT_CHECK_MESSAGES[contactCheck.reason]));
+                            setActiveTab("contato");
+                            return;
+                          }
                           setInviteModal({
                             open:       true,
                             memberId:   editingId,

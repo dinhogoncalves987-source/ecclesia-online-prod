@@ -139,7 +139,7 @@ export function RecommendationLetterDocument({
           <article
             id={documentId}
             data-recommendation-document-canvas
-            className="absolute left-0 top-0 h-[1120px] w-[790px] max-w-none origin-top-left overflow-hidden bg-[#fbfaf3] px-20 py-16 text-[#102e58] shadow-sm"
+            className="absolute left-0 top-0 h-[1120px] w-[790px] max-w-none origin-top-left overflow-hidden bg-[#fbfaf3] px-20 pb-20 pt-14 text-[#102e58] shadow-sm"
             style={{
               transform: `scale(${previewScale})`,
               fontFamily: "Georgia, 'Times New Roman', serif",
@@ -167,35 +167,35 @@ export function RecommendationLetterDocument({
               />
             )}
 
-            <div className="relative z-10 flex min-h-[990px] flex-col">
-              <header className="border-b-2 border-[#b58a2c] pb-5 text-center">
+            <div className="relative z-10 flex h-full min-h-0 flex-col pb-2">
+              <header className="border-b-2 border-[#b58a2c] pb-4 text-center">
                 {logoUrl && (
                   <img
                     src={logoUrl}
                     crossOrigin="anonymous"
                     alt={`Logo ${churchName}`}
                     data-recommendation-logo
-                    className="mx-auto mb-3 h-20 w-24 object-contain"
+                    className="mx-auto mb-2 h-16 w-20 object-contain"
                   />
                 )}
                 <p className="text-xl font-bold uppercase text-[#102e58]">{churchName}</p>
                 {origin && <p className="mt-1 text-sm text-neutral-600">{origin}</p>}
               </header>
 
-              <div className="mt-10 flex items-center justify-between text-sm">
+              <div className="mt-7 flex items-center justify-between text-sm">
                 <span>Documento eclesiástico oficial</span>
                 <span className="font-mono font-semibold">CARTA-{code}</span>
               </div>
 
-              <h1 className="my-10 text-center text-3xl font-bold uppercase tracking-wide">
+              <h1 className="my-7 text-center text-3xl font-bold uppercase tracking-wide">
                 Carta de Recomendação
               </h1>
 
-              <p className="mb-7">
+              <p className="mb-5">
                 À igreja <strong>{destination}</strong>.
               </p>
 
-              <div className="space-y-6 text-justify text-[17px] leading-8">
+              <div className="space-y-4 text-justify text-[16px] leading-7">
                 <p>Graça e paz.</p>
                 <p>
                   Por meio desta, recomendamos o(a) irmão(ã){" "}
@@ -215,16 +215,19 @@ export function RecommendationLetterDocument({
                 </p>
               </div>
 
-              <p className="mt-12">
+              <p className="mt-8">
                 {origin || churchName}, {formatDate(letter.approvedAt)}.
               </p>
 
-              <div className="mt-24 w-80 border-t border-neutral-700 pt-2 text-center">
+              <div className="mt-14 w-80 border-t border-neutral-700 pt-2 text-center">
                 <p className="font-semibold">{approverLabel || "Secretaria da Igreja"}</p>
                 <p className="text-sm text-neutral-600">{churchName}</p>
               </div>
 
-              <footer className="mt-auto flex items-end justify-between gap-5 border-t border-neutral-300 pt-5">
+              <footer
+                data-recommendation-footer
+                className="mt-auto flex shrink-0 items-end justify-between gap-5 border-t border-neutral-300 pt-4"
+              >
                 <div className="font-sans text-xs text-neutral-600">
                   <p className="font-semibold text-neutral-800">Validação digital permanente</p>
                   <p>Código: <span className="font-mono font-bold">{code}</span></p>
@@ -233,7 +236,7 @@ export function RecommendationLetterDocument({
                 <div className="shrink-0 text-center">
                   <QRCodeSVG
                     value={validationUrl}
-                    size={92}
+                    size={84}
                     level="M"
                     bgColor="#ffffff"
                     fgColor="#1a1a1a"

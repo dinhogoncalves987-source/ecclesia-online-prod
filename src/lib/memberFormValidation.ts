@@ -50,3 +50,59 @@ export const CPF_CHECK_MESSAGES: Record<CpfCheckResult extends { ok: false; reas
   invalid: "CPF inválido. Verifique os dígitos digitados.",
   duplicate: "Este CPF já está cadastrado para outro membro desta igreja.",
 };
+
+export type RequiredMemberContacts = {
+  phone: string | null | undefined;
+  whatsapp: string | null | undefined;
+  email: string | null | undefined;
+};
+
+export type MemberContactCheckResult =
+  | { ok: true }
+  | {
+      ok: false;
+      reason:
+        | "missing_phone"
+        | "missing_whatsapp"
+        | "missing_email"
+        | "invalid_email";
+    };
+
+const SIMPLE_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Valida os contatos exigidos no cadastro operacional de um membro.
+ *
+ * Telefone e WhatsApp são campos independentes: podem conter o mesmo número
+ * ou números diferentes. A função deliberadamente não compara os dois.
+ */
+export function checkRequiredMemberContacts(
+  contacts: RequiredMemberContacts,
+): MemberContactCheckResult {
+  if (!contacts.phone?.trim()) {
+    return { ok: false, reason: "missing_phone" };
+  }
+  if (!contacts.whatsapp?.trim()) {
+    return { ok: false, reason: "missing_whatsapp" };
+  }
+
+  const email = contacts.email?.trim() ?? "";
+  if (!email) {
+    return { ok: false, reason: "missing_email" };
+  }
+  if (!SIMPLE_EMAIL_PATTERN.test(email)) {
+    return { ok: false, reason: "invalid_email" };
+  }
+
+  return { ok: true };
+}
+
+export const MEMBER_CONTACT_CHECK_MESSAGES: Record<
+  Exclude<MemberContactCheckResult, { ok: true }>["reason"],
+  string
+> = {
+  missing_phone: "Informe o telefone.",
+  missing_whatsapp: "Informe o WhatsApp.",
+  missing_email: "Informe o e-mail.",
+  invalid_email: "E-mail inválido. Verifique o endereço digitado.",
+};

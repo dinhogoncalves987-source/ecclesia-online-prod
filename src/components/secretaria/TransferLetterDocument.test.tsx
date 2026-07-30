@@ -65,6 +65,11 @@ describe("TransferLetterDocument", () => {
     );
     expect(container.querySelector("[data-transfer-document-canvas]")).toHaveClass(
       "bg-[#fbfaf3]",
+      "pb-20",
+    );
+    expect(container.querySelector("[data-transfer-footer]")).toHaveClass(
+      "shrink-0",
+      "mt-auto",
     );
   });
 

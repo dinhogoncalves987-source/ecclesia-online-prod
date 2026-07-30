@@ -51,6 +51,8 @@ type FormMode =
   | "session_mismatch"  // authenticated, but with the WRONG account
   | "link_error";        // authenticated + matching, but acceptMemberInvite failed
 
+const MAGIC_LINK_RESEND_COOLDOWN_SECONDS = 60;
+
 // ── Error message mapping ─────────────────────────────────────────────────────
 
 const INVITE_LOAD_ERRORS: Record<string, string> = {
@@ -108,6 +110,7 @@ export default function ConviteMembro() {
   const [linkError, setLinkError]               = useState("");
   const [linkErrorCode, setLinkErrorCode]        = useState("");
   const [resendState, setResendState]           = useState<"idle" | "sending" | "sent">("idle");
+  const [resendSeconds, setResendSeconds]       = useState(0);
 
   // Only auto-attempt the finalize-link RPC once per (invite, user) pair —
   // otherwise a failed attempt (e.g. invite_expired) would loop forever, since
@@ -187,6 +190,14 @@ export default function ConviteMembro() {
   const fixedEmail     = invite?.member_email?.trim() ?? "";
   const memberHasEmail = hasMemberEmail(invite);
 
+  useEffect(() => {
+    if (resendSeconds <= 0) return;
+    const timer = window.setInterval(() => {
+      setResendSeconds(current => Math.max(0, current - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [resendSeconds]);
+
   // ── Finalize the link (safe RPC: auth.uid() + auth.email() vs members.email) ──
   const runAcceptMemberInvite = useCallback(async (userId: string) => {
     setStep("linking");
@@ -262,6 +273,7 @@ export default function ConviteMembro() {
       // A sessão só nasce depois que o destinatário abre o link recebido no
       // e-mail fixo. O effect acima finaliza o convite no retorno autenticado.
       setFormMode("check_email");
+      setResendSeconds(MAGIC_LINK_RESEND_COOLDOWN_SECONDS);
       setSubmitting(false);
     } catch (err) {
       console.error("[ConviteMembro] handleSignUp unexpected exception", err);
@@ -271,16 +283,19 @@ export default function ConviteMembro() {
   };
 
   const handleResendConfirmation = async () => {
-    if (resendState === "sending" || !fixedEmail) return;
+    if (resendState === "sending" || resendSeconds > 0 || !fixedEmail) return;
     setResendState("sending");
     try {
       const { error } = await sendMemberInviteMagicLink(fixedEmail, token);
       if (error) throw error;
+      setResendState("sent");
+      setResendSeconds(MAGIC_LINK_RESEND_COOLDOWN_SECONDS);
+      setTimeout(() => setResendState("idle"), 5000);
     } catch (e) {
       console.error("[ConviteMembro] resend confirmation failed", e);
+      setResendState("idle");
+      setFormError(t("Não foi possível reenviar o link seguro agora. Tente novamente."));
     }
-    setResendState("sent");
-    setTimeout(() => setResendState("idle"), 5000);
   };
 
   const handleSignOutAndRetry = async () => {
@@ -494,17 +509,22 @@ export default function ConviteMembro() {
           <p className="text-xs text-muted-foreground">
             {t("Abra o e-mail e clique no link para provar que esta caixa postal é sua. Você voltará automaticamente para concluir o acesso.")}
           </p>
+          <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+            {t("Use somente o e-mail mais recente. Ao reenviar, o link anterior deixa de funcionar.")}
+          </p>
         </div>
         <button
           type="button"
           onClick={handleResendConfirmation}
-          disabled={resendState === "sending"}
+          disabled={resendState === "sending" || resendSeconds > 0}
           className="text-sm text-primary hover:underline disabled:opacity-60"
         >
           {resendState === "sending" && t("Reenviando...")}
           {resendState === "sent" && t("E-mail reenviado!")}
-          {resendState === "idle" && t("Reenviar link seguro")}
+          {resendState === "idle" && resendSeconds > 0 && `${t("Reenviar link seguro")} (${resendSeconds}s)`}
+          {resendState === "idle" && resendSeconds === 0 && t("Reenviar link seguro")}
         </button>
+        {formError && <p className="text-xs text-destructive">{formError}</p>}
       </div>
     );
   } else {

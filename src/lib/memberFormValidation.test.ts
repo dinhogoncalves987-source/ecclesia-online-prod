@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { checkCpfForManualSave } from "./memberFormValidation";
+import {
+  checkCpfForManualSave,
+  checkRequiredMemberContacts,
+} from "./memberFormValidation";
 
 // CPFs válidos conhecidos (dígitos verificadores corretos), usados também em
 // cpfValidation.test.ts.
@@ -53,5 +56,32 @@ describe("checkCpfForManualSave", () => {
     const existing = new Set(["11144477735"]);
     const result = checkCpfForManualSave(VALID_CPF_2, existing);
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("checkRequiredMemberContacts", () => {
+  it.each([
+    [{ phone: "", whatsapp: "54999999999", email: "membro@example.com" }, "missing_phone"],
+    [{ phone: "5432220000", whatsapp: "", email: "membro@example.com" }, "missing_whatsapp"],
+    [{ phone: "5432220000", whatsapp: "54999999999", email: "" }, "missing_email"],
+    [{ phone: "5432220000", whatsapp: "54999999999", email: "email-invalido" }, "invalid_email"],
+  ] as const)("bloqueia contato obrigatório inválido", (contacts, reason) => {
+    expect(checkRequiredMemberContacts(contacts)).toEqual({ ok: false, reason });
+  });
+
+  it("aceita telefone e WhatsApp com o mesmo número", () => {
+    expect(checkRequiredMemberContacts({
+      phone: "(54) 99911-0927",
+      whatsapp: "(54) 99911-0927",
+      email: "membro@example.com",
+    })).toEqual({ ok: true });
+  });
+
+  it("aceita telefone e WhatsApp com números diferentes", () => {
+    expect(checkRequiredMemberContacts({
+      phone: "(54) 3222-0000",
+      whatsapp: "(54) 99911-0927",
+      email: "membro@example.com",
+    })).toEqual({ ok: true });
   });
 });

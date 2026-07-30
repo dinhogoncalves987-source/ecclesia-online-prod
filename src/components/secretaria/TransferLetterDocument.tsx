@@ -113,7 +113,7 @@ export function TransferLetterDocument({
           <article
             id={documentId}
             data-transfer-document-canvas
-            className="absolute left-0 top-0 h-[1120px] w-[790px] max-w-none origin-top-left overflow-hidden bg-[#fbfaf3] px-20 py-16 text-[#102e58] shadow-sm"
+            className="absolute left-0 top-0 h-[1120px] w-[790px] max-w-none origin-top-left overflow-hidden bg-[#fbfaf3] px-20 pb-20 pt-14 text-[#102e58] shadow-sm"
             style={{
               transform: `scale(${previewScale})`,
               fontFamily: "Georgia, 'Times New Roman', serif",
@@ -140,21 +140,21 @@ export function TransferLetterDocument({
               className="pointer-events-none absolute left-1/2 top-1/2 max-h-[46%] max-w-[56%] -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.08] saturate-50 mix-blend-multiply"
             />
           )}
-          <div className="relative z-10 flex min-h-[990px] flex-col">
-            <header className="border-b-2 border-[#b58a2c] pb-5 text-center">
-              {logo && <img src={logo} crossOrigin="anonymous" alt="" className="mx-auto mb-3 h-20 w-24 object-contain" />}
+          <div className="relative z-10 flex h-full min-h-0 flex-col pb-2">
+            <header className="border-b-2 border-[#b58a2c] pb-4 text-center">
+              {logo && <img src={logo} crossOrigin="anonymous" alt="" className="mx-auto mb-2 h-16 w-20 object-contain" />}
               <p className="text-xl font-bold uppercase text-[#102e58]">{letter.organization_name || letter.origin_church_name}</p>
               <p className="mt-1 text-sm text-neutral-600">{origin}</p>
             </header>
 
-            <div className="mt-10 flex items-center justify-between text-sm">
+            <div className="mt-7 flex items-center justify-between text-sm">
               <span>Documento eclesiástico oficial</span>
               <span className="font-mono font-semibold">{letter.transfer_number || "RASCUNHO"}</span>
             </div>
-            <h1 className="my-10 text-center text-3xl font-bold uppercase tracking-wide">Carta de Transferência</h1>
+            <h1 className="my-7 text-center text-3xl font-bold uppercase tracking-wide">Carta de Transferência</h1>
 
-            <p className="mb-7">À igreja <strong>{letter.destination_church_name}</strong>, {destination}.</p>
-            <div className="space-y-6 text-justify text-[17px] leading-8">
+            <p className="mb-5">À igreja <strong>{letter.destination_church_name}</strong>, {destination}.</p>
+            <div className="space-y-4 text-justify text-[16px] leading-7">
               <p>Graça e paz.</p>
               <p>
                 Por meio desta, comunicamos e confirmamos a transferência do(a) irmão(ã){" "}
@@ -170,20 +170,23 @@ export function TransferLetterDocument({
               <p>Rogamos as bênçãos de Deus sobre sua nova etapa de vida e ministério.</p>
             </div>
 
-            <p className="mt-12">{origin || letter.origin_church_name}, {formatDate(letter.completed_at || letter.issued_at)}.</p>
+            <p className="mt-8">{origin || letter.origin_church_name}, {formatDate(letter.completed_at || letter.issued_at)}.</p>
 
-            <div className="mt-24 w-80 border-t border-neutral-700 pt-2 text-center">
+            <div className="mt-14 w-80 border-t border-neutral-700 pt-2 text-center">
               <p className="font-semibold">{letter.signer_name || "Secretaria da Igreja"}</p>
               <p className="text-sm text-neutral-600">{letter.signer_role || "Pastor Presidente"}</p>
             </div>
 
-            <footer className="mt-auto flex items-end justify-between gap-5 border-t border-neutral-300 pt-5">
+            <footer
+              data-transfer-footer
+              className="mt-auto flex shrink-0 items-end justify-between gap-5 border-t border-neutral-300 pt-4"
+            >
               <div className="font-sans text-xs text-neutral-600">
                 <p className="font-semibold text-neutral-800">Validação digital permanente</p>
                 <p>{letter.status === "cancelada" ? "DOCUMENTO CANCELADO" : "Documento válido enquanto não cancelado."}</p>
                 {validationUrl && <p className="mt-1 max-w-lg break-all text-[10px]">{validationUrl}</p>}
               </div>
-              {validationUrl && <QRCodeSVG value={validationUrl} size={92} level="M" />}
+              {validationUrl && <QRCodeSVG value={validationUrl} size={84} level="M" />}
             </footer>
           </div>
           </article>
