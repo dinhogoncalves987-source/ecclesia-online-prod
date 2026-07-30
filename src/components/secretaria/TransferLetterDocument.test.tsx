@@ -55,6 +55,17 @@ describe("TransferLetterDocument", () => {
       "src",
       letter.organization_logo_url,
     );
+    expect(container.querySelectorAll("[data-transfer-frame]")).toHaveLength(2);
+    expect(container.querySelector("[data-transfer-watermark]")).toHaveAttribute(
+      "src",
+      letter.organization_logo_url,
+    );
+    expect(container.querySelector("[data-transfer-watermark]")).toHaveClass(
+      "mix-blend-multiply",
+    );
+    expect(container.querySelector("[data-transfer-document-canvas]")).toHaveClass(
+      "bg-[#fbfaf3]",
+    );
   });
 
   it("reduz a folha inteira à largura do celular sem rolagem horizontal", () => {

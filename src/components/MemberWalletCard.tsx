@@ -88,12 +88,12 @@ const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
 // ── Frente ────────────────────────────────────────────────────────────────────
 
 function CardFront({
-  id, member, churchName, churchAcronym, churchLogoUrl, code, issueDate, validUntil, qrValue, pdfQrPlaceholder,
+  id, member, churchName, churchAcronym, churchLogoUrl, code, issueDate, validUntil, qrValue,
   onQrClick,
 }: {
   id: string; member: WalletMember; churchName: string;
   churchAcronym?: string | null; churchLogoUrl?: string | null;
-  code: string; issueDate: string; validUntil: string; qrValue: string; pdfQrPlaceholder?: string;
+  code: string; issueDate: string; validUntil: string; qrValue: string;
   onQrClick?: () => void;
 }) {
   const statusInfo = STATUS_BADGE[member.status] ?? STATUS_BADGE.Ativo;
@@ -102,6 +102,7 @@ function CardFront({
   return (
     <div
       id={id}
+      data-wallet-card-face="front"
       className="relative w-full rounded-2xl overflow-hidden shadow-2xl select-none"
       style={{ aspectRatio: "85/54" }}
     >
@@ -154,6 +155,7 @@ function CardFront({
               <img
                 src={member.photo_url}
                 alt={member.full_name}
+                crossOrigin="anonymous"
                 className="w-11 h-14 rounded-lg object-cover shadow-lg flex-shrink-0"
               />
             ) : (
@@ -178,11 +180,7 @@ function CardFront({
             </motion.button>
           ) : (
             <div className="bg-white rounded-lg p-1 flex-shrink-0 shadow">
-              {pdfQrPlaceholder ? (
-                <div className="w-[40px] h-[40px] flex items-center justify-center p-0.5">
-                  <span className="text-[5px] text-slate-500 text-center leading-tight">{pdfQrPlaceholder}</span>
-                </div>
-              ) : qrValue ? (
+              {qrValue ? (
                 <QRCodeSVG value={qrValue} size={40} level="H" marginSize={1} />
               ) : (
                 <div className="w-[40px] h-[40px] flex items-center justify-center">
@@ -228,6 +226,7 @@ function CardBack({
   return (
     <div
       id={id}
+      data-wallet-card-face="back"
       className="relative w-full rounded-2xl overflow-hidden shadow-2xl select-none"
       style={{ aspectRatio: "85/54" }}
     >
@@ -381,7 +380,6 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
     ? `${window.location.origin}/admin/porteiro?token=${encodeURIComponent(qrToken)}`
     : "";
 
-  const pdfQrPlaceholder = "QR Code seguro disponível apenas na carteira digital.";
   const shareText = [
     `📋 CARTEIRA DE MEMBRO`,
     ``,
@@ -413,17 +411,40 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
       const images = Array.from(
         new Set([...frontEl.querySelectorAll("img"), ...backEl.querySelectorAll("img")]),
       );
-      await Promise.all(images.map((image) => {
-        if (image.complete) return Promise.resolve();
-        return new Promise<void>((resolve) => {
-          image.addEventListener("load", () => resolve(), { once: true });
-          image.addEventListener("error", () => resolve(), { once: true });
-        });
+      await Promise.all(images.map(async (image) => {
+        if (!image.complete) {
+          await new Promise<void>((resolve) => {
+            image.addEventListener("load", () => resolve(), { once: true });
+            image.addEventListener("error", () => resolve(), { once: true });
+          });
+        }
+        try {
+          await image.decode();
+        } catch {
+          // O navegador pode não oferecer decode para algumas URLs antigas.
+        }
       }));
+      if (document.fonts?.ready) await document.fonts.ready;
 
-      const captureOpts = { scale: 3, useCORS: true, allowTaint: true, backgroundColor: null, logging: false };
+      const captureOpts = {
+        scale: 4,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: null,
+        logging: false,
+        width: frontEl.offsetWidth,
+        height: frontEl.offsetHeight,
+        windowWidth: frontEl.offsetWidth,
+        windowHeight: frontEl.offsetHeight,
+      };
       const frontCanvas = await html2canvas(frontEl, captureOpts);
-      const backCanvas  = await html2canvas(backEl,  captureOpts);
+      const backCanvas  = await html2canvas(backEl, {
+        ...captureOpts,
+        width: backEl.offsetWidth,
+        height: backEl.offsetHeight,
+        windowWidth: backEl.offsetWidth,
+        windowHeight: backEl.offsetHeight,
+      });
 
       // Uma única folha A4 paisagem deixa o arquivo agradável no celular e
       // preserva frente/verso no tamanho físico real para impressão e corte.
@@ -560,7 +581,7 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
         style={{ position: "fixed", left: "-9999px", top: "-9999px", width: 360, pointerEvents: "none" }}
       >
         <div style={{ marginBottom: 16 }}>
-          <CardFront id="wallet-pdf-front" {...cardProps} qrValue="" pdfQrPlaceholder={pdfQrPlaceholder} />
+          <CardFront id="wallet-pdf-front" {...cardProps} />
         </div>
         <CardBack id="wallet-pdf-back" {...{ member, churchName, churchLogoUrl }} />
       </div>

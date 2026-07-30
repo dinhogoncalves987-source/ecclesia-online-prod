@@ -60,6 +60,13 @@ describe("RecommendationLetterDocument", () => {
       "src",
       "https://cdn.example.org/logo.png",
     );
+    expect(container.querySelectorAll("[data-recommendation-frame]")).toHaveLength(2);
+    expect(container.querySelector("[data-recommendation-watermark]")).toHaveClass(
+      "mix-blend-multiply",
+    );
+    expect(container.querySelector("[data-recommendation-document-canvas]")).toHaveClass(
+      "bg-[#fbfaf3]",
+    );
   });
 
   it("reduz a folha inteira à largura do celular sem recortar o documento", () => {

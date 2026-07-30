@@ -135,7 +135,7 @@ describe("MemberWalletCard — identidade visual", () => {
       output: vi.fn(() => new Blob(["pdf"], { type: "application/pdf" })),
     }));
 
-    render(
+    const { container } = render(
       <MemberWalletCard
         member={{ ...member, member_role: "leader", administrative_role: "Auxiliar" }}
         churchName="Assembleia de Deus Caxias do Sul"
@@ -160,5 +160,21 @@ describe("MemberWalletCard — identidade visual", () => {
     expect(addPageMock).not.toHaveBeenCalled();
     expect(screen.queryByText("Auxiliar")).not.toBeInTheDocument();
     expect(screen.getAllByText("Membro").length).toBeGreaterThan(0);
+    const visibleFront = container.querySelector("#wallet-card-front") as HTMLElement;
+    const pdfFront = container.querySelector("#wallet-pdf-front") as HTMLElement;
+    expect(pdfFront.className).toBe(visibleFront.className);
+    expect(pdfFront.getAttribute("style")).toBe(visibleFront.getAttribute("style"));
+    expect(pdfFront).toHaveTextContent("Edson G Roquete");
+    expect(pdfFront).toHaveTextContent("Membro");
+    expect(pdfFront).not.toHaveTextContent("QR Code seguro disponível");
+    expect(html2canvasMock).toHaveBeenCalledWith(
+      pdfFront,
+      expect.objectContaining({
+        scale: 4,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: null,
+      }),
+    );
   });
 });

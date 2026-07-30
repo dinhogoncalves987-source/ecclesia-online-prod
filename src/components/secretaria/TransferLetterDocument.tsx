@@ -113,24 +113,37 @@ export function TransferLetterDocument({
           <article
             id={documentId}
             data-transfer-document-canvas
-            className="absolute left-0 top-0 h-[1120px] w-[790px] max-w-none origin-top-left overflow-hidden bg-white px-20 py-16 text-neutral-900 shadow-sm"
+            className="absolute left-0 top-0 h-[1120px] w-[790px] max-w-none origin-top-left overflow-hidden bg-[#fbfaf3] px-20 py-16 text-[#102e58] shadow-sm"
             style={{
               transform: `scale(${previewScale})`,
               fontFamily: "Georgia, 'Times New Roman', serif",
+              backgroundImage:
+                "radial-gradient(circle at 50% 46%, rgba(184,143,51,0.08), transparent 38%), linear-gradient(120deg, rgba(255,255,255,0.9), rgba(247,244,230,0.96))",
             }}
           >
+          <div
+            aria-hidden="true"
+            data-transfer-frame="outer"
+            className="pointer-events-none absolute inset-[13px] border-2 border-[#b78b2e]"
+          />
+          <div
+            aria-hidden="true"
+            data-transfer-frame="inner"
+            className="pointer-events-none absolute inset-[23px] border-2 border-[#102e58]"
+          />
           {logo && (
             <img
               src={logo}
               alt=""
               crossOrigin="anonymous"
-              className="pointer-events-none absolute left-1/2 top-1/2 max-h-[45%] max-w-[55%] -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.045]"
+              data-transfer-watermark
+              className="pointer-events-none absolute left-1/2 top-1/2 max-h-[46%] max-w-[56%] -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.08] saturate-50 mix-blend-multiply"
             />
           )}
           <div className="relative z-10 flex min-h-[990px] flex-col">
             <header className="border-b-2 border-[#b58a2c] pb-5 text-center">
               {logo && <img src={logo} crossOrigin="anonymous" alt="" className="mx-auto mb-3 h-20 w-24 object-contain" />}
-              <p className="text-xl font-bold uppercase">{letter.organization_name || letter.origin_church_name}</p>
+              <p className="text-xl font-bold uppercase text-[#102e58]">{letter.organization_name || letter.origin_church_name}</p>
               <p className="mt-1 text-sm text-neutral-600">{origin}</p>
             </header>
 
