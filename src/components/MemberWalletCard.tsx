@@ -76,18 +76,6 @@ function maskCpf(cpf: string) {
   return `${clean.slice(0, 3)}.${clean.slice(3, 6)}.${clean.slice(6, 9)}-${clean.slice(9)}`;
 }
 
-const ROLE_LABEL: Record<string, string> = {
-  member:      "Membro",
-  leader:      "Líder",
-  co_leader:   "Co-líder",
-  pastor:      "Pastor",
-  secretary:   "Secretário(a)",
-  treasurer:   "Tesoureiro(a)",
-  deacon:      "Diácono/Diaconisa",
-  elder:       "Presbítero",
-  church_admin:"Administrador",
-};
-
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   Ativo:       { label: "ATIVO",        cls: "bg-emerald-600 text-white" },
   Inativo:     { label: "INATIVO",      cls: "bg-slate-500 text-white"   },
@@ -109,7 +97,6 @@ function CardFront({
   onQrClick?: () => void;
 }) {
   const statusInfo = STATUS_BADGE[member.status] ?? STATUS_BADGE.Ativo;
-  const roleLabel  = ROLE_LABEL[member.member_role ?? ""] ?? member.member_role ?? "Membro";
   const churchDisplay = churchAcronym?.trim() || organizationInitials(churchName);
 
   return (
@@ -128,7 +115,7 @@ function CardFront({
           aria-hidden="true"
           crossOrigin="anonymous"
           data-wallet-watermark
-          className="pointer-events-none absolute left-1/2 top-1/2 h-[72%] w-[62%] -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.14] grayscale invert contrast-[1.65] mix-blend-screen"
+          className="pointer-events-none absolute left-1/2 top-1/2 aspect-square h-[66%] max-w-[58%] -translate-x-1/2 -translate-y-1/2 rounded-full object-contain opacity-[0.09] grayscale invert contrast-[1.65] mix-blend-screen"
         />
       )}
 
@@ -176,17 +163,7 @@ function CardFront({
             )}
             <div className="pb-0.5">
               <p className="text-[12px] font-bold leading-tight text-white">{member.full_name}</p>
-              <p className="mt-1 text-[9px] font-medium text-slate-300">{roleLabel}</p>
-              {member.administrative_role && member.administrative_role !== "Nenhum" && (
-                <p className="text-[9px] text-slate-300">
-                  <span className="text-slate-500">Cargo:</span> {member.administrative_role}
-                </p>
-              )}
-              {member.congregation && (
-                <p className="text-[9px] text-slate-300">
-                  <span className="text-slate-500">Congregação:</span> {member.congregation}
-                </p>
-              )}
+              <p className="mt-1 text-[9px] font-medium text-slate-300">Membro</p>
             </div>
           </div>
           {qrValue && onQrClick ? (
@@ -263,7 +240,7 @@ function CardBack({
           aria-hidden="true"
           crossOrigin="anonymous"
           data-wallet-watermark
-          className="pointer-events-none absolute left-1/2 top-1/2 h-[70%] w-[60%] -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.12] grayscale invert contrast-[1.65] mix-blend-screen"
+          className="pointer-events-none absolute left-1/2 top-1/2 aspect-square h-[64%] max-w-[56%] -translate-x-1/2 -translate-y-1/2 rounded-full object-contain opacity-[0.08] grayscale invert contrast-[1.65] mix-blend-screen"
         />
       )}
 
@@ -405,16 +382,12 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
     : "";
 
   const pdfQrPlaceholder = "QR Code seguro disponível apenas na carteira digital.";
-  const roleLabel      = ROLE_LABEL[member.member_role ?? ""] ?? member.member_role ?? "Membro";
-
   const shareText = [
     `📋 CARTEIRA DE MEMBRO`,
     ``,
     `Nome: ${member.full_name}`,
     `Igreja: ${churchName}${churchCity ? ` · ${churchCity}${churchState ? `/${churchState}` : ""}` : ""}`,
-    `Função: ${roleLabel}`,
-    member.administrative_role && member.administrative_role !== "Nenhum" ? `Cargo: ${member.administrative_role}` : null,
-    member.congregation ? `Congregação: ${member.congregation}` : null,
+    `Vínculo: Membro`,
     `Matrícula: Nº ${code}`,
     `Situação: ${member.status || "Ativa"}`,
     ``,
@@ -452,10 +425,26 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
       const frontCanvas = await html2canvas(frontEl, captureOpts);
       const backCanvas  = await html2canvas(backEl,  captureOpts);
 
-      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: [85, 54] });
-      pdf.addImage(frontCanvas.toDataURL("image/jpeg", 0.97), "JPEG", 0, 0, 85, 54);
-      pdf.addPage([85, 54], "landscape");
-      pdf.addImage(backCanvas.toDataURL("image/jpeg", 0.97), "JPEG", 0, 0, 85, 54);
+      // Uma única folha A4 paisagem deixa o arquivo agradável no celular e
+      // preserva frente/verso no tamanho físico real para impressão e corte.
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const cardWidth = 85;
+      const cardHeight = 54;
+      const cardGap = 12;
+      const startX = (pageWidth - (cardWidth * 2 + cardGap)) / 2;
+      const startY = (pageHeight - cardHeight) / 2;
+
+      pdf.addImage(frontCanvas.toDataURL("image/png"), "PNG", startX, startY, cardWidth, cardHeight);
+      pdf.addImage(
+        backCanvas.toDataURL("image/png"),
+        "PNG",
+        startX + cardWidth + cardGap,
+        startY,
+        cardWidth,
+        cardHeight,
+      );
 
       return { blob: pdf.output("blob"), fileName };
     } catch (err) {

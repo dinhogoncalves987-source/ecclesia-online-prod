@@ -2,15 +2,35 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MemberWalletCard, type WalletMember } from "./MemberWalletCard";
 
-const { rpcMock } = vi.hoisted(() => ({ rpcMock: vi.fn() }));
+const {
+  rpcMock,
+  documentActionsProps,
+  html2canvasMock,
+  jsPdfMock,
+  addImageMock,
+  addPageMock,
+} = vi.hoisted(() => ({
+  rpcMock: vi.fn(),
+  documentActionsProps: { current: null as Record<string, unknown> | null },
+  html2canvasMock: vi.fn(),
+  jsPdfMock: vi.fn(),
+  addImageMock: vi.fn(),
+  addPageMock: vi.fn(),
+}));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { rpc: rpcMock },
 }));
 
 vi.mock("@/components/DocumentActions", () => ({
-  DocumentActions: () => <div data-testid="document-actions" />,
+  DocumentActions: (props: Record<string, unknown>) => {
+    documentActionsProps.current = props;
+    return <div data-testid="document-actions" />;
+  },
 }));
+
+vi.mock("html2canvas", () => ({ default: html2canvasMock }));
+vi.mock("jspdf", () => ({ jsPDF: jsPdfMock }));
 
 const member: WalletMember = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -39,7 +59,7 @@ describe("MemberWalletCard — identidade visual", () => {
     watermarks.forEach((watermark) => {
       expect(watermark).toHaveAttribute("src", "https://example.com/logo.png");
       expect(watermark).toHaveAttribute("crossorigin", "anonymous");
-      expect(watermark).toHaveClass("grayscale", "invert", "mix-blend-screen");
+      expect(watermark).toHaveClass("rounded-full", "grayscale", "invert", "mix-blend-screen");
     });
 
     fireEvent.click(screen.getByRole("button", { name: /verso/i }));
@@ -96,5 +116,49 @@ describe("MemberWalletCard — identidade visual", () => {
     await waitFor(() => {
       expect(screen.getByRole("dialog", { name: "QR Code seguro ampliado" })).toHaveStyle({ opacity: "0" });
     });
+  });
+
+  it("gera uma folha A4 única com frente e verso lado a lado no tamanho real", async () => {
+    const canvas = { toDataURL: vi.fn(() => "data:image/png;base64,teste") };
+    html2canvasMock.mockResolvedValue(canvas);
+    addImageMock.mockReset();
+    addPageMock.mockReset();
+    jsPdfMock.mockImplementation(() => ({
+      internal: {
+        pageSize: {
+          getWidth: () => 297,
+          getHeight: () => 210,
+        },
+      },
+      addImage: addImageMock,
+      addPage: addPageMock,
+      output: vi.fn(() => new Blob(["pdf"], { type: "application/pdf" })),
+    }));
+
+    render(
+      <MemberWalletCard
+        member={{ ...member, member_role: "leader", administrative_role: "Auxiliar" }}
+        churchName="Assembleia de Deus Caxias do Sul"
+        churchLogoUrl={null}
+      />,
+    );
+
+    const generatePdf = documentActionsProps.current?.onGeneratePdfBlob as
+      | (() => Promise<{ blob: Blob; fileName: string } | null>)
+      | undefined;
+    expect(generatePdf).toBeTypeOf("function");
+    await generatePdf?.();
+
+    expect(jsPdfMock).toHaveBeenCalledWith({
+      orientation: "landscape",
+      unit: "mm",
+      format: "a4",
+    });
+    expect(addImageMock).toHaveBeenCalledTimes(2);
+    expect(addImageMock.mock.calls[0].slice(1)).toEqual(["PNG", 57.5, 78, 85, 54]);
+    expect(addImageMock.mock.calls[1].slice(1)).toEqual(["PNG", 154.5, 78, 85, 54]);
+    expect(addPageMock).not.toHaveBeenCalled();
+    expect(screen.queryByText("Auxiliar")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Membro").length).toBeGreaterThan(0);
   });
 });
