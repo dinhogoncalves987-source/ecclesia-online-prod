@@ -51,7 +51,7 @@ describe("chat moderno — chamadas individuais e reuniões separadas", () => {
     const hook = read("src/hooks/useInternalCall.tsx");
     const overlay = read("src/components/messages/InternalCallOverlay.tsx");
     const ice = read("supabase/functions/get-internal-call-ice/index.ts");
-    const config = read("supabase/config.toml");
+    const config = read("supabase/config.toml").replace(/\r\n/g, "\n");
 
     expect(hook).toContain("new RTCPeerConnection");
     expect(hook).toContain("navigator.mediaDevices.getUserMedia");

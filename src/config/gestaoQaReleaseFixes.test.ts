@@ -84,7 +84,7 @@ describe("fechamento da homologação da Gestão", () => {
   it("protege a importação com IA com sessão real, sem usar a chave pública como usuário", () => {
     const modal = read("src/components/AIImportModal.tsx");
     const edgeFunction = read("supabase/functions/ai-import/index.ts");
-    const config = read("supabase/config.toml");
+    const config = read("supabase/config.toml").replace(/\r\n/g, "\n");
 
     expect(modal).toContain("supabase.auth.getSession()");
     expect(modal).toContain("Authorization: `Bearer ${accessToken}`");
