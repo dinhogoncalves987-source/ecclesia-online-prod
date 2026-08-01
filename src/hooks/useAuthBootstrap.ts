@@ -70,9 +70,39 @@ export class BootstrapFetchError extends Error {
   }
 }
 
+/**
+ * A PostgREST request can remain pending indefinitely on a mobile network if
+ * the connection is half-open.  Never let that transport state hold the
+ * entire authenticated application on AppBootScreen forever.
+ */
+export class BootstrapTimeoutError extends Error {
+  constructor() {
+    super("Tempo limite ao carregar permissoes de acesso");
+    this.name = "BootstrapTimeoutError";
+  }
+}
+
+const BOOTSTRAP_TIMEOUT_MS = 12_000;
+
+function withBootstrapTimeout<T>(operation: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => reject(new BootstrapTimeoutError()), BOOTSTRAP_TIMEOUT_MS);
+    operation.then(
+      (value) => {
+        window.clearTimeout(timeoutId);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timeoutId);
+        reject(error);
+      },
+    );
+  });
+}
+
 async function fetchBootstrapData(userId: string): Promise<BootstrapData> {
   return measureBoot("bootstrap (profile+roles+memberships+super_admins)", async () => {
-    const [profileResult, userRolesResult, membershipsResult, superAdminResult, capabilitiesResult] = await Promise.all([
+    const [profileResult, userRolesResult, membershipsResult, superAdminResult, capabilitiesResult] = await withBootstrapTimeout(Promise.all([
       supabase.from("profiles").select("platform_role").eq("user_id", userId).maybeSingle(),
       supabase.from("user_roles").select("role, organization_id").eq("user_id", userId),
       supabase
@@ -82,7 +112,7 @@ async function fetchBootstrapData(userId: string): Promise<BootstrapData> {
         .eq("is_active", true),
       supabase.from("super_admins").select("user_id").eq("user_id", userId).maybeSingle(),
       supabase.rpc("get_my_access_capabilities"),
-    ]);
+    ]));
 
     const failures: Array<{ table: string; message: string }> = [];
     if (profileResult.error) failures.push({ table: "profiles", message: profileResult.error.message });
@@ -124,7 +154,10 @@ export function useAuthBootstrap(userId: string | null | undefined) {
     // finally has something meaningful to act on — previously the queryFn
     // always resolved "successfully" with empty defaults, so retry never
     // engaged even though it was configured.
-    retry: 2,
+    // A transport/query timeout already waited 12 seconds. Surface the
+    // recoverable reconnect screen immediately instead of making the person
+    // stare at another 24 seconds of an apparently endless boot loop.
+    retry: (failureCount, error) => !(error instanceof BootstrapTimeoutError) && failureCount < 2,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
 

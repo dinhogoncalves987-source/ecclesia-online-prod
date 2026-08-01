@@ -134,7 +134,8 @@
     "20260803160000_member_invite_manual_whatsapp_otp.sql",
     "20260803170000_internal_calls_foundation.sql",
     "20260803180000_management_access_visibility_convergence.sql",
-    "20260803190000_legacy_role_capability_bridge.sql"
+    "20260803190000_legacy_role_capability_bridge.sql",
+    "20260803200000_access_bootstrap_hotfix.sql"
   ],
   "staging_feature": [],
   "staging_only": [
