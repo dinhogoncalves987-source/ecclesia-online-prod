@@ -36,15 +36,27 @@ describe("chat moderno — chamadas individuais e reuniões separadas", () => {
 
   it("telefone e câmera iniciam WebRTC individual, nunca uma reunião Jitsi", () => {
     const panel = read("src/components/messages/InternalChatPanel.tsx");
+    const header = read("src/components/messages/InternalChatHeader.tsx");
     expect(panel).toContain('void startCall(thread, "voice")');
     expect(panel).toContain('void startCall(thread, "video")');
     expect(panel).toContain('thread?.source === "meeting"');
     expect(panel).toContain("onJoinMeeting");
+    expect(panel).toContain("showCallActions={isDirect}");
+    expect(panel).toContain("Este membro precisa ativar o acesso ao aplicativo");
+    expect(header).toContain("callUnavailableReason");
 
     const voiceHandler = panel.match(/onVoiceCall=\{[^]*?onVideoCall=/)?.[0] ?? "";
     const videoHandler = panel.match(/onVideoCall=\{[^]*?onJoinMeeting=/)?.[0] ?? "";
     expect(voiceHandler).not.toContain("setMeetingOpen");
     expect(videoHandler).not.toContain("setMeetingOpen");
+  });
+
+  it("não deixa telefone e câmera desaparecerem de conversa direta não ativada", () => {
+    const panel = read("src/components/messages/InternalChatPanel.tsx");
+    const directDefinition = panel.match(/const isDirect = Boolean\([^]*?\);/)?.[0] ?? "";
+    expect(directDefinition).toContain('thread?.source === "secretariat"');
+    expect(directDefinition).toContain("thread.memberId");
+    expect(directDefinition).not.toContain("participantUserId");
   });
 
   it("usa mídia nativa, controles móveis e relay próprio temporário", () => {

@@ -132,7 +132,8 @@
     "20260803140000_gestao_release_qa_fixes.sql",
     "20260803150000_member_required_contacts.sql",
     "20260803160000_member_invite_manual_whatsapp_otp.sql",
-    "20260803170000_internal_calls_foundation.sql"
+    "20260803170000_internal_calls_foundation.sql",
+    "20260803180000_management_access_visibility_convergence.sql"
   ],
   "staging_feature": [],
   "staging_only": [

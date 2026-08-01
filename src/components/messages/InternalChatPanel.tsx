@@ -56,15 +56,21 @@ export function InternalChatPanel({
   const [pendingMessages, setPendingMessages] = useState<InternalMessage[]>([]);
   const [meetingOpen, setMeetingOpen] = useState(false);
 
-  // Determina se a thread é individual (1:1) ou de grupo/tópico
+  // Uma thread de secretaria vinculada a um membro e sempre a conversa 1:1.
+  // O usuario do membro pode ainda nao existir (convite nao ativado). Nesse
+  // caso os icones continuam visiveis, mas desabilitados com uma explicacao,
+  // em vez de desaparecerem e parecer que chamadas nao foram implantadas.
   const isDirect = Boolean(
     thread?.source === "secretariat"
     && thread.memberId
-    && thread.participantUserId
+  );
+  const hasCallableParticipant = Boolean(
+    isDirect
+    && thread?.participantUserId
     && currentUserId
     && thread.participantUserId !== currentUserId,
   );
-  const canCall = Boolean(thread && isDirect && !callBusy && !activeCall);
+  const canCall = Boolean(thread && hasCallableParticipant && !callBusy && !activeCall);
   const isMeeting = Boolean(thread?.source === "meeting" && thread.callRoomToken);
 
   const senderRole = isStaff ? (canonicalRole ?? "leader") : "member";
@@ -180,6 +186,11 @@ export function InternalChatPanel({
         showBack={showBack}
         onBack={onBack}
         showCallActions={isDirect}
+        callUnavailableReason={
+          isDirect && !thread?.participantUserId
+            ? t("Este membro precisa ativar o acesso ao aplicativo antes de receber ligações")
+            : undefined
+        }
         onVoiceCall={thread && canCall ? () => { void startCall(thread, "voice"); } : undefined}
         onVideoCall={thread && canCall ? () => { void startCall(thread, "video"); } : undefined}
         onJoinMeeting={thread && isMeeting ? () => setMeetingOpen(true) : undefined}

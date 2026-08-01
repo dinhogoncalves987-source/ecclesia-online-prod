@@ -23,6 +23,8 @@ type Props = {
   onJoinMeeting?: () => void;
   /** Exibe ações somente em conversa direta; handler ausente = chamada ocupada. */
   showCallActions?: boolean;
+  /** Explica por que a chamada direta ainda nao pode ser iniciada. */
+  callUnavailableReason?: string;
   busy?: boolean;
 };
 
@@ -36,6 +38,7 @@ export function InternalChatHeader({
   onVideoCall,
   onJoinMeeting,
   showCallActions = false,
+  callUnavailableReason,
 }: Props) {
   const { t, lang } = useLanguage();
   const { isOnline } = usePresenceStatus();
@@ -126,7 +129,7 @@ export function InternalChatHeader({
             title={
               onVoiceCall
                 ? (thread?.participantName ? `Ligar para ${thread.participantName}` : t("Iniciar chamada de voz"))
-                : t("Selecione uma conversa para ligar")
+                : (callUnavailableReason ?? t("Já existe uma chamada em andamento"))
             }
             className={cn(
               "h-9 w-9 rounded-full flex items-center justify-center transition-colors",
@@ -146,7 +149,7 @@ export function InternalChatHeader({
             title={
               onVideoCall
                 ? (thread?.participantName ? `Videochamada com ${thread.participantName}` : t("Iniciar videochamada"))
-                : t("Selecione uma conversa para videochamada")
+                : (callUnavailableReason ?? t("Já existe uma chamada em andamento"))
             }
             className={cn(
               "h-9 w-9 rounded-full flex items-center justify-center transition-colors",

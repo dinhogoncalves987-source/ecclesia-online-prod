@@ -1,5 +1,5 @@
 import { useRegisterSW } from "virtual:pwa-register/react";
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
 
 /**
@@ -9,22 +9,26 @@ import { useLanguage } from "@/hooks/useLanguage";
  * vite-plugin-pwa (registerType: 'prompt'). Quando uma nova versão está
  * disponível, exibe um banner solicitando ação do usuário.
  *
- * NÃO recarrega automaticamente e NÃO atualiza sem ação do usuário — a
- * atualização só ocorre quando o usuário clica em "Atualizar agora". O
- * usuário também pode dispensar o aviso clicando em "Depois", continuando
- * na versão atual até a próxima visita.
+ * Uma release nova nunca pode ficar silenciosamente escondida atras de uma
+ * versao antiga do PWA. A atualizacao continua exigindo o clique consciente
+ * (para nao interromper um formulario), mas o aviso nao pode ser dispensado.
+ * O registro tambem procura uma nova versao periodicamente enquanto a pagina
+ * permanece aberta.
  */
 export function PWAUpdatePrompt() {
   const { t } = useLanguage();
-  const [dismissed, setDismissed] = useState(false);
 
   const {
-    needRefresh: [needRefresh, setNeedRefresh],
+    needRefresh: [needRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(swUrl, registration) {
       if (registration) {
         console.debug("[Ecclesia PWA] Service Worker registrado:", swUrl);
+        void registration.update();
+        window.setInterval(() => {
+          void registration.update();
+        }, 5 * 60 * 1000);
       }
     },
     onRegisterError(error) {
@@ -36,12 +40,7 @@ export function PWAUpdatePrompt() {
     updateServiceWorker(true);
   }, [updateServiceWorker]);
 
-  const handleDismiss = useCallback(() => {
-    setNeedRefresh(false);
-    setDismissed(true);
-  }, [setNeedRefresh]);
-
-  if (!needRefresh || dismissed) return null;
+  if (!needRefresh) return null;
 
   return (
     <div
@@ -71,23 +70,6 @@ export function PWAUpdatePrompt() {
     >
       <span style={{ flex: "1 1 100%", minWidth: 0, fontWeight: 600 }}>{t("Nova versão disponível")}</span>
       <div style={{ display: "flex", gap: 12, marginLeft: "auto" }}>
-        <button
-          type="button"
-          onClick={handleDismiss}
-          style={{
-            background: "transparent",
-            color: "#c0c0c0",
-            border: "1px solid #4a4a6a",
-            borderRadius: 8,
-            padding: "8px 14px",
-            cursor: "pointer",
-            fontWeight: 500,
-            fontSize: 13,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {t("Depois")}
-        </button>
         <button
           type="button"
           onClick={handleUpdate}
