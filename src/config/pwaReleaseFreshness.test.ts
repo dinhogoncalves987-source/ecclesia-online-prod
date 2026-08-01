@@ -17,4 +17,21 @@ describe("atualizacao obrigatoria de release no PWA", () => {
     expect(prompt).not.toContain("handleDismiss");
     expect(prompt).not.toContain('{t("Depois")}');
   });
+
+  it("monta o React antes de qualquer manutenção do PWA", () => {
+    const main = read("src/main.tsx");
+    const mountCall = main.indexOf("mount();");
+    const migrationCall = main.indexOf("void runPwaMigration();");
+
+    expect(mountCall).toBeGreaterThan(-1);
+    expect(migrationCall).toBeGreaterThan(mountCall);
+    expect(main).not.toContain("runPwaMigration().finally(mount)");
+  });
+
+  it("a limpeza legada não desregistra o Service Worker atual", () => {
+    const migration = read("src/lib/pwaMigration.ts");
+    expect(migration).not.toContain("getRegistrations()");
+    expect(migration).not.toContain("reg.unregister()");
+    expect(migration).toContain("caches.delete(name)");
+  });
 });

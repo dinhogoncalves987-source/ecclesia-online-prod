@@ -6,18 +6,15 @@
  * 1. Executa apenas UMA vez por navegador, controlada por chave versionada
  *    em localStorage (MIGRATION_KEY). Em visitas subsequentes, retorna
  *    imediatamente sem tocar em Service Workers ou caches.
- * 2. NUNCA desregistra o Service Worker novo (gerado pelo vite-plugin-pwa /
- *    workbox): só chama `unregister()` quando existe evidência concreta do
- *    SW legado — ou seja, quando há caches com o prefixo "ecclesia-static-".
- *    O SW novo nunca cria caches com esse prefixo, então essa heurística é
- *    segura.
+ * 2. NUNCA desregistra Service Worker algum. O registro legado e o atual usam
+ *    o mesmo caminho `/sw.js`; tentar desregistrar durante a inicialização
+ *    cria uma corrida com o vite-plugin-pwa e pode remover o registro novo.
+ *    O navegador atualiza o registro normalmente quando recebe o novo sw.js.
  * 3. Remove apenas caches "ecclesia-static-*" — nunca toca em caches do
  *    Workbox (workbox-precache-*, google-fonts-*, ecclesia-campaign-images,
  *    ecclesia-icons etc.).
- * 4. Deve ser chamada (e aguardada) ANTES do React montar a aplicação, para
- *    que termine antes de qualquer registro do novo SW via
- *    `virtual:pwa-register/react` — eliminando a corrida entre migração e
- *    registro.
+ * 4. E manutencao oportunista executada DEPOIS do React montar. Se CacheStorage
+ *    travar no navegador, a aplicacao continua funcionando normalmente.
  */
 const MIGRATION_KEY = "ecclesia:pwa-legacy-cleanup:v1";
 const LEGACY_CACHE_PREFIX = "ecclesia-static-";
@@ -50,11 +47,6 @@ export async function runPwaMigration(): Promise<void> {
       const legacyCacheNames = cacheNames.filter((name) =>
         name.startsWith(LEGACY_CACHE_PREFIX),
       );
-
-      if (legacyCacheNames.length > 0 && "serviceWorker" in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(registrations.map((reg) => reg.unregister()));
-      }
 
       await Promise.all(legacyCacheNames.map((name) => caches.delete(name)));
     }

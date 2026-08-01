@@ -8,13 +8,17 @@ function mount(): void {
 }
 
 /**
- * Em produção, a migração de limpeza do Service Worker legado precisa
- * terminar ANTES do React montar a aplicação — só assim o PWAUpdatePrompt
- * (que registra o novo Service Worker via virtual:pwa-register/react) entra
- * em cena sem correr risco de colidir com a limpeza legada.
+ * A aplicação NUNCA pode aguardar manutenção de cache/Service Worker para
+ * montar. Em alguns navegadores Android, CacheStorage pode ficar pendente
+ * indefinidamente; quando a limpeza era aguardada aqui, o usuário permanecia
+ * para sempre no shell HTML estático "Abrindo Ecclesia" e nenhum provider do
+ * React sequer chegava a iniciar.
+ *
+ * Montamos primeiro. A limpeza legada é oportunista, não bloqueante e não
+ * interfere mais no registro atual (ver pwaMigration.ts).
  */
+mount();
+
 if (import.meta.env.PROD) {
-  void runPwaMigration().finally(mount);
-} else {
-  mount();
+  void runPwaMigration();
 }
