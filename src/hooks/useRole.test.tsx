@@ -195,6 +195,120 @@ describe("useRole", () => {
     expect(result.current.canAccess("/admin/porteiro")).toBe(true);
   });
 
+  // REGRESSÃO — homologação 20260728: perfil administrativo legado (vínculo
+  // criado antes das responsabilidades hierárquicas de Discipulado/Teologia/
+  // Missões) que só recebeu de volta a capability de Discipulado no banco.
+  // Reproduz exatamente o sintoma relatado: Discipulado aparece, Teologia e
+  // Missões continuam ausentes — mesmo perfil, mesma organização, único
+  // diferencial é quais permission_keys o backend devolveu no bootstrap.
+  // Este teste trava o comportamento fail-closed do frontend: a ausência
+  // real da capability no banco (não um bug de UI) é a única explicação
+  // aceitável para o módulo ficar oculto.
+  it("perfil administrativo legado com apenas discipleship.read reconciliado perde Teologia e Missões", async () => {
+    mockUseAuth.mockReturnValue({ user: { id: "legacy-admin" } });
+    mockUseChurch.mockReturnValue({ activeChurchId: "org-legacy", loading: false });
+    mockUseAuthBootstrap.mockReturnValue({
+      data: {
+        platformRole: null,
+        isSuperAdminRow: false,
+        userRoles: [],
+        memberships: [{ organization_id: "org-legacy", role: "church_admin", is_active: true }],
+        accessCapabilities: [
+          {
+            organization_id: "org-legacy",
+            source_organization_id: "org-legacy",
+            responsibility_type: "church_admin",
+            permission_key: "discipleship.read",
+          },
+        ],
+      },
+      loading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    const { result } = renderHook(() => useRole());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // church_admin ainda é o canonicalRole — não é um problema de identidade.
+    expect(result.current.canonicalRole).toBe("church_admin");
+    expect(result.current.canAccess("/admin/discipulado")).toBe(true);
+    expect(result.current.canAccess("/admin/teologia")).toBe(false);
+    expect(result.current.canAccess("/admin/missoes")).toBe(false);
+  });
+
+  // Mesmo perfil legado, agora com as três capabilities reconciliadas pela
+  // migration corretiva (20260803180000/190000/200000 + hotfix desta
+  // release). Discipulado, Teologia e Missões devem abrir simetricamente —
+  // nenhum tratamento especial para um módulo em relação aos outros dois.
+  it("perfil administrativo legado com discipleship/theology/missions reconciliados vê os três módulos", async () => {
+    mockUseAuth.mockReturnValue({ user: { id: "legacy-admin" } });
+    mockUseChurch.mockReturnValue({ activeChurchId: "org-legacy", loading: false });
+    mockUseAuthBootstrap.mockReturnValue({
+      data: {
+        platformRole: null,
+        isSuperAdminRow: false,
+        userRoles: [],
+        memberships: [{ organization_id: "org-legacy", role: "church_admin", is_active: true }],
+        accessCapabilities: [
+          "discipleship.read", "theology.read", "missions.read",
+        ].map((permission_key) => ({
+          organization_id: "org-legacy",
+          source_organization_id: "org-legacy",
+          responsibility_type: "church_admin",
+          permission_key,
+        })),
+      },
+      loading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    const { result } = renderHook(() => useRole());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.canonicalRole).toBe("church_admin");
+    expect(result.current.canAccess("/admin/discipulado")).toBe(true);
+    expect(result.current.canAccess("/admin/teologia")).toBe(true);
+    expect(result.current.canAccess("/admin/missoes")).toBe(true);
+  });
+
+  // Papel legado equivalente vindo de `pastor` (responsible_pastor), fonte
+  // organization_users — mesma reconciliação, identidade diferente.
+  it("pastor responsável legado com as três capabilities reconciliadas vê os três módulos", async () => {
+    mockUseAuth.mockReturnValue({ user: { id: "legacy-pastor" } });
+    mockUseChurch.mockReturnValue({ activeChurchId: "org-legacy", loading: false });
+    mockUseAuthBootstrap.mockReturnValue({
+      data: {
+        platformRole: null,
+        isSuperAdminRow: false,
+        userRoles: [],
+        memberships: [{ organization_id: "org-legacy", role: "pastor", is_active: true }],
+        accessCapabilities: [
+          "discipleship.read", "theology.read", "missions.read",
+        ].map((permission_key) => ({
+          organization_id: "org-legacy",
+          source_organization_id: "org-legacy",
+          responsibility_type: "responsible_pastor",
+          permission_key,
+        })),
+      },
+      loading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    const { result } = renderHook(() => useRole());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.canAccess("/admin/discipulado")).toBe(true);
+    expect(result.current.canAccess("/admin/teologia")).toBe(true);
+    expect(result.current.canAccess("/admin/missoes")).toBe(true);
+  });
+
   it("permite ao gestor de acessos navegar na hierarquia sem conceder gestão estrutural", async () => {
     mockUseAuth.mockReturnValue({ user: { id: "u1" } });
     mockUseChurch.mockReturnValue({ activeChurchId: "org-1", loading: false });
