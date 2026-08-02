@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 import { markBoot } from "@/lib/bootPerf";
 import { queryClient } from "@/lib/queryClient";
+import { clearResumeSnapshot } from "@/lib/appResumeState";
 
 interface AuthContextType {
   user: User | null;
@@ -124,6 +125,13 @@ function hasPersistedSupabaseSession(): boolean {
 // persisted token.
 const RESOLUTION_TIMEOUT_MS = 8000;
 
+// How long to wait before re-checking storage after a "refresh token
+// invalid" error, in case another tab/installed-PWA instance of this same
+// origin already rotated it and wrote the new one. This is NOT a network
+// retry — it exists purely to close the cross-tab race window described
+// above `attemptGetSession`.
+const REFRESH_RACE_RETRY_DELAY_MS = 300;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<User | null>(null);
   const [session, setSessionState] = useState<Session | null>(null);
@@ -194,7 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // reabrir o mesmo vetor escrevendo o campo de volta.
     });
 
-    const attemptGetSession = () => {
+    const attemptGetSession = (isRetryAfterRaceGuard = false) => {
       supabase.auth
         .getSession()
         .then(({ data: { session: initialSession } }) => {
@@ -211,6 +219,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (resolvedOnceRef.current) return;
 
           if (isInvalidRefreshTokenError(error)) {
+            // CORREÇÃO (retomada em múltiplas abas/instalações da PWA):
+            // "Invalid Refresh Token: Already Used" é o erro do GoTrote
+            // quando ESTE cliente tenta girar um refresh token que outra
+            // aba/instância do mesmo PWA (mesma origem) já usou e rotacionou
+            // primeiro — não significa que a sessão do dispositivo está
+            // morta, só que a cópia em memória deste cliente ficou
+            // desatualizada. Antes de derrubar a sessão, tenta mais uma vez:
+            // se a outra aba já escreveu o token novo no localStorage, esta
+            // segunda tentativa lê o token atualizado e recupera
+            // normalmente. Só depois dessa segunda tentativa falhar é que o
+            // token é tratado como definitivamente morto.
+            if (!isRetryAfterRaceGuard) {
+              window.setTimeout(() => attemptGetSession(true), REFRESH_RACE_RETRY_DELAY_MS);
+              return;
+            }
+
             // O token persistido está definitivamente morto — nenhuma
             // quantidade de "Tentar novamente" vai resolver isso, porque o
             // erro não é de rede. Limpa o token local e resolve como
@@ -237,9 +261,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           commit(null);
         });
     };
-    attemptRef.current = attemptGetSession;
+    attemptRef.current = () => attemptGetSession(false);
 
     attemptGetSession();
+
+    // CORREÇÃO (sincronização entre abas/instalações): se outra aba ou a
+    // versão "instalada como PWA" da mesma origem renovar ou encerrar a
+    // sessão, o Supabase grava a mudança em localStorage — mas esta aba só
+    // ouve o próprio GoTrueClient, não o storage de outras abas. Sem isto,
+    // esta aba podia continuar com um token em memória já superado até a
+    // próxima ação do usuário, aumentando a chance de bater exatamente na
+    // corrida de "Already Used" tratada acima. Qualquer mudança num valor
+    // `sb-*-auth-token` reexecuta a resolução da sessão imediatamente.
+    const onStorage = (event: StorageEvent) => {
+      if (!event.key || !event.key.startsWith("sb-") || !event.key.endsWith("-auth-token")) return;
+      hadPersistedSessionRef.current = hasPersistedSupabaseSession();
+      attemptGetSession(false);
+    };
+    window.addEventListener("storage", onStorage);
 
     timeoutIdRef.current = window.setTimeout(() => {
       timeoutIdRef.current = null;
@@ -261,6 +300,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       subscription.unsubscribe();
+      window.removeEventListener("storage", onStorage);
       clearPendingTimeout();
     };
   }, []);
@@ -284,6 +324,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // seguro aqui: o app está prestes a mostrar a tela de login, então não
     // há UI presa observando dados obsoletos.
     queryClient.clear();
+    // Um logout explícito é o único evento que deve encerrar rascunhos de
+    // retomada (rota/rolagem/formulário) — nunca uma falha de rede/timeout.
+    // Evita que um rascunho de cadastro fique no sessionStorage disponível
+    // para outra pessoa que faça login neste mesmo aparelho/aba em seguida.
+    clearResumeSnapshot();
   };
 
   return (

@@ -231,6 +231,76 @@ describe("AuthProvider", () => {
   // autoassociação organizacional por slug (equivalente OAuth do bloco
   // removido de handle_new_user()/Signup.tsx). Ver
   // supabase/migrations/20260715141000_remove_open_slug_join.sql.
+  // CORREÇÃO (retomada em múltiplas abas/instalações da mesma origem):
+  // "Already Used" é o erro do GoTrue quando ESTE cliente tenta girar um
+  // refresh token que outra aba/instância da PWA já rotacionou primeiro —
+  // não é prova de que a sessão do dispositivo está morta. Uma única
+  // tentativa extra (que lê o token já renovado do localStorage) deve
+  // recuperar a sessão em vez de deslogar por uma corrida entre abas.
+  it("recovers from a cross-tab refresh-token race instead of logging out on the first 'Already Used' error", async () => {
+    localStorage.setItem("sb-testproject-auth-token", JSON.stringify({ access_token: "abc" }));
+    const fakeSession = { user: { id: "user-123" } };
+    getSessionMock
+      .mockRejectedValueOnce(new Error("Invalid Refresh Token: Already Used"))
+      .mockResolvedValueOnce({ data: { session: fakeSession } });
+
+    render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("user").textContent).toBe("user-123"));
+    expect(screen.getByTestId("connectionIssue").textContent).toBe("false");
+    expect(signOutMock).not.toHaveBeenCalled();
+    // The refresh token the OTHER tab already rotated must never be wiped
+    // from this device — only a definitively dead token (both attempts
+    // fail) may trigger that.
+    expect(localStorage.getItem("sb-testproject-auth-token")).not.toBeNull();
+  });
+
+  it("only clears the local session once BOTH the initial and the retry attempt report an invalid refresh token", async () => {
+    localStorage.setItem("sb-testproject-auth-token", JSON.stringify({ access_token: "abc" }));
+    getSessionMock.mockRejectedValue(new Error("Invalid Refresh Token: Already Used"));
+
+    render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("loading").textContent).toBe("false"));
+    expect(getSessionMock).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId("user").textContent).toBe("null");
+    expect(signOutMock).not.toHaveBeenCalled();
+    expect(localStorage.getItem("sb-testproject-auth-token")).toBeNull();
+  });
+
+  // CORREÇÃO (sincronização entre abas): quando outra aba/instância da PWA
+  // grava uma sessão nova em localStorage, esta aba deve reagir ao evento
+  // `storage` e reconfirmar a sessão em vez de continuar com um estado
+  // desatualizado até a próxima ação manual do usuário.
+  it("re-resolves the session when another tab writes a new sb-*-auth-token via the storage event", async () => {
+    getSessionMock.mockResolvedValueOnce({ data: { session: null } });
+
+    render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("loading").textContent).toBe("false"));
+    expect(screen.getByTestId("user").textContent).toBe("null");
+
+    const fakeSession = { user: { id: "user-456" } };
+    getSessionMock.mockResolvedValueOnce({ data: { session: fakeSession } });
+    localStorage.setItem("sb-testproject-auth-token", JSON.stringify({ access_token: "xyz" }));
+    fireEvent(window, new StorageEvent("storage", { key: "sb-testproject-auth-token", newValue: "xyz" }));
+
+    await waitFor(() => expect(screen.getByTestId("user").textContent).toBe("user-456"));
+    expect(signOutMock).not.toHaveBeenCalled();
+  });
+
   it("never calls updateUser to sync church_slug after an OAuth SIGNED_IN, even with a pending slug", async () => {
     localStorage.setItem("ecclesia.pendingChurchSlug", "igreja-teste");
     getSessionMock.mockResolvedValue({ data: { session: null } });

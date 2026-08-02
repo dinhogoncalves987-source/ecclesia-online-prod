@@ -107,4 +107,59 @@ describe("ChurchProvider", () => {
     expect(screen.getByTestId("bootstrapError").textContent).toBe("false");
     expect(screen.getByTestId("church").textContent).toBe("org-1");
   });
+
+  // Retomada da PWA — "contexto da organização ativa": o usuário pertence a
+  // duas organizações e havia trocado para a segunda antes do app ter sido
+  // reiniciado (kill de processo, fechar/reabrir, etc). Um novo mount do
+  // ChurchProvider (equivalente a um reload completo) deve restaurar
+  // exatamente a organização que estava ativa — não a primeira da lista —
+  // lendo `ecclesia.activeChurchId.<userId>` do localStorage.
+  it("restores the previously active organization (not the first one) from localStorage across a fresh mount", async () => {
+    mockUseAuth.mockReturnValue({ user: { id: "u1" } });
+    mockUseAuthBootstrap.mockReturnValue({
+      data: {
+        platformRole: null,
+        isSuperAdminRow: false,
+        userRoles: [],
+        memberships: [
+          { organization_id: "org-1", role: "church_admin", is_active: true },
+          { organization_id: "org-2", role: "church_admin", is_active: true },
+        ],
+      },
+      loading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    const orgResult = {
+      data: [
+        { id: "org-1", parent_id: null, name: "Igreja 1", slug: "igreja-1", organization_type: "church" },
+        { id: "org-2", parent_id: null, name: "Igreja 2", slug: "igreja-2", organization_type: "church" },
+      ],
+      error: null,
+    };
+    const makeOrgQueryNode = (): unknown => {
+      const node = {
+        select: () => node,
+        order: () => node,
+        eq: () => node,
+        in: () => node,
+        then: (
+          onFulfilled: (v: typeof orgResult) => unknown,
+          onRejected?: (reason: unknown) => unknown,
+        ) => Promise.resolve(orgResult).then(onFulfilled, onRejected),
+      };
+      return node;
+    };
+    fromMock.mockReturnValue(makeOrgQueryNode());
+
+    localStorage.setItem("ecclesia.activeChurchId.u1", "org-2");
+
+    renderChurch();
+
+    await waitFor(() => expect(screen.getByTestId("hasActiveMembership").textContent).toBe("true"));
+    expect(screen.getByTestId("church").textContent).toBe("org-2");
+
+    localStorage.removeItem("ecclesia.activeChurchId.u1");
+  });
 });

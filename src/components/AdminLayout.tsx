@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Wallet, Users, Calendar, BookOpen, FileText,
@@ -25,6 +25,7 @@ import { RequireSupportOrganization } from "@/components/platform/RequireSupport
 import { useSupportContext } from "@/contexts/SupportContext";
 import { environment } from "@/config/environment";
 import { isRouteEnabled } from "@/config/modules";
+import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 import flagBR from "@/assets/flag-br.png";
 import flagUS from "@/assets/flag-us.png";
 import flagES from "@/assets/flag-es.png";
@@ -251,6 +252,13 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [langMenuOpen, setLangMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  // Retomada de rolagem por rota (ver useScrollRestoration): cobre tanto o
+  // scroll da janela (mobile, onde <main> é overflow-visible) quanto o
+  // scroll interno de <main> (desktop, lg:overflow-y-auto) — aplicado de
+  // forma genérica a toda página admin, sem exigir opt-in por página.
+  const mainRef = useRef<HTMLElement | null>(null);
+  useScrollRestoration(location.pathname, mainRef);
 
   const toggleFullscreen = useCallback(async () => {
     try {
@@ -594,7 +602,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           (`lg:`), o <main> volta a rolar internamente (mais previsível numa
           janela grande, sem o mesmo risco em hardware desktop).
         */}
-        <main className="flex-1 min-h-0 overflow-visible pb-20 lg:pb-0 lg:overflow-y-auto lg:overflow-x-hidden">
+        <main ref={mainRef} className="flex-1 min-h-0 overflow-visible pb-20 lg:pb-0 lg:overflow-y-auto lg:overflow-x-hidden">
           {/* Support mode banner — visible for all platform users */}
           <SupportModeBanner />
           <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">

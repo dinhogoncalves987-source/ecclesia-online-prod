@@ -39,6 +39,8 @@ import {
   getCivilDocLabel,
 } from "@/lib/secretariaConstants";
 import { matchesMemberSearch } from "@/lib/memberSearch";
+import { readFormDraft } from "@/lib/appResumeState";
+import { useResumableFormDraft, discardFormDraft } from "@/hooks/useResumableFormDraft";
 import {
   checkCpfForManualSave,
   checkRequiredMemberContacts,
@@ -206,6 +208,20 @@ const ADDRESS_TYPE_LABELS: Record<string, string> = {
 };
 
 type FilterStatus = "all" | MemberStatus;
+
+// Chave do rascunho de cadastro/edição de membro no snapshot de retomada da
+// PWA (ver src/lib/appResumeState.ts). Nunca inclui foto/documento (File),
+// que não sobrevivem a um kill de processo — apenas os campos de texto do
+// formulário, restaurados quando o app é reaberto na mesma rota.
+const MEMBER_CADASTRO_DRAFT_KEY = "membros.cadastro";
+
+type MemberCadastroDraft = {
+  modalOpen: boolean;
+  isNewMember: boolean;
+  editingId: string | null;
+  activeTab: string;
+  form: Omit<Member, "id">;
+};
 
 const EMPTY_FORM: Omit<Member, "id"> = {
   full_name: "",
@@ -432,6 +448,47 @@ export default function Membros() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("pessoal");
   const [form, setForm] = useState<Omit<Member, "id">>({ ...EMPTY_FORM });
+
+  // ── Retomada de cadastro após reinicialização da PWA ─────────────────────
+  // Restaura (uma única vez, ao montar) um rascunho de cadastro/edição que
+  // ficou aberto quando o app foi encerrado pelo Android/Chrome — por
+  // exemplo, ao abrir a galeria/câmera para anexar foto e o processo em
+  // segundo plano ser descartado por pressão de memória. Sem isto, o
+  // usuário reabre o app e cai na lista de membros com o formulário e os
+  // dados digitados perdidos (bug relatado: "reinicia e perde a tela").
+  //
+  // Restaura apenas se o rascunho foi salvo NESTA mesma rota
+  // (readFormDraft já valida isso) e dentro da janela de validade do
+  // snapshot (30 min, ver appResumeState.ts) — nunca ressuscita um
+  // rascunho de dias atrás.
+  const draftRestoredRef = useRef(false);
+  useEffect(() => {
+    if (draftRestoredRef.current) return;
+    draftRestoredRef.current = true;
+    const draft = readFormDraft<MemberCadastroDraft>(MEMBER_CADASTRO_DRAFT_KEY, location.pathname);
+    if (!draft || !draft.modalOpen) return;
+
+    setIsNewMember(draft.isNewMember);
+    setEditingId(draft.editingId);
+    setActiveTab(draft.activeTab);
+    setForm(draft.form);
+    setModalOpen(true);
+    // Foto/documento anexados (File) nunca sobrevivem a um reinício de
+    // processo — o navegador não consegue devolver o arquivo para uma
+    // página que não existia mais quando o seletor foi fechado. Isto é uma
+    // limitação real do navegador/SO, não um bug do Ecclesia; avisamos o
+    // usuário em vez de fingir que o anexo também foi restaurado.
+    toast.info(t("Rascunho do cadastro restaurado"), {
+      description: t("Se você tinha selecionado uma foto ou documento, selecione novamente."),
+    });
+  }, [location.pathname, t]);
+
+  useResumableFormDraft<MemberCadastroDraft>(
+    MEMBER_CADASTRO_DRAFT_KEY,
+    location.pathname,
+    modalOpen,
+    { modalOpen, isNewMember, editingId, activeTab, form },
+  );
 
   // Photo upload
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -1003,6 +1060,10 @@ export default function Membros() {
     setAddressEntries([]);
     setPendingAddressEntries([]);
     setAddressDraft(null);
+    // Fechamento explícito (cancelar OU salvar com sucesso, que já chama
+    // closeModal) — o rascunho de retomada deixa de fazer sentido a partir
+    // daqui.
+    discardFormDraft(MEMBER_CADASTRO_DRAFT_KEY);
   };
 
   // ── Schema / RLS error detection ─────────────────────────────────────────────
