@@ -48,13 +48,54 @@ describe("useScrollRestoration", () => {
 
     render(<Probe />);
     await act(async () => {
-      for (let i = 0; i < 4; i += 1) {
+      for (let i = 0; i < 5; i += 1) {
         await new Promise((r) => requestAnimationFrame(() => r(undefined)));
-        await new Promise((r) => setTimeout(r, 110));
+        await new Promise((r) => setTimeout(r, 160));
       }
     });
 
     expect(scrollToCalls).toBeGreaterThanOrEqual(3);
+    expect(currentScrollY).toBe(900);
+  });
+
+  it("does not give up early just because the document is still short on the first few attempts (regression)", async () => {
+    // Bug real reproduzido ao vivo em staging: uma primeira versão desta
+    // heurística de "desistir se o conteúdo é curto demais para o alvo"
+    // disparava já na 1ª tentativa (documento ainda só com a altura do
+    // esqueleto de loading, scrollHeight == innerHeight, logo
+    // maxScrollable == 0 < target) e cancelava o retry para sempre — mesmo
+    // que a lista real (React Query) fosse crescer o documento segundos
+    // depois. scrollHeight fica curto pelas primeiras 7 tentativas (menos
+    // que RESTORE_MIN_ATTEMPTS_BEFORE_SHORT_CONTENT_EXIT) e só cresce o
+    // suficiente na 8ª — a restauração deve continuar tentando e pegar o
+    // valor salvo, nunca desistir antes disso por causa da heurística.
+    saveScrollPosition(ROUTE, { window: 900 }, ROUTE);
+    let scrollToCalls = 0;
+    let currentScrollY = 0;
+    let currentScrollHeight = 300; // documento ainda no esqueleto: mais curto que innerHeight + target
+    window.scrollTo = vi.fn(() => {
+      scrollToCalls += 1;
+      if (scrollToCalls >= 8) {
+        currentScrollHeight = 2000; // lista termina de carregar
+        currentScrollY = 900;
+      }
+    });
+    Object.defineProperty(window, "scrollY", { get: () => currentScrollY, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: 800, configurable: true });
+    Object.defineProperty(document.documentElement, "scrollHeight", {
+      get: () => currentScrollHeight,
+      configurable: true,
+    });
+
+    render(<Probe />);
+    await act(async () => {
+      for (let i = 0; i < 10; i += 1) {
+        await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+        await new Promise((r) => setTimeout(r, 160));
+      }
+    });
+
+    expect(scrollToCalls).toBeGreaterThanOrEqual(8);
     expect(currentScrollY).toBe(900);
   });
 

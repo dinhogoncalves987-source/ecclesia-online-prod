@@ -2,15 +2,26 @@ import { useEffect, type RefObject } from "react";
 import { readScrollPosition, saveScrollPosition } from "@/lib/appResumeState";
 
 const SAVE_THROTTLE_MS = 300;
-// Reaplicar o scroll por até ~2s após o mount: a maioria das páginas admin
-// carrega a lista via React Query (fetch assíncrono ao Supabase), então no
-// primeiro requestAnimationFrame o documento ainda está com a altura do
+// Reaplicar o scroll por até ~6s após o mount: a maioria das páginas admin
+// carrega a lista via React Query (fetch assíncrono ao Supabase — em staging
+// já observamos o fetch inicial levar bem mais que 1-2s), então no primeiro
+// requestAnimationFrame o documento ainda está com a altura do
 // esqueleto/loading — um único scrollTo() nesse momento é "clampado" pelo
 // navegador ao conteúdo curto que existe agora e nunca é reaplicado quando a
 // lista termina de carregar e a página cresce. Sem este retry, a posição
 // salva (ex.: 900px) simplesmente não pega e o usuário volta para o topo.
-const RESTORE_RETRY_INTERVAL_MS = 100;
-const RESTORE_MAX_ATTEMPTS = 20; // ~2s no total, cobre o fetch inicial da maioria das páginas
+//
+// CONFIRMADO AO VIVO em staging (ecclesia-teste.vercel.app/admin/membros):
+// uma primeira versão deste retry desistia cedo demais — na 1ª tentativa
+// (ainda no esqueleto de loading, documento com a altura só da viewport) a
+// heurística "conteúdo atual é curto demais para alcançar o alvo" already
+// dava como concluído, então a lista carregava depois e a posição nunca era
+// reaplicada. Por isso essa heurística de saída antecipada só é confiável
+// depois de já ter dado um número mínimo de tentativas ao conteúdo
+// assíncrono (RESTORE_MIN_ATTEMPTS_BEFORE_SHORT_CONTENT_EXIT).
+const RESTORE_RETRY_INTERVAL_MS = 150;
+const RESTORE_MAX_ATTEMPTS = 40; // ~6s no total
+const RESTORE_MIN_ATTEMPTS_BEFORE_SHORT_CONTENT_EXIT = 10; // ~1.5s — dá tempo ao fetch inicial antes de aceitar "conteúdo curto demais" como definitivo
 const RESTORE_TOLERANCE_PX = 4;
 
 /**
@@ -30,6 +41,12 @@ export function useScrollRestoration(routeKey: string, containerRef: RefObject<H
   useEffect(() => {
     const stored = readScrollPosition(routeKey);
     let retryId: number | null = null;
+    // Enquanto a restauração ainda está em andamento, os próprios
+    // scrollTo()/scrollTop desta função disparam eventos "scroll" nativos —
+    // sem esta guarda, o listener de save abaixo gravaria a posição
+    // intermediária (ainda no meio do caminho para o alvo) por cima do
+    // rascunho salvo, corrompendo o alvo antes mesmo dele "pegar".
+    let isRestoring = Boolean(stored);
     if (stored) {
       let attempts = 0;
       const isTargetReached = (
@@ -38,11 +55,12 @@ export function useScrollRestoration(routeKey: string, containerRef: RefObject<H
         maxScrollable: number,
       ) => {
         if (typeof target !== "number" || target <= 0) return true;
-        // Aceita como concluído tanto quando o valor "pegou" (dentro da
-        // tolerância) quanto quando o conteúdo atual já é curto demais para
-        // rolar até o alvo — nesse segundo caso, insistir só re-agenda
-        // tentativas inúteis até o limite de RESTORE_MAX_ATTEMPTS.
-        return Math.abs(current - target) < RESTORE_TOLERANCE_PX || maxScrollable < target;
+        if (Math.abs(current - target) < RESTORE_TOLERANCE_PX) return true;
+        // Só confia em "conteúdo curto demais para alcançar o alvo" depois
+        // de um número mínimo de tentativas — na primeira tentativa (ainda
+        // no esqueleto de loading) isso quase sempre seria um falso
+        // positivo.
+        return attempts >= RESTORE_MIN_ATTEMPTS_BEFORE_SHORT_CONTENT_EXIT && maxScrollable < target;
       };
 
       const attemptRestore = () => {
@@ -64,7 +82,10 @@ export function useScrollRestoration(routeKey: string, containerRef: RefObject<H
           !containerEl ||
           isTargetReached(containerEl.scrollTop, stored.container, containerEl.scrollHeight - containerEl.clientHeight);
 
-        if ((windowDone && containerDone) || attempts >= RESTORE_MAX_ATTEMPTS) return;
+        if ((windowDone && containerDone) || attempts >= RESTORE_MAX_ATTEMPTS) {
+          isRestoring = false;
+          return;
+        }
         retryId = window.setTimeout(attemptRestore, RESTORE_RETRY_INTERVAL_MS);
       };
 
@@ -75,6 +96,7 @@ export function useScrollRestoration(routeKey: string, containerRef: RefObject<H
 
     let throttleId: number | null = null;
     const save = () => {
+      if (isRestoring) return;
       saveScrollPosition(
         routeKey,
         { window: window.scrollY, container: containerRef.current?.scrollTop },
@@ -82,7 +104,7 @@ export function useScrollRestoration(routeKey: string, containerRef: RefObject<H
       );
     };
     const scheduleSave = () => {
-      if (throttleId !== null) return;
+      if (isRestoring || throttleId !== null) return;
       throttleId = window.setTimeout(() => {
         throttleId = null;
         save();
