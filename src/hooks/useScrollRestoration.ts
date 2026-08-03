@@ -2,6 +2,16 @@ import { useEffect, type RefObject } from "react";
 import { readScrollPosition, saveScrollPosition } from "@/lib/appResumeState";
 
 const SAVE_THROTTLE_MS = 300;
+// Reaplicar o scroll por até ~2s após o mount: a maioria das páginas admin
+// carrega a lista via React Query (fetch assíncrono ao Supabase), então no
+// primeiro requestAnimationFrame o documento ainda está com a altura do
+// esqueleto/loading — um único scrollTo() nesse momento é "clampado" pelo
+// navegador ao conteúdo curto que existe agora e nunca é reaplicado quando a
+// lista termina de carregar e a página cresce. Sem este retry, a posição
+// salva (ex.: 900px) simplesmente não pega e o usuário volta para o topo.
+const RESTORE_RETRY_INTERVAL_MS = 100;
+const RESTORE_MAX_ATTEMPTS = 20; // ~2s no total, cobre o fetch inicial da maioria das páginas
+const RESTORE_TOLERANCE_PX = 4;
 
 /**
  * Restores and continuously tracks scroll position per route, so returning
@@ -19,17 +29,48 @@ const SAVE_THROTTLE_MS = 300;
 export function useScrollRestoration(routeKey: string, containerRef: RefObject<HTMLElement | null>): void {
   useEffect(() => {
     const stored = readScrollPosition(routeKey);
+    let retryId: number | null = null;
     if (stored) {
-      // Wait a frame so lazy-loaded page content has a chance to lay out —
-      // scrolling before content exists is a no-op.
-      requestAnimationFrame(() => {
-        if (typeof stored.window === "number") {
+      let attempts = 0;
+      const isTargetReached = (
+        current: number,
+        target: number | undefined,
+        maxScrollable: number,
+      ) => {
+        if (typeof target !== "number" || target <= 0) return true;
+        // Aceita como concluído tanto quando o valor "pegou" (dentro da
+        // tolerância) quanto quando o conteúdo atual já é curto demais para
+        // rolar até o alvo — nesse segundo caso, insistir só re-agenda
+        // tentativas inúteis até o limite de RESTORE_MAX_ATTEMPTS.
+        return Math.abs(current - target) < RESTORE_TOLERANCE_PX || maxScrollable < target;
+      };
+
+      const attemptRestore = () => {
+        attempts += 1;
+        if (typeof stored.window === "number" && stored.window > 0) {
           window.scrollTo({ top: stored.window, behavior: "auto" });
         }
-        if (containerRef.current && typeof stored.container === "number") {
-          containerRef.current.scrollTop = stored.container;
+        const containerEl = containerRef.current;
+        if (containerEl && typeof stored.container === "number" && stored.container > 0) {
+          containerEl.scrollTop = stored.container;
         }
-      });
+
+        const windowDone = isTargetReached(
+          window.scrollY,
+          stored.window,
+          document.documentElement.scrollHeight - window.innerHeight,
+        );
+        const containerDone =
+          !containerEl ||
+          isTargetReached(containerEl.scrollTop, stored.container, containerEl.scrollHeight - containerEl.clientHeight);
+
+        if ((windowDone && containerDone) || attempts >= RESTORE_MAX_ATTEMPTS) return;
+        retryId = window.setTimeout(attemptRestore, RESTORE_RETRY_INTERVAL_MS);
+      };
+
+      // Wait a frame so lazy-loaded page content has a chance to lay out —
+      // scrolling before content exists is a no-op.
+      requestAnimationFrame(attemptRestore);
     }
 
     let throttleId: number | null = null;
@@ -57,6 +98,7 @@ export function useScrollRestoration(routeKey: string, containerRef: RefObject<H
     window.addEventListener("pagehide", save);
 
     return () => {
+      if (retryId !== null) window.clearTimeout(retryId);
       if (throttleId !== null) window.clearTimeout(throttleId);
       window.removeEventListener("scroll", scheduleSave);
       container?.removeEventListener("scroll", scheduleSave);
