@@ -13,6 +13,7 @@ import {
 } from "@/lib/permissions";
 import {
   ACCESS_PERMISSION_KEYS,
+  ACCESS_RESPONSIBILITY_BY_KEY,
   ROUTE_ACCESS_PERMISSIONS,
   isAccessResponsibility,
   type AccessPermission,
@@ -128,18 +129,32 @@ export function useRole() {
     const scopedCapabilities = capabilityRows.filter((row) =>
       !activeChurchId || row.organization_id === activeChurchId,
     );
-    setResponsibilities(new Set(
+    const resolvedResponsibilities = new Set(
       scopedCapabilities
         .map((row) => row.responsibility_type)
         .filter(isAccessResponsibility),
-    ));
-    setCapabilities(new Set(
+    );
+    const resolvedCapabilities = new Set(
       scopedCapabilities
         .map((row) => row.permission_key)
         .filter((permission): permission is AccessPermission =>
           (ACCESS_PERMISSION_KEYS as readonly string[]).includes(permission),
         ),
-    ));
+    );
+
+    // A RPC devolve uma linha por permission_key. Durante uma atualização de
+    // PWA ela pode chegar momentaneamente parcial, embora a mesma resposta já
+    // confirme a responsabilidade real (ex.: church_admin). Reconciliar pelo
+    // catálogo oficial evita o menu assimétrico "só Discipulado". Isso não
+    // amplia autoridade no banco: toda leitura/escrita continua protegida por
+    // RLS/RPC; esta camada decide apenas quais rotas a interface apresenta.
+    for (const responsibility of resolvedResponsibilities) {
+      const definition = ACCESS_RESPONSIBILITY_BY_KEY.get(responsibility);
+      definition?.permissions.forEach((permission) => resolvedCapabilities.add(permission));
+    }
+
+    setResponsibilities(resolvedResponsibilities);
+    setCapabilities(resolvedCapabilities);
 
     const legacyRows = bootstrap.userRoles as Array<{ role: AppRole; organization_id?: string | null }>;
     const organizationRows = bootstrap.memberships as Array<{ role: AppRole; organization_id: string | null }>;

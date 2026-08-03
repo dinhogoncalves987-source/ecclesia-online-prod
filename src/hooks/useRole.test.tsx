@@ -201,10 +201,11 @@ describe("useRole", () => {
   // Reproduz exatamente o sintoma relatado: Discipulado aparece, Teologia e
   // Missões continuam ausentes — mesmo perfil, mesma organização, único
   // diferencial é quais permission_keys o backend devolveu no bootstrap.
-  // Este teste trava o comportamento fail-closed do frontend: a ausência
-  // real da capability no banco (não um bug de UI) é a única explicação
-  // aceitável para o módulo ficar oculto.
-  it("perfil administrativo legado com apenas discipleship.read reconciliado perde Teologia e Missões", async () => {
+  // A própria linha confirma responsibility_type=church_admin. Mesmo que o
+  // conjunto de permission_key chegue parcial durante a atualização do PWA,
+  // a interface deve reconciliar o catálogo oficial dessa responsabilidade.
+  // A autoridade final de leitura/escrita continua no RLS/RPC do banco.
+  it("reconcilia o catálogo de church_admin quando a RPC chega parcialmente", async () => {
     mockUseAuth.mockReturnValue({ user: { id: "legacy-admin" } });
     mockUseChurch.mockReturnValue({ activeChurchId: "org-legacy", loading: false });
     mockUseAuthBootstrap.mockReturnValue({
@@ -233,6 +234,36 @@ describe("useRole", () => {
 
     // church_admin ainda é o canonicalRole — não é um problema de identidade.
     expect(result.current.canonicalRole).toBe("church_admin");
+    expect(result.current.canAccess("/admin/discipulado")).toBe(true);
+    expect(result.current.canAccess("/admin/teologia")).toBe(true);
+    expect(result.current.canAccess("/admin/missoes")).toBe(true);
+  });
+
+  it("não amplia uma responsabilidade limitada para outros módulos", async () => {
+    mockUseAuth.mockReturnValue({ user: { id: "teacher" } });
+    mockUseChurch.mockReturnValue({ activeChurchId: "org-1", loading: false });
+    mockUseAuthBootstrap.mockReturnValue({
+      data: {
+        platformRole: null,
+        isSuperAdminRow: false,
+        userRoles: [],
+        memberships: [{ organization_id: "org-1", role: "member", is_active: true }],
+        accessCapabilities: [{
+          organization_id: "org-1",
+          source_organization_id: "org-1",
+          responsibility_type: "discipleship_teacher",
+          permission_key: "discipleship.read",
+        }],
+      },
+      loading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    const { result } = renderHook(() => useRole());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
     expect(result.current.canAccess("/admin/discipulado")).toBe(true);
     expect(result.current.canAccess("/admin/teologia")).toBe(false);
     expect(result.current.canAccess("/admin/missoes")).toBe(false);
