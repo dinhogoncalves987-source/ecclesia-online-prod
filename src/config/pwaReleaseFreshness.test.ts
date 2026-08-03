@@ -10,12 +10,24 @@ function read(relative: string): string {
 }
 
 describe("atualizacao obrigatoria de release no PWA", () => {
-  it("não permite dispensar silenciosamente uma versão nova", () => {
+  it("aplica uma versão nova automaticamente no PWA instalado", () => {
+    const viteConfig = read("vite.config.ts");
     const prompt = read("src/components/PWAUpdatePrompt.tsx");
+    expect(viteConfig).toContain('registerType: "autoUpdate"');
+    expect(viteConfig).toContain("skipWaiting: true");
+    expect(viteConfig).toContain("clientsClaim: true");
     expect(prompt).toContain("registration.update()");
-    expect(prompt).toContain("updateServiceWorker(true)");
-    expect(prompt).not.toContain("handleDismiss");
-    expect(prompt).not.toContain('{t("Depois")}');
+    expect(prompt).toContain('addEventListener("controllerchange"');
+    expect(prompt).toContain('addEventListener("visibilitychange"');
+    expect(prompt).toContain("window.location.reload()");
+    expect(prompt).toContain("return null");
+  });
+
+  it("revalida capabilities ao montar, retomar e reconectar", () => {
+    const bootstrap = read("src/hooks/useAuthBootstrap.ts");
+    expect(bootstrap).toContain('refetchOnMount: "always"');
+    expect(bootstrap).toContain('refetchOnWindowFocus: "always"');
+    expect(bootstrap).toContain('refetchOnReconnect: "always"');
   });
 
   it("monta o React antes de qualquer manutenção do PWA", () => {

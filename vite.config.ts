@@ -31,7 +31,12 @@ export default defineConfig(({ mode, command }) => {
     react(),
     mode === "development" && componentTagger(),
     VitePWA({
-      registerType: "prompt",
+      // Atualizações precisam chegar ao PWA instalado sem exigir que a
+      // pessoa limpe dados, reinstale o aplicativo ou encontre um aviso
+      // manual. O componente PWAUpdatePrompt continua responsável por
+      // verificar novas versões e recarregar uma única vez quando o novo
+      // Service Worker assumir o controle.
+      registerType: "autoUpdate",
       // false: o registro do SW é feito manualmente pelo componente
       // PWAUpdatePrompt via virtual:pwa-register/react. Deixar o plugin
       // também injetar um script de auto-registro no HTML criaria um
@@ -72,9 +77,10 @@ export default defineConfig(({ mode, command }) => {
         ],
         // Fallback SPA para todas as rotas de navegação
         navigateFallback: "/index.html",
-        // NÃO permitir que o SW assuma páginas já abertas automaticamente
-        skipWaiting: false,
-        clientsClaim: false,
+        // A nova release assume o PWA instalado imediatamente. A aplicação
+        // preserva rota, rolagem e rascunhos antes da recarga controlada.
+        skipWaiting: true,
+        clientsClaim: true,
         // Runtime caching controlado: apenas assets estáticos do próprio
         // domínio, com limites de entradas e expiração. Nunca cacheia
         // Supabase, APIs, autenticação, dados financeiros, mensagens,

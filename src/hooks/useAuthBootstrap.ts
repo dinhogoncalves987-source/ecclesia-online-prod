@@ -148,8 +148,14 @@ export function useAuthBootstrap(userId: string | null | undefined) {
     queryKey: ["ecclesia-auth-bootstrap", userId],
     queryFn: () => fetchBootstrapData(userId as string),
     enabled: Boolean(userId),
-    staleTime: 5 * 60 * 1000,
+    // Permissões podem mudar enquanto o PWA permanece instalado por dias.
+    // Sempre revalidar na montagem, ao voltar ao aplicativo e ao recuperar a
+    // conexão evita que um menu antigo sobreviva a uma correção no banco.
+    staleTime: 30 * 1000,
     gcTime: 10 * 60 * 1000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
+    refetchOnReconnect: "always",
     // Real failures now actually throw (see above), so this retry policy
     // finally has something meaningful to act on — previously the queryFn
     // always resolved "successfully" with empty defaults, so retry never

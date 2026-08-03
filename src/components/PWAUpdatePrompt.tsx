@@ -1,29 +1,30 @@
 import { useRegisterSW } from "virtual:pwa-register/react";
-import { useCallback } from "react";
-import { useLanguage } from "@/hooks/useLanguage";
+import { useEffect, useRef } from "react";
 
 /**
  * PWAUpdatePrompt
  *
  * Componente que monitora atualizações do Service Worker gerenciado pelo
- * vite-plugin-pwa (registerType: 'prompt'). Quando uma nova versão está
- * disponível, exibe um banner solicitando ação do usuário.
+ * vite-plugin-pwa (registerType: 'autoUpdate').
  *
- * Uma release nova nunca pode ficar silenciosamente escondida atras de uma
- * versao antiga do PWA. A atualizacao continua exigindo o clique consciente
- * (para nao interromper um formulario), mas o aviso nao pode ser dispensado.
- * O registro tambem procura uma nova versao periodicamente enquanto a pagina
- * permanece aberta.
+ * Uma release nova nunca pode ficar silenciosamente escondida atrás de uma
+ * versão antiga do PWA. O registro procura atualizações na abertura, quando o
+ * aplicativo volta ao primeiro plano e periodicamente enquanto permanece
+ * aberto. Quando o novo worker assume o controle, a página recarrega uma única
+ * vez; rota, rolagem e rascunhos são restaurados pelos mecanismos próprios do
+ * aplicativo.
  */
 export function PWAUpdatePrompt() {
-  const { t } = useLanguage();
+  const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
+  const reloadingRef = useRef(false);
+  const hadControllerRef = useRef(
+    typeof navigator !== "undefined" && Boolean(navigator.serviceWorker?.controller),
+  );
 
-  const {
-    needRefresh: [needRefresh],
-    updateServiceWorker,
-  } = useRegisterSW({
+  useRegisterSW({
     onRegisteredSW(swUrl, registration) {
       if (registration) {
+        registrationRef.current = registration;
         console.debug("[Ecclesia PWA] Service Worker registrado:", swUrl);
         void registration.update();
         window.setInterval(() => {
@@ -36,58 +37,38 @@ export function PWAUpdatePrompt() {
     },
   });
 
-  const handleUpdate = useCallback(() => {
-    updateServiceWorker(true);
-  }, [updateServiceWorker]);
+  useEffect(() => {
+    const serviceWorker = navigator.serviceWorker;
+    if (!serviceWorker) return;
 
-  if (!needRefresh) return null;
+    const handleControllerChange = () => {
+      // A primeira instalação não deve recarregar a tela. Somente a troca de
+      // um worker que já controlava o PWA representa uma release nova.
+      if (!hadControllerRef.current) {
+        hadControllerRef.current = true;
+        return;
+      }
+      if (reloadingRef.current) return;
+      reloadingRef.current = true;
+      window.location.reload();
+    };
 
-  return (
-    <div
-      role="alert"
-      aria-live="polite"
-      // bottom-20 (mobile) deixa espaço para a navegação inferior fixa do
-      // AdminLayout (h-16 + margem de segurança); em desktop (lg:), onde não
-      // há bottom nav, volta para bottom-4.
-      className="fixed bottom-20 lg:bottom-4 left-1/2 -translate-x-1/2 z-[9999]"
-      style={{
-        background: "#1a1a2e",
-        color: "#e0e0e0",
-        border: "1px solid #4a4a6a",
-        borderRadius: 12,
-        padding: "14px 20px",
-        display: "flex",
-        alignItems: "center",
-        flexWrap: "wrap",
-        rowGap: 8,
-        gap: 12,
-        boxShadow: "0 4px 24px rgba(0,0,0,0.4)",
-        maxWidth: "calc(100vw - 32px)",
-        width: 420,
-        fontFamily: "Inter, system-ui, sans-serif",
-        fontSize: 14,
-      }}
-    >
-      <span style={{ flex: "1 1 100%", minWidth: 0, fontWeight: 600 }}>{t("Nova versão disponível")}</span>
-      <div style={{ display: "flex", gap: 12, marginLeft: "auto" }}>
-        <button
-          type="button"
-          onClick={handleUpdate}
-          style={{
-            background: "#4f46e5",
-            color: "#fff",
-            border: "none",
-            borderRadius: 8,
-            padding: "8px 16px",
-            cursor: "pointer",
-            fontWeight: 600,
-            fontSize: 13,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {t("Atualizar agora")}
-        </button>
-      </div>
-    </div>
-  );
+    const checkForUpdate = () => {
+      if (document.visibilityState === "visible") {
+        void registrationRef.current?.update();
+      }
+    };
+
+    serviceWorker.addEventListener("controllerchange", handleControllerChange);
+    document.addEventListener("visibilitychange", checkForUpdate);
+    window.addEventListener("online", checkForUpdate);
+
+    return () => {
+      serviceWorker.removeEventListener("controllerchange", handleControllerChange);
+      document.removeEventListener("visibilitychange", checkForUpdate);
+      window.removeEventListener("online", checkForUpdate);
+    };
+  }, []);
+
+  return null;
 }
