@@ -48,7 +48,8 @@ const OTP_ERRORS: Record<string, string> = {
   invalid_arguments: "Confira o número e o código informados.",
   invite_not_found: "Convite não encontrado.",
   invite_not_pending: "Este convite expirou ou já foi utilizado.",
-  phone_mismatch: "Este número não corresponde ao telefone ou WhatsApp cadastrado.",
+  phone_mismatch: "Este número não corresponde ao WhatsApp cadastrado pela Secretaria.",
+  whatsapp_mismatch: "Este número não corresponde ao WhatsApp cadastrado pela Secretaria.",
   no_active_challenge: "Não existe um código ativo. Peça um novo código à secretaria.",
   challenge_expired: "O código expirou. Peça um novo código à secretaria.",
   max_attempts_exceeded: "O limite de tentativas foi atingido. Peça um novo código.",
@@ -123,7 +124,7 @@ export default function ConviteMembro() {
     event.preventDefault();
     if (step === "verifying") return;
     if (phone.length < 10 || code.length !== 6) {
-      setError(t("Informe um telefone válido e o código completo de seis dígitos."));
+      setError(t("Informe o WhatsApp cadastrado e o código completo de seis dígitos."));
       return;
     }
 
@@ -254,13 +255,13 @@ export default function ConviteMembro() {
               <ShieldCheck size={28} className="text-emerald-500 mx-auto" />
               <h2 className="font-semibold">{t("Confirme seu acesso")}</h2>
               <p className="text-xs text-muted-foreground">
-                {t("Digite o mesmo número cadastrado e o código recebido da Secretaria.")}
+                {t("Digite o WhatsApp cadastrado e o código recebido separadamente da Secretaria.")}
               </p>
             </div>
 
             <form onSubmit={handleActivate} className="space-y-4">
               <label className="block space-y-1.5">
-                <span className="text-xs font-medium">{t("WhatsApp ou telefone")}</span>
+                <span className="text-xs font-medium">{t("WhatsApp cadastrado")}</span>
                 <div className="relative">
                   <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input

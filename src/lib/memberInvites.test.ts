@@ -20,6 +20,7 @@ vi.mock("@/lib/publicUrl", () => ({
 
 import {
   acceptMemberInvite,
+  buildWhatsappCodeLink,
   buildWhatsappLink,
   emailsMatch,
   generateManualMemberInviteOtp,
@@ -68,18 +69,29 @@ describe("memberInvites — convite manual sem Meta", () => {
     vi.unstubAllGlobals();
   });
 
-  it("monta um link wa.me com link e código sem chamar API da Meta", () => {
+  it("monta a primeira mensagem somente com o link, sem expor o código", () => {
     const link = buildWhatsappLink(
       "(54) 99999-9999",
       "Fulano",
       "Igreja Teste",
       "https://app.example.com/convite-membro/tok",
-      "123456",
     );
     expect(link).toMatch(/^https:\/\/wa\.me\/5554999999999\?text=/);
-    expect(decodeURIComponent(link)).toContain("Código de acesso: 123456");
     expect(decodeURIComponent(link)).toContain("https://app.example.com/convite-membro/tok");
+    expect(decodeURIComponent(link)).not.toContain("Código de acesso");
     expect(link).not.toContain("graph.facebook.com");
+  });
+
+  it("monta a segunda mensagem somente com o código, sem repetir o link", () => {
+    const link = buildWhatsappCodeLink(
+      "(54) 99999-9999",
+      "Fulano",
+      "123456",
+    );
+    const message = decodeURIComponent(link);
+    expect(message).toContain("123456");
+    expect(message).not.toContain("/convite-membro/");
+    expect(message).not.toContain("Igreja Teste");
   });
 
   it("gera o código pela RPC autenticada e nunca persiste o texto no cliente", async () => {

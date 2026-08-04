@@ -47,7 +47,7 @@ function renderPage() {
   );
 }
 
-describe("ConviteMembro — ativação manual por WhatsApp/telefone", () => {
+describe("ConviteMembro — ativação manual exclusivamente por WhatsApp", () => {
   beforeEach(() => {
     getInviteByTokenMock.mockReset();
     verifyManualMemberInviteOtpMock.mockReset();
@@ -59,7 +59,7 @@ describe("ConviteMembro — ativação manual por WhatsApp/telefone", () => {
     renderPage();
     await screen.findByText("Fulano de Tal");
 
-    expect(screen.getByLabelText(/WhatsApp ou telefone/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/WhatsApp cadastrado/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Código de acesso/i)).toBeInTheDocument();
     expect(screen.queryByText(/e-mail/i)).not.toBeInTheDocument();
   });
@@ -74,7 +74,7 @@ describe("ConviteMembro — ativação manual por WhatsApp/telefone", () => {
 
     renderPage();
     await screen.findByText("Fulano de Tal");
-    fireEvent.change(screen.getByLabelText(/WhatsApp ou telefone/i), {
+    fireEvent.change(screen.getByLabelText(/WhatsApp cadastrado/i), {
       target: { value: "(54) 99999-9999" },
     });
     fireEvent.change(screen.getByLabelText(/Código de acesso/i), {
@@ -94,7 +94,7 @@ describe("ConviteMembro — ativação manual por WhatsApp/telefone", () => {
 
     renderPage();
     await screen.findByText("Fulano de Tal");
-    fireEvent.change(screen.getByLabelText(/WhatsApp ou telefone/i), {
+    fireEvent.change(screen.getByLabelText(/WhatsApp cadastrado/i), {
       target: { value: "54999999999" },
     });
     fireEvent.change(screen.getByLabelText(/Código de acesso/i), {

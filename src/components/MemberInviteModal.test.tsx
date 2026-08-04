@@ -41,7 +41,7 @@ const invite = {
   created_at: "2026-07-30T12:00:00.000Z",
 };
 
-function renderModal(phone = "54999999999") {
+function renderModal(whatsapp = "54999999999") {
   return render(
     <MemberInviteModal
       open
@@ -51,7 +51,7 @@ function renderModal(phone = "54999999999") {
       organizationId="org-1"
       churchName="Igreja Teste"
       invitedBy="admin-1"
-      phone={phone}
+      whatsapp={whatsapp}
       email={null}
     />,
   );
@@ -65,7 +65,7 @@ describe("MemberInviteModal — convite manual sem Meta", () => {
       ok: true,
       code: "123456",
       memberName: "Pessoa Teste",
-      phoneNormalized: "5554999999999",
+      whatsappNormalized: "5554999999999",
       expiresAt: "2026-07-30T12:10:00.000Z",
     });
     vi.stubGlobal("open", mocks.open);
@@ -78,31 +78,45 @@ describe("MemberInviteModal — convite manual sem Meta", () => {
     expect(mocks.createMemberInvite).toHaveBeenCalledTimes(1);
     expect(mocks.generateManualMemberInviteOtp).not.toHaveBeenCalled();
     expect(mocks.open).not.toHaveBeenCalled();
-    expect(screen.getByText("Nada é enviado automaticamente. Você revisa e confirma no WhatsApp."))
+    expect(screen.getByText("Envie primeiro o link. Depois envie o código em uma segunda mensagem."))
       .toBeInTheDocument();
   });
 
-  it("só prepara o código e abre o WhatsApp Business após clique explícito", async () => {
+  it("prepara link e código em duas mensagens separadas e na ordem correta", async () => {
     renderModal();
-    fireEvent.click(await screen.findByRole("button", { name: "Preparar no WhatsApp Business" }));
+    const codeButton = await screen.findByRole("button", { name: "2. Enviar código pelo WhatsApp" });
+    expect(codeButton).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "1. Enviar link pelo WhatsApp" }));
+    expect(codeButton).toBeEnabled();
+    expect(mocks.generateManualMemberInviteOtp).not.toHaveBeenCalled();
+
+    const [linkUrl] = mocks.open.mock.calls[0];
+    const firstMessage = decodeURIComponent(linkUrl);
+    expect(firstMessage).toContain("/convite-membro/token-1");
+    expect(firstMessage).not.toContain("Código de acesso");
+
+    fireEvent.click(codeButton);
 
     await waitFor(() => {
       expect(mocks.generateManualMemberInviteOtp).toHaveBeenCalledWith("invite-1");
-      expect(mocks.open).toHaveBeenCalledTimes(1);
+      expect(mocks.open).toHaveBeenCalledTimes(2);
     });
-    const [url, target, features] = mocks.open.mock.calls[0];
+    const [url, target, features] = mocks.open.mock.calls[1];
+    const secondMessage = decodeURIComponent(url);
     expect(url).toMatch(/^https:\/\/wa\.me\//);
-    expect(decodeURIComponent(url)).toContain("Código de acesso: 123456");
+    expect(secondMessage).toContain("123456");
+    expect(secondMessage).not.toContain("/convite-membro/");
     expect(target).toBe("_blank");
     expect(features).toBe("noopener,noreferrer");
   });
 
-  it("bloqueia a preparação quando não existe telefone ou WhatsApp", async () => {
+  it("bloqueia a preparação quando não existe WhatsApp", async () => {
     renderModal("");
 
-    expect(await screen.findByText(/Cadastre o WhatsApp ou telefone/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Cadastre o WhatsApp deste membro/i)).toBeInTheDocument();
     expect(mocks.createMemberInvite).not.toHaveBeenCalled();
-    expect(screen.queryByRole("button", { name: "Preparar no WhatsApp Business" }))
+    expect(screen.queryByRole("button", { name: "1. Enviar link pelo WhatsApp" }))
       .not.toBeInTheDocument();
   });
 });

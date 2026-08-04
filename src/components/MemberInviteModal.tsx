@@ -1,7 +1,7 @@
 /**
  * Post-save invite modal.
- * Shown after creating a new member when they have a phone/whatsapp number.
- * Generates an invite token and offers WhatsApp + copy-link options.
+ * Shown after creating a new member with a registered WhatsApp number.
+ * Sends the invite link and access code as two separate manual messages.
  */
 import { useState, useEffect, useCallback, useRef } from "react";
 import { X, MessageCircle, Copy, Clock, CheckCircle2, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
@@ -13,6 +13,7 @@ import {
   revokeMemberInvites,
   buildInviteUrl,
   buildWhatsappLink,
+  buildWhatsappCodeLink,
   type InviteRecord,
 } from "@/lib/memberInvites";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -29,8 +30,8 @@ interface Props {
   sectorId?:      string | null;
   congregationId?: string | null;
   invitedBy?:     string;
-  /** Phone OR WhatsApp number (raw, will be sanitised). */
-  phone?:         string | null;
+  /** WhatsApp do membro (raw, será normalizado ao abrir o aplicativo). */
+  whatsapp?:      string | null;
   /** Mantido somente para compatibilidade com chamadas antigas do componente. */
   email?:         string | null;
 }
@@ -41,15 +42,16 @@ export function MemberInviteModal({
   open, onClose,
   memberId, memberName, organizationId, churchName,
   sectorId, congregationId, invitedBy,
-  phone,
+  whatsapp,
 }: Props) {
   const { t, lang } = useLanguage();
   const [invite, setInvite]     = useState<InviteRecord | null>(null);
   const [loading, setLoading]   = useState(false);
-  const [openingWhatsapp, setOpeningWhatsapp] = useState(false);
+  const [openingCode, setOpeningCode] = useState(false);
+  const [linkPrepared, setLinkPrepared] = useState(false);
   const [copied, setCopied]     = useState(false);
   const generationInFlightRef = useRef(false);
-  const hasPhone = Boolean(phone?.trim());
+  const hasWhatsapp = Boolean(whatsapp?.trim());
 
   const generate = useCallback(async () => {
     if (generationInFlightRef.current) return;
@@ -77,9 +79,9 @@ export function MemberInviteModal({
 
   useEffect(() => {
     // Criar o registro não envia mensagem. O código só nasce depois do clique
-    // explícito em "Preparar no WhatsApp Business".
-    if (open && !invite && hasPhone) generate();
-  }, [open, invite, hasPhone, generate]);
+    // explícito na segunda ação, após o link ter sido preparado.
+    if (open && !invite && hasWhatsapp) generate();
+  }, [open, invite, hasWhatsapp, generate]);
 
   const inviteUrl = invite ? buildInviteUrl(invite.token) : "";
 
@@ -88,6 +90,7 @@ export function MemberInviteModal({
     try {
       await navigator.clipboard.writeText(inviteUrl);
       setCopied(true);
+      setLinkPrepared(true);
       toast.success(t("Link copiado!"));
       setTimeout(() => setCopied(false), 2500);
     } catch {
@@ -95,9 +98,19 @@ export function MemberInviteModal({
     }
   };
 
-  const handleWhatsApp = async () => {
-    if (!invite || !phone || openingWhatsapp) return;
-    setOpeningWhatsapp(true);
+  const handleWhatsappLink = () => {
+    if (!invite || !whatsapp) return;
+    const waLink = buildWhatsappLink(whatsapp, memberName, churchName, inviteUrl);
+    window.open(waLink, "_blank", "noopener,noreferrer");
+    setLinkPrepared(true);
+    toast.success(t("Primeira mensagem preparada"), {
+      description: t("Envie o link e depois volte para preparar o código separado."),
+    });
+  };
+
+  const handleWhatsappCode = async () => {
+    if (!invite || !whatsapp || !linkPrepared || openingCode) return;
+    setOpeningCode(true);
     try {
       const otp = await generateManualMemberInviteOtp(invite.id);
       if (!otp.ok || !otp.code) {
@@ -106,18 +119,19 @@ export function MemberInviteModal({
         });
         return;
       }
-      const waLink = buildWhatsappLink(phone, memberName, churchName, inviteUrl, otp.code);
+      const waLink = buildWhatsappCodeLink(whatsapp, memberName, otp.code);
       window.open(waLink, "_blank", "noopener,noreferrer");
-      toast.success(t("Mensagem preparada"), {
-        description: t("Revise e confirme o envio no WhatsApp Business."),
+      toast.success(t("Segunda mensagem preparada"), {
+        description: t("Revise e envie o código separado no WhatsApp Business."),
       });
     } finally {
-      setOpeningWhatsapp(false);
+      setOpeningCode(false);
     }
   };
 
   const handleRegenerate = async () => {
     await revokeMemberInvites(memberId);
+    setLinkPrepared(false);
     setInvite(null);
     await generate();
   };
@@ -163,18 +177,18 @@ export function MemberInviteModal({
         {/* Body */}
         <div className="px-5 py-5 space-y-4">
 
-          {/* Blocked: member has no registered WhatsApp/phone */}
-          {!hasPhone && (
+          {/* Blocked: member has no registered WhatsApp */}
+          {!hasWhatsapp && (
             <div className="flex flex-col items-center text-center gap-2 py-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-4">
               <AlertTriangle size={22} className="text-amber-600 dark:text-amber-400" />
               <p className="text-sm text-amber-800 dark:text-amber-300">
-                {t("Cadastre o WhatsApp ou telefone deste membro antes de preparar o acesso.")}
+                {t("Cadastre o WhatsApp deste membro antes de preparar o acesso.")}
               </p>
             </div>
           )}
 
           {/* Loading state */}
-          {hasPhone && loading && (
+          {hasWhatsapp && loading && (
             <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground">
               <Loader2 size={18} className="animate-spin" />
               <span className="text-sm">{t("Gerando convite...")}</span>
@@ -182,7 +196,7 @@ export function MemberInviteModal({
           )}
 
           {/* Invite ready */}
-          {hasPhone && !loading && invite && (
+          {hasWhatsapp && !loading && invite && (
             <>
               {/* Link preview */}
               <div className="bg-muted/40 rounded-lg px-3 py-2.5">
@@ -205,19 +219,27 @@ export function MemberInviteModal({
               {/* Actions */}
               <div className="space-y-2 pt-1">
                 <button
-                  onClick={handleWhatsApp}
-                  disabled={openingWhatsapp}
+                  onClick={handleWhatsappLink}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#25D366] text-white rounded-lg text-sm font-medium hover:bg-[#1ebe5b] disabled:opacity-60 transition-colors"
                 >
-                  {openingWhatsapp
+                  <MessageCircle size={16} />
+                  {t("1. Enviar link pelo WhatsApp")}
+                </button>
+
+                <button
+                  onClick={handleWhatsappCode}
+                  disabled={!linkPrepared || openingCode}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-secondary text-foreground rounded-lg text-sm font-medium hover:bg-secondary/80 disabled:opacity-50 transition-colors"
+                >
+                  {openingCode
                     ? <Loader2 size={16} className="animate-spin" />
                     : <MessageCircle size={16} />}
-                  {openingWhatsapp
+                  {openingCode
                     ? t("Preparando código...")
-                    : t("Preparar no WhatsApp Business")}
+                    : t("2. Enviar código pelo WhatsApp")}
                 </button>
                 <p className="text-[11px] text-center text-muted-foreground">
-                  {t("Nada é enviado automaticamente. Você revisa e confirma no WhatsApp.")}
+                  {t("Envie primeiro o link. Depois envie o código em uma segunda mensagem.")}
                 </p>
 
                 <button

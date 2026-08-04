@@ -64,27 +64,41 @@ export function formatWhatsappNumber(raw: string): string {
   return digits;
 }
 
-/** Build a wa.me link with the invite message pre-filled. */
+/** Build the first WhatsApp message: invite link only, never the access code. */
 export function buildWhatsappLink(
-  phone: string,
+  whatsapp: string,
   memberName: string,
   churchName: string,
   inviteUrl: string,
-  accessCode?: string,
 ): string {
-  const number = formatWhatsappNumber(phone);
+  const number = formatWhatsappNumber(whatsapp);
   const text = [
     `Olá, ${memberName}!`,
     ``,
     `A Secretaria da ${churchName} preparou seu acesso ao Ecclesia Online.`,
     ``,
-    `Abra o link abaixo e confirme o seu número de WhatsApp:`,
+    `Abra o link abaixo para iniciar a ativação:`,
     inviteUrl,
-    ...(accessCode ? [``, `Código de acesso: ${accessCode}`] : []),
-    ``,
-    `Este código é pessoal e temporário. Não encaminhe para outra pessoa.`,
     ``,
     `Deus abençoe.`,
+  ].join("\n");
+  return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
+}
+
+/** Build the second WhatsApp message: access code only, sent after the link. */
+export function buildWhatsappCodeLink(
+  whatsapp: string,
+  memberName: string,
+  accessCode: string,
+): string {
+  const number = formatWhatsappNumber(whatsapp);
+  const text = [
+    `Olá, ${memberName}!`,
+    ``,
+    `Seu código de acesso ao Ecclesia Online é:`,
+    accessCode,
+    ``,
+    `O código é pessoal, temporário e só pode ser usado uma vez.`,
   ].join("\n");
   return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
 }
@@ -130,7 +144,7 @@ export type ManualInviteOtp = {
   ok: boolean;
   error?: string;
   memberName?: string;
-  phoneNormalized?: string;
+  whatsappNormalized?: string;
   code?: string;
   expiresAt?: string;
 };
@@ -154,7 +168,7 @@ export async function generateManualMemberInviteOtp(inviteId: string): Promise<M
   return {
     ok: true,
     memberName: typeof result.member_name === "string" ? result.member_name : undefined,
-    phoneNormalized: typeof result.phone_normalized === "string" ? result.phone_normalized : undefined,
+    whatsappNormalized: typeof result.whatsapp_normalized === "string" ? result.whatsapp_normalized : undefined,
     code: typeof result.code === "string" ? result.code : undefined,
     expiresAt: typeof result.expires_at === "string" ? result.expires_at : undefined,
   };

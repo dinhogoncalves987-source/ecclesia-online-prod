@@ -510,7 +510,7 @@ export default function Membros() {
     open: boolean;
     memberId: string;
     memberName: string;
-    phone: string | null;
+    whatsapp: string | null;
     email: string | null;
   } | null>(null);
 
@@ -1404,12 +1404,11 @@ export default function Membros() {
         closeModal();
 
         // Open invite modal after creating a new member
-        const invitePhone = form.whatsapp?.trim() || form.phone?.trim() || null;
         setInviteModal({
           open:       true,
           memberId:   newId,
           memberName: form.full_name.trim(),
-          phone:      invitePhone,
+          whatsapp:   form.whatsapp?.trim() || null,
           email:      form.email?.trim() || null,
         });
 
@@ -2695,7 +2694,7 @@ export default function Membros() {
                             open:       true,
                             memberId:   editingId,
                             memberName: form.full_name,
-                            phone:      form.whatsapp?.trim() || form.phone?.trim() || null,
+                            whatsapp:   form.whatsapp?.trim() || null,
                             email:      form.email?.trim() || null,
                           });
                         }}
@@ -2777,7 +2776,7 @@ export default function Membros() {
           sectorId={form.sector_id}
           congregationId={form.congregation_id}
           invitedBy={user?.id}
-          phone={inviteModal.phone}
+          whatsapp={inviteModal.whatsapp}
           email={inviteModal.email}
         />
       )}
