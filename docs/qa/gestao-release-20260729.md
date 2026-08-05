@@ -85,3 +85,51 @@ foram modificados por esta correção e o problema não foi ocultado com
    hierarquia e Financeiro.
 5. Somente após aprovação, promover o mesmo commit, a mesma migration e a mesma
    Edge Function para produção, sem dados criados no staging.
+
+## Integração híbrida de IA — DeepSeek + Gemini (2026-08-05)
+
+Decisão do Edson: separar provedor de IA por tipo de tarefa — DeepSeek para o
+Assistente Operacional (extração de texto), Gemini exclusivamente para geração
+de imagem de banners de campanha. Commits
+`review/gestao-homologacao-20260728` (`e584828`, `7b9c5d9`).
+
+### `operational-assistant` — DeepSeek V4 Flash — **homologado**
+
+- Provedor: DeepSeek, modelo `deepseek-v4-flash` (nunca `deepseek-chat` /
+  `deepseek-reasoner`, ambos legados). Secret `DEEPSEEK_API_KEY`.
+- Publicado em staging (`qkiiwopkbcslquyfhdec`) e testado com login real de
+  usuário de teste — dois testes ponta a ponta reais, `HTTP 200`, extração
+  correta e consistente (nome, função, telefone formatado, e-mail). Contrato
+  de resposta `{ data, missing } | { error }` preservado.
+- Tratamento de chave ausente, 401, 402/saldo insuficiente, 429, timeout e
+  5xx implementado e sem regressão nos testes automatizados.
+
+### `generate-campaign-banner` — Gemini — **integração pronta, aguardando liberação de billing/cota**
+
+- Provedor: Gemini, modelo `gemini-2.5-flash-image` (versão estável da API,
+  não a `-preview`, que está descontinuada). Caminho OpenAI removido por
+  completo; `OPENAI_API_KEY` não é mais exigida.
+- Publicado em staging e testado com login real. Resposta: `HTTP 200`,
+  `{ imageUrl: null, error: "Image generation usage limit reached...", details: [...] }`.
+  O provedor Gemini respondeu `429 RESOURCE_EXHAUSTED` com `limit: 0` nas
+  três métricas de cota do tier gratuito (tokens/min, requisições/min,
+  requisições/dia) para o modelo de geração de imagem — repetido após ~60s
+  com o mesmo resultado, confirmando que é uma restrição de plano/billing da
+  chave `GEMINI_API_KEY` atual, não uma falha de código nem um limite de
+  tráfego passageiro.
+- Por decisão do Edson, a liberação de billing/cota no Gemini foi **adiada**.
+  Nenhuma alteração de código, chave ou função foi feita para contornar essa
+  restrição.
+- Tratamento de erro (chave ausente, 429, 401/403, timeout, 5xx, imagem não
+  retornada, resposta inválida) confirmado funcional pelo próprio teste real
+  acima — o caminho de sucesso (`{ imageUrl, provider: "gemini", prompt }`)
+  está implementado e cobria pelos mesmos testes automatizados, mas só será
+  validado ponta a ponta quando a cota for liberada.
+
+**Próximo passo (fora desta etapa):** quando o Edson autorizar, liberar
+billing/cota na conta Google associada a `GEMINI_API_KEY` (ou trocar por uma
+chave com plano habilitado para `gemini-2.5-flash-image`) e repetir apenas o
+teste real de geração de imagem — sem nova alteração de código.
+
+`activate-member-invite` e `hymn-chat` seguem não publicadas em staging
+(sem chamador ativo / neutralizada por segurança, respectivamente).
