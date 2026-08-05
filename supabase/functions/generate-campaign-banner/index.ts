@@ -8,6 +8,14 @@ const corsHeaders = {
 
 const bucketName = "platform-media";
 
+// Modelo estável de geração de imagem da Gemini API (não a variante
+// "-preview", que a documentação oficial marca como descontinuada).
+// generateContent com este modelo exige generationConfig.responseModalities
+// incluindo "IMAGE" — sem isso a API pode responder só texto.
+const GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image";
+const GEMINI_IMAGE_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMAGE_MODEL}:generateContent`;
+const GEMINI_TIMEOUT_MS = 60000;
+
 const sanitizeFilePart = (value: string) =>
   value
     .normalize("NFD")
@@ -20,7 +28,7 @@ const sanitizeFilePart = (value: string) =>
 const decodeBase64 = (base64: string) =>
   Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
 
-const fetchWithTimeout = async (url: string, init: RequestInit, timeoutMs = 70000) => {
+const fetchWithTimeout = async (url: string, init: RequestInit, timeoutMs: number) => {
   const controller = new AbortController();
   let timeout: number | undefined;
 
@@ -63,61 +71,16 @@ Generate a fresh unique image. Do not reuse previous compositions.
 Uniqueness id: ${generationId}
 `;
 
-const generateWithOpenAi = async (prompt: string, apiKey: string) => {
-  let response: Response;
+type GeminiImageResult =
+  | { ok: true; bytes: Uint8Array; contentType: string; extension: string; provider: "gemini" }
+  | { ok: false; status: number; error: string };
 
-  try {
-    response = await fetchWithTimeout("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-image-1",
-        prompt,
-        n: 1,
-        size: "1536x1024",
-        quality: "medium",
-        output_format: "png",
-      }),
-    }, 120000);
-  } catch (error) {
-    return {
-      ok: false as const,
-      error: `OpenAI timeout/network error: ${error instanceof Error ? error.message : "unknown error"}`,
-    };
-  }
-
-  if (!response.ok) {
-    return {
-      ok: false as const,
-      error: `OpenAI ${response.status}: ${await response.text()}`,
-    };
-  }
-
-  const data = await response.json();
-  const base64Image = data?.data?.[0]?.b64_json;
-
-  if (!base64Image) {
-    return { ok: false as const, error: "OpenAI did not return image bytes" };
-  }
-
-  return {
-    ok: true as const,
-    bytes: decodeBase64(base64Image),
-    contentType: "image/png",
-    extension: "png",
-    provider: "openai",
-  };
-};
-
-const generateWithGemini = async (prompt: string, apiKey: string) => {
+const generateWithGemini = async (prompt: string, apiKey: string): Promise<GeminiImageResult> => {
   let response: Response;
 
   try {
     response = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`,
+      `${GEMINI_IMAGE_ENDPOINT}?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -128,39 +91,61 @@ const generateWithGemini = async (prompt: string, apiKey: string) => {
               parts: [{ text: prompt }],
             },
           ],
+          generationConfig: {
+            responseModalities: ["IMAGE"],
+          },
         }),
       },
-      25000
+      GEMINI_TIMEOUT_MS
     );
   } catch (error) {
     return {
-      ok: false as const,
+      ok: false,
+      status: 0,
       error: `Gemini timeout/network error: ${error instanceof Error ? error.message : "unknown error"}`,
     };
   }
 
   if (!response.ok) {
+    const errBody = await response.text().catch(() => "");
     return {
-      ok: false as const,
-      error: `Gemini ${response.status}: ${await response.text()}`,
+      ok: false,
+      status: response.status,
+      error: `Gemini ${response.status}: ${errBody}`,
     };
   }
 
-  const data = await response.json();
+  let data: {
+    candidates?: Array<{
+      content?: {
+        parts?: Array<{
+          inlineData?: { data?: string; mimeType?: string };
+          inline_data?: { data?: string; mime_type?: string };
+        }>;
+      };
+    }>;
+  };
+  try {
+    data = await response.json();
+  } catch {
+    return { ok: false, status: response.status, error: "Gemini returned an invalid (non-JSON) response" };
+  }
+
   const parts = data?.candidates?.[0]?.content?.parts || [];
-  const imagePart = parts.find((part: { inlineData?: { data?: string }; inline_data?: { data?: string } }) =>
-    part.inlineData?.data || part.inline_data?.data
-  );
+  const imagePart = parts.find((part) => part.inlineData?.data || part.inline_data?.data);
   const inlineData = imagePart?.inlineData || imagePart?.inline_data;
   const base64Image = inlineData?.data;
 
   if (!base64Image) {
-    return { ok: false as const, error: "Gemini did not return image bytes" };
+    return { ok: false, status: response.status, error: "Gemini did not return image bytes" };
   }
 
-  const contentType = inlineData?.mimeType || inlineData?.mime_type || "image/png";
+  const contentType =
+    (inlineData as { mimeType?: string; mime_type?: string })?.mimeType ||
+    (inlineData as { mimeType?: string; mime_type?: string })?.mime_type ||
+    "image/png";
   return {
-    ok: true as const,
+    ok: true,
     bytes: decodeBase64(base64Image),
     contentType,
     extension: contentType.includes("jpeg") ? "jpg" : "png",
@@ -185,7 +170,6 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const openAiApiKey = Deno.env.get("OPENAI_API_KEY");
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
 
     if (!supabaseUrl || !serviceRoleKey) {
@@ -195,51 +179,47 @@ serve(async (req) => {
       );
     }
 
-    if (!openAiApiKey && !geminiApiKey) {
+    if (!geminiApiKey) {
       return new Response(
-        JSON.stringify({ imageUrl: null, error: "No real image provider is configured. Set OPENAI_API_KEY or GEMINI_API_KEY." }),
+        JSON.stringify({ imageUrl: null, error: "Image generation is not configured. Set GEMINI_API_KEY." }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const generationId = generation_id || crypto.randomUUID();
     const prompt = buildImagePrompt(title, short_description, full_content, generationId);
-    const errors: string[] = [];
-    let generated:
-      | { ok: true; bytes: Uint8Array; contentType: string; extension: string; provider: string }
-      | null = null;
 
-    if (geminiApiKey) {
-      const result = await generateWithGemini(prompt, geminiApiKey);
-      if (result.ok) {
-        generated = result;
-      } else {
-        errors.push(result.error);
+    const result = await generateWithGemini(prompt, geminiApiKey);
+
+    if (!result.ok) {
+      // Log só status + mensagem do provedor — nunca a chave.
+      console.error("Gemini image generation error:", result.status, result.error);
+
+      let userMessage = "Real image generation failed. Please try again.";
+      if (result.status === 429) {
+        userMessage = "Image generation usage limit reached. Please wait a moment and try again.";
+      } else if (result.status === 401 || result.status === 403) {
+        userMessage = "Image generation authentication failed. Please contact support.";
+      } else if (result.status === 0) {
+        userMessage = "Image generation timed out. Please try again.";
+      } else if (result.status >= 500) {
+        userMessage = "Image provider is temporarily unavailable. Please try again.";
+      } else if (result.error.includes("did not return image bytes")) {
+        userMessage = "The AI did not return an image. Please try again.";
       }
-    }
 
-    if (!generated && openAiApiKey) {
-      const result = await generateWithOpenAi(prompt, openAiApiKey);
-      if (result.ok) {
-        generated = result;
-      } else {
-        errors.push(result.error);
-      }
-    }
-
-    if (!generated) {
       return new Response(
-        JSON.stringify({ imageUrl: null, error: "Real image generation failed", details: errors }),
+        JSON.stringify({ imageUrl: null, error: userMessage, details: [result.error] }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
-    const filePath = `platform-announcements/ai-${Date.now()}-${generationId}-${sanitizeFilePart(title)}.${generated.extension}`;
+    const filePath = `platform-announcements/ai-${Date.now()}-${generationId}-${sanitizeFilePart(title)}.${result.extension}`;
     const { error: uploadError } = await supabase.storage
       .from(bucketName)
-      .upload(filePath, generated.bytes, {
-        contentType: generated.contentType,
+      .upload(filePath, result.bytes, {
+        contentType: result.contentType,
         upsert: false,
       });
 
@@ -268,7 +248,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ imageUrl, provider: generated.provider, prompt }),
+      JSON.stringify({ imageUrl, provider: result.provider, prompt }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

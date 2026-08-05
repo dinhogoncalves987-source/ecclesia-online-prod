@@ -15,10 +15,37 @@ type AssistantField = {
 
 type AssistantModule = "member" | "document" | "communication" | "financial";
 
-const GEMINI_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+// Provedor: DeepSeek (deepseek-v4-flash). NUNCA deepseek-chat / deepseek-reasoner
+// (legados, agendados para desativação — ver decisão do Edson).
+const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
+const DEEPSEEK_CHAT_ENDPOINT = `${DEEPSEEK_BASE_URL}/chat/completions`;
+const DEEPSEEK_MODEL = "deepseek-v4-flash";
+const DEEPSEEK_TIMEOUT_MS = 25000;
 
 const MAX_INPUT = 1500;
+
+const fetchWithTimeout = async (
+  url: string,
+  init: RequestInit,
+  timeoutMs: number
+) => {
+  const controller = new AbortController();
+  let timeout: number | undefined;
+
+  try {
+    return await Promise.race([
+      fetch(url, { ...init, signal: controller.signal }),
+      new Promise<Response>((_, reject) => {
+        timeout = setTimeout(() => {
+          controller.abort();
+          reject(new Error(`Request timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+};
 
 function buildSystemPrompt(
   module: AssistantModule,
@@ -100,8 +127,8 @@ serve(async (req) => {
       });
     }
 
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!GEMINI_API_KEY) {
+    const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY");
+    if (!DEEPSEEK_API_KEY) {
       return new Response(
         JSON.stringify({ error: "AI service not configured" }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -123,37 +150,95 @@ serve(async (req) => {
 
     const systemPrompt = buildSystemPrompt(module, fields, lang);
 
-    const geminiResp = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: rawText }] }],
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 600,
-          responseMimeType: "text/plain",
+    let deepseekResp: Response;
+    try {
+      deepseekResp = await fetchWithTimeout(
+        DEEPSEEK_CHAT_ENDPOINT,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            // A chave nunca é logada nem incluída em nenhuma resposta — só
+            // trafega neste header, servidor a servidor.
+            Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: DEEPSEEK_MODEL,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: rawText },
+            ],
+            temperature: 0.1,
+            max_tokens: 600,
+            // Extração estruturada não precisa de raciocínio encadeado —
+            // desligar "thinking" reduz latência e custo, e mantém a saída
+            // determinística (equivalente ao comportamento anterior).
+            thinking: { type: "disabled" },
+            stream: false,
+          }),
         },
-      }),
-    });
+        DEEPSEEK_TIMEOUT_MS
+      );
+    } catch (error) {
+      console.error(
+        "DeepSeek network/timeout error:",
+        error instanceof Error ? error.message : "unknown error"
+      );
+      return new Response(
+        JSON.stringify({ error: "AI service timed out. Please try again." }),
+        { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    if (!geminiResp.ok) {
-      const errBody = await geminiResp.text().catch(() => "");
-      console.error("Gemini error:", geminiResp.status, errBody);
-      const status = geminiResp.status === 429 ? 429 : 502;
-      const msg =
-        geminiResp.status === 429
-          ? "Too many requests. Please wait a moment."
-          : "AI service error. Please try again.";
+    if (!deepseekResp.ok) {
+      const errBody = await deepseekResp.text().catch(() => "");
+      // Log só o status e o corpo de erro do provedor — nunca a chave.
+      console.error("DeepSeek error:", deepseekResp.status, errBody);
+
+      let status = 502;
+      let msg = "AI service error. Please try again.";
+      if (deepseekResp.status === 401) {
+        status = 503;
+        msg = "AI service authentication failed. Please contact support.";
+      } else if (deepseekResp.status === 402) {
+        status = 503;
+        msg = "AI service is temporarily unavailable. Please contact support.";
+      } else if (deepseekResp.status === 429) {
+        status = 429;
+        msg = "Too many requests. Please wait a moment.";
+      } else if (deepseekResp.status >= 500) {
+        status = 502;
+        msg = "AI service error. Please try again.";
+      }
+
       return new Response(JSON.stringify({ error: msg }), {
         status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const geminiData = await geminiResp.json();
-    const rawContent: string =
-      geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    let deepseekData: {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    try {
+      deepseekData = await deepseekResp.json();
+    } catch {
+      console.error("DeepSeek returned a non-JSON response");
+      return new Response(
+        JSON.stringify({ error: "AI service returned an invalid response." }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const rawContent: string = deepseekData?.choices?.[0]?.message?.content ?? "";
+
+    if (!rawContent.trim()) {
+      console.error("DeepSeek returned an empty completion");
+      return new Response(
+        JSON.stringify({ error: "AI service returned an empty response." }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Strip any accidental markdown wrapping
     const cleaned = rawContent

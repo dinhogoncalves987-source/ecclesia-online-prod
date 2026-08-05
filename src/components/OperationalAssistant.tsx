@@ -12,7 +12,7 @@
  * Architecture notes:
  * - Voice input: mic button is rendered but calls `onMicClick` (future hook-in point).
  * - Image/OCR: file upload button is stubbed for future implementation.
- * - Edge Function: /functions/v1/operational-assistant (Gemini 2.5 Flash).
+ * - Edge Function: /functions/v1/operational-assistant (DeepSeek V4 Flash).
  */
 
 import { useState, useRef } from "react";
