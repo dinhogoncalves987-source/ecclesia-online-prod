@@ -155,26 +155,43 @@ async function fetchActiveOrganizations(
 
 export function ChurchProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const { isPlatformUser, activeSupportOrg } = useSupportContext();
+  const { isPlatformUser, activeSupportOrg, loadingPlatformRole } = useSupportContext();
   // memberships (organization_users) already come from the shared bootstrap
   // fetch — no independent query here for the common case. Only the
   // downstream `organizations` lookup (by the resulting ids) is inherently
   // a second round-trip, since we can't know which orgs to fetch before
   // knowing the membership ids.
   const { data: bootstrap, loading: bootstrapLoading, isError: bootstrapIsError, refetch: refetchBootstrap } = useAuthBootstrap(user?.id);
-  const [church, setChurch] = useState<Church | null>(null);
-  const [profileChurchId, setProfileChurchId] = useState<string | null>(null);
+  // `ownChurch`/`ownProfileChurchId`/`ownLoading` hold the church resolved
+  // from the user's OWN memberships (organization_users) via the bootstrap
+  // fetch below. For platform users (super_admin/platform_admin/support_*)
+  // this state is intentionally NEVER exposed as the active `church` — see
+  // the single derivation below. Previously this same fetch also wrote
+  // `church = null` directly for platform users, in a SEPARATE effect from
+  // the one that set `church = activeSupportOrg`. Any time the bootstrap
+  // query (useAuthBootstrap, `refetchOnWindowFocus: "always"`) re-ran in the
+  // background, the first effect could momentarily null out `church` (with
+  // `loading` already back to `false`) and the second effect would only
+  // restore it if `activeSupportOrg`'s reference itself had changed — which
+  // it hadn't — leaving `church` stuck at `null` while the UI looked fully
+  // loaded. That silently broke every `if (!church) return` write guard
+  // (member save, territorial unit create, etc.) for support-mode users.
+  // Fix: `ownChurch` is only ever consulted for non-platform users; platform
+  // users read `activeSupportOrg` directly and exclusively (single source
+  // of truth, invariant of this fix).
+  const [ownChurch, setOwnChurch] = useState<Church | null>(null);
+  const [ownProfileChurchId, setOwnProfileChurchId] = useState<string | null>(null);
   const [churches, setChurches] = useState<Church[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [ownLoading, setOwnLoading] = useState(true);
   const [hasActiveMembership, setHasActiveMembership] = useState(false);
 
   const fetchChurches = useCallback(async () => {
     if (!user) {
-      setChurch(null);
-      setProfileChurchId(null);
+      setOwnChurch(null);
+      setOwnProfileChurchId(null);
       setChurches([]);
       setHasActiveMembership(false);
-      setLoading(false);
+      setOwnLoading(false);
       return;
     }
 
@@ -184,16 +201,16 @@ export function ChurchProvider({ children }: { children: ReactNode }) {
       // wipe out whatever church data we already had in memory. Just settle
       // `loading` so ProtectedRoute can show a recoverable error state
       // (driven by `bootstrapError`) instead of spinning forever.
-      setLoading(false);
+      setOwnLoading(false);
       return;
     }
 
     if (bootstrapLoading || !bootstrap) {
-      setLoading(true);
+      setOwnLoading(true);
       return;
     }
 
-    setLoading(true);
+    setOwnLoading(true);
 
     // SEGURANÇA (FASE 2): nenhuma auto-associação por church_slug acontece
     // mais aqui. `ensureOrganizationMembership`/`join_organization_by_slug`
@@ -219,10 +236,10 @@ export function ChurchProvider({ children }: { children: ReactNode }) {
       if (platformAdmin) {
         organizationsQueryIds = null;
       } else {
-        setChurch(null);
-        setProfileChurchId(null);
+        setOwnChurch(null);
+        setOwnProfileChurchId(null);
         setChurches([]);
-        setLoading(false);
+        setOwnLoading(false);
         return;
       }
     }
@@ -233,23 +250,28 @@ export function ChurchProvider({ children }: { children: ReactNode }) {
 
     if (organizationsError) {
       console.error("Erro ao buscar organizações:", organizationsError);
-      setChurch(null);
-      setProfileChurchId(null);
+      setOwnChurch(null);
+      setOwnProfileChurchId(null);
       setChurches([]);
-      setLoading(false);
+      setOwnLoading(false);
       return;
     }
 
     const visibleChurches = organizations.map(mapOrganizationToChurch);
+    // `churches` (the full visible list) is shared by platform and
+    // non-platform users alike — e.g. the support-org picker needs it —
+    // so it's always kept up to date here regardless of `isPlatformUser`.
+    setChurches(visibleChurches);
 
-    // Platform users (super_admin, platform_admin, support_*) do NOT auto-select
-    // an active church. Their active church is driven by SupportContext.
-    // This prevents the Super Admin from appearing "as a church" on login.
+    // Platform users (super_admin, platform_admin, support_*) never
+    // self-select an active church from their own memberships — see the
+    // single `church` derivation below, which reads `activeSupportOrg`
+    // exclusively for them. `ownChurch`/`ownProfileChurchId` are simply left
+    // at null and never consulted for this user type.
     if (isPlatformUser) {
-      setChurches(visibleChurches);
-      setProfileChurchId(null);
-      setChurch(null);
-      setLoading(false);
+      setOwnProfileChurchId(null);
+      setOwnChurch(null);
+      setOwnLoading(false);
       return;
     }
 
@@ -265,10 +287,9 @@ export function ChurchProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    setProfileChurchId(activeChurch?.id || visibleChurches[0]?.id || null);
-    setChurches(visibleChurches);
-    setChurch(activeChurch);
-    setLoading(false);
+    setOwnProfileChurchId(activeChurch?.id || visibleChurches[0]?.id || null);
+    setOwnChurch(activeChurch);
+    setOwnLoading(false);
     markBoot("church resolved");
   }, [user, isPlatformUser, bootstrap, bootstrapLoading, bootstrapIsError]);
 
@@ -276,18 +297,31 @@ export function ChurchProvider({ children }: { children: ReactNode }) {
     fetchChurches();
   }, [fetchChurches]);
 
-  // When support context changes (org selected/cleared), update active church
-  useEffect(() => {
-    if (!isPlatformUser) return;
-    setChurch(activeSupportOrg);
-    setProfileChurchId(activeSupportOrg?.id ?? null);
-  }, [isPlatformUser, activeSupportOrg]);
+  // ── Single source of truth for the exposed `church` ───────────────────────
+  // Platform users: `activeSupportOrg` (SupportContext) IS the church, full
+  // stop — derived here directly instead of being copied into a second
+  // `useState` by a separate effect. There is now only ONE effect
+  // (`fetchChurches` above) that ever writes organizational state, and it
+  // never touches `church` for platform users — so a background bootstrap
+  // refetch can no longer blank it out from under an in-progress action.
+  // Non-platform users: unchanged from before (own membership-derived state).
+  const church = isPlatformUser ? activeSupportOrg : ownChurch;
+  const profileChurchId = isPlatformUser ? (activeSupportOrg?.id ?? null) : ownProfileChurchId;
+  // While the platform role / persisted support-org restoration hasn't
+  // settled yet, keep exposing `loading = true` so dependent screens stay in
+  // a blocked/loading state instead of reading `church = null` as "ready,
+  // no organization" (invariant: no action releases while this resolves).
+  const loading = isPlatformUser ? (loadingPlatformRole || ownLoading) : ownLoading;
 
   const switchChurch = (churchId: string) => {
+    // Platform users change organization exclusively via
+    // SupportContext.setSupportOrg — this legacy API only ever applied to a
+    // regular user's own multiple memberships.
+    if (isPlatformUser) return false;
     const found = churches.find((c) => c.id === churchId);
     if (!found) return false;
 
-    setChurch(found);
+    setOwnChurch(found);
     if (user) {
       localStorage.setItem(`${ACTIVE_CHURCH_STORAGE_KEY}.${user.id}`, found.id);
     }
@@ -295,11 +329,12 @@ export function ChurchProvider({ children }: { children: ReactNode }) {
   };
 
   const clearActiveChurch = () => {
+    if (isPlatformUser) return;
     if (user) {
       localStorage.removeItem(`${ACTIVE_CHURCH_STORAGE_KEY}.${user.id}`);
     }
-    const profileChurch = churches.find((c) => c.id === profileChurchId) || churches[0] || null;
-    setChurch(profileChurch);
+    const profileChurch = churches.find((c) => c.id === ownProfileChurchId) || churches[0] || null;
+    setOwnChurch(profileChurch);
   };
 
   const isMatriz = church?.is_matriz ?? false;

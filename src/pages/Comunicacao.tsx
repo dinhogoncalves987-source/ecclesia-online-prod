@@ -11,6 +11,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { format } from "date-fns";
 import { ptBR, enUS, es } from "date-fns/locale";
 import { insertWithOrganizationScope, runScopedOrganizationQuery } from "@/lib/organizationScope";
+import { checkOrganizationContext } from "@/lib/organizationContextGuard";
 import { OperationalAssistant } from "@/components/OperationalAssistant";
 import { useRole } from "@/hooks/useRole";
 import { canWriteSecretaria, hasPermission, type AdminRole } from "@/lib/permissions";
@@ -148,7 +149,13 @@ export default function Comunicacao() {
       });
       return;
     }
-    if (!user || !church) return;
+    if (!user) return;
+    const orgCheck = checkOrganizationContext(church?.id, churchLoading);
+    if (orgCheck.ok === false) {
+      toast({ title: t("Organização não disponível"), description: t(orgCheck.message), variant: "destructive" });
+      return;
+    }
+    if (!church) return; // já reportado acima — apenas estreita o tipo para o TypeScript.
     setSaving(true);
     const { error } = await insertWithOrganizationScope("communications", church.id, {
       created_by: user.id,
@@ -170,7 +177,7 @@ export default function Comunicacao() {
   };
 
   const saveEdit = async () => {
-    if (!editingAnnouncement || !church) return;
+    if (!editingAnnouncement) return;
     if (!editForm.title.trim() || !editForm.content.trim()) {
       toast({
         title: t("Erro"),
@@ -179,6 +186,12 @@ export default function Comunicacao() {
       });
       return;
     }
+    const orgCheck = checkOrganizationContext(church?.id, churchLoading);
+    if (orgCheck.ok === false) {
+      toast({ title: t("Organização não disponível"), description: t(orgCheck.message), variant: "destructive" });
+      return;
+    }
+    if (!church) return; // já reportado acima — apenas estreita o tipo para o TypeScript.
     setSaving(true);
     const { error } = await supabase
       .from("communications")
@@ -204,7 +217,13 @@ export default function Comunicacao() {
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!canDelete || !church) return;
+    if (!canDelete) return; // botão nem deveria estar visível sem permissão — defensivo.
+    const orgCheck = checkOrganizationContext(church?.id, churchLoading);
+    if (orgCheck.ok === false) {
+      toast({ title: t("Organização não disponível"), description: t(orgCheck.message), variant: "destructive" });
+      return;
+    }
+    if (!church) return; // já reportado acima — apenas estreita o tipo para o TypeScript.
     if (!window.confirm(t("Remover este comunicado?"))) return;
     const { error } = await supabase
       .from("communications")

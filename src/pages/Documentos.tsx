@@ -15,6 +15,7 @@ import { OperationalAssistant } from "@/components/OperationalAssistant";
 import { useRole } from "@/hooks/useRole";
 import { canWriteSecretaria } from "@/lib/permissions";
 import { insertWithOrganizationScope } from "@/lib/organizationScope";
+import { checkOrganizationContext } from "@/lib/organizationContextGuard";
 
 type Document = {
   id: string; title: string; document_type: string; content: string | null;
@@ -52,7 +53,13 @@ export default function Documentos() {
   ];
 
   const handleBulkImport = async (rows: Record<string, string>[]) => {
-    if (!user || !church) return { success: 0, errors: 0 };
+    if (!user) return { success: 0, errors: rows.length };
+    const orgCheck = checkOrganizationContext(church?.id, churchLoading);
+    if (orgCheck.ok === false) {
+      toast({ title: t("Organização não disponível"), description: t(orgCheck.message), variant: "destructive" });
+      return { success: 0, errors: rows.length };
+    }
+    if (!church) return { success: 0, errors: rows.length }; // já reportado acima.
     let success = 0, errors = 0;
     for (const row of rows) {
       if (!row.title) { errors++; continue; }
@@ -69,7 +76,13 @@ export default function Documentos() {
   };
 
   const handleTextFile = (file: File) => {
-    if (!user || !church) return;
+    if (!user) return;
+    const orgCheck = checkOrganizationContext(church?.id, churchLoading);
+    if (orgCheck.ok === false) {
+      toast({ title: t("Organização não disponível"), description: t(orgCheck.message), variant: "destructive" });
+      return;
+    }
+    if (!church) return; // já reportado acima.
     const reader = new FileReader();
     reader.onload = async (e) => {
       const text = (e.target?.result as string) ?? "";
@@ -106,7 +119,13 @@ export default function Documentos() {
   }, [church, churchLoading, fetch_]);
 
   const handleAdd = async () => {
-    if (!title.trim() || !user || !church) return;
+    if (!title.trim() || !user) return;
+    const orgCheck = checkOrganizationContext(church?.id, churchLoading);
+    if (orgCheck.ok === false) {
+      toast({ title: t("Organização não disponível"), description: t(orgCheck.message), variant: "destructive" });
+      return;
+    }
+    if (!church) return; // já reportado acima.
     const { error } = await insertWithOrganizationScope("documents", church.id, {
       created_by: user.id,
       title: title.trim(),
@@ -120,7 +139,12 @@ export default function Documentos() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!church) return;
+    const orgCheck = checkOrganizationContext(church?.id, churchLoading);
+    if (orgCheck.ok === false) {
+      toast({ title: t("Organização não disponível"), description: t(orgCheck.message), variant: "destructive" });
+      return;
+    }
+    if (!church) return; // já reportado acima.
     if (!window.confirm(t("Remover este documento?"))) return;
     const { error } = await supabase
       .from("documents")

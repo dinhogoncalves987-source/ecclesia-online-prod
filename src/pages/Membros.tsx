@@ -47,6 +47,7 @@ import {
   CPF_CHECK_MESSAGES,
   MEMBER_CONTACT_CHECK_MESSAGES,
 } from "@/lib/memberFormValidation";
+import { checkOrganizationContext } from "@/lib/organizationContextGuard";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -1225,7 +1226,15 @@ export default function Membros() {
       setActiveTab("funcao");
       return;
     }
-    if (!user || !church) return;
+    if (!user) return;
+    const orgCheck = checkOrganizationContext(church?.id, churchLoading);
+    // Comparação explícita do discriminante — ver nota em memberFormValidation
+    // sobre strictNullChecks: false afetando o estreitamento de tipo aqui.
+    if (orgCheck.ok === false) {
+      toast.error(t(orgCheck.message));
+      return;
+    }
+    if (!church) return; // já reportado acima — apenas estreita o tipo para o TypeScript.
 
     // ── Validação de CPF (obrigatório, dígito verificador válido, sem
     // duplicidade na organização) — cadastro manual NUNCA usa a exceção de
