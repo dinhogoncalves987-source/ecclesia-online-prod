@@ -1190,7 +1190,13 @@ export default function Membros() {
 
     if (fromTabId === "contato") {
       const contactCheck = checkRequiredMemberContacts(form);
-      if (!contactCheck.ok) {
+      // Comparação explícita (`=== false`), não `!contactCheck.ok`: com
+      // strictNullChecks desligado neste projeto (tsconfig.json), o
+      // narrowing de uniões discriminadas por booleano literal via negação
+      // não é confiável no TypeScript — `=== false` narrowing funciona
+      // corretamente mesmo assim (union declarada em
+      // src/lib/memberFormValidation.ts).
+      if (contactCheck.ok === false) {
         toast.error(t(MEMBER_CONTACT_CHECK_MESSAGES[contactCheck.reason]));
         return false;
       }
@@ -1208,7 +1214,8 @@ export default function Membros() {
       return;
     }
     const contactCheck = checkRequiredMemberContacts(form);
-    if (!contactCheck.ok) {
+    // Comparação explícita — ver comentário equivalente em validateCurrentTabBeforeLeaving.
+    if (contactCheck.ok === false) {
       toast.error(t(MEMBER_CONTACT_CHECK_MESSAGES[contactCheck.reason]));
       setActiveTab("contato");
       return;
@@ -1628,7 +1635,8 @@ export default function Membros() {
                     whatsapp: data.whatsapp,
                     email: data.email,
                   });
-                  if (!contactCheck.ok) {
+                  // Comparação explícita — ver comentário em validateCurrentTabBeforeLeaving.
+                  if (contactCheck.ok === false) {
                     throw new Error(t(MEMBER_CONTACT_CHECK_MESSAGES[contactCheck.reason]));
                   }
                   const { data: cpfRows, error: cpfLookupError } = await supabase
@@ -1643,7 +1651,8 @@ export default function Membros() {
                       .filter(Boolean),
                   );
                   const cpfCheck = checkCpfForManualSave(data.cpf, existingCpfs);
-                  if (!cpfCheck.ok) throw new Error(t(CPF_CHECK_MESSAGES[cpfCheck.reason]));
+                  // Comparação explícita — ver comentário em validateCurrentTabBeforeLeaving.
+                  if (cpfCheck.ok === false) throw new Error(t(CPF_CHECK_MESSAGES[cpfCheck.reason]));
                   const { error } = await insertWithOrganizationScope("members", church.id, {
                     created_by: user.id, full_name: data.name, member_code: data.member_code?.trim() || null, member_role: data.role || "Membro",
                     cpf: cpfCheck.normalized,
@@ -2685,7 +2694,8 @@ export default function Membros() {
                         onClick={() => {
                           if (!editingId) return;
                           const contactCheck = checkRequiredMemberContacts(form);
-                          if (!contactCheck.ok) {
+                          // Comparação explícita — ver comentário em validateCurrentTabBeforeLeaving.
+                          if (contactCheck.ok === false) {
                             toast.error(t(MEMBER_CONTACT_CHECK_MESSAGES[contactCheck.reason]));
                             setActiveTab("contato");
                             return;
