@@ -711,17 +711,40 @@ export default function Membros() {
 
   const reloadMembers = useCallback(async () => {
     if (!church) return;
-    // Filtro aplicado ANTES do order para garantir que o PostgREST respeite o escopo
-    const { data, error } = await supabase
-      .from("members")
-      .select("*")
-      .eq("organization_id", church.id)
-      .order("full_name", { ascending: true });
-    if (import.meta.env.DEV) {
-      console.log("[Membros] Supabase retornou", data?.length ?? 0, data?.slice(0, 3));
+    // O PostgREST limita cada resposta a 1.000 linhas. Sem paginação, a lista
+    // terminava por volta da letra C apesar de haver milhares de membros.
+    // A ordenação secundária por id deixa a paginação estável quando existem
+    // nomes iguais.
+    const pageSize = 1_000;
+    const loadedMembers: Member[] = [];
+    let from = 0;
+    let loadError: { message: string } | null = null;
+
+    while (true) {
+      const { data, error } = await supabase
+        .from("members")
+        .select("*")
+        .eq("organization_id", church.id)
+        .order("full_name", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, from + pageSize - 1);
+
+      if (error) {
+        loadError = error;
+        break;
+      }
+
+      const page = (data as Member[]) || [];
+      loadedMembers.push(...page);
+      if (page.length < pageSize) break;
+      from += pageSize;
     }
-    if (error) { console.error("[Membros] Erro ao carregar:", error); toast.error(t("Erro ao carregar membros")); return; }
-    setMembers((data as Member[]) || []);
+
+    if (import.meta.env.DEV) {
+      console.log("[Membros] Supabase retornou", loadedMembers.length, loadedMembers.slice(0, 3));
+    }
+    if (loadError) { console.error("[Membros] Erro ao carregar:", loadError); toast.error(t("Erro ao carregar membros")); return; }
+    setMembers(loadedMembers);
   }, [church, t]);
 
   // ── Load sub-organizations for selectors (matrix + setores + congregações) ────
