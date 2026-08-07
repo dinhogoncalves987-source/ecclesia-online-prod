@@ -23,7 +23,6 @@ import { insertWithOrganizationScope } from "@/lib/organizationScope";
 import { canWriteSecretaria } from "@/lib/permissions";
 import {
   MEMBER_STATUSES,
-  MEMBER_STATUSES_NO_DELETE,
   isMemberStatus,
   type MemberStatus,
   ECCLESIASTICAL_FUNCTIONS,
