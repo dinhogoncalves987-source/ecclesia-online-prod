@@ -1477,12 +1477,23 @@ export default function Membros() {
   // ── Delete ───────────────────────────────────────────────────────────────────
 
   const removeMember = async (m: Member) => {
-    if (!church) return;
-    if (!confirm(`${t("Desativar")} ${m.full_name}? ${t("O histórico será preservado.")}`)) return;
-    const { error } = await supabase.from("members").update({ status: "Inativo" })
-      .eq("id", m.id).eq("organization_id", church.id);
-    if (error) { toast.error(t("Erro ao desativar"), { description: error.message }); return; }
-    toast.success(t("Membro desativado"));
+    if (!church || !canPermanentlyDeleteMember) return;
+    if (!confirm(`${t("Excluir definitivamente")} ${m.full_name}? ${t("Esta ação não pode ser desfeita.")}`)) return;
+
+    const { error } = await supabase
+      .from("members")
+      .delete()
+      .eq("id", m.id)
+      .eq("organization_id", church.id);
+
+    if (error) {
+      toast.error(t("Não foi possível excluir o membro"), {
+        description: `${t("O cadastro pode possuir histórico vinculado. Remova os vínculos ou mantenha-o inativo.")} ${error.message}`,
+      });
+      return;
+    }
+
+    toast.success(t("Membro excluído definitivamente"));
     await reloadMembers();
   };
 
@@ -1595,10 +1606,9 @@ export default function Membros() {
   const falecidoCount   = scopedMembers.filter(m => m.status === "Falecido").length;
   const transferidoCount = scopedMembers.filter(m => m.status === "Transferido").length;
 
-  const canDeactivateMember = (m: Member) =>
+  const canPermanentlyDeleteMember =
     canWrite
-    && m.status !== "Inativo"
-    && !MEMBER_STATUSES_NO_DELETE.includes(m.status as MemberStatus);
+    && (canonicalRole === "super_admin" || canonicalRole === "church_admin");
 
   // ── Sub-org label helper ─────────────────────────────────────────────────────
 
@@ -1871,13 +1881,13 @@ export default function Membros() {
                                 className="p-1 rounded hover:bg-secondary transition-colors" title={t("Editar")}>
                                 <Pencil size={14} className="text-muted-foreground" />
                               </button>
-                              {canDeactivateMember(m) ? (
+                              {canPermanentlyDeleteMember ? (
                                 <button type="button" onClick={() => removeMember(m)}
-                                  className="p-1 rounded hover:bg-destructive/10 transition-colors" title={t("Desativar")}>
+                                  className="p-1 rounded hover:bg-destructive/10 transition-colors" title={t("Excluir definitivamente")}>
                                   <Trash2 size={14} className="text-muted-foreground" />
                                 </button>
                               ) : (
-                                <span className="p-1 text-[10px] text-muted-foreground" title={t("Use alteração de status")}>—</span>
+                                <span className="p-1 text-[10px] text-muted-foreground" title={t("Exclusão disponível apenas para administradores")}>—</span>
                               )}
                             </>
                           )}
@@ -1948,9 +1958,9 @@ export default function Membros() {
                         className="p-1.5 rounded-lg bg-accent/10 hover:bg-accent/20 transition-colors" title={t("Carteira")}>
                         <CreditCard size={14} className="text-accent" />
                       </button>
-                      {canDeactivateMember(m) && (
+                      {canPermanentlyDeleteMember && (
                         <button type="button" onClick={e => { e.stopPropagation(); removeMember(m); }}
-                          className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors" title={t("Desativar")}>
+                          className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors" title={t("Excluir definitivamente")}>
                           <Trash2 size={14} className="text-muted-foreground" />
                         </button>
                       )}
