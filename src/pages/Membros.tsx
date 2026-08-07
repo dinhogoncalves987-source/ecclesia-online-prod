@@ -1,6 +1,6 @@
 import { AdminLayout } from "@/components/AdminLayout";
 import {
-  Search, Plus, X, Trash2, Loader2, Upload, Pencil, CreditCard, Camera, ChevronRight,
+  Search, Plus, X, Trash2, Loader2, Upload, Pencil, CreditCard, Camera, ChevronLeft, ChevronRight,
   User, FileText, Phone, MapPin, Church, Briefcase, Users, BookOpen, Send, Building2,
   Shield,
   type LucideIcon,
@@ -109,6 +109,8 @@ type Member = {
 };
 
 type SubOrg = { id: string; name: string; organization_type: string };
+
+const MEMBERS_VIEW_PAGE_SIZE = 100;
 
 // ─── Família e Dependentes (public.member_family) ───────────────────────────
 
@@ -439,6 +441,7 @@ export default function Membros() {
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
+  const [currentPage, setCurrentPage] = useState(1);
   const [showImport, setShowImport] = useState(false);
   const [walletMember, setWalletMember] = useState<Member | null>(null);
 
@@ -750,31 +753,38 @@ export default function Membros() {
 
   const reloadSubOrgs = useCallback(async () => {
     if (!church) return;
-    // Step 1: direct children of matrix (setores)
-    const { data: children } = await supabase
-      .from("organizations")
-      .select("id, name, organization_type")
-      .eq("parent_id", church.id)
-      .eq("active", true);
-    const childIds = (children || []).map(c => c.id);
-    // Step 2: grandchildren (congregações under setores) — only if setores exist
-    let grandchildren: SubOrg[] = [];
-    if (childIds.length > 0) {
-      const { data: gc } = await supabase
+
+    // A estrutura municipal possui até três níveis abaixo da matriz:
+    // setor → subsede → congregação. A consulta anterior parava no segundo
+    // nível e deixava congregações de subsedes sem nome nos seletores/listas.
+    const descendants: SubOrg[] = [];
+    let parentIds = [church.id];
+
+    for (let depth = 0; depth < 3 && parentIds.length > 0; depth += 1) {
+      const { data, error } = await supabase
         .from("organizations")
         .select("id, name, organization_type")
-        .in("parent_id", childIds)
-        .eq("active", true);
-      grandchildren = (gc as SubOrg[]) || [];
+        .in("parent_id", parentIds)
+        .eq("active", true)
+        .order("name", { ascending: true });
+
+      if (error) {
+        console.error("[Membros] Erro ao carregar estrutura:", error);
+        toast.error(t("Erro ao carregar estrutura"), { description: error.message });
+        return;
+      }
+
+      const level = (data as SubOrg[] | null) ?? [];
+      descendants.push(...level);
+      parentIds = level.map((organization) => organization.id);
     }
-    // Combine: include matrix itself + all descendants
+
     const all: SubOrg[] = [
       { id: church.id, name: church.name, organization_type: church.organization_type || "matriz" },
-      ...((children as SubOrg[]) || []),
-      ...grandchildren,
+      ...descendants,
     ].sort((a, b) => a.name.localeCompare(b.name));
     setSubOrgs(all);
-  }, [church]);
+  }, [church, t]);
 
   useEffect(() => {
     if (!user || churchLoading) return;
@@ -817,6 +827,19 @@ export default function Membros() {
     if (filterStatus !== "all" && m.status !== filterStatus) return false;
     return matchesMemberSearch(m, searchQuery);
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / MEMBERS_VIEW_PAGE_SIZE));
+  const visiblePage = Math.min(currentPage, totalPages);
+  const pageStart = (visiblePage - 1) * MEMBERS_VIEW_PAGE_SIZE;
+  const visibleMembers = filtered.slice(pageStart, pageStart + MEMBERS_VIEW_PAGE_SIZE);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterStatus, contextFilter?.orgId]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
 
   // ── Photo upload ─────────────────────────────────────────────────────────────
 
@@ -1798,7 +1821,7 @@ export default function Membros() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map(m => (
+                  {visibleMembers.map(m => (
                     <tr key={m.id}
                       onClick={() => canWrite && openEdit(m)}
                       className={`border-b border-border/30 transition-colors ${canWrite ? "hover:bg-secondary/30 cursor-pointer" : ""}`}>
@@ -1908,7 +1931,7 @@ export default function Membros() {
 
             {/* Mobile cards */}
             <div className="sm:hidden space-y-2">
-              {filtered.map((m, i) => (
+              {visibleMembers.map((m, i) => (
                 <motion.div key={m.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
                   <div
                     role="button" tabIndex={0}
@@ -1973,6 +1996,37 @@ export default function Membros() {
                 </div>
               )}
             </div>
+
+            {filtered.length > MEMBERS_VIEW_PAGE_SIZE && (
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-1 pt-1">
+                <p className="text-xs text-muted-foreground">
+                  {pageStart + 1}–{Math.min(pageStart + MEMBERS_VIEW_PAGE_SIZE, filtered.length)} de {filtered.length} membros
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    disabled={visiblePage === 1}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-secondary text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-secondary/80 transition-colors"
+                    aria-label="Página anterior"
+                  >
+                    <ChevronLeft size={14} /> Anterior
+                  </button>
+                  <span className="text-xs text-muted-foreground min-w-20 text-center">
+                    Página {visiblePage} de {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                    disabled={visiblePage === totalPages}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-secondary text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-secondary/80 transition-colors"
+                    aria-label="Próxima página"
+                  >
+                    Próxima <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
