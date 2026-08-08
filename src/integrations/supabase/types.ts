@@ -6754,6 +6754,17 @@ export type Database = {
         Args: { p_organization_id: string; p_rows: Json }
         Returns: Json
       }
+      member_status_counts: {
+        Args: {
+          p_match_congregation_ids?: string[] | null
+          p_match_either_ids?: string[] | null
+          p_organization_id: string
+        }
+        Returns: {
+          status: string
+          total: number
+        }[]
+      }
       import_finance_transactions_bulk: {
         Args: { p_rows: Json }
         Returns: Json

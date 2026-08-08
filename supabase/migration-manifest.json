@@ -137,7 +137,8 @@
     "20260803190000_legacy_role_capability_bridge.sql",
     "20260803200000_access_bootstrap_hotfix.sql",
     "20260804090000_management_access_reconciliation_audit.sql",
-    "20260804100000_member_invite_whatsapp_only_split_delivery.sql"
+    "20260804100000_member_invite_whatsapp_only_split_delivery.sql",
+    "20260808170000_members_server_side_listing_performance.sql"
   ],
   "staging_feature": [],
   "staging_only": [

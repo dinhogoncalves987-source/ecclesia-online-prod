@@ -37,7 +37,6 @@ import {
   ADDRESS_TYPES,
   getCivilDocLabel,
 } from "@/lib/secretariaConstants";
-import { matchesMemberSearch } from "@/lib/memberSearch";
 import { readFormDraft } from "@/lib/appResumeState";
 import { useResumableFormDraft, discardFormDraft } from "@/hooks/useResumableFormDraft";
 import {
@@ -110,7 +109,45 @@ type Member = {
 
 type SubOrg = { id: string; name: string; organization_type: string };
 
+// Subconjunto de campos de Member realmente usado na listagem (linha da
+// tabela/card). Buscar somente estas colunas — em vez de select("*") — evita
+// transferir ~40 campos (endereço, dados eclesiásticos, documentos, notas
+// etc.) que só são necessários quando a ficha completa é aberta (ver
+// FETCH_MEMBER_DETAIL_COLUMNS / openEdit / openWalletFor, que buscam a ficha
+// inteira sob demanda, um único registro por vez, indexado por id).
+const MEMBER_LIST_COLUMNS =
+  "id, full_name, member_code, member_role, administrative_role, status, phone, email, photo_url, birth_date, joined_at, congregation_id, sector_id, civil_document_status, marital_status";
+
+type MemberListItem = Pick<
+  Member,
+  | "id"
+  | "full_name"
+  | "member_code"
+  | "member_role"
+  | "administrative_role"
+  | "status"
+  | "phone"
+  | "email"
+  | "photo_url"
+  | "birth_date"
+  | "joined_at"
+  | "congregation_id"
+  | "sector_id"
+  | "civil_document_status"
+  | "marital_status"
+>;
+
+// Opção leve para o seletor "vincular a membro existente" (aba Família) —
+// nunca carrega a ficha inteira dos outros membros, apenas id + nome,
+// limitado a MEMBER_LINK_OPTIONS_LIMIT registros (ver reloadFamilyLinkOptions).
+type MemberLinkOption = { id: string; full_name: string };
+const MEMBER_LINK_OPTIONS_LIMIT = 500;
+
 const MEMBERS_VIEW_PAGE_SIZE = 100;
+
+// Contadores do cabeçalho (por status) — resultado de public.member_status_counts,
+// sempre calculados no servidor, nunca a partir da página atual de membros.
+type MemberStatusCounts = Partial<Record<MemberStatus, number>>;
 
 // ─── Família e Dependentes (public.member_family) ───────────────────────────
 
@@ -436,21 +473,47 @@ export default function Membros() {
     return () => { cancelled = true; };
   }, [contextFilter]);
 
-  const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
+  // ── Listagem paginada no servidor ────────────────────────────────────────
+  // `members` contém SOMENTE a página atual (no máximo MEMBERS_VIEW_PAGE_SIZE
+  // registros, colunas enxutas de MEMBER_LIST_COLUMNS) — nunca a organização
+  // inteira. Ver reloadMembersPage/fetchMembersPage mais abaixo.
+  const [members, setMembers] = useState<MemberListItem[]>([]);
+  const [loading, setLoading] = useState(true); // somente a 1ª carga (sem cache) — nunca reaparece em troca de página/filtro com cache quente
+  const [pageTransitioning, setPageTransitioning] = useState(false); // troca de página/filtro com cache frio: mantém linhas antigas visíveis + indicador discreto
+  const [listError, setListError] = useState<string | null>(null);
+  const [totalFilteredCount, setTotalFilteredCount] = useState(0); // total no escopo+filtro+busca atuais (para "1–100 de N" e totalPages)
   const [saving, setSaving] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchInput, setSearchInput] = useState(""); // valor bruto do campo de busca
+  const [searchQuery, setSearchQuery] = useState(""); // valor após debounce — usado na query ao servidor
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [showImport, setShowImport] = useState(false);
   const [walletMember, setWalletMember] = useState<Member | null>(null);
+  const [walletLoadingId, setWalletLoadingId] = useState<string | null>(null);
+
+  // Contadores do cabeçalho — sempre por RPC independente (member_status_counts),
+  // nunca derivados da página de membros carregada. null enquanto carregando
+  // (renderiza "—", nunca "0" falso).
+  const [statusCounts, setStatusCounts] = useState<MemberStatusCounts | null>(null);
 
   // Modal form state
   const [modalOpen, setModalOpen] = useState(false);
   const [isNewMember, setIsNewMember] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  // Ficha completa do membro em edição (buscada sob demanda em openEdit — só
+  // quando o membro é efetivamente aberto, nunca a partir da listagem
+  // paginada). Alimenta os botões "Carteira" e "Gerenciar acessos" do rodapé
+  // do modal, que antes dependiam de procurar o membro no array `members`
+  // (que agora só tem a página atual, não a organização inteira).
+  const [editingMemberFull, setEditingMemberFull] = useState<Member | null>(null);
   const [activeTab, setActiveTab] = useState("pessoal");
   const [form, setForm] = useState<Omit<Member, "id">>({ ...EMPTY_FORM });
+
+  // Opções para "vincular a membro existente" na aba Família — lista leve
+  // (id + nome, limitada) e independente da listagem paginada; ver
+  // reloadFamilyLinkOptions.
+  const [familyLinkOptions, setFamilyLinkOptions] = useState<MemberLinkOption[]>([]);
 
   // ── Retomada de cadastro após reinicialização da PWA ─────────────────────
   // Restaura (uma única vez, ao montar) um rascunho de cadastro/edição que
@@ -709,45 +772,259 @@ export default function Membros() {
   const setField = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm(prev => ({ ...prev, [key]: value }));
 
-  // ── Load members ────────────────────────────────────────────────────────────
+  // ── Load members — paginação, filtro, busca e contagem no servidor ─────────
+  // Substitui o antigo reloadMembers (while(true) + select("*") trazendo os
+  // 7.121 membros da organização para o navegador). Agora cada requisição
+  // busca no máximo MEMBERS_VIEW_PAGE_SIZE linhas, com apenas as colunas de
+  // MEMBER_LIST_COLUMNS, filtro/busca/ordenação executados pelo Postgres
+  // (índices em supabase/migrations/20260808170000_members_server_side_listing_performance.sql)
+  // e o total exato devolvido pelo próprio PostgREST (count: "exact").
+  const CACHE_TTL_MS = 60_000;
+  const membersCacheRef = useRef(new Map<string, { items: MemberListItem[]; total: number; ts: number }>());
+  const membersRequestIdRef = useRef(0);
+  const membersAbortRef = useRef<AbortController | null>(null);
 
-  const reloadMembers = useCallback(async () => {
+  type MemberScope = { matchCongregationIds: string[] | null; matchEitherIds: string[] | null; empty: boolean };
+
+  // Mesma regra de escopo hierárquico que existia no filtro client-side
+  // (scopedMembers), agora aplicada como filtro de servidor:
+  //  • subsede selecionada  → congregation_id IN (congregações filhas)
+  //  • setor/congregação selecionados → congregation_id = id OU sector_id = id
+  //  • nenhum contextFilter → toda a organização (matriz)
+  const buildMemberScope = useCallback((): MemberScope => {
+    if (!contextFilter) return { matchCongregationIds: null, matchEitherIds: null, empty: false };
+    if (contextFilter.orgType === "subsede") {
+      if (subsedeCongregationIds.length === 0) {
+        return { matchCongregationIds: [], matchEitherIds: null, empty: true };
+      }
+      return { matchCongregationIds: subsedeCongregationIds, matchEitherIds: null, empty: false };
+    }
+    return { matchCongregationIds: null, matchEitherIds: [contextFilter.orgId], empty: false };
+  }, [contextFilter, subsedeCongregationIds]);
+
+  const memberScopeKey = contextFilter
+    ? contextFilter.orgType === "subsede"
+      ? `subsede:${contextFilter.orgId}:${subsedeCongregationIds.join(",")}`
+      : `direct:${contextFilter.orgId}`
+    : "all";
+
+  const fetchMembersPage = useCallback(async (page: number, opts: { silent?: boolean } = {}) => {
     if (!church) return;
-    // O PostgREST limita cada resposta a 1.000 linhas. Sem paginação, a lista
-    // terminava por volta da letra C apesar de haver milhares de membros.
-    // A ordenação secundária por id deixa a paginação estável quando existem
-    // nomes iguais.
-    const pageSize = 1_000;
-    const loadedMembers: Member[] = [];
-    let from = 0;
-    let loadError: { message: string } | null = null;
+    const scope = buildMemberScope();
+    const trimmedSearch = searchQuery.trim().toLowerCase();
+    const cacheKey = `${church.id}|${memberScopeKey}|${filterStatus}|${trimmedSearch}|${page}`;
 
-    while (true) {
-      const { data, error } = await supabase
+    // Subsede sem nenhuma congregação filha: resultado é sempre vazio — não
+    // vale a pena ir ao servidor.
+    if (scope.empty) {
+      membersCacheRef.current.set(cacheKey, { items: [], total: 0, ts: Date.now() });
+      setMembers([]);
+      setTotalFilteredCount(0);
+      setListError(null);
+      setLoading(false);
+      setPageTransitioning(false);
+      return;
+    }
+
+    const requestId = ++membersRequestIdRef.current;
+    membersAbortRef.current?.abort(); // cancela qualquer requisição de página/filtro anterior ainda em voo
+    const controller = new AbortController();
+    membersAbortRef.current = controller;
+
+    if (!opts.silent) setPageTransitioning(true);
+    try {
+      const from = (page - 1) * MEMBERS_VIEW_PAGE_SIZE;
+      const to = from + MEMBERS_VIEW_PAGE_SIZE - 1;
+      let query = supabase
         .from("members")
-        .select("*")
-        .eq("organization_id", church.id)
-        .order("full_name", { ascending: true })
-        .order("id", { ascending: true })
-        .range(from, from + pageSize - 1);
+        .select(MEMBER_LIST_COLUMNS, { count: "exact" })
+        .eq("organization_id", church.id);
 
-      if (error) {
-        loadError = error;
-        break;
+      if (scope.matchCongregationIds) {
+        query = query.in("congregation_id", scope.matchCongregationIds);
+      } else if (scope.matchEitherIds) {
+        const orExpr = scope.matchEitherIds
+          .flatMap(id => [`congregation_id.eq.${id}`, `sector_id.eq.${id}`])
+          .join(",");
+        query = query.or(orExpr);
       }
 
-      const page = (data as Member[]) || [];
-      loadedMembers.push(...page);
-      if (page.length < pageSize) break;
-      from += pageSize;
+      if (filterStatus !== "all") {
+        query = query.eq("status", filterStatus);
+      }
+      // Busca única contra a coluna gerada search_blob (índice GIN trigram) —
+      // substitui matchesMemberSearch client-side, mesmos campos cobertos
+      // (nome, apelido, código, CPF, telefone, WhatsApp, função, cargo, e-mail).
+      if (trimmedSearch) {
+        query = query.ilike("search_blob", `%${trimmedSearch}%`);
+      }
+
+      const { data, error, count } = await query
+        .order("full_name", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to)
+        .abortSignal(controller.signal);
+
+      if (requestId !== membersRequestIdRef.current) return; // resposta obsoleta — outra página/filtro já foi solicitada
+
+      if (error) {
+        if ((error as { name?: string; code?: string }).name === "AbortError") return;
+        console.error("[Membros] Erro ao carregar página:", error);
+        if (!opts.silent) {
+          setListError(error.message || t("Erro ao carregar membros"));
+          toast.error(t("Erro ao carregar membros"), { description: error.message });
+        }
+        return;
+      }
+
+      const items = (data as MemberListItem[]) ?? [];
+      const total = count ?? items.length;
+      membersCacheRef.current.set(cacheKey, { items, total, ts: Date.now() });
+      setMembers(items);
+      setTotalFilteredCount(total);
+      setListError(null);
+
+      // Prefetch silencioso da próxima página (só a partir de uma busca em
+      // primeiro plano — nunca encadeado a partir de outro prefetch, para não
+      // varrer todas as páginas restantes de uma vez).
+      if (!opts.silent) {
+        const nextPage = page + 1;
+        if (nextPage <= Math.ceil(total / MEMBERS_VIEW_PAGE_SIZE)) {
+          const nextKey = `${church.id}|${memberScopeKey}|${filterStatus}|${trimmedSearch}|${nextPage}`;
+          const cachedNext = membersCacheRef.current.get(nextKey);
+          if (!cachedNext || Date.now() - cachedNext.ts > CACHE_TTL_MS) {
+            void fetchMembersPage(nextPage, { silent: true });
+          }
+        }
+      }
+    } finally {
+      if (requestId === membersRequestIdRef.current) {
+        setLoading(false);
+        setPageTransitioning(false);
+      }
+    }
+  }, [church, buildMemberScope, memberScopeKey, filterStatus, searchQuery, t]);
+
+  // Debounce curto (300ms) do campo de busca — evita uma requisição por tecla.
+  useEffect(() => {
+    const handle = setTimeout(() => setSearchQuery(searchInput), 300);
+    return () => clearTimeout(handle);
+  }, [searchInput]);
+
+  useEffect(() => {
+    if (!user || churchLoading) return;
+    if (!church) { setMembers([]); setTotalFilteredCount(0); setLoading(false); return; }
+
+    const trimmedSearch = searchQuery.trim().toLowerCase();
+    const cacheKey = `${church.id}|${memberScopeKey}|${filterStatus}|${trimmedSearch}|${currentPage}`;
+    const cached = membersCacheRef.current.get(cacheKey);
+
+    if (cached) {
+      // Cache quente: exibe imediatamente (nunca zero falso, nunca spinner) e
+      // revalida em segundo plano se os dados já não forem tão recentes.
+      setMembers(cached.items);
+      setTotalFilteredCount(cached.total);
+      setListError(null);
+      setLoading(false);
+      setPageTransitioning(false);
+      if (Date.now() - cached.ts > CACHE_TTL_MS) {
+        void fetchMembersPage(currentPage, { silent: true });
+      }
+      return;
     }
 
-    if (import.meta.env.DEV) {
-      console.log("[Membros] Supabase retornou", loadedMembers.length, loadedMembers.slice(0, 3));
+    void fetchMembersPage(currentPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setLoading(true) condicional lê `members` sem precisar disparar o efeito quando `members` muda (evitaria loop)
+  }, [user, church, churchLoading, memberScopeKey, filterStatus, searchQuery, currentPage, fetchMembersPage]);
+
+  // Mostra o spinner grande de página inteira somente na 1ª carga real (sem
+  // nenhuma linha ainda) — trocas subsequentes de página/filtro usam
+  // pageTransitioning (indicador discreto, mantendo a tabela anterior visível).
+  useEffect(() => {
+    if (members.length === 0 && pageTransitioning) setLoading(true);
+    else if (members.length > 0) setLoading(false);
+  }, [members.length, pageTransitioning]);
+
+  // ── Contadores do cabeçalho — RPC independente, nunca bloqueia a listagem ──
+  // Escopo igual ao da listagem (hierarquia), mas independente de busca/status
+  // selecionado no filtro de abas — mostra sempre o total por status da
+  // unidade em foco, exatamente como antes (scopedMembers agrupado por status).
+  useEffect(() => {
+    if (!user || churchLoading || !church) return;
+    let cancelled = false;
+    const scope = buildMemberScope();
+    if (scope.empty) {
+      setStatusCounts({});
+      return;
     }
-    if (loadError) { console.error("[Membros] Erro ao carregar:", loadError); toast.error(t("Erro ao carregar membros")); return; }
-    setMembers(loadedMembers);
-  }, [church, t]);
+    setStatusCounts(null); // "—" enquanto carrega — nunca 0 falso
+    supabase
+      .rpc("member_status_counts", {
+        p_organization_id: church.id,
+        p_match_congregation_ids: scope.matchCongregationIds,
+        p_match_either_ids: scope.matchEitherIds,
+      })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          console.error("[Membros] Erro ao carregar contadores:", error.message);
+          setStatusCounts({}); // degrada para "0" explícito em vez de "—" infinito
+          return;
+        }
+        const counts: MemberStatusCounts = {};
+        for (const row of (data ?? []) as { status: string; total: number }[]) {
+          if (isMemberStatus(row.status)) counts[row.status] = Number(row.total);
+        }
+        setStatusCounts(counts);
+      });
+    return () => { cancelled = true; };
+  }, [user, churchLoading, church, memberScopeKey, buildMemberScope]);
+
+  // Invalida o cache e recarrega a página atual + contadores após qualquer
+  // escrita (criar/editar/excluir/mudar status/importar) — nunca reintroduz o
+  // fetch-all: apenas repete a mesma consulta paginada de antes.
+  const refreshAfterMutation = useCallback(async () => {
+    membersCacheRef.current.clear();
+    await fetchMembersPage(currentPage);
+    if (church) {
+      const scope = buildMemberScope();
+      if (!scope.empty) {
+        const { data, error } = await supabase.rpc("member_status_counts", {
+          p_organization_id: church.id,
+          p_match_congregation_ids: scope.matchCongregationIds,
+          p_match_either_ids: scope.matchEitherIds,
+        });
+        if (!error) {
+          const counts: MemberStatusCounts = {};
+          for (const row of (data ?? []) as { status: string; total: number }[]) {
+            if (isMemberStatus(row.status)) counts[row.status] = Number(row.total);
+          }
+          setStatusCounts(counts);
+        }
+      } else {
+        setStatusCounts({});
+      }
+    }
+  }, [fetchMembersPage, currentPage, church, buildMemberScope]);
+
+  // Lista leve (id + nome, limitada) para "vincular a membro existente" na
+  // aba Família do modal — nunca usa a listagem paginada (que só tem a
+  // página atual) nem baixa a organização inteira.
+  const reloadFamilyLinkOptions = useCallback(async () => {
+    if (!church) return;
+    const { data, error } = await supabase
+      .from("members")
+      .select("id, full_name")
+      .eq("organization_id", church.id)
+      .order("full_name", { ascending: true })
+      .limit(MEMBER_LINK_OPTIONS_LIMIT);
+    if (error) {
+      console.warn("[Membros] Não foi possível carregar opções de família:", error.message);
+      setFamilyLinkOptions([]);
+      return;
+    }
+    setFamilyLinkOptions((data as MemberLinkOption[]) ?? []);
+  }, [church]);
 
   // ── Load sub-organizations for selectors (matrix + setores + congregações) ────
 
@@ -788,50 +1065,18 @@ export default function Membros() {
 
   useEffect(() => {
     if (!user || churchLoading) return;
-    if (!church) { setMembers([]); setLoading(false); return; }
-    const load = async () => {
-      setLoading(true);
-      await Promise.all([reloadMembers(), reloadSubOrgs()]);
-      setLoading(false);
-    };
-    load();
-  }, [user, church, churchLoading, reloadMembers, reloadSubOrgs]);
+    if (!church) return;
+    void reloadSubOrgs();
+  }, [user, church, churchLoading, reloadSubOrgs]);
 
-  // ── Filtering ───────────────────────────────────────────────────────────────
-
-  // Membros da unidade em foco: toda a matriz (sem contextFilter) OU somente a
-  // congregação/setor selecionado (com contextFilter). Contadores do cabeçalho
-  // e o "Nenhum membro encontrado" devem ser calculados sobre este escopo —
-  // nunca sobre o total da matriz quando uma congregação está selecionada.
-  // Subsedes: lista membros de todas as congregações filhas da subsede.
-  const scopedMembers = contextFilter
-    ? contextFilter.orgType === "subsede"
-      ? subsedeCongregationIds.length > 0
-        ? members.filter(m =>
-            m.congregation_id !== null &&
-            subsedeCongregationIds.includes(m.congregation_id),
-          )
-        : [] // subsede sem congregações = lista vazia
-      : members.filter(m =>
-          m.congregation_id === contextFilter.orgId ||
-          m.sector_id       === contextFilter.orgId,
-        )
-    : members;
-
-  // Busca textual (nome, nome conhecido, CPF, WhatsApp, código legado e
-  // matrícula antiga) — lógica extraída para src/lib/memberSearch.ts para
-  // ser testável isoladamente. Filtra sobre os membros já carregados no
-  // cliente (mesmo comportamento client-side de antes da Parte 1; ver
-  // comentário no módulo memberSearch.ts sobre risco de escala).
-  const filtered = scopedMembers.filter(m => {
-    if (filterStatus !== "all" && m.status !== filterStatus) return false;
-    return matchesMemberSearch(m, searchQuery);
-  });
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / MEMBERS_VIEW_PAGE_SIZE));
+  // ── Paginação/contagem exibida — inteiramente derivada do servidor ─────────
+  // `members` já é a página atual (fetchMembersPage) e `totalFilteredCount` é
+  // o total exato no escopo+filtro+busca atuais (count: "exact" do
+  // PostgREST) — nunca calculados fatiando um array carregado por completo.
+  const visibleMembers = members;
+  const totalPages = Math.max(1, Math.ceil(totalFilteredCount / MEMBERS_VIEW_PAGE_SIZE));
   const visiblePage = Math.min(currentPage, totalPages);
   const pageStart = (visiblePage - 1) * MEMBERS_VIEW_PAGE_SIZE;
-  const visibleMembers = filtered.slice(pageStart, pageStart + MEMBERS_VIEW_PAGE_SIZE);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -1005,6 +1250,7 @@ export default function Membros() {
   const openNew = () => {
     setIsNewMember(true);
     setEditingId(null);
+    setEditingMemberFull(null);
     const isSectorContext = !!contextFilter && SECTOR_TYPES.includes(contextFilter.orgType);
     setForm({
       ...EMPTY_FORM,
@@ -1022,11 +1268,47 @@ export default function Membros() {
     setPendingAddressEntries([]);
     setAddressDraft(null);
     setModalOpen(true);
+    void reloadFamilyLinkOptions();
   };
 
-  const openEdit = (m: Member) => {
+  // Busca a ficha COMPLETA do membro sob demanda (um único registro, por id
+  // — indexado, instantâneo) somente quando o membro é efetivamente aberto.
+  // Antes, a edição usava o objeto já presente no array `members`, que
+  // guardava a organização inteira (select("*") de todos os 7.121 membros);
+  // agora `members` só tem a página atual com colunas enxutas
+  // (MEMBER_LIST_COLUMNS), então a ficha completa precisa vir sob demanda.
+  // O modal abre IMEDIATAMENTE (resposta visual ao clique) com um estado de
+  // carregamento próprio (editLoading) enquanto a ficha chega.
+  const openEdit = async (id: string) => {
     setIsNewMember(false);
-    setEditingId(m.id);
+    setEditingId(id);
+    setEditingMemberFull(null);
+    setEditLoading(true);
+    setActiveTab("pessoal");
+    setPhotoFile(null);
+    setCivilDocumentFile(null);
+    setPendingFamilyEntries([]);
+    setFamilyDraft(null);
+    setPendingAddressEntries([]);
+    setAddressDraft(null);
+    setModalOpen(true);
+    void reloadFamilyLinkOptions();
+
+    const { data, error } = await supabase
+      .from("members")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error || !data) {
+      toast.error(t("Não foi possível carregar os dados do membro."), { description: error?.message });
+      closeModal();
+      setEditLoading(false);
+      return;
+    }
+
+    const m = data as Member;
+    setEditingMemberFull(m);
     setForm({
       full_name:         m.full_name,
       known_name:        m.known_name || "",
@@ -1082,21 +1364,16 @@ export default function Membros() {
       consecration_date:        m.consecration_date || "",
     });
     setPhotoPreview(m.photo_url || null);
-    setPhotoFile(null);
-    setCivilDocumentFile(null);
-    setActiveTab("pessoal");
-    setPendingFamilyEntries([]);
-    setFamilyDraft(null);
-    setPendingAddressEntries([]);
-    setAddressDraft(null);
+    setEditLoading(false);
     void loadFamilyEntries(m.id);
     void loadAddressEntries(m.id);
-    setModalOpen(true);
   };
 
   const closeModal = () => {
     setModalOpen(false);
     setEditingId(null);
+    setEditingMemberFull(null);
+    setEditLoading(false);
     setPhotoPreview(null);
     setPhotoFile(null);
     setCivilDocumentFile(null);
@@ -1457,10 +1734,13 @@ export default function Membros() {
         }
 
         toast.success(t("Membro cadastrado com sucesso!"));
-        await reloadMembers();
+        await refreshAfterMutation();
         if (openWallet) {
-          const saved = members.find(m => m.id === newId) || { ...(form as Member), id: newId, photo_url: photoUrl, civil_document_url: civilDocumentUrl };
-          setWalletMember(saved as Member);
+          // `form` já contém exatamente os dados recém-gravados (buildCorePayload
+          // + buildExtendedPayload) — não é preciso procurar o novo membro na
+          // listagem paginada (que pode nem incluir esta página).
+          const saved: Member = { ...(form as Member), id: newId, photo_url: photoUrl, civil_document_url: civilDocumentUrl };
+          setWalletMember(saved);
         }
         closeModal();
 
@@ -1488,7 +1768,7 @@ export default function Membros() {
         if (!allSaved) return;
         toast.success(t("Membro atualizado com sucesso!"));
 
-        await reloadMembers();
+        await refreshAfterMutation();
         closeModal();
       }
     } finally {
@@ -1498,7 +1778,7 @@ export default function Membros() {
 
   // ── Delete ───────────────────────────────────────────────────────────────────
 
-  const removeMember = async (m: Member) => {
+  const removeMember = async (m: Pick<Member, "id" | "full_name">) => {
     if (!church || !canPermanentlyDeleteMember) return;
     if (!confirm(`${t("Excluir definitivamente")} ${m.full_name}? ${t("Esta ação não pode ser desfeita.")}`)) return;
 
@@ -1516,7 +1796,7 @@ export default function Membros() {
     }
 
     toast.success(t("Membro excluído definitivamente"));
-    await reloadMembers();
+    await refreshAfterMutation();
   };
 
   const updateMemberStatus = async (id: string, newStatus: MemberStatus) => {
@@ -1525,7 +1805,7 @@ export default function Membros() {
       .eq("id", id).eq("organization_id", church.id);
     if (error) { toast.error(t("Erro ao atualizar"), { description: error.message }); return; }
     toast.success(t("Status atualizado"));
-    await reloadMembers();
+    await refreshAfterMutation();
   };
 
   // ── Bulk import ──────────────────────────────────────────────────────────────
@@ -1617,16 +1897,19 @@ export default function Membros() {
       ? data as { success?: number; errors?: number }
       : {};
     const success = result.success ?? prepared.length;
-    await reloadMembers();
+    await refreshAfterMutation();
     return { success, errors: result.errors ?? 0 };
   };
 
-  // ── Stats ────────────────────────────────────────────────────────────────────
-
-  const activeCount     = scopedMembers.filter(m => m.status === "Ativo").length;
-  const visitanteCount  = scopedMembers.filter(m => m.status === "Visitante").length;
-  const falecidoCount   = scopedMembers.filter(m => m.status === "Falecido").length;
-  const transferidoCount = scopedMembers.filter(m => m.status === "Transferido").length;
+  // ── Stats — sempre via RPC member_status_counts, nunca da página carregada ──
+  // statusCounts === null enquanto a contagem carrega (renderiza "—", nunca
+  // "0" falso); {} quando a organização/escopo legitimamente não tem membros.
+  const countsLoading  = statusCounts === null;
+  const countsTotal    = statusCounts ? Object.values(statusCounts).reduce((a, b) => a + (b ?? 0), 0) : 0;
+  const activeCount     = statusCounts?.["Ativo"] ?? 0;
+  const visitanteCount  = statusCounts?.["Visitante"] ?? 0;
+  const falecidoCount   = statusCounts?.["Falecido"] ?? 0;
+  const transferidoCount = statusCounts?.["Transferido"] ?? 0;
 
   const canPermanentlyDeleteMember =
     canWrite
@@ -1657,6 +1940,23 @@ export default function Membros() {
     joined_at: m.joined_at,
   });
 
+  // A Carteira precisa de campos (cpf, filiação, batismo) que não fazem parte
+  // de MEMBER_LIST_COLUMNS — busca a ficha completa sob demanda, um único
+  // registro por id, só quando o botão "Carteira" é realmente clicado.
+  const openWalletFor = async (id: string) => {
+    setWalletLoadingId(id);
+    try {
+      const { data, error } = await supabase.from("members").select("*").eq("id", id).maybeSingle();
+      if (error || !data) {
+        toast.error(t("Não foi possível carregar a carteira do membro."), { description: error?.message });
+        return;
+      }
+      setWalletMember(data as Member);
+    } finally {
+      setWalletLoadingId(null);
+    }
+  };
+
   const filterOptions: FilterStatus[] = ["all", ...MEMBER_STATUSES];
   const sectors       = subOrgs.filter(o => o.organization_type === "setor" || o.organization_type === "district");
   const congregations = subOrgs.filter(o => o.organization_type === "congregacao" || o.organization_type === "congregation" || o.organization_type === "church");
@@ -1674,9 +1974,9 @@ export default function Membros() {
           <div>
             <h1 className="text-2xl sm:text-3xl font-serif tracking-tight">{t("Membros")}</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {scopedMembers.length} {t("cadastrados")} · {activeCount} {t("ativos")} · {visitanteCount} {t("visitantes")}
-              {falecidoCount > 0 && ` · ${falecidoCount} ${t("falecidos")}`}
-              {transferidoCount > 0 && ` · ${transferidoCount} ${t("transferidos")}`}
+              {countsLoading ? "—" : countsTotal} {t("cadastrados")} · {countsLoading ? "—" : activeCount} {t("ativos")} · {countsLoading ? "—" : visitanteCount} {t("visitantes")}
+              {!countsLoading && falecidoCount > 0 && ` · ${falecidoCount} ${t("falecidos")}`}
+              {!countsLoading && transferidoCount > 0 && ` · ${transferidoCount} ${t("transferidos")}`}
             </p>
           </div>
           {canWrite && (
@@ -1726,7 +2026,7 @@ export default function Membros() {
                     joined_at: new Date().toISOString().split("T")[0], status: "Ativo",
                   });
                   if (error) throw new Error(String((error as { message?: string }).message || ""));
-                  await reloadMembers();
+                  await refreshAfterMutation();
                   toast.success(t("Membro cadastrado!"));
                 }}
                 onEdit={data => {
@@ -1783,8 +2083,8 @@ export default function Membros() {
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               placeholder={t("Buscar por nome, CPF, código ou contato...")}
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
               className="w-full pl-9 pr-4 py-2.5 bg-card rounded-lg shadow-[var(--shadow-sm)] text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
             />
           </div>
@@ -1799,12 +2099,34 @@ export default function Membros() {
         </div>
 
         {/* Table */}
-        {loading || churchLoading ? (
+        {listError ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+            <p className="text-sm text-destructive">{t("Não foi possível carregar os membros.")}</p>
+            <p className="text-xs text-muted-foreground max-w-md">{listError}</p>
+            <button
+              type="button"
+              onClick={() => { setListError(null); void fetchMembersPage(currentPage); }}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
+            >
+              {t("Tentar novamente")}
+            </button>
+          </div>
+        ) : (loading || churchLoading) && members.length === 0 ? (
+          // Spinner de página inteira somente na 1ª carga real, sem nenhuma
+          // linha em cache — trocas de página/filtro nunca voltam a este
+          // estado (usam o indicador discreto de pageTransitioning abaixo,
+          // mantendo a tabela anterior visível: "nenhum zero falso, nenhum
+          // spinner indefinido bloqueando o conteúdo já conhecido").
           <div className="flex items-center justify-center py-12">
             <Loader2 size={24} className="animate-spin text-muted-foreground" />
           </div>
         ) : (
           <>
+            {pageTransitioning && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
+                <Loader2 size={12} className="animate-spin" /> {t("Atualizando...")}
+              </div>
+            )}
             {/* Desktop table */}
             <div className="hidden sm:block bg-card rounded-xl shadow-executive overflow-hidden">
               {/* overflow-x-auto isolado do overflow-hidden externo: mantém os cantos arredondados e ainda permite rolagem horizontal se a tabela não couber (evita conteúdo cortado silenciosamente) */}
@@ -1823,7 +2145,7 @@ export default function Membros() {
                 <tbody>
                   {visibleMembers.map(m => (
                     <tr key={m.id}
-                      onClick={() => canWrite && openEdit(m)}
+                      onClick={() => canWrite && openEdit(m.id)}
                       className={`border-b border-border/30 transition-colors ${canWrite ? "hover:bg-secondary/30 cursor-pointer" : ""}`}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -1892,14 +2214,14 @@ export default function Membros() {
                             className="p-1 rounded hover:bg-secondary transition-colors" title={t("Ver perfil")}>
                             <User size={14} className="text-muted-foreground" />
                           </button>
-                          <button type="button" onClick={() => setWalletMember(m)}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-accent/10 hover:bg-accent/20 text-accent text-[11px] font-medium transition-colors"
+                          <button type="button" onClick={() => openWalletFor(m.id)} disabled={walletLoadingId === m.id}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-accent/10 hover:bg-accent/20 text-accent text-[11px] font-medium transition-colors disabled:opacity-60"
                             title={t("Carteira de Membro")}>
-                            <CreditCard size={12} /> {t("Carteira")}
+                            {walletLoadingId === m.id ? <Loader2 size={12} className="animate-spin" /> : <CreditCard size={12} />} {t("Carteira")}
                           </button>
                           {canWrite && (
                             <>
-                              <button type="button" onClick={() => openEdit(m)}
+                              <button type="button" onClick={() => openEdit(m.id)}
                                 className="p-1 rounded hover:bg-secondary transition-colors" title={t("Editar")}>
                                 <Pencil size={14} className="text-muted-foreground" />
                               </button>
@@ -1917,7 +2239,7 @@ export default function Membros() {
                       </td>
                     </tr>
                   ))}
-                  {filtered.length === 0 && (
+                  {totalFilteredCount === 0 && (
                     <tr>
                       <td colSpan={6} className="text-center py-8 text-sm text-muted-foreground">
                         {t("Nenhum membro encontrado.")}
@@ -1935,8 +2257,8 @@ export default function Membros() {
                 <motion.div key={m.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
                   <div
                     role="button" tabIndex={0}
-                    onClick={() => canWrite && openEdit(m)}
-                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openEdit(m); } }}
+                    onClick={() => canWrite && openEdit(m.id)}
+                    onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openEdit(m.id); } }}
                     className="bg-card rounded-xl shadow-executive p-4 flex items-center gap-3 cursor-pointer hover:bg-secondary/20 transition-colors"
                   >
                     <MemberAvatar member={m} size="md" />
@@ -1976,9 +2298,9 @@ export default function Membros() {
                         className="p-1.5 rounded-lg hover:bg-secondary transition-colors" title={t("Ver perfil")}>
                         <User size={14} className="text-muted-foreground" />
                       </button>
-                      <button type="button" onClick={e => { e.stopPropagation(); setWalletMember(m); }}
-                        className="p-1.5 rounded-lg bg-accent/10 hover:bg-accent/20 transition-colors" title={t("Carteira")}>
-                        <CreditCard size={14} className="text-accent" />
+                      <button type="button" onClick={e => { e.stopPropagation(); openWalletFor(m.id); }} disabled={walletLoadingId === m.id}
+                        className="p-1.5 rounded-lg bg-accent/10 hover:bg-accent/20 transition-colors disabled:opacity-60" title={t("Carteira")}>
+                        {walletLoadingId === m.id ? <Loader2 size={14} className="animate-spin text-accent" /> : <CreditCard size={14} className="text-accent" />}
                       </button>
                       {canPermanentlyDeleteMember && (
                         <button type="button" onClick={e => { e.stopPropagation(); removeMember(m); }}
@@ -1990,17 +2312,17 @@ export default function Membros() {
                   </div>
                 </motion.div>
               ))}
-              {filtered.length === 0 && (
+              {totalFilteredCount === 0 && (
                 <div className="text-center py-8 text-sm text-muted-foreground">
                   {t("Nenhum membro encontrado.")}
                 </div>
               )}
             </div>
 
-            {filtered.length > MEMBERS_VIEW_PAGE_SIZE && (
+            {totalFilteredCount > MEMBERS_VIEW_PAGE_SIZE && (
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-1 pt-1">
                 <p className="text-xs text-muted-foreground">
-                  {pageStart + 1}–{Math.min(pageStart + MEMBERS_VIEW_PAGE_SIZE, filtered.length)} de {filtered.length} membros
+                  {pageStart + 1}–{Math.min(pageStart + MEMBERS_VIEW_PAGE_SIZE, totalFilteredCount)} de {totalFilteredCount} membros
                 </p>
                 <div className="flex items-center gap-2">
                   <button
@@ -2076,7 +2398,14 @@ export default function Membros() {
 
               {/* Tab content */}
               <div className="min-w-0 overflow-y-auto flex-1 px-4 py-4 sm:px-5 sm:py-5">
-
+                {editLoading ? (
+                  // Ficha completa ainda sendo buscada (openEdit) — o modal já
+                  // abriu instantaneamente ao clique; só o conteúdo aguarda.
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 size={24} className="animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                <>
                 {/* ── Tab 1: Dados Pessoais ── */}
                 {activeTab === "pessoal" && (
                   <div className="space-y-5">
@@ -2639,7 +2968,7 @@ export default function Membros() {
                                   value={familyDraft.related_member_id || ""}
                                   onChange={e => {
                                     const relatedId = e.target.value || null;
-                                    const related = members.find(m => m.id === relatedId);
+                                    const related = familyLinkOptions.find(m => m.id === relatedId);
                                     setFamilyDraft(prev => prev && {
                                       ...prev,
                                       related_member_id: relatedId,
@@ -2649,7 +2978,7 @@ export default function Membros() {
                                   className="px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-1 focus:ring-ring"
                                 >
                                   <option value="">— Não é membro —</option>
-                                  {members.filter(m => m.id !== editingId).map(m => (
+                                  {familyLinkOptions.filter(m => m.id !== editingId).map(m => (
                                     <option key={m.id} value={m.id}>{m.full_name}</option>
                                   ))}
                                 </select>
@@ -2709,6 +3038,8 @@ export default function Membros() {
                     </div>
                   </div>
                 )}
+                </>
+                )}
               </div>
 
               {/* Modal footer */}
@@ -2752,7 +3083,7 @@ export default function Membros() {
                         <button
                           type="button"
                           onClick={() => {
-                            const member = members.find((item) => item.id === editingId);
+                            const member = editingMemberFull;
                             if (!member) return;
                             const targetOrganizationId = member.congregation_id
                               ?? member.sector_id
@@ -2779,7 +3110,7 @@ export default function Membros() {
                       )}
                       <button
                         type="button"
-                        onClick={() => { const m = members.find(x => x.id === editingId); if (m) { closeModal(); setWalletMember(m); } }}
+                        onClick={() => { if (editingMemberFull) { closeModal(); setWalletMember(editingMemberFull); } }}
                         className="inline-flex items-center gap-1.5 px-3 py-2 bg-secondary rounded-lg text-sm font-medium hover:bg-secondary/80 transition-colors"
                       >
                         <CreditCard size={14} /> Carteira
