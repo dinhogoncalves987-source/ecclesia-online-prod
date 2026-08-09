@@ -190,38 +190,81 @@ Classificação usada nesta operação:
 
 **P0 confirmado e corrigido nesta operação:** tela Membros
 (`src/pages/Membros.tsx`) — único ponto do código com o padrão de loop
-`while (true)` baixando a tabela inteira. Uma varredura por esse mesmo
-padrão (`while (true)`/`while (hasMore)` seguido de acumulação em array) no
-restante de `src/` não encontrou nenhuma outra ocorrência — é o único P0
-dessa classe no repositório nesta data.
+`while (true)` baixando a tabela inteira. Uma varredura completa por esse
+mesmo padrão (`while (true)`/`while (hasMore)` seguido de acumulação em
+array) em todas as rotas de `src/pages/` — incluindo Dashboard, Conversas,
+Bíblia, Culto & Louvor, Campanhas, Carteira, Cartas de Recomendação/
+Transferência, Certificados, Solicitações, Documentos, Comunicação,
+Orações, Agenda, Escalas, Financeiro, Congregações, Configurações,
+Gerenciar Acessos e SuperAdmin — **confirmou zero outras ocorrências**. É o
+único P0 dessa classe no repositório nesta data.
 
 **P1 documentados para próxima rodada** (não alterados nesta operação, para
 não introduzir refatoração de escopo amplo sob prazo apertado, conforme
 proibição explícita de "não fazer refatoração massiva apenas para
 padronizar estilo" e "não alterar regras de negócio sem evidência e
-necessidade" — mudar essas consultas envolve lógica de saldo/relatório que
-precisa de revisão do responsável antes de qualquer alteração):
+necessidade" — mudar essas consultas envolve lógica de saldo/relatório/
+mensageria que precisa de revisão do responsável antes de qualquer
+alteração). Auditoria completa (22 P1 catalogados):
 
-- `src/pages/Financeiro.tsx` — `select("*")` sobre `transactions` filtrado
-  por `organization_id`, ordenado por `date`, sem `.range()`/`.limit()`
-  explícito: depende do teto implícito do PostgREST (tipicamente 1.000
-  linhas). Uma organização com mais de 1.000 lançamentos ao longo dos anos
-  passaria a ver uma lista/relatório truncado silenciosamente. Recomendação:
-  aplicar o mesmo padrão de Membros (paginação server-side + agregações via
-  RPC para totais/saldos, nunca somados no cliente sobre a lista truncada).
-- Demais telas com `select("*")` sem paginação (`Documentos.tsx`,
+- **`src/pages/CarteiraEcclesia.tsx`** — carrega **todos** os `members` com
+  `select("*")`, sem paginação; é o irmão mais próximo do anti-padrão de
+  Membros (mesma tabela, mesma escala — ~7k em staging), só que sem o loop
+  (fica truncado no teto implícito de ~1.000 em vez de baixar tudo).
+- **`src/pages/Dashboard.tsx` + `src/components/MatrizDashboard.tsx`** —
+  "Membros Ativos" e totais de receita/despesa/eventos calculados em
+  JavaScript sobre linhas baixadas (não `count`/`SUM` no banco); o
+  `MatrizDashboard` piora isso com um `for` **sequencial** por organização
+  filha, repetindo 5 consultas sem limite por unidade.
+- **`src/pages/Financeiro.tsx`** (+ `FinanceOverview`, `FinanceAccountability`,
+  `FinanceBudget`, `FinanceReports`, `FinanceTithesOfferings`,
+  `FinanceExecutive`) — `transactions.select("*")` sem `.range()`/`.limit()`
+  e totais/saldos via `reduce`/`filter` no cliente em vez de `SUM`/`COUNT`
+  no Postgres. `FinanceExecutive` ainda baixa transações por unidade da
+  hierarquia (N organizações × linhas ilimitadas).
+- **Pilha de chat interno** (`src/lib/internalMessages.ts` +
+  `src/hooks/useInternalThreads.tsx`) — threads e mensagens de thread via
+  `select("*")` sem limite; o enriquecimento de preview/não-lidas baixa
+  mensagens de todas as threads; a subscription Realtime de threads/
+  mensagens dispara um `load()` completo da caixa de entrada a cada evento
+  (não incremental).
+- **`src/pages/Escalas.tsx`** — carrega **todos** os membros ativos
+  (`member_directory`) para o seletor de responsável por escala, sem
+  limite.
+- **`src/pages/Grupos.tsx`** — `group_messages` sem limite (pode crescer
+  bastante por grupo).
+- **`src/pages/SuperAdmin.tsx`** — métricas do console de plataforma
+  calculadas em JS sobre listas de organizações/tickets/agentes sem
+  paginação, mais N+1 (uma consulta de contagem por departamento, e um
+  join aninhado por agente). Console interno da plataforma, não
+  multi-tenant — sem risco de vazamento entre igrejas, mas mesmo custo de
+  performance.
+- **`src/pages/CartasTransferencia.tsx`** — seletor de organização de
+  destino baixa todas as `organizations` da conta sem limite.
+- Demais telas com `select("*")` sem paginação e mesmo risco de
+  truncamento silencioso acima de ~1.000 linhas: `Documentos.tsx`,
   `Comunicacao.tsx`, `SolicitacoesAdministrativas.tsx`, `Oracoes.tsx`,
-  `Grupos.tsx`, `AssembleiaGeral.tsx`, `CarteiraEcclesia.tsx`,
-  `MemberProfile.tsx`, `SuperAdmin.tsx`) — mesmo risco de truncamento
-  silencioso acima de ~1.000 linhas; volume atual em staging não confirma
-  isso como problema real hoje, mas deve ser resolvido com o mesmo padrão
-  antes que qualquer uma dessas tabelas se aproxime desse volume por
-  organização.
+  `AssembleiaGeral.tsx` (anexos, sem `organization_id` explícito na query
+  — depende só de RLS), `MemberProfile.tsx` (histórico, correto para
+  detalhe de um único membro), `src/lib/worshipStorage.ts` (músicas/
+  roteiros de culto).
 
-**P2:** uso de `select("*")` em tabelas de baixo volume/poucas colunas onde
-o custo é desprezível hoje (ex.: registros de configuração por organização).
-Não é necessário agir agora; revisar caso a caso quando essas telas forem
-tocadas por outro motivo.
+Nenhum desses 22 P1 representa vazamento confirmado entre organizações
+(todas as consultas de telas multi-tenant são filtradas por
+`organization_id`, mesmo sem paginação) — o risco é de truncamento
+silencioso/contagem errada acima de ~1.000 linhas, não de isolamento.
+Recomendação para cada um: aplicar o mesmo padrão de Membros (paginação
+server-side + agregações via RPC/`SUM`/`COUNT`, nunca somadas no cliente
+sobre uma lista potencialmente truncada), priorizando CarteiraEcclesia e
+Dashboard/MatrizDashboard por serem os de maior volume real hoje.
+
+**P2 (18 catalogados):** uso de `select("*")` em tabelas de baixo volume
+por organização hoje (assembleias, campanhas, certificados, cartas de
+recomendação, ficha única de um membro, configuração da igreja, etc.), ou
+onde a consulta já é adequadamente limitada/paginada (ex.: `Campanhas.tsx`
+via `CAMPAIGN_SELECT` + `.limit(100)`, `ChatSecretaria.tsx` com busca
+`.limit(10)`, `Agenda.tsx` com janela mensal). Não é necessário agir agora;
+revisar caso a caso quando essas telas forem tocadas por outro motivo.
 
 ## 12. Checklist obrigatório para toda tela nova (ou lista existente sendo alterada)
 
