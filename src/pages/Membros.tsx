@@ -495,6 +495,17 @@ export default function Membros() {
   // nunca derivados da página de membros carregada. null enquanto carregando
   // (renderiza "—", nunca "0" falso).
   const [statusCounts, setStatusCounts] = useState<MemberStatusCounts | null>(null);
+  // Espelho síncrono de `statusCounts` para leitura dentro de fetchMembersPage
+  // sem incluir o objeto inteiro nas dependências do useCallback (ver uso mais
+  // abaixo, na correção do timeout do count exato).
+  const statusCountsRef = useRef<MemberStatusCounts | null>(null);
+  useEffect(() => { statusCountsRef.current = statusCounts; }, [statusCounts]);
+  // Espelho de `totalFilteredCount` para uso como fallback dentro de
+  // fetchMembersPage sem precisar incluí-lo nas dependências do useCallback
+  // (evitaria recriar a função — e reexecutar o efeito que a chama — a cada
+  // atualização de contagem).
+  const totalFilteredCountRef = useRef(0);
+  useEffect(() => { totalFilteredCountRef.current = totalFilteredCount; }, [totalFilteredCount]);
 
   // Modal form state
   const [modalOpen, setModalOpen] = useState(false);
@@ -835,10 +846,32 @@ export default function Membros() {
     try {
       const from = (page - 1) * MEMBERS_VIEW_PAGE_SIZE;
       const to = from + MEMBERS_VIEW_PAGE_SIZE - 1;
-      let query = supabase
-        .from("members")
-        .select(MEMBER_LIST_COLUMNS, { count: "exact" })
-        .eq("organization_id", church.id);
+
+      // count:"exact" força o PostgREST a executar, na mesma requisição, uma
+      // segunda consulta SEM range/limit contando TODAS as linhas que casam
+      // com o filtro para devolver o total exato. Sob RLS hierárquica
+      // (has_org_access_permission → is_organization_descendant_or_self,
+      // avaliada por linha porque depende de congregation_id/sector_id, que
+      // variam entre membros), essa contagem completa é cara em escopos
+      // amplos (ex.: matriz sem contextFilter, 7.121 membros de dezenas de
+      // congregações distintas) e foi a causa do "canceling statement due to
+      // statement timeout" reportado — mesmo com a consulta de dados limitada
+      // a 100 linhas via range()/LIMIT, o count exato ainda precisa visitar
+      // (e reavaliar RLS para) todas as linhas do escopo.
+      //
+      // Quando não há busca textual ativa, o total já é conhecido pela RPC
+      // independente member_status_counts (mesmo escopo hierárquico, já
+      // validada funcionando no STAGING — GROUP BY simples, sem
+      // ORDER BY/range concorrendo pelo mesmo plano). Reaproveitamos esse
+      // valor em vez de pedir um segundo count caro ao PostgREST. A busca
+      // textual (search_blob) não tem equivalente na RPC de contadores, então
+      // nesse caso mantemos count:"exact" — o índice GIN trigram normalmente
+      // já reduz bastante o conjunto candidato.
+      const needsExactCount = trimmedSearch.length > 0;
+      let query = needsExactCount
+        ? supabase.from("members").select(MEMBER_LIST_COLUMNS, { count: "exact" })
+        : supabase.from("members").select(MEMBER_LIST_COLUMNS);
+      query = query.eq("organization_id", church.id);
 
       if (scope.matchCongregationIds) {
         query = query.in("congregation_id", scope.matchCongregationIds);
@@ -878,7 +911,26 @@ export default function Membros() {
       }
 
       const items = (data as MemberListItem[]) ?? [];
-      const total = count ?? items.length;
+      let total: number;
+      if (needsExactCount) {
+        total = count ?? items.length;
+      } else {
+        // Sem busca: total vem do mesmo escopo já contado pela RPC de
+        // cabeçalho (statusCountsRef). Enquanto a RPC ainda não respondeu
+        // (raríssimo — ambas disparam em paralelo), evita regredir para 0
+        // quando já existem linhas nesta página (isso mostraria "Nenhum
+        // membro encontrado" junto da própria lista preenchida) usando o
+        // maior valor conhecido; o efeito abaixo corrige o total tão logo a
+        // RPC responder.
+        const counts = statusCountsRef.current;
+        const derived = counts
+          ? (filterStatus === "all"
+              ? Object.values(counts).reduce((a, b) => a + (b ?? 0), 0)
+              : (counts[filterStatus as MemberStatus] ?? 0))
+          : null;
+        const previousKnown = membersCacheRef.current.get(cacheKey)?.total ?? totalFilteredCountRef.current;
+        total = derived ?? Math.max(items.length, previousKnown);
+      }
       membersCacheRef.current.set(cacheKey, { items, total, ts: Date.now() });
       setMembers(items);
       setTotalFilteredCount(total);
@@ -979,6 +1031,21 @@ export default function Membros() {
       });
     return () => { cancelled = true; };
   }, [user, churchLoading, church, memberScopeKey, buildMemberScope]);
+
+  // Mantém "1–100 de N" sincronizado com o total já contado pela RPC de
+  // cabeçalho acima sempre que não há busca textual ativa — fetchMembersPage
+  // evita pedir count:"exact" nesse caso (ver comentário junto da consulta a
+  // MEMBER_LIST_COLUMNS) para não repetir, a cada página, uma contagem
+  // completa cara sob RLS hierárquica. Quando há busca, o total exato já vem
+  // da própria listagem e este efeito não interfere.
+  useEffect(() => {
+    if (searchQuery.trim()) return;
+    if (!statusCounts) return; // ainda carregando — mantém o último total conhecido, nunca regride para 0
+    const derived = filterStatus === "all"
+      ? Object.values(statusCounts).reduce((a, b) => a + (b ?? 0), 0)
+      : (statusCounts[filterStatus as MemberStatus] ?? 0);
+    setTotalFilteredCount(derived);
+  }, [statusCounts, filterStatus, searchQuery]);
 
   // Invalida o cache e recarrega a página atual + contadores após qualquer
   // escrita (criar/editar/excluir/mudar status/importar) — nunca reintroduz o
