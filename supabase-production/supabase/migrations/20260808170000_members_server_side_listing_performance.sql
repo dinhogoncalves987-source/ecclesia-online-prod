@@ -108,4 +108,6 @@ COMMENT ON FUNCTION public.member_status_counts(uuid, uuid[], uuid[]) IS
   'Contadores de membros por status (Ativo/Inativo/Visitante/etc.), calculados no servidor via GROUP BY — nunca dependem do download da listagem. SECURITY INVOKER: herda RLS de public.members, sem checagem manual de permissão.';
 
 REVOKE ALL ON FUNCTION public.member_status_counts(uuid, uuid[], uuid[]) FROM public;
+REVOKE EXECUTE ON FUNCTION public.member_status_counts(uuid, uuid[], uuid[]) FROM anon;
 GRANT EXECUTE ON FUNCTION public.member_status_counts(uuid, uuid[], uuid[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.member_status_counts(uuid, uuid[], uuid[]) TO service_role;
