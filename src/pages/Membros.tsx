@@ -481,7 +481,8 @@ export default function Membros() {
   const [loading, setLoading] = useState(true); // somente a 1ª carga (sem cache) — nunca reaparece em troca de página/filtro com cache quente
   const [pageTransitioning, setPageTransitioning] = useState(false); // troca de página/filtro com cache frio: mantém linhas antigas visíveis + indicador discreto
   const [listError, setListError] = useState<string | null>(null);
-  const [totalFilteredCount, setTotalFilteredCount] = useState(0); // total no escopo+filtro+busca atuais (para "1–100 de N" e totalPages)
+  const [totalFilteredCount, setTotalFilteredCount] = useState(0); // total no escopo+filtro+busca atuais (para "1–100 de N" e totalPages) — só é exato quando não há busca ativa
+  const [hasNextPage, setHasNextPage] = useState(false); // detectado pela linha extra (range PAGE_SIZE+1), nunca por count:"exact" — única fonte de verdade para o botão "Próxima" durante busca textual
   const [saving, setSaving] = useState(false);
   const [searchInput, setSearchInput] = useState(""); // valor bruto do campo de busca
   const [searchQuery, setSearchQuery] = useState(""); // valor após debounce — usado na query ao servidor
@@ -786,12 +787,37 @@ export default function Membros() {
   // ── Load members — paginação, filtro, busca e contagem no servidor ─────────
   // Substitui o antigo reloadMembers (while(true) + select("*") trazendo os
   // 7.121 membros da organização para o navegador). Agora cada requisição
-  // busca no máximo MEMBERS_VIEW_PAGE_SIZE linhas, com apenas as colunas de
-  // MEMBER_LIST_COLUMNS, filtro/busca/ordenação executados pelo Postgres
-  // (índices em supabase/migrations/20260808170000_members_server_side_listing_performance.sql)
-  // e o total exato devolvido pelo próprio PostgREST (count: "exact").
+  // busca no máximo MEMBERS_VIEW_PAGE_SIZE + 1 linhas, com apenas as colunas
+  // de MEMBER_LIST_COLUMNS, filtro/busca/ordenação executados pelo Postgres
+  // (índices em supabase/migrations/20260808170000_members_server_side_listing_performance.sql).
+  //
+  // count:"exact" NUNCA é solicitado ao PostgREST aqui — nem na listagem
+  // normal, nem durante busca textual. count:"exact" força uma segunda
+  // consulta, sem range/limit, contando TODAS as linhas que casam com o
+  // filtro para devolver o total exato; sob a RLS hierárquica de
+  // public.members (has_org_access_permission → is_organization_descendant_or_self,
+  // avaliada por linha porque depende de congregation_id/sector_id, que
+  // variam entre membros), essa contagem completa é cara em escopos amplos
+  // e foi a causa do "canceling statement due to statement timeout"
+  // reportado — tanto na listagem sem busca (matriz inteira) quanto na busca
+  // textual (o índice trigram acelera achar as linhas, mas count:"exact"
+  // ainda precisa reavaliar RLS sobre TODO o conjunto candidato, não apenas
+  // sobre a página exibida).
+  //
+  // Em vez de contar, pedimos sempre uma linha extra (range 0..PAGE_SIZE, ou
+  // seja PAGE_SIZE+1 linhas): se vier a linha 101, existe próxima página
+  // (hasNextPage=true) e ela é descartada da exibição; se vierem até 100,
+  // não há próxima página. Sem busca, o total exibido ("1–100 de N") vem do
+  // mesmo escopo já contado pela RPC independente member_status_counts (ver
+  // efeito mais abaixo) — nunca de count:"exact". Com busca, não fabricamos
+  // um total exato: mostramos "há mais resultados" enquanto hasNextPage for
+  // true, e só exibimos um total quando a última página é alcançada (nesse
+  // ponto o total é simplesmente offset + linhas retornadas, conhecido sem
+  // nenhuma contagem adicional).
   const CACHE_TTL_MS = 60_000;
-  const membersCacheRef = useRef(new Map<string, { items: MemberListItem[]; total: number; ts: number }>());
+  const membersCacheRef = useRef(
+    new Map<string, { items: MemberListItem[]; total: number; hasNextPage: boolean; ts: number }>(),
+  );
   const membersRequestIdRef = useRef(0);
   const membersAbortRef = useRef<AbortController | null>(null);
 
@@ -828,9 +854,10 @@ export default function Membros() {
     // Subsede sem nenhuma congregação filha: resultado é sempre vazio — não
     // vale a pena ir ao servidor.
     if (scope.empty) {
-      membersCacheRef.current.set(cacheKey, { items: [], total: 0, ts: Date.now() });
+      membersCacheRef.current.set(cacheKey, { items: [], total: 0, hasNextPage: false, ts: Date.now() });
       setMembers([]);
       setTotalFilteredCount(0);
+      setHasNextPage(false);
       setListError(null);
       setLoading(false);
       setPageTransitioning(false);
@@ -845,33 +872,18 @@ export default function Membros() {
     if (!opts.silent) setPageTransitioning(true);
     try {
       const from = (page - 1) * MEMBERS_VIEW_PAGE_SIZE;
-      const to = from + MEMBERS_VIEW_PAGE_SIZE - 1;
+      // range(from, from + PAGE_SIZE) pede PAGE_SIZE + 1 linhas (0-indexado,
+      // inclusive nas duas pontas) — a linha extra nunca é exibida, serve
+      // apenas para provar que existe próxima página sem precisar contar.
+      const to = from + MEMBERS_VIEW_PAGE_SIZE;
 
-      // count:"exact" força o PostgREST a executar, na mesma requisição, uma
-      // segunda consulta SEM range/limit contando TODAS as linhas que casam
-      // com o filtro para devolver o total exato. Sob RLS hierárquica
-      // (has_org_access_permission → is_organization_descendant_or_self,
-      // avaliada por linha porque depende de congregation_id/sector_id, que
-      // variam entre membros), essa contagem completa é cara em escopos
-      // amplos (ex.: matriz sem contextFilter, 7.121 membros de dezenas de
-      // congregações distintas) e foi a causa do "canceling statement due to
-      // statement timeout" reportado — mesmo com a consulta de dados limitada
-      // a 100 linhas via range()/LIMIT, o count exato ainda precisa visitar
-      // (e reavaliar RLS para) todas as linhas do escopo.
-      //
-      // Quando não há busca textual ativa, o total já é conhecido pela RPC
-      // independente member_status_counts (mesmo escopo hierárquico, já
-      // validada funcionando no STAGING — GROUP BY simples, sem
-      // ORDER BY/range concorrendo pelo mesmo plano). Reaproveitamos esse
-      // valor em vez de pedir um segundo count caro ao PostgREST. A busca
-      // textual (search_blob) não tem equivalente na RPC de contadores, então
-      // nesse caso mantemos count:"exact" — o índice GIN trigram normalmente
-      // já reduz bastante o conjunto candidato.
-      const needsExactCount = trimmedSearch.length > 0;
-      let query = needsExactCount
-        ? supabase.from("members").select(MEMBER_LIST_COLUMNS, { count: "exact" })
-        : supabase.from("members").select(MEMBER_LIST_COLUMNS);
-      query = query.eq("organization_id", church.id);
+      // Nunca solicitar count exato ao PostgREST aqui — ver comentário acima
+      // de fetchMembersPage sobre o timeout que essa opção provoca sob RLS
+      // hierárquica, tanto sem busca quanto com busca textual.
+      let query = supabase
+        .from("members")
+        .select(MEMBER_LIST_COLUMNS)
+        .eq("organization_id", church.id);
 
       if (scope.matchCongregationIds) {
         query = query.in("congregation_id", scope.matchCongregationIds);
@@ -892,7 +904,7 @@ export default function Membros() {
         query = query.ilike("search_blob", `%${trimmedSearch}%`);
       }
 
-      const { data, error, count } = await query
+      const { data, error } = await query
         .order("full_name", { ascending: true })
         .order("id", { ascending: true })
         .range(from, to)
@@ -904,17 +916,22 @@ export default function Membros() {
         if ((error as { name?: string; code?: string }).name === "AbortError") return;
         console.error("[Membros] Erro ao carregar página:", error);
         if (!opts.silent) {
+          // Requisição visível (não é uma revalidação silenciosa em segundo
+          // plano): sem dados confiáveis desta página, nunca deixar
+          // "Próxima" habilitada com base numa resposta anterior obsoleta.
+          setHasNextPage(false);
           setListError(error.message || t("Erro ao carregar membros"));
           toast.error(t("Erro ao carregar membros"), { description: error.message });
         }
         return;
       }
 
-      const items = (data as MemberListItem[]) ?? [];
+      const rows = (data as MemberListItem[]) ?? [];
+      const pageHasNext = rows.length > MEMBERS_VIEW_PAGE_SIZE;
+      const items = pageHasNext ? rows.slice(0, MEMBERS_VIEW_PAGE_SIZE) : rows; // descarta a 101ª linha (só serve para detectar próxima página)
+
       let total: number;
-      if (needsExactCount) {
-        total = count ?? items.length;
-      } else {
+      if (!trimmedSearch) {
         // Sem busca: total vem do mesmo escopo já contado pela RPC de
         // cabeçalho (statusCountsRef). Enquanto a RPC ainda não respondeu
         // (raríssimo — ambas disparam em paralelo), evita regredir para 0
@@ -930,25 +947,28 @@ export default function Membros() {
           : null;
         const previousKnown = membersCacheRef.current.get(cacheKey)?.total ?? totalFilteredCountRef.current;
         total = derived ?? Math.max(items.length, previousKnown);
+      } else {
+        // Com busca: nunca fabricamos um total exato (isso exigiria contar
+        // — o próprio problema que estamos evitando). `total` aqui só é
+        // usado como valor de fallback/cache; o texto exibido na UI usa
+        // `hasNextPage` + `members.length` diretamente (ver seção de
+        // paginação/render). Guardamos offset + linhas retornadas como a
+        // melhor estimativa conhecida até agora (torna-se exata quando
+        // `pageHasNext` é false, isto é, na última página).
+        total = from + items.length;
       }
-      membersCacheRef.current.set(cacheKey, { items, total, ts: Date.now() });
+      membersCacheRef.current.set(cacheKey, { items, total, hasNextPage: pageHasNext, ts: Date.now() });
       setMembers(items);
       setTotalFilteredCount(total);
+      setHasNextPage(pageHasNext);
       setListError(null);
-
-      // Prefetch silencioso da próxima página (só a partir de uma busca em
-      // primeiro plano — nunca encadeado a partir de outro prefetch, para não
-      // varrer todas as páginas restantes de uma vez).
-      if (!opts.silent) {
-        const nextPage = page + 1;
-        if (nextPage <= Math.ceil(total / MEMBERS_VIEW_PAGE_SIZE)) {
-          const nextKey = `${church.id}|${memberScopeKey}|${filterStatus}|${trimmedSearch}|${nextPage}`;
-          const cachedNext = membersCacheRef.current.get(nextKey);
-          if (!cachedNext || Date.now() - cachedNext.ts > CACHE_TTL_MS) {
-            void fetchMembersPage(nextPage, { silent: true });
-          }
-        }
-      }
+      // Sem prefetch automático da próxima página: fetchMembersPage também
+      // faz setMembers/setTotalFilteredCount/setHasNextPage, então um
+      // prefetch em segundo plano poderia substituir silenciosamente a
+      // página atualmente visível na tela (race condition) se o usuário
+      // ainda estiver nela quando a resposta do prefetch chegasse. A página
+      // seguinte só é buscada quando o usuário efetivamente clica em
+      // "Próxima" (ver botão de paginação).
     } finally {
       if (requestId === membersRequestIdRef.current) {
         setLoading(false);
@@ -965,7 +985,7 @@ export default function Membros() {
 
   useEffect(() => {
     if (!user || churchLoading) return;
-    if (!church) { setMembers([]); setTotalFilteredCount(0); setLoading(false); return; }
+    if (!church) { setMembers([]); setTotalFilteredCount(0); setHasNextPage(false); setLoading(false); return; }
 
     const trimmedSearch = searchQuery.trim().toLowerCase();
     const cacheKey = `${church.id}|${memberScopeKey}|${filterStatus}|${trimmedSearch}|${currentPage}`;
@@ -976,6 +996,7 @@ export default function Membros() {
       // revalida em segundo plano se os dados já não forem tão recentes.
       setMembers(cached.items);
       setTotalFilteredCount(cached.total);
+      setHasNextPage(cached.hasNextPage);
       setListError(null);
       setLoading(false);
       setPageTransitioning(false);
@@ -1034,10 +1055,12 @@ export default function Membros() {
 
   // Mantém "1–100 de N" sincronizado com o total já contado pela RPC de
   // cabeçalho acima sempre que não há busca textual ativa — fetchMembersPage
-  // evita pedir count:"exact" nesse caso (ver comentário junto da consulta a
+  // nunca pede count:"exact" (ver comentário junto da consulta a
   // MEMBER_LIST_COLUMNS) para não repetir, a cada página, uma contagem
-  // completa cara sob RLS hierárquica. Quando há busca, o total exato já vem
-  // da própria listagem e este efeito não interfere.
+  // completa cara sob RLS hierárquica. Quando há busca, este efeito não
+  // interfere — não existe total exato fabricado nesse caso; a UI de
+  // paginação usa `hasNextPage` + `members.length` diretamente (ver seção de
+  // paginação/render).
   useEffect(() => {
     if (searchQuery.trim()) return;
     if (!statusCounts) return; // ainda carregando — mantém o último total conhecido, nunca regride para 0
@@ -1137,21 +1160,48 @@ export default function Membros() {
   }, [user, church, churchLoading, reloadSubOrgs]);
 
   // ── Paginação/contagem exibida — inteiramente derivada do servidor ─────────
-  // `members` já é a página atual (fetchMembersPage) e `totalFilteredCount` é
-  // o total exato no escopo+filtro+busca atuais (count: "exact" do
-  // PostgREST) — nunca calculados fatiando um array carregado por completo.
+  // `members` já é a página atual (fetchMembersPage), nunca um array
+  // carregado por completo e fatiado no cliente.
+  //
+  // Sem busca textual: `totalFilteredCount` é exato (RPC member_status_counts,
+  // nunca count:"exact") e `totalPages`/`visiblePage` funcionam como antes.
+  //
+  // Com busca textual: não existe total exato (evitar count:"exact" é
+  // exatamente o que corrige o timeout ao buscar) — a navegação usa
+  // `hasNextPage` (detectado pela linha extra da própria consulta, ver
+  // fetchMembersPage) em vez de `totalPages`. `visiblePage` passa a ser o
+  // próprio `currentPage` (sem clamp por um total desconhecido); o efeito de
+  // reset abaixo garante que trocar a busca sempre volta para a página 1.
   const visibleMembers = members;
+  const isSearchActive = searchQuery.trim().length > 0;
   const totalPages = Math.max(1, Math.ceil(totalFilteredCount / MEMBERS_VIEW_PAGE_SIZE));
-  const visiblePage = Math.min(currentPage, totalPages);
+  const visiblePage = isSearchActive ? currentPage : Math.min(currentPage, totalPages);
   const pageStart = (visiblePage - 1) * MEMBERS_VIEW_PAGE_SIZE;
+  // Mostra a paginação quando sabidamente há mais de uma página: sem busca,
+  // pelo total exato; com busca, quando já passamos da 1ª página ou existe
+  // próxima (nunca dependendo de um total fabricado).
+  const showPagination = isSearchActive
+    ? (visiblePage > 1 || hasNextPage)
+    : totalFilteredCount > MEMBERS_VIEW_PAGE_SIZE;
+  // Texto honesto de intervalo — nunca um total fabricado durante busca.
+  const rangeLabel = isSearchActive
+    ? (hasNextPage
+        ? `${pageStart + 1}–${pageStart + visibleMembers.length} resultados — há mais resultados`
+        : `${pageStart + 1}–${pageStart + visibleMembers.length} de ${pageStart + visibleMembers.length} resultados`)
+    : `${pageStart + 1}–${Math.min(pageStart + MEMBERS_VIEW_PAGE_SIZE, totalFilteredCount)} de ${totalFilteredCount} membros`;
 
   useEffect(() => {
     setCurrentPage(1);
+    // Limpa hasNextPage também: sem isto, uma busca/filtro/contexto novo
+    // herdaria momentaneamente o hasNextPage=true da busca anterior,
+    // habilitando "Próxima" antes de a nova página 1 responder.
+    setHasNextPage(false);
   }, [searchQuery, filterStatus, contextFilter?.orgId]);
 
   useEffect(() => {
+    if (isSearchActive) return; // sem total conhecido durante busca — nunca clampar por um totalPages fabricado
     setCurrentPage((page) => Math.min(page, totalPages));
-  }, [totalPages]);
+  }, [totalPages, isSearchActive]);
 
   // ── Photo upload ─────────────────────────────────────────────────────────────
 
@@ -2306,7 +2356,7 @@ export default function Membros() {
                       </td>
                     </tr>
                   ))}
-                  {totalFilteredCount === 0 && (
+                  {visibleMembers.length === 0 && (
                     <tr>
                       <td colSpan={6} className="text-center py-8 text-sm text-muted-foreground">
                         {t("Nenhum membro encontrado.")}
@@ -2379,17 +2429,17 @@ export default function Membros() {
                   </div>
                 </motion.div>
               ))}
-              {totalFilteredCount === 0 && (
+              {visibleMembers.length === 0 && (
                 <div className="text-center py-8 text-sm text-muted-foreground">
                   {t("Nenhum membro encontrado.")}
                 </div>
               )}
             </div>
 
-            {totalFilteredCount > MEMBERS_VIEW_PAGE_SIZE && (
+            {showPagination && (
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-1 pt-1">
                 <p className="text-xs text-muted-foreground">
-                  {pageStart + 1}–{Math.min(pageStart + MEMBERS_VIEW_PAGE_SIZE, totalFilteredCount)} de {totalFilteredCount} membros
+                  {rangeLabel}
                 </p>
                 <div className="flex items-center gap-2">
                   <button
@@ -2402,12 +2452,12 @@ export default function Membros() {
                     <ChevronLeft size={14} /> Anterior
                   </button>
                   <span className="text-xs text-muted-foreground min-w-20 text-center">
-                    Página {visiblePage} de {totalPages}
+                    {isSearchActive ? `Página ${visiblePage}` : `Página ${visiblePage} de ${totalPages}`}
                   </span>
                   <button
                     type="button"
-                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                    disabled={visiblePage === totalPages}
+                    onClick={() => setCurrentPage((page) => (isSearchActive ? (hasNextPage ? page + 1 : page) : Math.min(totalPages, page + 1)))}
+                    disabled={isSearchActive ? !hasNextPage : visiblePage === totalPages}
                     className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-secondary text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-secondary/80 transition-colors"
                     aria-label="Próxima página"
                   >
