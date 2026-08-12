@@ -76,14 +76,99 @@ function maskCpf(cpf: string) {
   return `${clean.slice(0, 3)}.${clean.slice(3, 6)}.${clean.slice(6, 9)}-${clean.slice(9)}`;
 }
 
-const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
-  Ativo:       { label: "ATIVO",        cls: "bg-emerald-600 text-white" },
-  Inativo:     { label: "INATIVO",      cls: "bg-slate-500 text-white"   },
-  Visitante:   { label: "VISITANTE",    cls: "bg-amber-500 text-white"   },
-  Transferido: { label: "TRANSFERIDO",  cls: "bg-blue-600 text-white"    },
-  Disciplinado:{ label: "DISCIPLINADO", cls: "bg-red-700 text-white"     },
-  Falecido:    { label: "IN MEMORIAM",  cls: "bg-slate-700 text-white"   },
+/**
+ * Perfis visuais de status da Carteira de Membro.
+ *
+ * Cada status canônico (ver `MEMBER_STATUSES` em `@/lib/secretariaConstants`)
+ * possui selo, cor e rodapé próprios — nenhum deles declara "cadastro ativo"
+ * exceto o próprio `Ativo`. "Disciplinado" é mantido apenas como alias legado
+ * compatível, apontando para a mesma apresentação de "Em disciplina".
+ *
+ * O período disciplinar (início/término) ainda não é exibido aqui porque não
+ * existem, hoje, campos estruturados no banco para isso — ver contrato da
+ * migration do Alfred no relatório da Fase 1C-G2.
+ */
+export type StatusProfile = { label: string; cls: string; footer: string };
+
+const ACTIVE_FOOTER = "Documento institucional · Válido mediante verificação de cadastro ativo";
+
+export const STATUS_PROFILES: Record<string, StatusProfile> = {
+  Ativo: {
+    label: "ATIVO",
+    cls: "bg-emerald-600 text-white",
+    footer: ACTIVE_FOOTER,
+  },
+  Inativo: {
+    label: "INATIVO",
+    cls: "bg-red-600 text-white",
+    footer: "Documento institucional · Cadastro inativo",
+  },
+  Transferido: {
+    label: "TRANSFERIDO",
+    cls: "bg-blue-600 text-white",
+    footer: "Documento institucional · Membro transferido",
+  },
+  "Em disciplina": {
+    label: "EM DISCIPLINA",
+    cls: "bg-amber-500 text-white",
+    footer: "Documento institucional · Membro em disciplina",
+  },
+  // Alias legado — mesma apresentação de "Em disciplina".
+  Disciplinado: {
+    label: "EM DISCIPLINA",
+    cls: "bg-amber-500 text-white",
+    footer: "Documento institucional · Membro em disciplina",
+  },
+  Afastado: {
+    label: "AFASTADO",
+    cls: "bg-orange-600 text-white",
+    footer: "Documento institucional · Membro afastado",
+  },
+  Falecido: {
+    label: "IN MEMORIAM",
+    cls: "bg-slate-700 text-white",
+    footer: "Documento institucional · In memoriam",
+  },
+  Visitante: {
+    label: "VISITANTE",
+    cls: "bg-sky-500 text-white",
+    footer: "Documento institucional · Visitante",
+  },
+  Congregado: {
+    label: "CONGREGADO",
+    cls: "bg-violet-600 text-white",
+    footer: "Documento institucional · Congregado",
+  },
 };
+
+/**
+ * Resolve o perfil visual de um status. Um status ausente ou desconhecido
+ * NUNCA cai em `Ativo` — usa o valor real recebido (se houver) ou
+ * "STATUS NÃO INFORMADO", sempre com apresentação neutra cinza/slate.
+ */
+export function getStatusProfile(status: string | null | undefined): StatusProfile {
+  if (status && STATUS_PROFILES[status]) return STATUS_PROFILES[status];
+  const trimmed = status?.trim();
+  return {
+    label: trimmed ? trimmed.toUpperCase() : "STATUS NÃO INFORMADO",
+    cls: "bg-slate-500 text-white",
+    footer: "Documento institucional · Situação cadastral a confirmar",
+  };
+}
+
+/** Logo Ω dourado sobreposto ao centro do QR — máximo 15% da largura/altura. */
+export const QR_LOGO_SRC = "/icons/ecclesia-omega-qr.png";
+const QR_LOGO_MAX_RATIO = 0.15;
+
+export function qrLogoImageSettings(qrSize: number) {
+  const logoSize = Math.round(qrSize * QR_LOGO_MAX_RATIO);
+  return {
+    src: QR_LOGO_SRC,
+    height: logoSize,
+    width: logoSize,
+    excavate: true,
+  } as const;
+}
 
 // ── Frente ────────────────────────────────────────────────────────────────────
 
@@ -96,7 +181,7 @@ function CardFront({
   code: string; issueDate: string; validUntil: string; qrValue: string;
   onQrClick?: () => void;
 }) {
-  const statusInfo = STATUS_BADGE[member.status] ?? STATUS_BADGE.Ativo;
+  const statusInfo = getStatusProfile(member.status);
   const churchDisplay = churchAcronym?.trim() || organizationInitials(churchName);
 
   return (
@@ -144,7 +229,10 @@ function CardFront({
               </p>
             </div>
           </div>
-          <span className={cn("flex-shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider", statusInfo.cls)}>
+          <span
+            data-wallet-status-badge
+            className={cn("flex-shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider", statusInfo.cls)}
+          >
             {statusInfo.label}
           </span>
         </div>
@@ -176,12 +264,24 @@ function CardFront({
               aria-label="Ampliar QR Code seguro"
               className="flex-shrink-0 rounded-lg bg-white p-1 shadow transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-emerald-400"
             >
-              <QRCodeSVG value={qrValue} size={40} level="H" marginSize={1} />
+              <QRCodeSVG
+                value={qrValue}
+                size={40}
+                level="H"
+                marginSize={1}
+                imageSettings={qrLogoImageSettings(40)}
+              />
             </motion.button>
           ) : (
             <div className="bg-white rounded-lg p-1 flex-shrink-0 shadow">
               {qrValue ? (
-                <QRCodeSVG value={qrValue} size={40} level="H" marginSize={1} />
+                <QRCodeSVG
+                  value={qrValue}
+                  size={40}
+                  level="H"
+                  marginSize={1}
+                  imageSettings={qrLogoImageSettings(40)}
+                />
               ) : (
                 <div className="w-[40px] h-[40px] flex items-center justify-center">
                   <QrCode size={16} className="text-slate-300" />
@@ -375,6 +475,9 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
   // O código interno definido pela própria igreja tem prioridade. Sem ele,
   // mantém a matrícula técnica gerada a partir do identificador do cadastro.
   const code           = member.member_code?.trim() || memberCode(member.id);
+  // Perfil visual/textual do status atual — usado no selo, no rodapé e no
+  // texto compartilhado (WhatsApp/Email). Nunca cai em "Ativo" por omissão.
+  const statusProfile  = getStatusProfile(member.status);
 
   const qrValue = qrState === "ready" && qrToken
     ? `${window.location.origin}/admin/porteiro?token=${encodeURIComponent(qrToken)}`
@@ -387,7 +490,7 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
     `Igreja: ${churchName}${churchCity ? ` · ${churchCity}${churchState ? `/${churchState}` : ""}` : ""}`,
     `Vínculo: Membro`,
     `Matrícula: Nº ${code}`,
-    `Situação: ${member.status || "Ativa"}`,
+    `Situação: ${statusProfile.label}`,
     ``,
     `Documento emitido pela igreja via Ecclesia Online.`,
   ].filter(Boolean).join("\n");
@@ -718,6 +821,7 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
                   size={288}
                   level="H"
                   marginSize={2}
+                  imageSettings={qrLogoImageSettings(288)}
                   className="h-auto w-full max-w-[288px]"
                 />
               </div>
@@ -739,8 +843,8 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
         </button>
       )}
 
-      <p className="text-[11px] text-muted-foreground text-center max-w-xs">
-        Documento institucional · Válido mediante verificação de cadastro ativo
+      <p className="text-[11px] text-muted-foreground text-center max-w-xs" data-wallet-footer>
+        {statusProfile.footer}
       </p>
     </div>
   );

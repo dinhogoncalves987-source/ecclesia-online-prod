@@ -47,17 +47,70 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  Ativo: "Ativo",
-  Inativo: "Inativo",
-  Visitante: "Visitante",
-  Transferido: "Transferido",
-  "Em disciplina": "Em disciplina",
-  Disciplinado: "Disciplinado",
-  Congregado: "Congregado",
-  Falecido: "In Memoriam",
-  Afastado: "Afastado",
+/**
+ * Perfis de texto/cor do selo de status exibido após a leitura do QR.
+ *
+ * Usa a MESMA semântica de cores da Carteira de Membro
+ * (`STATUS_PROFILES` em `@/components/MemberWalletCard`): verde só para
+ * `Ativo`; nenhum outro status — nem um status desconhecido — cai em verde.
+ * "Disciplinado" é mantido apenas como alias legado de "Em disciplina".
+ */
+type StatusPill = { label: string; cls: string };
+
+const STATUS_PILL: Record<string, StatusPill> = {
+  Ativo: {
+    label: "Ativo",
+    cls: "bg-emerald-200 dark:bg-emerald-800/60 text-emerald-800 dark:text-emerald-200",
+  },
+  Inativo: {
+    label: "Inativo",
+    cls: "bg-red-200 dark:bg-red-900/50 text-red-800 dark:text-red-200",
+  },
+  Transferido: {
+    label: "Transferido",
+    cls: "bg-blue-200 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200",
+  },
+  "Em disciplina": {
+    label: "Em disciplina",
+    cls: "bg-amber-200 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200",
+  },
+  // Alias legado — mesma apresentação de "Em disciplina".
+  Disciplinado: {
+    label: "Em disciplina",
+    cls: "bg-amber-200 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200",
+  },
+  Afastado: {
+    label: "Afastado",
+    cls: "bg-orange-200 dark:bg-orange-900/50 text-orange-800 dark:text-orange-200",
+  },
+  Falecido: {
+    label: "In Memoriam",
+    cls: "bg-slate-300 dark:bg-slate-700/60 text-slate-800 dark:text-slate-200",
+  },
+  Visitante: {
+    label: "Visitante",
+    cls: "bg-sky-200 dark:bg-sky-900/50 text-sky-800 dark:text-sky-200",
+  },
+  Congregado: {
+    label: "Congregado",
+    cls: "bg-violet-200 dark:bg-violet-900/50 text-violet-800 dark:text-violet-200",
+  },
 };
+
+/**
+ * Resolve o selo de status retornado pela RPC de validação. Um status
+ * ausente ou desconhecido NUNCA cai em `Ativo`/verde — usa o valor real
+ * recebido (se houver) ou um texto neutro, sempre com apresentação
+ * cinza/slate.
+ */
+function getStatusPill(status: string | null | undefined): StatusPill {
+  if (status && STATUS_PILL[status]) return STATUS_PILL[status];
+  const trimmed = status?.trim();
+  return {
+    label: trimmed || "Status não informado",
+    cls: "bg-slate-200 dark:bg-slate-700/60 text-slate-700 dark:text-slate-200",
+  };
+}
 
 function getErrorMessage(reason: string, t: (key: string) => string): string {
   switch (reason) {
@@ -332,8 +385,11 @@ export default function ModoPorteiro() {
                 <p className="text-sm text-emerald-700 dark:text-emerald-300">
                   {result.member_role}
                 </p>
-                <span className="inline-block mt-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-200 dark:bg-emerald-800/60 text-emerald-800 dark:text-emerald-200">
-                  {t(STATUS_LABEL[result.status] || result.status)}
+                <span
+                  data-porteiro-status-pill
+                  className={`inline-block mt-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${getStatusPill(result.status).cls}`}
+                >
+                  {t(getStatusPill(result.status).label)}
                 </span>
               </div>
             </div>

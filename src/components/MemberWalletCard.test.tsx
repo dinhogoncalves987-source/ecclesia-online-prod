@@ -1,6 +1,13 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { MemberWalletCard, type WalletMember } from "./MemberWalletCard";
+import { MEMBER_STATUSES } from "@/lib/secretariaConstants";
+import {
+  MemberWalletCard,
+  STATUS_PROFILES,
+  getStatusProfile,
+  qrLogoImageSettings,
+  type WalletMember,
+} from "./MemberWalletCard";
 
 const {
   rpcMock,
@@ -177,5 +184,175 @@ describe("MemberWalletCard — identidade visual", () => {
     );
     expect(documentActionsProps.current?.onPrint).toBeTypeOf("function");
     expect(documentActionsProps.current?.printElementId).toBe("wallet-card-front");
+  });
+});
+
+/**
+ * FASE 1C-G2 — a carteira de ANDRIELE DOS SANTOS BRAZ (matrícula 019904,
+ * status real "Em disciplina") mostrava o selo verde "Ativo" porque
+ * `STATUS_BADGE` não conhecia a chave "Em disciplina" e caía no fallback
+ * `?? STATUS_BADGE.Ativo`. Estes testes cobrem os 8 status canônicos de
+ * `MEMBER_STATUSES`, o alias legado "Disciplinado" e o fallback seguro para
+ * status ausente/desconhecido — nenhum deles pode declarar "Ativo" por
+ * omissão.
+ */
+describe("MemberWalletCard — perfis de todos os status (Fase 1C-G2)", () => {
+  const renderWithStatus = (status: string) =>
+    render(
+      <MemberWalletCard
+        member={{ ...member, status }}
+        churchName="Congregação Central"
+        churchLogoUrl={null}
+      />,
+    );
+
+  const frontBadge = (container: HTMLElement) =>
+    container.querySelector("#wallet-card-front [data-wallet-status-badge]");
+
+  const footer = (container: HTMLElement) => container.querySelector("[data-wallet-footer]");
+
+  it("Ativo aparece em verde/esmeralda com rodapé de cadastro ativo", () => {
+    const { container } = renderWithStatus("Ativo");
+    expect(frontBadge(container)).toHaveTextContent("ATIVO");
+    expect(frontBadge(container)).toHaveClass("bg-emerald-600");
+    expect(footer(container)).toHaveTextContent(
+      "Documento institucional · Válido mediante verificação de cadastro ativo",
+    );
+  });
+
+  it("Inativo aparece em vermelho e o rodapé nunca declara cadastro ativo", () => {
+    const { container } = renderWithStatus("Inativo");
+    expect(frontBadge(container)).toHaveTextContent("INATIVO");
+    expect(frontBadge(container)).toHaveClass("bg-red-600");
+    expect(footer(container)).toHaveTextContent("Cadastro inativo");
+    expect(footer(container)?.textContent).not.toContain("cadastro ativo");
+  });
+
+  it("Transferido aparece em azul", () => {
+    const { container } = renderWithStatus("Transferido");
+    expect(frontBadge(container)).toHaveTextContent("TRANSFERIDO");
+    expect(frontBadge(container)).toHaveClass("bg-blue-600");
+    expect(footer(container)).toHaveTextContent("Membro transferido");
+  });
+
+  it('"Em disciplina" aparece em âmbar/amarelo e NUNCA cai em Ativo (bug de ANDRIELE DOS SANTOS BRAZ)', () => {
+    const { container } = renderWithStatus("Em disciplina");
+    const badge = frontBadge(container);
+    expect(badge).toHaveTextContent("EM DISCIPLINA");
+    expect(badge).toHaveClass("bg-amber-500");
+    expect(badge).not.toHaveClass("bg-emerald-600");
+    expect(badge?.textContent).not.toBe("ATIVO");
+    expect(footer(container)).toHaveTextContent("Membro em disciplina");
+  });
+
+  it("Afastado aparece em laranja", () => {
+    const { container } = renderWithStatus("Afastado");
+    expect(frontBadge(container)).toHaveTextContent("AFASTADO");
+    expect(frontBadge(container)).toHaveClass("bg-orange-600");
+    expect(footer(container)).toHaveTextContent("Membro afastado");
+  });
+
+  it("Falecido aparece com perfil escuro/In memoriam, preservando o padrão institucional", () => {
+    const { container } = renderWithStatus("Falecido");
+    expect(frontBadge(container)).toHaveTextContent("IN MEMORIAM");
+    expect(frontBadge(container)).toHaveClass("bg-slate-700");
+    expect(footer(container)).toHaveTextContent("In memoriam");
+  });
+
+  it("Visitante possui perfil próprio e distinto (não é verde nem âmbar)", () => {
+    const { container } = renderWithStatus("Visitante");
+    const badge = frontBadge(container);
+    expect(badge).toHaveTextContent("VISITANTE");
+    expect(badge).toHaveClass("bg-sky-500");
+    expect(badge).not.toHaveClass("bg-emerald-600");
+    expect(badge).not.toHaveClass("bg-amber-500");
+    expect(footer(container)).toHaveTextContent("Visitante");
+  });
+
+  it("Congregado possui perfil próprio e distinto", () => {
+    const { container } = renderWithStatus("Congregado");
+    const badge = frontBadge(container);
+    expect(badge).toHaveTextContent("CONGREGADO");
+    expect(badge).toHaveClass("bg-violet-600");
+    expect(badge).not.toHaveClass("bg-emerald-600");
+    expect(footer(container)).toHaveTextContent("Congregado");
+  });
+
+  it('"Disciplinado" funciona apenas como alias legado, idêntico a "Em disciplina"', () => {
+    expect(getStatusProfile("Disciplinado")).toEqual(getStatusProfile("Em disciplina"));
+    const { container } = renderWithStatus("Disciplinado");
+    expect(frontBadge(container)).toHaveTextContent("EM DISCIPLINA");
+    expect(frontBadge(container)).toHaveClass("bg-amber-500");
+  });
+
+  it("status desconhecido nunca cai em Ativo — usa o valor real recebido, em cinza/slate neutro", () => {
+    const { container } = renderWithStatus("Bloqueado");
+    const badge = frontBadge(container);
+    expect(badge).toHaveTextContent("BLOQUEADO");
+    expect(badge).toHaveClass("bg-slate-500");
+    expect(badge).not.toHaveClass("bg-emerald-600");
+  });
+
+  it("status ausente/vazio mostra \"STATUS NÃO INFORMADO\" — nunca Ativo", () => {
+    const { container } = renderWithStatus("");
+    const badge = frontBadge(container);
+    expect(badge).toHaveTextContent("STATUS NÃO INFORMADO");
+    expect(badge).toHaveClass("bg-slate-500");
+    expect(badge).not.toHaveClass("bg-emerald-600");
+  });
+
+  it("todos os valores de MEMBER_STATUSES possuem apresentação explícita (nenhum cai no fallback genérico)", () => {
+    for (const status of MEMBER_STATUSES) {
+      expect(STATUS_PROFILES[status], `status sem perfil: ${status}`).toBeDefined();
+      expect(STATUS_PROFILES[status].cls).not.toBe("");
+    }
+  });
+
+  it("o texto compartilhado (WhatsApp/Email) reflete o selo real, nunca 'Ativa' fixo por omissão", () => {
+    renderWithStatus("Em disciplina");
+    expect(documentActionsProps.current?.shareText).toContain("Situação: EM DISCIPLINA");
+    expect(documentActionsProps.current?.emailBody).toContain("Situação: EM DISCIPLINA");
+  });
+});
+
+/**
+ * FASE 1C-G2 — símbolo Ω dourado sobreposto ao centro dos três QRCodeSVG da
+ * Carteira: pequeno clicável (frente visível), pequeno não clicável (clone
+ * off-screen usado por PDF/impressão/compartilhamento) e ampliado (modal).
+ */
+describe("MemberWalletCard — Ω dourado no QR (Fase 1C-G2)", () => {
+  it("qrLogoImageSettings usa o ativo oficial, habilita excavate e nunca excede 15% do QR", () => {
+    for (const size of [40, 288]) {
+      const settings = qrLogoImageSettings(size);
+      expect(settings.src).toBe("/icons/ecclesia-omega-qr.png");
+      expect(settings.excavate).toBe(true);
+      expect(settings.width).toBeGreaterThan(0);
+      expect(settings.height).toBeGreaterThan(0);
+      expect(settings.width / size).toBeLessThanOrEqual(0.15);
+      expect(settings.height / size).toBeLessThanOrEqual(0.15);
+    }
+  });
+
+  it("os três QRs (clicável, clone off-screen e ampliado) exibem o Ω dourado após a geração", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { token: "token-omega", expires_at: new Date(Date.now() + 300_000).toISOString() },
+      error: null,
+    });
+
+    const { container } = render(
+      <MemberWalletCard member={member} churchName="Congregação Central" churchLogoUrl={null} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Gerar QR seguro" }));
+    await screen.findByRole("dialog", { name: "QR Code seguro ampliado" });
+
+    const clickableLogo = container.querySelector("#wallet-card-front image");
+    const pdfCloneLogo = container.querySelector("#wallet-pdf-front image");
+    const expandedLogo = container.querySelector("[data-member-qr-expanded] image");
+
+    for (const logo of [clickableLogo, pdfCloneLogo, expandedLogo]) {
+      expect(logo).not.toBeNull();
+      expect(logo).toHaveAttribute("href", "/icons/ecclesia-omega-qr.png");
+    }
   });
 });
