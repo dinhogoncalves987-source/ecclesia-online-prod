@@ -2,7 +2,7 @@ import { AdminLayout } from "@/components/AdminLayout";
 import {
   Search, Plus, X, Trash2, Loader2, Upload, Pencil, CreditCard, Camera, ChevronLeft, ChevronRight,
   User, FileText, Phone, MapPin, Church, Briefcase, Users, BookOpen, Send, Building2,
-  Shield,
+  Shield, CalendarClock,
   type LucideIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -10,6 +10,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { MemberWalletCard } from "@/components/MemberWalletCard";
+import {
+  DisciplinePeriodDialog,
+  type DisciplinePeriodConfirmPayload,
+  type DisciplinePeriodInfo,
+} from "@/components/DisciplinePeriodDialog";
 import { MemberInviteModal } from "@/components/MemberInviteModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -356,6 +361,11 @@ function statusBadgeClass(status: string) {
   }
 }
 
+// Estados considerados "em disciplina" para fins de fluxo de período —
+// inclui o alias legado "Disciplinado" (nunca oferecido no <select>, mas
+// presente em registros antigos como ANDRIELE, DANIEL e DORACI).
+const DISCIPLINE_STATUSES = new Set(["Em disciplina", "Disciplinado"]);
+
 function MemberAvatar({ member, size = "sm" }: { member: Pick<Member, "full_name" | "photo_url">; size?: "sm" | "md" | "lg" }) {
   const sizeClass = size === "lg" ? "w-16 h-16 text-base" : size === "md" ? "w-10 h-10 text-sm" : "w-8 h-8 text-xs";
   if (member.photo_url) {
@@ -491,6 +501,50 @@ export default function Membros() {
   const [showImport, setShowImport] = useState(false);
   const [walletMember, setWalletMember] = useState<Member | null>(null);
   const [walletLoadingId, setWalletLoadingId] = useState<string | null>(null);
+
+  // ── Período disciplinar (Fase 1C-H3) ────────────────────────────────────────
+  // Estados canônicos considerados "em disciplina" para fins de UI — inclui o
+  // alias legado "Disciplinado" (nunca oferecido no <select>, mas presente em
+  // registros antigos). Ver contrato completo em applyMemberStatusChange.
+  const [disciplineDialog, setDisciplineDialog] = useState<{
+    mode: "enter" | "regularize" | "end";
+    member: MemberListItem;
+    targetStatus: MemberStatus;
+    currentPeriod: DisciplinePeriodInfo | null;
+  } | null>(null);
+  const [disciplineSubmitting, setDisciplineSubmitting] = useState(false);
+
+  // Trava de concorrência por membro (Fase 1C-H5, achado P2): um `Set`
+  // síncrono (checado/atualizado fora de qualquer `setState`, portanto
+  // efetivo no mesmo tick) impede que dois eventos disparados antes do
+  // próximo render — duplo clique no select, seleção rápida, clique duplo em
+  // "Período" — abram duas RPCs/diálogos concorrentes para o mesmo membro.
+  // `mutatingMemberIds` é o espelho em estado React usado apenas para
+  // desabilitar visualmente o select e o botão "Período" daquele membro;
+  // outros membros nunca são afetados.
+  const memberMutationLockRef = useRef<Set<string>>(new Set());
+  const [mutatingMemberIds, setMutatingMemberIds] = useState<Set<string>>(new Set());
+
+  const beginMemberMutation = (id: string): boolean => {
+    if (memberMutationLockRef.current.has(id)) return false;
+    memberMutationLockRef.current.add(id);
+    setMutatingMemberIds(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    return true;
+  };
+
+  const endMemberMutation = (id: string) => {
+    memberMutationLockRef.current.delete(id);
+    setMutatingMemberIds(prev => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
 
   // Contadores do cabeçalho — sempre por RPC independente (member_status_counts),
   // nunca derivados da página de membros carregada. null enquanto carregando
@@ -1916,13 +1970,167 @@ export default function Membros() {
     await refreshAfterMutation();
   };
 
-  const updateMemberStatus = async (id: string, newStatus: MemberStatus) => {
-    if (!church) return;
-    const { error } = await supabase.from("members").update({ status: newStatus })
-      .eq("id", id).eq("organization_id", church.id);
-    if (error) { toast.error(t("Erro ao atualizar"), { description: error.message }); return; }
+  // ── Status + período disciplinar (Fase 1C-H3) ───────────────────────────────
+  // Toda mudança de status passa pela RPC transacional
+  // `set_member_status_with_discipline` — não há mais caminho na interface que
+  // atualize `members.status` diretamente via `.update()`. Campos disciplinares
+  // vão nulos para status não disciplinares (a própria RPC decide o que fazer
+  // com o período aberto, se houver).
+
+  // Força o <select> de status a refletir visualmente o valor real persistido
+  // — nunca fica preso na opção clicada quando a mudança é bloqueada,
+  // cancelada ou falha (a única fonte de verdade é `m.status`, vindo do
+  // servidor via refreshAfterMutation/fetchMembersPage).
+  const resyncStatusSelect = (id: string) => {
+    setMembers(prev => prev.map(x => (x.id === id ? { ...x } : x)));
+  };
+
+  const fetchDisciplinePeriod = async (
+    memberId: string,
+  ): Promise<{ ok: true; found: boolean; info: DisciplinePeriodInfo | null } | { ok: false }> => {
+    const { data, error } = await supabase.rpc("get_current_member_discipline_period", {
+      p_member_id: memberId,
+    });
+    if (error) {
+      toast.error(t("Não foi possível consultar o período disciplinar."), { description: error.message });
+      return { ok: false };
+    }
+    const payload = data as {
+      found?: boolean;
+      discipline_started_at?: string | null;
+      discipline_expected_end_at?: string | null;
+    } | null;
+    if (!payload?.found) return { ok: true, found: false, info: null };
+    return {
+      ok: true,
+      found: true,
+      info: {
+        startedAt: payload.discipline_started_at ?? null,
+        expectedEndAt: payload.discipline_expected_end_at ?? null,
+      },
+    };
+  };
+
+  const applyMemberStatusChange = async (
+    id: string,
+    newStatus: MemberStatus,
+    discipline: {
+      startedAt?: string | null;
+      expectedEndAt?: string | null;
+      description?: string | null;
+      endedAt?: string | null;
+    } = {},
+  ): Promise<boolean> => {
+    if (!church) return false;
+    const { error } = await supabase.rpc("set_member_status_with_discipline", {
+      p_member_id: id,
+      p_new_status: newStatus,
+      p_discipline_started_at: discipline.startedAt ?? null,
+      p_discipline_expected_end_at: discipline.expectedEndAt ?? null,
+      p_discipline_description: discipline.description ?? null,
+      p_discipline_ended_at: discipline.endedAt ?? null,
+    });
+    if (error) {
+      toast.error(t("Erro ao atualizar"), { description: error.message });
+      resyncStatusSelect(id);
+      return false;
+    }
     toast.success(t("Status atualizado"));
     await refreshAfterMutation();
+    return true;
+  };
+
+  /**
+   * onChange do <select> de status na listagem (desktop e mobile).
+   *
+   * A trava `beginMemberMutation`/`endMemberMutation` cobre toda a operação
+   * para este membro — incluindo o tempo em que o diálogo disciplinar fica
+   * aberto aguardando confirmação do usuário — para impedir que um segundo
+   * evento (duplo clique, seleção rápida) dispare uma segunda RPC/diálogo
+   * concorrente antes do próximo render desabilitar o select. Quando o fluxo
+   * abre um diálogo, a trava só é liberada em `handleDisciplineDialogCancel`
+   * ou `handleDisciplineDialogConfirm` (ver `keepLocked` abaixo); nos demais
+   * casos, é sempre liberada em `finally`.
+   */
+  const handleStatusSelect = async (m: MemberListItem, newStatusRaw: string) => {
+    if (!church) return;
+    if (!isMemberStatus(newStatusRaw)) return;
+    const newStatus = newStatusRaw;
+    if (!beginMemberMutation(m.id)) return;
+    let keepLocked = false;
+    try {
+      const wasInDiscipline = DISCIPLINE_STATUSES.has(m.status);
+      const enteringDiscipline = newStatus === "Em disciplina" && !wasInDiscipline;
+      const leavingDiscipline = wasInDiscipline && newStatus !== "Em disciplina";
+
+      if (enteringDiscipline) {
+        // Nunca preenche uma data silenciosamente: o selo/select só reflete
+        // "Em disciplina" depois que o usuário confirmar o diálogo.
+        resyncStatusSelect(m.id);
+        setDisciplineDialog({ mode: "enter", member: m, targetStatus: newStatus, currentPeriod: null });
+        keepLocked = true;
+        return;
+      }
+
+      if (leavingDiscipline) {
+        const lookup = await fetchDisciplinePeriod(m.id);
+        resyncStatusSelect(m.id);
+        if (!lookup.ok) return;
+        if (!lookup.found) {
+          toast.error(t("Registre o período disciplinar antes de alterar este status."));
+          return;
+        }
+        setDisciplineDialog({ mode: "end", member: m, targetStatus: newStatus, currentPeriod: lookup.info });
+        keepLocked = true;
+        return;
+      }
+
+      await applyMemberStatusChange(m.id, newStatus);
+    } finally {
+      if (!keepLocked) endMemberMutation(m.id);
+    }
+  };
+
+  /** Ação "Período" — disponível apenas para membros já em disciplina. */
+  const openDisciplinePeriodAction = async (m: MemberListItem) => {
+    if (!beginMemberMutation(m.id)) return;
+    let keepLocked = false;
+    try {
+      const lookup = await fetchDisciplinePeriod(m.id);
+      if (!lookup.ok) return;
+      setDisciplineDialog({
+        mode: "regularize",
+        member: m,
+        targetStatus: "Em disciplina",
+        currentPeriod: lookup.found ? lookup.info : null,
+      });
+      keepLocked = true;
+    } finally {
+      if (!keepLocked) endMemberMutation(m.id);
+    }
+  };
+
+  const handleDisciplineDialogCancel = () => {
+    if (disciplineDialog) endMemberMutation(disciplineDialog.member.id);
+    setDisciplineDialog(null);
+  };
+
+  const handleDisciplineDialogConfirm = async (payload: DisciplinePeriodConfirmPayload) => {
+    if (!disciplineDialog) return;
+    const memberId = disciplineDialog.member.id;
+    setDisciplineSubmitting(true);
+    try {
+      const success = await applyMemberStatusChange(memberId, disciplineDialog.targetStatus, {
+        startedAt: payload.startedAt,
+        expectedEndAt: payload.expectedEndAt,
+        description: payload.description,
+        endedAt: payload.endedAt,
+      });
+      if (success) setDisciplineDialog(null);
+    } finally {
+      setDisciplineSubmitting(false);
+      endMemberMutation(memberId);
+    }
   };
 
   // ── Bulk import ──────────────────────────────────────────────────────────────
@@ -2312,8 +2520,9 @@ export default function Membros() {
                         {canWrite ? (
                           <select
                             value={isMemberStatus(m.status) ? m.status : "Ativo"}
-                            onChange={e => updateMemberStatus(m.id, e.target.value as MemberStatus)}
-                            className={`text-[10px] font-medium px-2 py-0.5 rounded-full border-0 cursor-pointer ${statusBadgeClass(m.status)}`}
+                            onChange={e => void handleStatusSelect(m, e.target.value)}
+                            disabled={mutatingMemberIds.has(m.id)}
+                            className={`text-[10px] font-medium px-2 py-0.5 rounded-full border-0 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${statusBadgeClass(m.status)}`}
                           >
                             {MEMBER_STATUSES.map(s => (
                               <option key={s} value={s}>{t(s)}</option>
@@ -2336,6 +2545,13 @@ export default function Membros() {
                             title={t("Carteira de Membro")}>
                             {walletLoadingId === m.id ? <Loader2 size={12} className="animate-spin" /> : <CreditCard size={12} />} {t("Carteira")}
                           </button>
+                          {canWrite && DISCIPLINE_STATUSES.has(m.status) && (
+                            <button type="button" onClick={() => void openDisciplinePeriodAction(m)} disabled={mutatingMemberIds.has(m.id)}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-[11px] font-medium transition-colors disabled:opacity-60"
+                              title={t("Período disciplinar")}>
+                              {mutatingMemberIds.has(m.id) ? <Loader2 size={12} className="animate-spin" /> : <CalendarClock size={12} />} {t("Período")}
+                            </button>
+                          )}
                           {canWrite && (
                             <>
                               <button type="button" onClick={() => openEdit(m.id)}
@@ -2386,8 +2602,9 @@ export default function Membros() {
                           <select
                             value={isMemberStatus(m.status) ? m.status : "Ativo"}
                             onClick={e => e.stopPropagation()}
-                            onChange={e => { e.stopPropagation(); updateMemberStatus(m.id, e.target.value as MemberStatus); }}
-                            className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border-0 flex-shrink-0 ${statusBadgeClass(m.status)}`}
+                            onChange={e => { e.stopPropagation(); void handleStatusSelect(m, e.target.value); }}
+                            disabled={mutatingMemberIds.has(m.id)}
+                            className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border-0 flex-shrink-0 disabled:opacity-60 disabled:cursor-not-allowed ${statusBadgeClass(m.status)}`}
                           >
                             {MEMBER_STATUSES.map(s => <option key={s} value={s}>{t(s)}</option>)}
                           </select>
@@ -2419,6 +2636,12 @@ export default function Membros() {
                         className="p-1.5 rounded-lg bg-accent/10 hover:bg-accent/20 transition-colors disabled:opacity-60" title={t("Carteira")}>
                         {walletLoadingId === m.id ? <Loader2 size={14} className="animate-spin text-accent" /> : <CreditCard size={14} className="text-accent" />}
                       </button>
+                      {canWrite && DISCIPLINE_STATUSES.has(m.status) && (
+                        <button type="button" onClick={e => { e.stopPropagation(); void openDisciplinePeriodAction(m); }} disabled={mutatingMemberIds.has(m.id)}
+                          className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 transition-colors disabled:opacity-60" title={t("Período disciplinar")}>
+                          {mutatingMemberIds.has(m.id) ? <Loader2 size={14} className="animate-spin text-amber-600" /> : <CalendarClock size={14} className="text-amber-600" />}
+                        </button>
+                      )}
                       {canPermanentlyDeleteMember && (
                         <button type="button" onClick={e => { e.stopPropagation(); removeMember(m); }}
                           className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors" title={t("Excluir definitivamente")}>
@@ -3305,6 +3528,20 @@ export default function Membros() {
             />
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Período disciplinar (Fase 1C-H3) */}
+      {disciplineDialog && (
+        <DisciplinePeriodDialog
+          open={!!disciplineDialog}
+          mode={disciplineDialog.mode}
+          memberName={disciplineDialog.member.full_name}
+          targetStatusLabel={t(disciplineDialog.targetStatus)}
+          currentPeriod={disciplineDialog.currentPeriod}
+          submitting={disciplineSubmitting}
+          onCancel={handleDisciplineDialogCancel}
+          onConfirm={payload => void handleDisciplineDialogConfirm(payload)}
+        />
       )}
 
       {/* Bulk import */}

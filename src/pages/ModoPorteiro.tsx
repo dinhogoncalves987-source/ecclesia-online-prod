@@ -22,6 +22,10 @@ type ValidationResult = {
   congregation_id: string | null;
   sector_id: string | null;
   matricula: string;
+  // Período disciplinar (Fase 1C-H3) — nunca inclui motivo/descrição.
+  discipline_period_recorded?: boolean;
+  discipline_started_at?: string | null;
+  discipline_expected_end_at?: string | null;
 };
 
 type AppState =
@@ -110,6 +114,42 @@ function getStatusPill(status: string | null | undefined): StatusPill {
     label: trimmed || "Status não informado",
     cls: "bg-slate-200 dark:bg-slate-700/60 text-slate-700 dark:text-slate-200",
   };
+}
+
+// Alias legado — mesma leitura de "Em disciplina" para fins de período.
+const DISCIPLINE_STATUSES = new Set(["Em disciplina", "Disciplinado"]);
+
+function formatIsoDateBr(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return iso;
+  return `${d}/${m}/${y}`;
+}
+
+/**
+ * Texto do período disciplinar exibido junto ao selo de status. Nunca
+ * inventa data: sem registro (legado) mostra "Período ainda não
+ * informado"; com início mas sem previsão mostra "Período em andamento".
+ * Nunca inclui motivo/descrição (a RPC de validação não retorna esse campo).
+ *
+ * `discipline_period_recorded === true` sem `discipline_started_at` é um
+ * retorno inconsistente do backend — nunca deve ser tratado como a mesma
+ * "ausência legítima" de um membro legado sem período (Fase 1C-H5,
+ * correção direta P2). Nunca inventa data nesse caso; apenas sinaliza a
+ * inconsistência, mantendo o selo e a identidade confirmados.
+ */
+function disciplinePeriodText(result: ValidationResult, t: (key: string) => string): string {
+  if (result.discipline_period_recorded === true) {
+    if (!result.discipline_started_at) {
+      return t("Dados do período disciplinar inconsistentes");
+    }
+    const started = formatIsoDateBr(result.discipline_started_at);
+    if (result.discipline_expected_end_at) {
+      return `${t("Início")}: ${started} · ${t("Previsão")}: ${formatIsoDateBr(result.discipline_expected_end_at)}`;
+    }
+    return `${t("Início")}: ${started} · ${t("Período em andamento")}`;
+  }
+  return t("Período ainda não informado");
 }
 
 function getErrorMessage(reason: string, t: (key: string) => string): string {
@@ -391,6 +431,14 @@ export default function ModoPorteiro() {
                 >
                   {t(getStatusPill(result.status).label)}
                 </span>
+                {DISCIPLINE_STATUSES.has(result.status) && (
+                  <p
+                    data-porteiro-discipline-period
+                    className="mt-1 text-[11px] text-amber-700 dark:text-amber-400"
+                  >
+                    {disciplinePeriodText(result, t)}
+                  </p>
+                )}
               </div>
             </div>
 

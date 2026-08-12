@@ -14,6 +14,7 @@ import { ChevronLeft, ChevronRight, Shield, QrCode, RefreshCw, Loader2, X } from
 import { AnimatePresence, motion } from "framer-motion";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
 import { DocumentActions } from "@/components/DocumentActions";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -156,6 +157,66 @@ export function getStatusProfile(status: string | null | undefined): StatusProfi
   };
 }
 
+/**
+ * Período disciplinar (Fase 1C-H3/1C-H5) — consultado via
+ * `get_current_member_discipline_period` somente quando o status é
+ * "Em disciplina"/"Disciplinado". Nunca inclui motivo/descrição (a RPC não
+ * retorna esse campo para este consumidor).
+ *
+ * Máquina de 5 estados (Fase 1C-H5, achado P1 da revisão 1C-H4): a Carteira
+ * precisa distinguir explicitamente status não disciplinar, carregando,
+ * encontrado, ausência legítima e erro técnico/retorno inconsistente — uma
+ * falha de RPC NUNCA pode ser exibida como "Período ainda não informado".
+ * Só o motivo `discipline_period_not_recorded` é tratado como ausência
+ * legítima; qualquer outro motivo (permission_denied, not_authenticated,
+ * member_not_found, desconhecido, ou `found: true` sem data de início) cai
+ * no estado de erro.
+ */
+const DISCIPLINE_STATUSES = new Set(["Em disciplina", "Disciplinado"]);
+const DISCIPLINE_PERIOD_NOT_RECORDED_REASON = "discipline_period_not_recorded";
+
+export type DisciplinePeriod = { startedAt: string | null; expectedEndAt: string | null };
+
+type DisciplineState =
+  | { kind: "not-applicable" }
+  | { kind: "loading" }
+  | { kind: "found"; period: DisciplinePeriod }
+  | { kind: "not-recorded" }
+  | { kind: "error" };
+
+function formatIsoDateBr(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  if (!y || !m || !d) return iso;
+  return `${d}/${m}/${y}`;
+}
+
+/**
+ * Nunca inventa data: sem registro (membro legado) mostra "Período ainda
+ * não informado"; com início mas sem previsão mostra "Período em
+ * andamento"; erro técnico/retorno inconsistente mostra um aviso de erro
+ * verdadeiro — nunca o mesmo texto de ausência legítima. Nunca exibe
+ * motivo/descrição.
+ */
+function formatDisciplinePeriodLine(state: DisciplineState): string | null {
+  switch (state.kind) {
+    case "not-applicable":
+      return null;
+    case "loading":
+      return "Carregando período disciplinar…";
+    case "found": {
+      const started = formatIsoDateBr(state.period.startedAt);
+      return state.period.expectedEndAt
+        ? `Início: ${started} · Previsão: ${formatIsoDateBr(state.period.expectedEndAt)}`
+        : `Início: ${started} · Período em andamento`;
+    }
+    case "not-recorded":
+      return "Período ainda não informado";
+    case "error":
+      return "Não foi possível carregar o período disciplinar";
+  }
+}
+
 /** Logo Ω dourado sobreposto ao centro do QR — máximo 15% da largura/altura. */
 export const QR_LOGO_SRC = "/icons/ecclesia-omega-qr.png";
 const QR_LOGO_MAX_RATIO = 0.15;
@@ -174,11 +235,13 @@ export function qrLogoImageSettings(qrSize: number) {
 
 function CardFront({
   id, member, churchName, churchAcronym, churchLogoUrl, code, issueDate, validUntil, qrValue,
+  disciplinePeriodLine,
   onQrClick,
 }: {
   id: string; member: WalletMember; churchName: string;
   churchAcronym?: string | null; churchLogoUrl?: string | null;
   code: string; issueDate: string; validUntil: string; qrValue: string;
+  disciplinePeriodLine?: string | null;
   onQrClick?: () => void;
 }) {
   const statusInfo = getStatusProfile(member.status);
@@ -291,6 +354,12 @@ function CardFront({
           )}
         </div>
 
+        {disciplinePeriodLine && (
+          <p data-wallet-discipline-period className="text-[7px] font-medium leading-none text-amber-300">
+            {disciplinePeriodLine}
+          </p>
+        )}
+
         <div className="flex items-center justify-between border-t border-slate-700/50 pt-1.5">
           <div>
             <p className="text-[7px] uppercase tracking-wide text-slate-500">Matrícula</p>
@@ -400,6 +469,98 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
   const [showBack, setShowBack] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
+  // ── Período disciplinar (Fase 1C-H3/1C-H5) ─────────────────────────────────
+  const isDisciplineStatus = DISCIPLINE_STATUSES.has(member.status);
+  const [disciplineState, setDisciplineState] = useState<DisciplineState>(
+    isDisciplineStatus ? { kind: "loading" } : { kind: "not-applicable" },
+  );
+
+  // Sequência de requisição (substitui o antigo guard booleano de execução
+  // única — Fase 1C-H5, achado P2): incrementada a cada execução do efeito
+  // (mudança de member.id/status, incluindo o duplo ciclo do React Strict
+  // Mode em desenvolvimento). Só a resposta cuja sequência ainda é a atual
+  // pode atualizar o estado; uma resposta atrasada de um membro anterior é
+  // silenciosamente descartada.
+  const disciplineRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    if (!isDisciplineStatus) {
+      setDisciplineState({ kind: "not-applicable" });
+      return;
+    }
+
+    const requestId = ++disciplineRequestIdRef.current;
+    // Limpa imediatamente qualquer período de um membro anterior antes de
+    // buscar o atual — nunca reaproveita dado de outro membro/status.
+    setDisciplineState({ kind: "loading" });
+    let cancelled = false;
+
+    (async () => {
+      let next: DisciplineState;
+      try {
+        const result = await supabase.rpc("get_current_member_discipline_period", {
+          p_member_id: member.id,
+        });
+
+        if (result?.error) {
+          next = { kind: "error" };
+        } else {
+          const payload = result?.data as {
+            found?: boolean;
+            reason?: string;
+            discipline_started_at?: string | null;
+            discipline_expected_end_at?: string | null;
+          } | null | undefined;
+
+          if (payload?.found === true && payload.discipline_started_at) {
+            next = {
+              kind: "found",
+              period: {
+                startedAt: payload.discipline_started_at,
+                expectedEndAt: payload.discipline_expected_end_at ?? null,
+              },
+            };
+          } else if (payload?.found === false && payload.reason === DISCIPLINE_PERIOD_NOT_RECORDED_REASON) {
+            next = { kind: "not-recorded" };
+          } else {
+            // `found: true` sem data de início (retorno inconsistente),
+            // motivo inesperado (permission_denied/not_authenticated/
+            // member_not_found/desconhecido) ou payload ausente/malformado:
+            // sempre erro técnico, nunca ausência silenciosa.
+            next = { kind: "error" };
+          }
+        }
+      } catch {
+        next = { kind: "error" };
+      }
+
+      if (!cancelled && requestId === disciplineRequestIdRef.current) {
+        setDisciplineState(next);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [member.id, isDisciplineStatus]);
+
+  const disciplinePeriodLine = formatDisciplinePeriodLine(disciplineState);
+
+  // PDF/impressão/compartilhamento só ficam liberados depois de uma resposta
+  // confiável (encontrado ou ausência legítima); nunca durante carregamento
+  // ou erro técnico — não gera documento incompleto/errado silenciosamente
+  // (Fase 1C-H5, achado P1).
+  const disciplineDocumentActionsBlocked =
+    disciplineState.kind === "loading" || disciplineState.kind === "error";
+
+  const handleDisciplineActionBlocked = () => {
+    toast.error(
+      disciplineState.kind === "error"
+        ? "Não foi possível carregar o período disciplinar."
+        : "Aguarde o carregamento do período disciplinar.",
+    );
+  };
+
   // ── Dynamic QR state ────────────────────────────────────────────────────────
   const [qrState, setQrState] = useState<"idle" | "loading" | "ready" | "expired" | "error">("idle");
   const [qrToken, setQrToken] = useState<string | null>(null);
@@ -491,6 +652,7 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
     `Vínculo: Membro`,
     `Matrícula: Nº ${code}`,
     `Situação: ${statusProfile.label}`,
+    disciplinePeriodLine ? `Período disciplinar: ${disciplinePeriodLine}` : null,
     ``,
     `Documento emitido pela igreja via Ecclesia Online.`,
   ].filter(Boolean).join("\n");
@@ -643,7 +805,7 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
     }
   };
 
-  const cardProps = { member, churchName, churchAcronym, churchLogoUrl, code, issueDate, validUntil, qrValue };
+  const cardProps = { member, churchName, churchAcronym, churchLogoUrl, code, issueDate, validUntil, qrValue, disciplinePeriodLine };
 
   return (
     <div className="flex flex-col items-center gap-4 py-2">
@@ -777,6 +939,8 @@ export function MemberWalletCard({ member, churchName, churchAcronym, churchCity
         onGeneratePdfBlob={generatingPdf ? undefined : generateWalletPdfBlob}
         onPrint={generatingPdf ? undefined : handlePrintWallet}
         onGeneratingChange={setGeneratingPdf}
+        disabled={disciplineDocumentActionsBlocked}
+        onDisabledAction={handleDisciplineActionBlocked}
       />
 
       {generatingPdf && (

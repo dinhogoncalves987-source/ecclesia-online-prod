@@ -125,4 +125,69 @@ describe("DocumentActions", () => {
     await waitFor(() => expect(onPrint).toHaveBeenCalledTimes(1));
     expect(browserPrint).not.toHaveBeenCalled();
   });
+
+  /**
+   * FASE 1C-H5 — achado P1: quando `disabled` é `true`, nenhuma ação pode
+   * executar — nem por clique (botão desabilitado visualmente), nem por
+   * uma chamada que já estivesse em voo antes do próximo render aplicar o
+   * atributo `disabled` (por isso o guard também vive no topo de cada
+   * handler, não só no botão).
+   */
+  describe("disabled — bloqueio de todas as ações (Fase 1C-H5, achado P1)", () => {
+    it("com disabled=true, todos os botões ficam desabilitados visualmente", () => {
+      render(
+        <DocumentActions
+          actions={["pdf", "share", "whatsapp", "email", "print"]}
+          disabled
+          onGeneratePdfBlob={vi.fn().mockResolvedValue(pdfResult)}
+        />,
+      );
+
+      for (const name of ["PDF", "Compartilhar", "WhatsApp / Business", "Email", "Imprimir"]) {
+        expect(screen.getByRole("button", { name })).toBeDisabled();
+      }
+    });
+
+    it("com disabled=true, o clique não gera o PDF nem chama onGeneratePdfBlob", () => {
+      const onGeneratePdfBlob = vi.fn().mockResolvedValue(pdfResult);
+      render(<DocumentActions actions={["pdf"]} disabled onGeneratePdfBlob={onGeneratePdfBlob} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "PDF" }));
+
+      expect(onGeneratePdfBlob).not.toHaveBeenCalled();
+    });
+
+    it("com disabled=true, Compartilhar/WhatsApp/Email não executam mesmo se acionados programaticamente", () => {
+      const onGeneratePdfBlob = vi.fn().mockResolvedValue(pdfResult);
+      render(
+        <DocumentActions
+          actions={["share", "whatsapp", "email"]}
+          disabled
+          onGeneratePdfBlob={onGeneratePdfBlob}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Compartilhar" }));
+      fireEvent.click(screen.getByRole("button", { name: "WhatsApp / Business" }));
+      fireEvent.click(screen.getByRole("button", { name: "Email" }));
+
+      expect(onGeneratePdfBlob).not.toHaveBeenCalled();
+    });
+
+    it("com disabled=false (padrão), o comportamento é idêntico ao de antes — nenhum consumidor existente é afetado", async () => {
+      const createObjectURL = vi.fn().mockReturnValue("blob:documento");
+      Object.defineProperty(URL, "createObjectURL", { configurable: true, value: createObjectURL });
+      Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
+      vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+
+      const onGeneratePdfBlob = vi.fn().mockResolvedValue(pdfResult);
+      render(<DocumentActions actions={["pdf"]} onGeneratePdfBlob={onGeneratePdfBlob} />);
+
+      expect(screen.getByRole("button", { name: "PDF" })).not.toBeDisabled();
+      fireEvent.click(screen.getByRole("button", { name: "PDF" }));
+
+      await waitFor(() => expect(onGeneratePdfBlob).toHaveBeenCalledTimes(1));
+      expect(createObjectURL).toHaveBeenCalledWith(pdfResult.blob);
+    });
+  });
 });

@@ -3012,6 +3012,8 @@ export type Database = {
           created_by: string | null
           description: string | null
           document_id: string | null
+          ended_at: string | null
+          ended_by: string | null
           id: string
           legacy_code: string | null
           legacy_module: string | null
@@ -3032,6 +3034,8 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           document_id?: string | null
+          ended_at?: string | null
+          ended_by?: string | null
           id?: string
           legacy_code?: string | null
           legacy_module?: string | null
@@ -3052,6 +3056,8 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           document_id?: string | null
+          ended_at?: string | null
+          ended_by?: string | null
           id?: string
           legacy_code?: string | null
           legacy_module?: string | null
@@ -7027,6 +7033,21 @@ export type Database = {
       }
       validate_member_validation_token: {
         Args: { p_token: string }
+        Returns: Json
+      }
+      set_member_status_with_discipline: {
+        Args: {
+          p_discipline_description: string | null
+          p_discipline_ended_at: string | null
+          p_discipline_expected_end_at: string | null
+          p_discipline_started_at: string | null
+          p_member_id: string
+          p_new_status: string
+        }
+        Returns: Json
+      }
+      get_current_member_discipline_period: {
+        Args: { p_member_id: string }
         Returns: Json
       }
       list_member_family_for_certificates: {

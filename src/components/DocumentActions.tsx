@@ -46,6 +46,16 @@ export type DocumentActionsProps = {
   onPrint?: () => void | Promise<void>;
   /** Notifica o pai quando a geração começa/termina (útil para spinner externo). */
   onGeneratingChange?: (v: boolean) => void;
+  /**
+   * Quando `true`, bloqueia todas as ações: botões desabilitados
+   * visualmente e os handlers não executam (protege contra clique/chamada
+   * programática antes do próximo render aplicar o `disabled`). Padrão
+   * `false` — não afeta nenhum consumidor existente que não passar esta
+   * prop (Fase 1C-H5).
+   */
+  disabled?: boolean;
+  /** Chamado quando uma ação é tentada enquanto `disabled` é `true` (ex.: toast explicando o motivo do bloqueio). */
+  onDisabledAction?: () => void;
   size?: "sm" | "default";
   variant?: "default" | "outline" | "ghost";
 };
@@ -143,12 +153,21 @@ export function DocumentActions({
   onGeneratePdfBlob,
   onPrint,
   onGeneratingChange,
+  disabled = false,
+  onDisabledAction,
   size = "sm",
   variant = "outline",
 }: DocumentActionsProps) {
   const [generating, setGenerating] = useState(false);
 
   const canShare = typeof navigator !== "undefined" && Boolean(navigator.share);
+
+  /** Bloqueia a ação (handler) enquanto `disabled` for `true`. Verificado no topo de cada handler — não apenas no atributo `disabled` do botão — para também impedir invocação programática ou um clique disparado antes do próximo render. */
+  const guardDisabled = () => {
+    if (!disabled) return false;
+    onDisabledAction?.();
+    return true;
+  };
 
   const withGenerating = async (fn: () => Promise<void>) => {
     setGenerating(true);
@@ -162,6 +181,7 @@ export function DocumentActions({
   };
 
   const handlePrint = async () => {
+    if (guardDisabled()) return;
     if (onPrint) {
       await withGenerating(async () => {
         await onPrint();
@@ -175,6 +195,7 @@ export function DocumentActions({
   // ── PDF: gerar e baixar ──────────────────────────────────────────────────
 
   const handlePdf = async () => {
+    if (guardDisabled()) return;
     if (onGeneratePdf) { await onGeneratePdf(); return; }
     if (onGeneratePdfBlob) {
       await withGenerating(async () => {
@@ -190,6 +211,7 @@ export function DocumentActions({
   // ── Compartilhar: Web Share API com arquivo PDF ─────────────────────────
 
   const handleShare = async () => {
+    if (guardDisabled()) return;
     if (onGeneratePdfBlob) {
       await withGenerating(async () => {
         const result = await onGeneratePdfBlob();
@@ -246,6 +268,7 @@ export function DocumentActions({
   //      nativo (que pode direcionar para o WhatsApp com o arquivo).
 
   const handleWhatsApp = async () => {
+    if (guardDisabled()) return;
     if (onGeneratePdfBlob) {
       await withGenerating(async () => {
         const result = await onGeneratePdfBlob();
@@ -286,6 +309,7 @@ export function DocumentActions({
   //   3. Informar que o PDF deve ser anexado manualmente.
 
   const handleEmail = async () => {
+    if (guardDisabled()) return;
     if (onGeneratePdfBlob) {
       await withGenerating(async () => {
         const result = await onGeneratePdfBlob();
@@ -308,7 +332,7 @@ export function DocumentActions({
 
   const shownActions = actions;
 
-  const btnProps = { size, variant, disabled: generating } as const;
+  const btnProps = { size, variant, disabled: generating || disabled } as const;
 
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
@@ -350,7 +374,7 @@ export function DocumentActions({
           type="button"
           size={size}
           variant={variant}
-          disabled={generating}
+          disabled={generating || disabled}
           onClick={() => void handlePrint()}
           className="gap-1.5"
         >

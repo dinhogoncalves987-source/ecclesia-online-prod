@@ -40,9 +40,19 @@ type FakeValidation = {
   congregation_id: string | null;
   sector_id: string | null;
   matricula: string;
+  discipline_period_recorded?: boolean;
+  discipline_started_at?: string | null;
+  discipline_expected_end_at?: string | null;
 };
 
-function buildValidationResult(status: string): FakeValidation {
+function buildValidationResult(
+  status: string,
+  discipline?: {
+    discipline_period_recorded?: boolean;
+    discipline_started_at?: string | null;
+    discipline_expected_end_at?: string | null;
+  },
+): FakeValidation {
   return {
     valid: true,
     member_id: "11111111-1111-4111-8111-111111111111",
@@ -55,6 +65,7 @@ function buildValidationResult(status: string): FakeValidation {
     congregation_id: null,
     sector_id: null,
     matricula: "019904",
+    ...discipline,
   };
 }
 
@@ -181,5 +192,122 @@ describe("ModoPorteiro — selo real de status após validação do QR (Fase 1C-
     expect(pill).toHaveTextContent("Em disciplina");
     expect(pill).toHaveClass("bg-amber-200");
     expect(pill).not.toHaveClass("bg-emerald-200");
+  });
+});
+
+/**
+ * FASE 1C-H3 — período disciplinar exibido junto ao selo, usando os campos
+ * retornados por `validate_member_validation_token`. Nunca inventa data e
+ * nunca exibe motivo/descrição (a RPC não retorna esse campo).
+ */
+describe("ModoPorteiro — período disciplinar (Fase 1C-H3)", () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+  });
+
+  it("mostra início e previsão de término quando o período foi registrado", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: buildValidationResult("Em disciplina", {
+        discipline_period_recorded: true,
+        discipline_started_at: "2026-01-10",
+        discipline_expected_end_at: "2026-03-01",
+      }),
+      error: null,
+    });
+    const { container } = renderWithToken("token-periodo-completo");
+
+    await screen.findByText("Membro validado");
+
+    const period = container.querySelector("[data-porteiro-discipline-period]");
+    expect(period).toHaveTextContent("Início: 10/01/2026");
+    expect(period).toHaveTextContent("Previsão: 01/03/2026");
+  });
+
+  it("sem término previsto, mostra 'Período em andamento'", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: buildValidationResult("Em disciplina", {
+        discipline_period_recorded: true,
+        discipline_started_at: "2026-01-10",
+        discipline_expected_end_at: null,
+      }),
+      error: null,
+    });
+    const { container } = renderWithToken("token-periodo-andamento");
+
+    await screen.findByText("Membro validado");
+
+    expect(container.querySelector("[data-porteiro-discipline-period]")).toHaveTextContent(
+      "Período em andamento",
+    );
+  });
+
+  it("sem período registrado (legado), mostra aviso sem inventar nenhuma data", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: buildValidationResult("Disciplinado", { discipline_period_recorded: false }),
+      error: null,
+    });
+    const { container } = renderWithToken("token-periodo-legado");
+
+    await screen.findByText("Membro validado");
+
+    const period = container.querySelector("[data-porteiro-discipline-period]");
+    expect(period).toHaveTextContent("Período ainda não informado");
+    expect(period?.textContent).not.toMatch(/\d{2}\/\d{2}\/\d{4}/);
+  });
+
+  it("nunca exibe motivo/descrição confidencial junto ao período", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: buildValidationResult("Em disciplina", {
+        discipline_period_recorded: true,
+        discipline_started_at: "2026-01-10",
+        discipline_expected_end_at: null,
+      }),
+      error: null,
+    });
+    renderWithToken("token-sem-motivo");
+
+    await screen.findByText("Membro validado");
+
+    expect(screen.queryByText(/confidencial/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/motivo/i)).not.toBeInTheDocument();
+  });
+
+  it("não exibe o período para status não disciplinares", async () => {
+    rpcMock.mockResolvedValueOnce({ data: buildValidationResult("Ativo"), error: null });
+    const { container } = renderWithToken("token-ativo-sem-periodo");
+
+    await screen.findByText("Membro validado");
+
+    expect(container.querySelector("[data-porteiro-discipline-period]")).toBeNull();
+  });
+
+  /**
+   * FASE 1C-H5 — correção direta P2: `discipline_period_recorded === true`
+   * sem `discipline_started_at` é um retorno inconsistente do backend, não
+   * a mesma "ausência legítima" de um membro legado sem período. Nunca
+   * inventa data; a identidade e o selo âmbar continuam confirmados.
+   */
+  it("recorded=true sem discipline_started_at mostra aviso de inconsistência, nunca 'ainda não informado' e nunca inventa data", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: buildValidationResult("Em disciplina", {
+        discipline_period_recorded: true,
+        discipline_started_at: null,
+        discipline_expected_end_at: null,
+      }),
+      error: null,
+    });
+    const { container } = renderWithToken("token-periodo-inconsistente");
+
+    await screen.findByText("Membro validado");
+
+    const period = container.querySelector("[data-porteiro-discipline-period]");
+    expect(period).toHaveTextContent("Dados do período disciplinar inconsistentes");
+    expect(period).not.toHaveTextContent("Período ainda não informado");
+    expect(period?.textContent).not.toMatch(/\d{2}\/\d{2}\/\d{4}/);
+
+    // Identidade e selo continuam confirmados mesmo com o dado inconsistente.
+    expect(screen.getByText("Membro validado")).toBeInTheDocument();
+    const pill = container.querySelector("[data-porteiro-status-pill]");
+    expect(pill).toHaveClass("bg-amber-200");
   });
 });
