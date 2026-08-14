@@ -82,6 +82,17 @@ const CANONICAL: Record<string, string> = {
   "periodo": "period_label",
   "per": "period_label",
   // ── Setor / Distrito ────────────────────────────────────────────────────────
+  // ATENÇÃO: os cabeçalhos reais da planilha CONFIADCS são frases completas
+  // ("SETOR/DISTRITO - ORIGEM 1" / "DISTRITO - ORIGEM 1"), não apenas o prefixo
+  // "setor/distrito". Como buildColumnMap() faz correspondência EXATA da chave
+  // normalizada, as entradas abaixo precisam cobrir a frase inteira — do
+  // contrário a coluna nunca é reconhecida e o dado inteiro cai silenciosamente
+  // fora do mapeamento (bug encontrado na FASE 1D-B1, corrigido aqui).
+  "setor/distrito origem 1": "district",
+  "distrito origem 1": "district",
+  "setor distrito origem 1": "district",
+  "sede/setor/distrito origem 1": "district",
+  "sede setor distrito origem 1": "district",
   "setor/distrito": "district",
   "setor distrito": "district",
   "sede/setor/distrito": "district",
@@ -89,6 +100,8 @@ const CANONICAL: Record<string, string> = {
   "distrito": "district",
   "setor": "district",
   // ── Congregação ─────────────────────────────────────────────────────────────
+  // Mesmo problema do distrito: o cabeçalho real é "CONGREGAÇÃO - ORIGEM 2".
+  "congregacao origem 2": "congregation",
   "congregacao": "congregation",
   // ── Beneficiário ────────────────────────────────────────────────────────────
   "beneficiario": "supplier_beneficiary_name",

@@ -1,14 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { useLanguage } from "@/hooks/useLanguage";
-import { useChurch } from "@/hooks/useChurchContext";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { ExecutiveCard } from "@/components/ExecutiveCard";
 import { formatFinanceCurrency } from "@/lib/financeDemo";
-import { isExpense, type TreasuryTransaction } from "@/lib/finance";
 import { activeCampaigns } from "@/lib/campaignsDemo";
-import { runScopedOrganizationQuery } from "@/lib/organizationScope";
-import { getTypeBadgeLabel } from "@/lib/organizationHierarchy";
-import { useFinanceInsights } from "@/lib/financeInsights";
+import { useFinanceInsights, type HierarchyRow } from "@/lib/financeInsights";
 import { AlertTriangle, ArrowRight, CheckCircle2, Info, Loader2, Megaphone, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { DocExportMenu } from "@/components/shared/DocExportMenu";
@@ -19,92 +15,52 @@ import { FinanceDetailModal } from "@/components/financeiro/FinanceDetailModal";
  * CORREÇÃO 2026-07-24 (Fase G — restauração do Financeiro) — "Executivo"
  * usava EXECUTIVE_STATS/HIERARCHY_LEVELS/SECTOR_PERFORMANCE/FINANCE_ALERTS/
  * RECOMMENDED_ACTIONS fixos de financeDemo.ts. Agora:
- *  - Os 6 KPIs vêm de `transactions` real (mesma fonte da Tesouraria) +
- *    campanhas reais (useCampaigns).
- *  - "Consolidado por hierarquia" vem da árvore real de organizações
- *    (useChurch().congregations, mesmo mecanismo já usado em
- *    MatrizDashboard.tsx), agregando receita por unidade via
- *    runScopedOrganizationQuery — sem nível fictício de "Convenção".
- *  - "Desempenho por setor" foi substituído por "Desempenho por centro de
- *    custo" (orçado vs. realizado), reaproveitando a mesma agregação real da
- *    Fase D (finance_budgets) — não existe hoje uma tabela de metas por
- *    setor geográfico; ver src/lib/financeInsights.ts.
- *  - Alertas/ações recomendadas vêm de src/lib/financeInsights.ts, regras
- *    determinísticas sobre os mesmos dados reais (também usado pela aba
+ *  - Os 6 KPIs, "Consolidado por hierarquia" e "Desempenho por centro de
+ *    custo" vêm de src/lib/financeInsights.ts, que por sua vez consome
+ *    finance_dashboard_aggregates (server-side) — ver CORREÇÃO 2026-08-14
+ *    abaixo.
+ *  - Alertas/ações recomendadas vêm da mesma fonte (também usado pela aba
  *    Inteligência).
+ *
+ * CORREÇÃO 2026-08-14 (CORREÇÃO C3.1 — eliminar fetch-all) — este componente
+ * recebia `transactions: TreasuryTransaction[]` (array completo da
+ * organização) via prop e também disparava 1 consulta sem limite por
+ * unidade organizacional (useHierarchyRevenue). Ambos foram REMOVIDOS: os
+ * KPIs, a hierarquia e o desempenho por centro de custo agora vêm
+ * inteiramente de useFinanceInsights (finance_dashboard_aggregates) — nenhum
+ * fetch-all de transactions ocorre mais nesta aba.
  */
 
-type HierarchyRow = { id: string; name: string; level: string; revenue: number; share: number };
 type CenterChartRow = { name: string; actual: number; budgeted: number; pct: number };
 type CenterRow = { name: string; revenue: number; goal: number; pct: number };
 
-function useHierarchyRevenue() {
-  const { church, congregations } = useChurch();
-  const [rows, setRows] = useState<HierarchyRow[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      if (!church) { setRows([]); setLoading(false); return; }
-      setLoading(true);
-      const units = [church, ...congregations];
-      const results = await Promise.all(units.map(async (u) => {
-        const { data } = await runScopedOrganizationQuery<{ amount: number }[]>(
-          "transactions", u.id, q => q.select("amount").eq("type", "Entrada"),
-        );
-        const revenue = (data ?? []).reduce((s, tx) => s + Number(tx.amount), 0);
-        return { id: u.id, name: u.name, level: getTypeBadgeLabel(u.organization_type, church), revenue };
-      }));
-      if (!active) return;
-      const total = results.reduce((s, r) => s + r.revenue, 0);
-      setRows(
-        results
-          .map(r => ({ ...r, share: total > 0 ? Math.round((r.revenue / total) * 100) : 0 }))
-          .sort((a, b) => b.revenue - a.revenue),
-      );
-      setLoading(false);
-    };
-    load();
-    return () => { active = false; };
-  }, [church, congregations]);
-
-  return { rows, loading };
-}
-
 type Props = {
   onTabChange?: (tab: string) => void;
-  transactions: TreasuryTransaction[];
+  reloadToken?: number;
 };
 
-export function FinanceExecutive({ onTabChange, transactions }: Props) {
+export function FinanceExecutive({ onTabChange, reloadToken }: Props) {
   const { t, lang } = useLanguage();
   const fmt = (v: number) => formatFinanceCurrency(v, lang);
   const { campaigns } = useCampaigns();
 
-  const { rows: hierarchyRows, loading: hierarchyLoading } = useHierarchyRevenue();
-  const { alerts, insights, actions, loading: insightsLoading, centerPerformance } = useFinanceInsights({ transactions, t, fmt });
+  const {
+    alerts, insights, actions,
+    loading: insightsLoading,
+    centerPerformance,
+    hierarchyRows,
+    hierarchyLoading,
+    stats: aggregateStats,
+  } = useFinanceInsights({ t, fmt, reloadToken });
 
   const [selectedHierarchy, setSelectedHierarchy] = useState<HierarchyRow | null>(null);
   const [selectedCenter, setSelectedCenter] = useState<CenterRow | null>(null);
   const [activeBar, setActiveBar] = useState<string | null>(null);
 
-  const thisMonth = new Date().toISOString().substring(0, 7);
-
-  const stats = useMemo(() => {
-    const totalRevenue = transactions.filter(tx => !isExpense(tx.type)).reduce((s, tx) => s + Number(tx.amount), 0);
-    const totalExpenses = transactions.filter(tx => isExpense(tx.type)).reduce((s, tx) => s + Number(tx.amount), 0);
-    const consolidatedBalance = totalRevenue - totalExpenses;
-    const activeCampaignsCount = activeCampaigns(campaigns).length;
-
-    const monthly = (predicate: (category: string) => boolean) => transactions
-      .filter(tx => !isExpense(tx.type) && tx.date?.substring(0, 7) === thisMonth && predicate((tx.category ?? "").toLowerCase()))
-      .reduce((s, tx) => s + Number(tx.amount), 0);
-    const monthlyTithes = monthly(c => c.includes("dízimo") || c.includes("dizimo"));
-    const monthlyOfferings = monthly(c => c.includes("oferta"));
-
-    return { totalRevenue, totalExpenses, consolidatedBalance, activeCampaignsCount, monthlyTithes, monthlyOfferings };
-  }, [transactions, campaigns, thisMonth]);
+  const stats = {
+    ...aggregateStats,
+    activeCampaignsCount: activeCampaigns(campaigns).length,
+  };
 
   const cards = [
     { title: t("Receita Total"), value: fmt(stats.totalRevenue), icon: TrendingUp, tab: "treasury" },

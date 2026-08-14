@@ -3,7 +3,6 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useChurch } from "@/hooks/useChurchContext";
 import { useRole } from "@/hooks/useRole";
 import { formatFinanceCurrency } from "@/lib/financeDemo";
-import { isExpense, type TreasuryTransaction } from "@/lib/finance";
 import { PixCard } from "@/components/financeiro/PixCard";
 import { ExecutiveCard } from "@/components/ExecutiveCard";
 import { DocExportMenu } from "@/components/shared/DocExportMenu";
@@ -13,50 +12,34 @@ import { supabase } from "@/integrations/supabase/client";
 import { runScopedOrganizationQuery } from "@/lib/organizationScope";
 import { toast } from "sonner";
 import { CheckCircle2, CreditCard, Heart, Info, Loader2, TrendingUp, Users } from "lucide-react";
+import { useFinanceDashboardAggregates } from "@/hooks/useFinanceDashboardAggregates";
+import {
+  buildCongregationOfferingsRows,
+  distinctCongregationIdsWithOfferings,
+  sumCongregationCategoryByKind,
+} from "@/lib/financeDashboardAggregates";
+import { currentMonthKey, monthDateRange, previousMonthKey } from "@/lib/financeDateRanges";
 
 /**
  * CORREÇÃO 2026-07-20 (Fase C — restauração do Financeiro) — a aba
  * "Dízimos & Ofertas" foi removida do render em 07/07/2026 (commit
  * d394a1d) e nunca teve dado real: os totais vinham de
- * `financeDemo.TITHES_OFFERINGS` (fixo em código). Agora os valores são
- * calculados a partir de `transactions` reais (mesma fonte da Tesouraria),
- * classificando cada lançamento de entrada pela categoria (Dízimos,
- * Ofertas, Missões) — sem nenhuma tabela nova, sem seed fictício. A
- * categoria "Ofertas especiais" não tem um valor contábil dedicado hoje
- * (nenhuma organização semeia essa categoria em finance_account_categories)
- * — é reconhecida heuristicamente pelo nome da categoria conter "especial";
- * fica em zero até a igreja cadastrar essa categoria, o que é mais correto
- * do que um número fictício. A configuração de PIX passou a persistir de
- * verdade em `finance_accounts` (mesma tabela lida pelo PixCard).
+ * `financeDemo.TITHES_OFFERINGS` (fixo em código). A categoria "Ofertas
+ * especiais" não tem um valor contábil dedicado hoje (nenhuma organização
+ * semeia essa categoria em finance_account_categories) — é reconhecida
+ * heuristicamente pelo nome da categoria conter "especial"; fica em zero
+ * até a igreja cadastrar essa categoria, o que é mais correto do que um
+ * número fictício. A configuração de PIX persiste em `finance_accounts`
+ * (mesma tabela lida pelo PixCard).
+ *
+ * CORREÇÃO 2026-08-14 (CORREÇÃO C3.1 — eliminar fetch-all) — este
+ * componente recebia `transactions: TreasuryTransaction[]` (array completo
+ * da organização) via prop e agrupava tudo em memória por
+ * congregation_id/categoria. Agora usa finance_dashboard_aggregates
+ * (bucket by_congregation_category, mês atual + mês anterior) — nenhuma
+ * transação crua chega ao cliente; apenas totais já agrupados por
+ * congregação e categoria.
  */
-
-function normalizeCategory(category: string | null | undefined): string {
-  return (category ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-}
-
-type OfferingKind = "tithe" | "missionary" | "special" | "offering" | "other";
-
-function categoryKind(category: string | null | undefined): OfferingKind {
-  const c = normalizeCategory(category);
-  if (c.includes("dizimo")) return "tithe";
-  if (c.includes("missao") || c.includes("missoes")) return "missionary";
-  if (c.includes("especial")) return "special";
-  if (c.includes("oferta")) return "offering";
-  return "other";
-}
-
-function monthKey(date: string): string {
-  return date?.substring(0, 7) ?? "";
-}
-
-function previousMonthKey(key: string): string {
-  const [y, m] = key.split("-").map(Number);
-  const d = new Date(y, m - 1 - 1, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
 
 function pctGrowth(current: number, previous: number): number {
   if (previous <= 0) return current > 0 ? 100 : 0;
@@ -65,7 +48,7 @@ function pctGrowth(current: number, previous: number): number {
 
 type CongregationRow = { id: string; name: string; tithes: number; offerings: number; growth: number };
 
-export function FinanceTithesOfferings({ transactions }: { transactions: TreasuryTransaction[] }) {
+export function FinanceTithesOfferings({ reloadToken }: { reloadToken?: number }) {
   const { t, lang } = useLanguage();
   const { church } = useChurch();
   const { hasRole, hasCapability } = useRole();
@@ -81,13 +64,29 @@ export function FinanceTithesOfferings({ transactions }: { transactions: Treasur
   const [pixRefreshKey, setPixRefreshKey] = useState(0);
   const [congregationNames, setCongregationNames] = useState<Map<string, string>>(new Map());
 
-  const thisMonth = monthKey(new Date().toISOString());
-  const lastMonth = previousMonthKey(thisMonth);
+  const thisMonthKey = currentMonthKey();
+  const lastMonthKey = previousMonthKey(thisMonthKey);
+  const thisMonthRange = useMemo(() => monthDateRange(thisMonthKey), [thisMonthKey]);
+  const lastMonthRange = useMemo(() => monthDateRange(lastMonthKey), [lastMonthKey]);
 
-  const incoming = useMemo(() => transactions.filter(tx => !isExpense(tx.type)), [transactions]);
+  const thisMonth = useFinanceDashboardAggregates({
+    organizationId: church?.id, dateFrom: thisMonthRange.from, dateTo: thisMonthRange.to, reloadToken,
+  });
+  const lastMonth = useFinanceDashboardAggregates({
+    organizationId: church?.id, dateFrom: lastMonthRange.from, dateTo: lastMonthRange.to, reloadToken,
+  });
+
+  const loading = thisMonth.status === "loading" || thisMonth.status === "idle"
+    || lastMonth.status === "loading" || lastMonth.status === "idle";
+
+  const thisMonthBuckets = thisMonth.data?.byCongregationCategory ?? [];
+  const lastMonthBuckets = lastMonth.data?.byCongregationCategory ?? [];
 
   useEffect(() => {
-    const ids = Array.from(new Set(incoming.map(tx => tx.congregation_id).filter((id): id is string => !!id)));
+    const ids = Array.from(new Set([
+      ...distinctCongregationIdsWithOfferings(thisMonthBuckets),
+      ...distinctCongregationIdsWithOfferings(lastMonthBuckets),
+    ]));
     if (ids.length === 0) { setCongregationNames(new Map()); return; }
     let active = true;
     supabase.from("organizations").select("id, name").in("id", ids).then(({ data }) => {
@@ -96,66 +95,49 @@ export function FinanceTithesOfferings({ transactions }: { transactions: Treasur
     });
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incoming.map(tx => tx.congregation_id ?? "").join(",")]);
+  }, [thisMonthBuckets, lastMonthBuckets]);
 
   const summary = useMemo(() => {
-    const sumFor = (month: string, kind: OfferingKind) =>
-      incoming.filter(tx => monthKey(tx.date) === month && categoryKind(tx.category) === kind)
-        .reduce((s, tx) => s + Number(tx.amount), 0);
+    const monthlyTithes = sumCongregationCategoryByKind(thisMonthBuckets, "tithe");
+    const monthlyOfferings = sumCongregationCategoryByKind(thisMonthBuckets, "offering");
+    const missionaryOfferings = sumCongregationCategoryByKind(thisMonthBuckets, "missionary");
+    const specialOfferings = sumCongregationCategoryByKind(thisMonthBuckets, "special");
 
-    const monthlyTithes = sumFor(thisMonth, "tithe");
-    const monthlyOfferings = sumFor(thisMonth, "offering");
-    const missionaryOfferings = sumFor(thisMonth, "missionary");
-    const specialOfferings = sumFor(thisMonth, "special");
-
-    const prevTithes = sumFor(lastMonth, "tithe");
-    const prevOfferings = sumFor(lastMonth, "offering");
-    const prevMissionary = sumFor(lastMonth, "missionary");
-    const prevSpecial = sumFor(lastMonth, "special");
+    const prevTithes = sumCongregationCategoryByKind(lastMonthBuckets, "tithe");
+    const prevOfferings = sumCongregationCategoryByKind(lastMonthBuckets, "offering");
+    const prevMissionary = sumCongregationCategoryByKind(lastMonthBuckets, "missionary");
+    const prevSpecial = sumCongregationCategoryByKind(lastMonthBuckets, "special");
 
     const totalThisMonth = monthlyTithes + monthlyOfferings + missionaryOfferings + specialOfferings;
     const totalLastMonth = prevTithes + prevOfferings + prevMissionary + prevSpecial;
     const growthVsPrevious = pctGrowth(totalThisMonth, totalLastMonth);
 
-    const congregationIdsThisMonth = new Set(
-      incoming.filter(tx => monthKey(tx.date) === thisMonth && tx.congregation_id).map(tx => tx.congregation_id as string),
-    );
-    const avgPerCongregation = congregationIdsThisMonth.size > 0
-      ? totalThisMonth / congregationIdsThisMonth.size
+    const congregationIdsThisMonth = distinctCongregationIdsWithOfferings(thisMonthBuckets);
+    const avgPerCongregation = congregationIdsThisMonth.length > 0
+      ? totalThisMonth / congregationIdsThisMonth.length
       : totalThisMonth;
 
     return { monthlyTithes, monthlyOfferings, missionaryOfferings, specialOfferings, growthVsPrevious, avgPerCongregation };
-  }, [incoming, thisMonth, lastMonth]);
+  }, [thisMonthBuckets, lastMonthBuckets]);
 
   const byCongregation = useMemo<CongregationRow[]>(() => {
-    const byId = new Map<string, { tithes: number; offerings: number; prevTithes: number; prevOfferings: number }>();
-    incoming.forEach(tx => {
-      if (!tx.congregation_id) return;
-      const kind = categoryKind(tx.category);
-      if (kind === "other") return;
-      const entry = byId.get(tx.congregation_id) ?? { tithes: 0, offerings: 0, prevTithes: 0, prevOfferings: 0 };
-      const isTithe = kind === "tithe";
-      const month = monthKey(tx.date);
-      if (month === thisMonth) {
-        if (isTithe) entry.tithes += Number(tx.amount);
-        else entry.offerings += Number(tx.amount);
-      } else if (month === lastMonth) {
-        if (isTithe) entry.prevTithes += Number(tx.amount);
-        else entry.prevOfferings += Number(tx.amount);
-      }
-      byId.set(tx.congregation_id, entry);
-    });
-    return Array.from(byId.entries())
-      .map(([id, v]) => ({
-        id,
-        name: congregationNames.get(id) ?? t("Congregação"),
-        tithes: v.tithes,
-        offerings: v.offerings,
-        growth: pctGrowth(v.tithes + v.offerings, v.prevTithes + v.prevOfferings),
-      }))
+    const currentRows = buildCongregationOfferingsRows(thisMonthBuckets);
+    const previousRows = buildCongregationOfferingsRows(lastMonthBuckets);
+    const previousById = new Map(previousRows.map(r => [r.congregationId, r]));
+    return currentRows
+      .map(row => {
+        const prev = previousById.get(row.congregationId);
+        return {
+          id: row.congregationId,
+          name: congregationNames.get(row.congregationId) ?? t("Congregação"),
+          tithes: row.tithes,
+          offerings: row.offerings,
+          growth: pctGrowth(row.tithes + row.offerings, (prev?.tithes ?? 0) + (prev?.offerings ?? 0)),
+        };
+      })
       .filter(row => row.tithes > 0 || row.offerings > 0)
       .sort((a, b) => (b.tithes + b.offerings) - (a.tithes + a.offerings));
-  }, [incoming, congregationNames, thisMonth, lastMonth, t]);
+  }, [thisMonthBuckets, lastMonthBuckets, congregationNames, t]);
 
   const cards = [
     { title: t("Dízimos do Mês"), value: fmt(summary.monthlyTithes), icon: TrendingUp, trend: `${summary.growthVsPrevious >= 0 ? "+" : ""}${summary.growthVsPrevious}%` },
@@ -241,7 +223,11 @@ export function FinanceTithesOfferings({ transactions }: { transactions: Treasur
             />
           </div>
         </div>
-        {byCongregation.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-10 text-muted-foreground gap-2 text-sm">
+            <Loader2 size={16} className="animate-spin" /> {t("Carregando...")}
+          </div>
+        ) : byCongregation.length === 0 ? (
           <p className="text-center text-sm text-muted-foreground py-8">
             {t("Nenhum lançamento de dízimo ou oferta vinculado a uma congregação neste mês.")}
           </p>

@@ -1,9 +1,10 @@
-import { useMemo } from "react";
-import { TrendingUp, TrendingDown, Wallet, Target, BarChart3 } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, Target, BarChart3, Loader2, AlertTriangle } from "lucide-react";
 import { ExecutiveCard } from "@/components/ExecutiveCard";
 import { useLanguage } from "@/hooks/useLanguage";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend } from "recharts";
-import { isExpense, type TreasuryTransaction } from "@/lib/finance";
+import { useChurch } from "@/hooks/useChurchContext";
+import { useFinanceDashboardAggregates } from "@/hooks/useFinanceDashboardAggregates";
+import { buildMonthlySeries, buildCategorySeries } from "@/lib/financeDashboardAggregates";
 
 const CURRENCY_LOCALE: Record<string, { locale: string; currency: string }> = {
   pt: { locale: "pt-BR", currency: "BRL" },
@@ -21,55 +22,58 @@ const COLORS = [
   "hsl(142 76% 36%)", "hsl(280 65% 60%)", "hsl(30 90% 55%)", "hsl(200 80% 50%)", "hsl(350 70% 50%)"
 ];
 
-export function FinanceOverview({ transactions }: { transactions: TreasuryTransaction[] }) {
+/**
+ * CORREÇÃO 2026-08-14 (FASE 1D-C3 — desempenho) — antes, esta seção recebia
+ * TODAS as transações da organização via prop e recalculava totais/gráficos
+ * inteiramente no navegador (.filter/.reduce sobre 29.957+ linhas a cada
+ * render). Agora consome finance_dashboard_aggregates: 1 RPC agregada
+ * server-side (SUM/COUNT/GROUP BY), sujeita à mesma RLS de leitura
+ * financeira de sempre — nenhuma linha crua chega ao cliente.
+ */
+export function FinanceOverview({ reloadToken }: { reloadToken?: number }) {
   const { t, lang } = useLanguage();
+  const { church } = useChurch();
   const formatCurrency = makeCurrencyFormatter(lang);
 
-  const summary = useMemo(() => {
-    const totalReceita = transactions.filter(tx => !isExpense(tx.type)).reduce((s, tx) => s + Number(tx.amount), 0);
-    const totalDespesa = transactions.filter(tx => isExpense(tx.type)).reduce((s, tx) => s + Number(tx.amount), 0);
-    const saldo = totalReceita - totalDespesa;
-    const confirmed = transactions.filter(tx => tx.status === "Confirmado" || tx.status === "Pago").reduce((s, tx) => s + Number(tx.amount) * (isExpense(tx.type) ? -1 : 1), 0);
-    const pending = transactions.filter(tx => tx.status === "Pendente").length;
-    const margin = totalReceita > 0 ? ((saldo / totalReceita) * 100).toFixed(1) : "0";
-    return { totalReceita, totalDespesa, saldo, confirmed, pending, margin };
-  }, [transactions]);
+  const { status, data, error } = useFinanceDashboardAggregates({
+    organizationId: church?.id,
+    reloadToken,
+  });
+
+  const totals = data?.totals ?? null;
+  const monthlyData = data ? buildMonthlySeries(data.byMonth) : [];
+  const categoryData = data ? buildCategorySeries(data.byCategory) : [];
+  const pieData = categoryData.map(c => ({ name: c.name, value: c.receita + c.despesa })).filter(c => c.value > 0).slice(0, 8);
+
+  const totalReceita = totals?.entriesAmount ?? 0;
+  const totalDespesa = totals?.exitsAmount ?? 0;
+  const saldo = totalReceita - totalDespesa;
+  const margin = totalReceita > 0 ? ((saldo / totalReceita) * 100).toFixed(1) : "0";
 
   const cards = [
-    { title: t("Receita Total"), value: formatCurrency(summary.totalReceita), icon: TrendingUp, trend: `${summary.margin}% ${t("margem")}` },
-    { title: t("Despesas Totais"), value: formatCurrency(summary.totalDespesa), icon: TrendingDown },
-    { title: t("Saldo Atual"), value: formatCurrency(summary.saldo), icon: Wallet },
-    { title: t("Confirmados"), value: formatCurrency(summary.confirmed), icon: Target, trend: `${summary.pending} ${t("pendentes")}` },
+    { title: t("Receita Total"), value: formatCurrency(totalReceita), icon: TrendingUp, trend: `${margin}% ${t("margem")}` },
+    { title: t("Despesas Totais"), value: formatCurrency(totalDespesa), icon: TrendingDown },
+    { title: t("Saldo Atual"), value: formatCurrency(saldo), icon: Wallet },
+    { title: t("Confirmados"), value: formatCurrency(totals?.confirmedNet ?? 0), icon: Target, trend: `${totals?.pendingCount ?? 0} ${t("pendentes")}` },
   ];
 
-  const monthlyData = useMemo(() => {
-    const months: Record<string, { month: string; receita: number; despesa: number }> = {};
-    transactions.forEach(tx => {
-      const m = tx.date?.substring(0, 7) || "N/A";
-      if (!months[m]) months[m] = { month: m, receita: 0, despesa: 0 };
-      if (!isExpense(tx.type)) months[m].receita += Number(tx.amount);
-      else months[m].despesa += Number(tx.amount);
-    });
-    return Object.values(months).sort((a, b) => a.month.localeCompare(b.month)).slice(-12).map(m => ({
-      ...m,
-      month: m.month.substring(5) + "/" + m.month.substring(2, 4),
-    }));
-  }, [transactions]);
+  if (status === "loading" || status === "idle") {
+    return (
+      <div className="flex items-center justify-center py-16 text-muted-foreground gap-2 text-sm">
+        <Loader2 size={16} className="animate-spin" /> {t("Carregando...")}
+      </div>
+    );
+  }
 
-  const categoryData = useMemo(() => {
-    const cats: Record<string, { name: string; receita: number; despesa: number }> = {};
-    transactions.forEach(tx => {
-      const cat = tx.category || "Geral";
-      if (!cats[cat]) cats[cat] = { name: cat, receita: 0, despesa: 0 };
-      if (!isExpense(tx.type)) cats[cat].receita += Number(tx.amount);
-      else cats[cat].despesa += Number(tx.amount);
-    });
-    return Object.values(cats).sort((a, b) => (b.receita + b.despesa) - (a.receita + a.despesa));
-  }, [transactions]);
-
-  const pieData = useMemo(() => {
-    return categoryData.map(c => ({ name: c.name, value: c.receita + c.despesa })).filter(c => c.value > 0).slice(0, 8);
-  }, [categoryData]);
+  if (status === "error") {
+    return (
+      <div className="flex items-center justify-center gap-2 py-16 text-sm text-destructive">
+        <AlertTriangle size={16} />
+        {t("Não foi possível carregar a visão geral financeira.")}
+        {error ? <span className="text-muted-foreground">({error})</span> : null}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

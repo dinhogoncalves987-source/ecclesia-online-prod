@@ -3,7 +3,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useChurch } from "@/hooks/useChurchContext";
 import { useRole } from "@/hooks/useRole";
 import { formatFinanceCurrency } from "@/lib/financeDemo";
-import { isExpense, type TreasuryTransaction, type FinanceCostCenter } from "@/lib/finance";
+import { type FinanceCostCenter } from "@/lib/finance";
 import { AlertTriangle, Loader2, PieChart, Plus } from "lucide-react";
 import { ExecutiveCard } from "@/components/ExecutiveCard";
 import { DocExportMenu } from "@/components/shared/DocExportMenu";
@@ -12,14 +12,22 @@ import { FinanceDetailModal } from "@/components/financeiro/FinanceDetailModal";
 import { supabase } from "@/integrations/supabase/client";
 import { runScopedOrganizationQuery, insertWithOrganizationScope } from "@/lib/organizationScope";
 import { toast } from "sonner";
+import { useFinanceDashboardAggregates } from "@/hooks/useFinanceDashboardAggregates";
+import { buildCostCenterTotalsMap } from "@/lib/financeDashboardAggregates";
+import { monthDateRange, yearDateRange } from "@/lib/financeDateRanges";
 
 /**
  * CORREÇÃO 2026-07-20 (Fase D — restauração do Financeiro) — "Orçamento"
  * usava BUDGET_COST_CENTERS/BUDGET_SUMMARY fixos de financeDemo.ts. Agora o
  * "orçado" vem da nova tabela public.finance_budgets (migration
- * 20260721090000_finance_budgets.sql), editável por centro de custo/mês, e o
- * "realizado" continua vindo de `transactions` real (mesma fonte da
- * Tesouraria), agregado por cost_center_id. Sem nenhum valor fictício.
+ * 20260721090000_finance_budgets.sql), editável por centro de custo/mês.
+ * Sem nenhum valor fictício.
+ *
+ * CORREÇÃO 2026-08-14 (CORREÇÃO C3.1 — eliminar fetch-all) — o "realizado"
+ * vinha de `transactions: TreasuryTransaction[]` (array completo) via prop,
+ * agregado em memória por cost_center_id/mês/ano. Agora vem de 2 chamadas a
+ * finance_dashboard_aggregates (bucket by_cost_center — mês atual e ano
+ * atual) — nenhuma transação crua chega ao cliente.
  */
 
 type BudgetRow = { id: string; cost_center_id: string; period_year: number; period_month: number | null; budgeted_amount: number };
@@ -55,7 +63,7 @@ function useFinanceBudgetData(organizationId: string | undefined, year: number) 
   return { costCenters, budgets, loading, reload: () => setReloadToken(k => k + 1) };
 }
 
-export function FinanceBudget({ transactions }: { transactions: TreasuryTransaction[] }) {
+export function FinanceBudget({ reloadToken: externalReloadToken }: { reloadToken?: number }) {
   const { t, lang } = useLanguage();
   const { church } = useChurch();
   const { hasRole, hasCapability } = useRole();
@@ -75,20 +83,22 @@ export function FinanceBudget({ transactions }: { transactions: TreasuryTransact
   const [newCenterName, setNewCenterName] = useState("");
   const [savingCenter, setSavingCenter] = useState(false);
 
-  const actualByCenter = useMemo(() => {
-    const monthly = new Map<string, number>();
-    const annual = new Map<string, number>();
-    transactions.filter(tx => isExpense(tx.type)).forEach(tx => {
-      if (!tx.cost_center_id) return;
-      const txDate = tx.date ? new Date(`${tx.date}T00:00:00`) : null;
-      if (!txDate || txDate.getFullYear() !== year) return;
-      annual.set(tx.cost_center_id, (annual.get(tx.cost_center_id) ?? 0) + Number(tx.amount));
-      if (txDate.getMonth() + 1 === month) {
-        monthly.set(tx.cost_center_id, (monthly.get(tx.cost_center_id) ?? 0) + Number(tx.amount));
-      }
-    });
-    return { monthly, annual };
-  }, [transactions, year, month]);
+  const monthRange = useMemo(() => monthDateRange(`${year}-${String(month).padStart(2, "0")}`), [year, month]);
+  const yearRange = useMemo(() => yearDateRange(year), [year]);
+
+  const monthlyAgg = useFinanceDashboardAggregates({
+    organizationId: church?.id, dateFrom: monthRange.from, dateTo: monthRange.to, reloadToken: externalReloadToken,
+  });
+  const annualAgg = useFinanceDashboardAggregates({
+    organizationId: church?.id, dateFrom: yearRange.from, dateTo: yearRange.to, reloadToken: externalReloadToken,
+  });
+  const actualLoading = monthlyAgg.status === "loading" || monthlyAgg.status === "idle"
+    || annualAgg.status === "loading" || annualAgg.status === "idle";
+
+  const actualByCenter = useMemo(() => ({
+    monthly: monthlyAgg.data ? buildCostCenterTotalsMap(monthlyAgg.data.byCostCenter, "Saida") : new Map<string, number>(),
+    annual: annualAgg.data ? buildCostCenterTotalsMap(annualAgg.data.byCostCenter, "Saida") : new Map<string, number>(),
+  }), [monthlyAgg.data, annualAgg.data]);
 
   const budgetedByCenter = useMemo(() => {
     const monthly = new Map<string, number>();
@@ -222,7 +232,7 @@ export function FinanceBudget({ transactions }: { transactions: TreasuryTransact
           </div>
         </div>
 
-        {loading ? (
+        {loading || actualLoading ? (
           <div className="flex items-center justify-center py-10 text-muted-foreground gap-2 text-sm">
             <Loader2 size={16} className="animate-spin" /> {t("Carregando...")}
           </div>

@@ -42,6 +42,18 @@ export function buildFinanceImportPayload(
     treasurer_name: tx.treasurer_name ?? null,
     period_label: tx.period_label ?? null,
     legacy_record_number: tx.legacy_record_number ?? null,
+    // FASE 1D-B1 — carimbo completo, rótulos "raw" para todo campo com FK, e
+    // observação isolada (nunca mais concatenada com fallbacks em notes).
+    // A RPC usa os "*_raw_label" para alimentar o catálogo de aliases e
+    // reconciliação; nenhum deles é opcional/perdido na conversão.
+    raw_timestamp: tx.raw_timestamp ?? null,
+    district_raw_label: tx.district_raw_label ?? null,
+    congregation_raw_label: tx.congregation_raw_label ?? null,
+    financial_account_raw_label: tx.financial_account_raw_label ?? null,
+    accounting_group_raw_label: tx.accounting_group_raw_label ?? null,
+    account_category_raw_label: tx.account_category_raw_label ?? null,
+    document_type_raw_label: tx.document_type_raw_label ?? null,
+    source_observation: tx.source_observation ?? null,
   };
 }
 

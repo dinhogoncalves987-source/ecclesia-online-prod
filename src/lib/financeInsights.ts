@@ -11,14 +11,33 @@
 //
 // Também usado pela aba Inteligência (Fase H) — mesma fonte de dados,
 // apresentação diferente.
+//
+// CORREÇÃO 2026-08-14 (CORREÇÃO C3.1 — eliminar fetch-all) — este hook
+// recebia `transactions: TreasuryTransaction[]` (o array COMPLETO da
+// organização, até 29.957+ linhas) e recalculava tudo com
+// .filter()/.reduce() no navegador a cada render. Agora consome
+// finance_dashboard_aggregates (3 chamadas agregadas: histórico completo
+// para totais/hierarquia, mês atual e mês anterior para comparações) —
+// nenhuma linha crua de transactions chega ao cliente. "Consolidado por
+// hierarquia" (antes useHierarchyRevenue, com 1 consulta sem limite por
+// unidade organizacional) também foi absorvido aqui, usando
+// by_organization em uma única chamada agregada.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useState } from "react";
 import { useChurch } from "@/hooks/useChurchContext";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { runScopedOrganizationQuery } from "@/lib/organizationScope";
-import { isExpense, type TreasuryTransaction, type FinanceCostCenter } from "@/lib/finance";
+import { type FinanceCostCenter } from "@/lib/finance";
 import { activeCampaigns, campaignProgress } from "@/lib/campaignsDemo";
+import { getTypeBadgeLabel } from "@/lib/organizationHierarchy";
+import { useFinanceDashboardAggregates } from "@/hooks/useFinanceDashboardAggregates";
+import {
+  buildCostCenterTotalsMap,
+  findOrganizationEntriesAmount,
+  sumCategoryTotalsMatching,
+} from "@/lib/financeDashboardAggregates";
+import { currentMonthKey, monthDateRange, previousMonthKey } from "@/lib/financeDateRanges";
 
 export type FinanceAlertType = "warning" | "success" | "info";
 export type FinanceAlert = { id: string; type: FinanceAlertType; message: string };
@@ -28,52 +47,82 @@ export type FinanceInsight = { id: string; message: string; category: FinanceIns
 
 export type FinanceAction = { id: string; message: string; targetTab: string };
 
+export type HierarchyRow = { id: string; name: string; level: string; revenue: number; share: number };
+export type CenterPerformanceRow = { name: string; pct: number; actual: number; budgeted: number };
+
+export interface FinanceExecutiveStats {
+  totalRevenue: number;
+  totalExpenses: number;
+  consolidatedBalance: number;
+  monthlyTithes: number;
+  monthlyOfferings: number;
+}
+
 type BudgetRow = { cost_center_id: string; period_year: number; period_month: number | null; budgeted_amount: number };
 type AccountabilityReportRow = { id: string; period_label: string; status: string };
 
-// Mesma heurística de categorização usada em FinanceTithesOfferings.tsx —
-// mantida local para não criar dependência entre componentes de aba.
-function normalizeCategory(category: string | null | undefined): string {
-  return (category ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-}
-function isTitheOrOffering(category: string | null | undefined): boolean {
-  const c = normalizeCategory(category);
-  return c.includes("dizimo") || c.includes("oferta") || c.includes("missao") || c.includes("missoes");
-}
-function monthKey(date: string): string { return date?.substring(0, 7) ?? ""; }
-function previousMonthKey(key: string): string {
-  const [y, m] = key.split("-").map(Number);
-  const d = new Date(y, m - 1 - 1, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
 function pctChange(current: number, previous: number): number {
   if (previous <= 0) return current > 0 ? 100 : 0;
   return Math.round(((current - previous) / previous) * 100);
 }
 
 type Args = {
-  transactions: TreasuryTransaction[];
   t: (key: string) => string;
   fmt: (value: number) => string;
+  /** Incremente para forçar nova busca (import/exclusão/reset). */
+  reloadToken?: number;
 };
 
-export function useFinanceInsights({ transactions, t, fmt }: Args) {
-  const { church } = useChurch();
+export function useFinanceInsights({ t, fmt, reloadToken }: Args) {
+  const { church, congregations } = useChurch();
   const { campaigns } = useCampaigns();
+
+  const hierarchyOrganizationIds = useMemo(
+    () => (church ? [church.id, ...congregations.map(c => c.id)] : []),
+    [church, congregations],
+  );
+
+  const thisMonthKey = currentMonthKey();
+  const lastMonthKey = previousMonthKey(thisMonthKey);
+  const thisMonthRange = useMemo(() => monthDateRange(thisMonthKey), [thisMonthKey]);
+  const lastMonthRange = useMemo(() => monthDateRange(lastMonthKey), [lastMonthKey]);
+
+  // Histórico completo — totais gerais, hierarquia e contas vencidas
+  // (overdue nunca depende de p_date_from/p_date_to — ver migration
+  // 20260814150000).
+  const allTime = useFinanceDashboardAggregates({
+    organizationId: church?.id,
+    hierarchyOrganizationIds,
+    reloadToken,
+  });
+  // Mês atual — dízimos/ofertas do mês, realizado por centro de custo.
+  const thisMonth = useFinanceDashboardAggregates({
+    organizationId: church?.id,
+    dateFrom: thisMonthRange.from,
+    dateTo: thisMonthRange.to,
+    reloadToken,
+  });
+  // Mês anterior — apenas para comparação de crescimento.
+  const lastMonth = useFinanceDashboardAggregates({
+    organizationId: church?.id,
+    dateFrom: lastMonthRange.from,
+    dateTo: lastMonthRange.to,
+    reloadToken,
+  });
 
   const [costCenters, setCostCenters] = useState<FinanceCostCenter[]>([]);
   const [budgets, setBudgets] = useState<BudgetRow[]>([]);
   const [reports, setReports] = useState<AccountabilityReportRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [sideLoading, setSideLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
     const load = async () => {
       if (!church?.id) {
-        setCostCenters([]); setBudgets([]); setReports([]); setLoading(false);
+        setCostCenters([]); setBudgets([]); setReports([]); setSideLoading(false);
         return;
       }
-      setLoading(true);
+      setSideLoading(true);
       const year = new Date().getFullYear();
       const [centersRes, budgetsRes, reportsRes] = await Promise.all([
         runScopedOrganizationQuery<FinanceCostCenter[]>("finance_cost_centers", church.id, q =>
@@ -90,27 +139,39 @@ export function useFinanceInsights({ transactions, t, fmt }: Args) {
       setCostCenters(centersRes.data ?? []);
       setBudgets(budgetsRes.data ?? []);
       setReports(reportsRes.data ?? []);
-      setLoading(false);
+      setSideLoading(false);
     };
     load();
     return () => { active = false; };
-  }, [church?.id]);
+  }, [church?.id, reloadToken]);
+
+  const aggregatesLoading =
+    allTime.status === "loading" || allTime.status === "idle" ||
+    thisMonth.status === "loading" || thisMonth.status === "idle" ||
+    lastMonth.status === "loading" || lastMonth.status === "idle";
+  const loading = sideLoading || aggregatesLoading;
 
   return useMemo(() => {
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth() + 1;
-    const thisMonth = monthKey(now.toISOString());
-    const lastMonth = previousMonthKey(thisMonth);
+
+    // ── Consolidado por hierarquia (antes useHierarchyRevenue) ──────────────
+    const hierarchyUnits = church ? [church, ...congregations] : [];
+    const hierarchyRowsRaw = hierarchyUnits.map(u => ({
+      id: u.id,
+      name: u.name,
+      level: getTypeBadgeLabel(u.organization_type, church),
+      revenue: allTime.data ? findOrganizationEntriesAmount(allTime.data.byOrganization, u.id) : 0,
+    }));
+    const hierarchyTotal = hierarchyRowsRaw.reduce((s, r) => s + r.revenue, 0);
+    const hierarchyRows: HierarchyRow[] = hierarchyRowsRaw
+      .map(r => ({ ...r, share: hierarchyTotal > 0 ? Math.round((r.revenue / hierarchyTotal) * 100) : 0 }))
+      .sort((a, b) => b.revenue - a.revenue);
 
     // ── Orçamento: centros de custo acima do orçamento no mês ────────────────
-    const actualByCenter = new Map<string, number>();
-    transactions.filter(tx => isExpense(tx.type)).forEach(tx => {
-      if (!tx.cost_center_id) return;
-      if (monthKey(tx.date) !== thisMonth) return;
-      actualByCenter.set(tx.cost_center_id, (actualByCenter.get(tx.cost_center_id) ?? 0) + Number(tx.amount));
-    });
-    const centerPerformance = costCenters
+    const actualByCenter = thisMonth.data ? buildCostCenterTotalsMap(thisMonth.data.byCostCenter, "Saida") : new Map<string, number>();
+    const centerPerformance: CenterPerformanceRow[] = costCenters
       .map(c => {
         const id = c.id as string;
         const budgeted = budgets.find(b => b.cost_center_id === id && b.period_month === month && b.period_year === year)?.budgeted_amount ?? 0;
@@ -132,30 +193,31 @@ export function useFinanceInsights({ transactions, t, fmt }: Args) {
     // ── Prestação de contas pendente ───────────────────────────────────────────
     const pendingReports = reports.filter(r => r.status !== "Publicado");
 
-    // ── Contas vencidas (mesma heurística de FinanceAccounts.tsx) ─────────────
-    const today = new Date().toISOString().split("T")[0];
-    const overdue = transactions.filter(tx =>
-      isExpense(tx.type) && tx.status !== "Pago" && tx.status !== "Confirmado" && tx.date < today);
-    const overdueTotal = overdue.reduce((s, tx) => s + Number(tx.amount), 0);
+    // ── Contas vencidas — sempre "hoje", nunca uma janela de período (ver
+    // migration 20260814150000) ───────────────────────────────────────────────
+    const overdue = allTime.data?.overdue ?? { count: 0, amount: 0 };
 
-    // ── Crescimento de dízimos/ofertas vs. mês anterior ────────────────────────
-    const titheOfferingSum = (m: string) => transactions
-      .filter(tx => !isExpense(tx.type) && monthKey(tx.date) === m && isTitheOrOffering(tx.category))
-      .reduce((s, tx) => s + Number(tx.amount), 0);
-    const titheGrowth = pctChange(titheOfferingSum(thisMonth), titheOfferingSum(lastMonth));
+    // ── Crescimento de dízimos/ofertas/missões vs. mês anterior ──────────────
+    const titheOfferingTerms = ["dizimo", "oferta", "missao", "missoes"];
+    const titheOfferingSumThisMonth = thisMonth.data
+      ? sumCategoryTotalsMatching(thisMonth.data.byCategory, titheOfferingTerms, "Entrada")
+      : 0;
+    const titheOfferingSumLastMonth = lastMonth.data
+      ? sumCategoryTotalsMatching(lastMonth.data.byCategory, titheOfferingTerms, "Entrada")
+      : 0;
+    const titheGrowth = pctChange(titheOfferingSumThisMonth, titheOfferingSumLastMonth);
 
     // ── Crescimento de despesas vs. mês anterior ───────────────────────────────
-    const expenseSum = (m: string) => transactions
-      .filter(tx => isExpense(tx.type) && monthKey(tx.date) === m)
-      .reduce((s, tx) => s + Number(tx.amount), 0);
-    const expenseGrowth = pctChange(expenseSum(thisMonth), expenseSum(lastMonth));
+    const expenseSumThisMonth = thisMonth.data?.totals.exitsAmount ?? 0;
+    const expenseSumLastMonth = lastMonth.data?.totals.exitsAmount ?? 0;
+    const expenseGrowth = pctChange(expenseSumThisMonth, expenseSumLastMonth);
 
     // ── Alertas ────────────────────────────────────────────────────────────────
     const alerts: FinanceAlert[] = [];
-    if (overdue.length > 0) {
+    if (overdue.count > 0) {
       alerts.push({
         id: "overdue", type: "warning",
-        message: `${overdue.length} ${t("conta(s) vencida(s) totalizando")} ${fmt(overdueTotal)}`,
+        message: `${overdue.count} ${t("conta(s) vencida(s) totalizando")} ${fmt(overdue.amount)}`,
       });
     }
     overBudgetCenters.slice(0, 2).forEach((c, i) => {
@@ -206,10 +268,22 @@ export function useFinanceInsights({ transactions, t, fmt }: Args) {
     if (topCampaign && topCampaign.pct >= 90) {
       actions.push({ id: "action-campaign", message: `${t("Revisar repasse da campanha")} ${topCampaign.title}`, targetTab: "campaigns" });
     }
-    if (overdue.length > 0) {
+    if (overdue.count > 0) {
       actions.push({ id: "action-overdue", message: t("Revisar contas vencidas"), targetTab: "accounts" });
     }
 
-    return { alerts, insights, actions, loading, centerPerformance };
-  }, [transactions, campaigns, costCenters, budgets, reports, loading, t, fmt]);
+    // ── Estatísticas gerais (cards do Executivo) ────────────────────────────────
+    const stats: FinanceExecutiveStats = {
+      totalRevenue: allTime.data?.totals.entriesAmount ?? 0,
+      totalExpenses: allTime.data?.totals.exitsAmount ?? 0,
+      consolidatedBalance: (allTime.data?.totals.entriesAmount ?? 0) - (allTime.data?.totals.exitsAmount ?? 0),
+      monthlyTithes: thisMonth.data ? sumCategoryTotalsMatching(thisMonth.data.byCategory, ["dizimo"], "Entrada") : 0,
+      monthlyOfferings: thisMonth.data ? sumCategoryTotalsMatching(thisMonth.data.byCategory, ["oferta"], "Entrada") : 0,
+    };
+
+    return { alerts, insights, actions, loading, centerPerformance, hierarchyRows, hierarchyLoading: loading, stats };
+  }, [
+    church, congregations, campaigns, costCenters, budgets, reports, loading,
+    allTime.data, thisMonth.data, lastMonth.data, t, fmt,
+  ]);
 }

@@ -16,13 +16,15 @@ import {
   Send,
 } from "lucide-react";
 import type { TreasuryTransaction } from "@/lib/finance";
-import { isExpense, getTransactionMonth } from "@/lib/finance";
 import { FinanceReports } from "@/components/financeiro/FinanceReports";
 import { DocExportMenu } from "@/components/shared/DocExportMenu";
 import { buildFinanceExportItems } from "@/lib/docExport";
 import { supabase } from "@/integrations/supabase/client";
 import { runScopedOrganizationQuery, insertWithOrganizationScope } from "@/lib/organizationScope";
 import { toast } from "sonner";
+import { useFinanceDashboardAggregates } from "@/hooks/useFinanceDashboardAggregates";
+import { dayBefore, monthDateRange } from "@/lib/financeDateRanges";
+import { fetchDateRangeForExport, fetchPeriodReceiptsPage, reportPeriodDateRange } from "@/lib/financeMonthlyLedger";
 
 /**
  * CORREÇÃO 2026-07-23 (Fase F — restauração do Financeiro) — os "Relatórios
@@ -30,11 +32,38 @@ import { toast } from "sonner";
  * aprovadores fictícios "Pr. João Silva"/"Maria Santos"/"Conselho Fiscal").
  * Agora vêm de public.finance_accountability_reports +
  * finance_accountability_approvals (migration
- * 20260723090000_finance_accountability.sql). Os "Relatórios Contábeis"
- * (DRE/Balancete/Fluxo, em FinanceReports.tsx) já usavam dados reais e não
- * foram alterados. O status do "Relatório mensal" no topo, que antes era só
- * estado React local (perdido ao navegar), agora também persiste na mesma
- * tabela (period_key = mês selecionado).
+ * 20260723090000_finance_accountability.sql). O status do "Relatório
+ * mensal" no topo, que antes era só estado React local (perdido ao
+ * navegar), agora também persiste na mesma tabela (period_key = mês
+ * selecionado).
+ *
+ * CORREÇÃO 2026-08-14 (CORREÇÃO C3.1 — eliminar fetch-all) — este
+ * componente recebia `transactions: TreasuryTransaction[]` (array completo
+ * da organização) via prop. Agora:
+ *  - a lista de meses disponíveis vem de finance_dashboard_aggregates
+ *    (by_month, histórico completo, agregado);
+ *  - o saldo anterior ao mês selecionado vem do mesmo RPC, com
+ *    p_date_to = dia anterior ao 1º dia do mês;
+ *  - entradas/saídas/contagem do mês selecionado vêm do mesmo RPC
+ *    (p_date_from/p_date_to = intervalo do mês) — nunca somadas a partir
+ *    de linhas cruas baixadas no navegador;
+ *  - os comprovantes de cada relatório histórico só são buscados quando o
+ *    relatório é aberto (nunca eagerly para todos os relatórios da lista).
+ *
+ * CORREÇÃO 2026-08-14 (CORREÇÃO C4 — eliminar limites silenciosos) — a
+ * versão da C3.1 buscava o extrato do mês com `.limit(3000)` e os
+ * comprovantes com `.limit(1000)`, tratando esses tetos como se fossem "o
+ * total" — uma organização com mais dados que isso teria informação
+ * truncada SEM aviso. Agora:
+ *  - os comprovantes usam paginação real (`fetchPeriodReceiptsPage`, 50 por
+ *    página, técnica pageSize+1), carregada só quando a seção é aberta,
+ *    com "carregar mais" e aviso explícito quando há mais páginas;
+ *  - a exportação CSV do mês busca a quantidade esperada previamente do
+ *    RPC agregador, busca o período completo em blocos (`for` limitado por
+ *    essa quantidade, nunca `while(true)`), mostra progresso e VALIDA que
+ *    o total buscado é exatamente igual ao esperado antes de gerar o
+ *    arquivo — qualquer divergência ou falha de bloco cancela a exportação
+ *    com erro explícito, nunca um CSV parcial anunciado como completo.
  */
 
 type AccountabilityStatus = "Em preparação" | "Aguardando aprovação" | "Aprovado" | "Publicado";
@@ -78,26 +107,6 @@ const CURRENCY_LOCALE: Record<string, { locale: string; currency: string }> = {
   en: { locale: "en-US", currency: "USD" },
   es: { locale: "es-MX", currency: "MXN" },
 };
-
-function monthsInQuarter(year: string, quarter: string): string[] {
-  const q = Number(quarter);
-  const startMonth = (q - 1) * 3 + 1;
-  return [0, 1, 2].map(offset => `${year}-${String(startMonth + offset).padStart(2, "0")}`);
-}
-
-function receiptsForPeriod(transactions: TreasuryTransaction[], report: ReportRow): TreasuryTransaction[] {
-  if (report.report_type === "Mensal") {
-    return transactions.filter(tx => tx.receipt_url && tx.date?.startsWith(report.period_key));
-  }
-  if (report.report_type === "Trimestral") {
-    const match = report.period_key.match(/^(\d{4})-Q(\d)$/);
-    if (!match) return [];
-    const months = new Set(monthsInQuarter(match[1], match[2]));
-    return transactions.filter(tx => tx.receipt_url && tx.date && months.has(tx.date.slice(0, 7)));
-  }
-  // Anual
-  return transactions.filter(tx => tx.receipt_url && tx.date?.startsWith(report.period_key));
-}
 
 // ---------------------------------------------------------------------------
 // Hook — reports + approvals reais por organização
@@ -150,9 +159,9 @@ function useAccountabilityReports(organizationId: string | undefined) {
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
-type Props = { transactions: TreasuryTransaction[] };
+type Props = { reloadToken?: number };
 
-export function FinanceAccountability({ transactions }: Props) {
+export function FinanceAccountability({ reloadToken }: Props) {
   const { t, lang } = useLanguage();
   const { church } = useChurch();
   const { hasRole, hasCapability } = useRole();
@@ -174,12 +183,15 @@ export function FinanceAccountability({ transactions }: Props) {
   const [newReportForm, setNewReportForm] = useState({ periodKey: "", periodLabel: "", reportType: "Mensal" as ReportRow["report_type"] });
   const [togglingApprovalId, setTogglingApprovalId] = useState<string | null>(null);
 
-  // Month list from real transactions
+  // Lista de meses disponíveis — vem de finance_dashboard_aggregates
+  // (by_month, histórico completo agregado), nunca de um array de
+  // transações baixado no navegador.
+  const monthsAgg = useFinanceDashboardAggregates({ organizationId: church?.id, reloadToken });
   const months = useMemo(() => {
-    const set = new Set<string>();
-    transactions.forEach(tx => { if (tx.date) set.add(getTransactionMonth(tx.date)); });
+    if (!monthsAgg.data) return [];
+    const set = new Set(monthsAgg.data.byMonth.map(b => b.month).filter(Boolean));
     return [...set].sort().reverse();
-  }, [transactions]);
+  }, [monthsAgg.data]);
 
   const defaultMonth = useMemo(() => {
     if (months.length > 0) return months[0];
@@ -188,22 +200,120 @@ export function FinanceAccountability({ transactions }: Props) {
   }, [months]);
 
   const [selectedMonth, setSelectedMonth] = useState<string>(defaultMonth);
+  useEffect(() => {
+    if (months.length > 0 && !months.includes(selectedMonth)) setSelectedMonth(months[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [months]);
 
-  // Period-specific derived data
+  // Saldo anterior ao mês selecionado — agregado no servidor
+  // (p_date_to = dia anterior ao 1º dia do mês), nunca somando o array
+  // completo no navegador.
+  const monthRange = useMemo(() => monthDateRange(selectedMonth), [selectedMonth]);
+  const priorAgg = useFinanceDashboardAggregates({
+    organizationId: church?.id, dateTo: dayBefore(monthRange.from), reloadToken,
+  });
+  const saldoAnterior = (priorAgg.data?.totals.entriesAmount ?? 0) - (priorAgg.data?.totals.exitsAmount ?? 0);
+
+  // Entradas/saídas/contagem do mês selecionado — CORREÇÃO C4: antes vinha
+  // de um extrato bruto limitado a 3000 linhas (`fetchMonthLedger`), que
+  // truncava silenciosamente organizações com mais lançamentos que isso.
+  // Agora vem do mesmo RPC agregador (p_date_from/p_date_to = intervalo do
+  // mês) — a contagem é sempre exata, nunca capada.
+  const monthAgg = useFinanceDashboardAggregates({
+    organizationId: church?.id, dateFrom: monthRange.from, dateTo: monthRange.to, reloadToken,
+  });
+  const periodLoading = monthAgg.status === "loading" || monthAgg.status === "idle"
+    || priorAgg.status === "loading" || priorAgg.status === "idle";
   const periodData = useMemo(() => {
-    const txs = transactions.filter(tx => tx.date?.startsWith(selectedMonth));
-    const prevTxs = transactions.filter(tx => tx.date && tx.date < selectedMonth + "-01");
-    const saldoAnterior = prevTxs.reduce(
-      (s, tx) => s + Number(tx.amount) * (isExpense(tx.type) ? -1 : 1),
-      0,
-    );
-    const entradas = txs.filter(tx => !isExpense(tx.type)).reduce((s, tx) => s + Number(tx.amount), 0);
-    const saidas = txs.filter(tx => isExpense(tx.type)).reduce((s, tx) => s + Number(tx.amount), 0);
+    const entradas = monthAgg.data?.totals.entriesAmount ?? 0;
+    const saidas = monthAgg.data?.totals.exitsAmount ?? 0;
+    const txCount = (monthAgg.data?.totals.entriesCount ?? 0) + (monthAgg.data?.totals.exitsCount ?? 0);
     const saldoFinal = saldoAnterior + entradas - saidas;
     const resultado = entradas - saidas;
-    const receipts = txs.filter(tx => tx.receipt_url);
-    return { txs, saldoAnterior, entradas, saidas, saldoFinal, resultado, receipts };
-  }, [transactions, selectedMonth]);
+    return { entradas, saidas, saldoFinal, resultado, txCount };
+  }, [monthAgg.data, saldoAnterior]);
+
+  // Comprovantes do mês selecionado — CORREÇÃO C4: antes vinha de
+  // `fetchPeriodReceipts(...).limit(1000)`, assumindo que 1000 era o
+  // total. Agora é paginação real (50/página, técnica pageSize+1),
+  // carregada só quando a seção é aberta, com "carregar mais".
+  const [receiptsPage, setReceiptsPage] = useState(1);
+  const [receiptsRows, setReceiptsRows] = useState<TreasuryTransaction[]>([]);
+  const [receiptsHasNextPage, setReceiptsHasNextPage] = useState(false);
+  const [receiptsLoading, setReceiptsLoading] = useState(false);
+  const [receiptsError, setReceiptsError] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    if (showReceiptsFor !== selectedMonth || !church?.id) return;
+    setReceiptsLoading(true);
+    fetchPeriodReceiptsPage(church.id, monthRange.from, monthRange.to, receiptsPage).then(({ rows, hasNextPage, error }) => {
+      if (!active) return;
+      if (error) { setReceiptsError(error); setReceiptsRows([]); setReceiptsHasNextPage(false); }
+      else { setReceiptsError(null); setReceiptsRows(rows); setReceiptsHasNextPage(hasNextPage); }
+      setReceiptsLoading(false);
+    });
+    return () => { active = false; };
+  }, [showReceiptsFor, selectedMonth, church?.id, monthRange.from, monthRange.to, receiptsPage, reloadToken]);
+
+  // Reseta para a página 1 sempre que o mês muda ou a seção é reaberta.
+  useEffect(() => { setReceiptsPage(1); }, [showReceiptsFor, selectedMonth]);
+
+  // Exportação CSV do mês — CORREÇÃO C4: busca a quantidade EXATA esperada
+  // do RPC agregador, depois busca o período completo em blocos (`for`
+  // limitado por essa quantidade, nunca `while(true)`), valida ao final e
+  // só então gera o CSV. Qualquer divergência/falha lança erro — o
+  // chamador (useDocExport) nunca mostra "Exportado!" nesse caso.
+  const [exportProgress, setExportProgress] = useState<{ fetched: number; total: number } | null>(null);
+  const exportPrestacaoCSV = async (): Promise<string> => {
+    if (!church) throw new Error(t("Organização não disponível."));
+    const expectedTotal = periodData.txCount;
+    setExportProgress({ fetched: 0, total: expectedTotal });
+    try {
+      const { rows, ok, error } = await fetchDateRangeForExport(
+        church.id, monthRange.from, monthRange.to, expectedTotal,
+        (fetched, total) => setExportProgress({ fetched, total }),
+      );
+      if (!ok) throw new Error(error || t("Não foi possível exportar o período completo."));
+      let csv = `"Prestação de Contas — ${formatMonth(selectedMonth)}"\n\n`;
+      csv += `"Saldo anterior",${saldoAnterior}\n`;
+      csv += `"Entradas",${periodData.entradas}\n`;
+      csv += `"Saídas",${periodData.saidas}\n`;
+      csv += `"Saldo final",${periodData.saldoFinal}\n\n`;
+      csv += "Data,Descrição,Tipo,Categoria,Valor,Status,Comprovante\n";
+      rows.forEach(tx => {
+        csv += `${tx.date},"${tx.description}",${tx.type},"${tx.category || ""}",${tx.amount},${tx.status},"${tx.receipt_url || ""}"\n`;
+      });
+      return csv;
+    } finally {
+      setExportProgress(null);
+    }
+  };
+
+  // Comprovantes de um relatório histórico — buscados somente quando o
+  // relatório é aberto (selectedReportId), nunca eagerly para todos os
+  // relatórios da lista. CORREÇÃO C4: paginação real em vez de
+  // `.limit(1000)`.
+  const [selectedReportReceiptsPage, setSelectedReportReceiptsPage] = useState(1);
+  const [selectedReportReceipts, setSelectedReportReceipts] = useState<TreasuryTransaction[]>([]);
+  const [selectedReportReceiptsHasNextPage, setSelectedReportReceiptsHasNextPage] = useState(false);
+  const [selectedReportReceiptsLoading, setSelectedReportReceiptsLoading] = useState(false);
+  const [selectedReportReceiptsError, setSelectedReportReceiptsError] = useState<string | null>(null);
+  useEffect(() => { setSelectedReportReceiptsPage(1); }, [selectedReportId]);
+  useEffect(() => {
+    let active = true;
+    const report = reports.find(r => r.id === selectedReportId) ?? null;
+    if (!church?.id || !report) { setSelectedReportReceipts([]); setSelectedReportReceiptsHasNextPage(false); return; }
+    const range = reportPeriodDateRange(report.period_key, report.report_type);
+    if (!range) { setSelectedReportReceipts([]); setSelectedReportReceiptsHasNextPage(false); return; }
+    setSelectedReportReceiptsLoading(true);
+    fetchPeriodReceiptsPage(church.id, range.from, range.to, selectedReportReceiptsPage).then(({ rows, hasNextPage, error }) => {
+      if (!active) return;
+      if (error) { setSelectedReportReceiptsError(error); setSelectedReportReceipts([]); setSelectedReportReceiptsHasNextPage(false); }
+      else { setSelectedReportReceiptsError(null); setSelectedReportReceipts(rows); setSelectedReportReceiptsHasNextPage(hasNextPage); }
+      setSelectedReportReceiptsLoading(false);
+    });
+    return () => { active = false; };
+  }, [church?.id, selectedReportId, selectedReportReceiptsPage, reports]);
 
   // Helpers
   const formatMonth = (m: string) => {
@@ -239,20 +349,6 @@ export function FinanceAccountability({ transactions }: Props) {
     }
     setAdvancingMonthly(false);
     reload();
-  };
-
-  const buildPrestacaoCSV = () => {
-    const { txs, saldoAnterior, entradas, saidas, saldoFinal } = periodData;
-    let csv = `"Prestação de Contas — ${formatMonth(selectedMonth)}"\n\n`;
-    csv += `"Saldo anterior",${saldoAnterior}\n`;
-    csv += `"Entradas",${entradas}\n`;
-    csv += `"Saídas",${saidas}\n`;
-    csv += `"Saldo final",${saldoFinal}\n\n`;
-    csv += "Data,Descrição,Tipo,Categoria,Valor,Status,Comprovante\n";
-    txs.forEach(tx => {
-      csv += `${tx.date},"${tx.description}",${tx.type},"${tx.category || ""}",${tx.amount},${tx.status},"${tx.receipt_url || ""}"\n`;
-    });
-    return csv;
   };
 
   const selectedReport = reports.find(r => r.id === selectedReportId) ?? null;
@@ -363,17 +459,23 @@ export function FinanceAccountability({ transactions }: Props) {
               items={buildFinanceExportItems({
                 moduleTitle: `${t("Prestação de Contas")} — ${formatMonth(selectedMonth)}`,
                 summary: `Entradas: ${fmt(periodData.entradas)} | Saídas: ${fmt(periodData.saidas)} | Resultado: ${fmt(periodData.resultado)}`,
-                csvFn: buildPrestacaoCSV,
+                csvFn: exportPrestacaoCSV,
                 csvFilename: `prestacao_${selectedMonth}.csv`,
               })}
             />
           </div>
         </div>
 
+        {exportProgress && (
+          <p className="px-5 pt-2 text-[11px] text-muted-foreground">
+            {t("Exportando")}… {exportProgress.fetched}/{exportProgress.total}
+          </p>
+        )}
+
         {/* Summary cards */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 p-5">
           {[
-            { label: t("Saldo inicial"), value: periodData.saldoAnterior, cls: "" },
+            { label: t("Saldo inicial"), value: saldoAnterior, cls: "" },
             { label: t("Entradas"), value: periodData.entradas, cls: "text-success" },
             { label: t("Saídas"), value: periodData.saidas, cls: "text-destructive" },
             {
@@ -397,9 +499,10 @@ export function FinanceAccountability({ transactions }: Props) {
         {/* Actions bar */}
         <div className="flex flex-wrap items-center gap-3 px-5 pb-4">
           <p className="text-xs text-muted-foreground flex-1">
-            {periodData.txs.length} {t("lançamentos no período")}
-            {periodData.receipts.length > 0 && (
-              <> · {periodData.receipts.length} {t("comprovantes")}</>
+            {periodLoading ? (
+              <Loader2 size={13} className="animate-spin inline" />
+            ) : (
+              <>{periodData.txCount} {t("lançamentos no período")}</>
             )}
           </p>
 
@@ -428,33 +531,62 @@ export function FinanceAccountability({ transactions }: Props) {
           )}
         </div>
 
-        {/* Receipts accordion */}
+        {/* Receipts accordion — paginado (50/página), carregado só ao abrir */}
         {showReceiptsFor === selectedMonth && (
           <div className="px-5 pb-5 border-t border-border/40 pt-4 space-y-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
               {t("Comprovantes do período")} — {formatMonth(selectedMonth)}
             </p>
-            {periodData.receipts.length === 0 ? (
+            {receiptsError ? (
+              <p className="text-sm text-destructive">{receiptsError}</p>
+            ) : receiptsLoading ? (
+              <div className="flex items-center justify-center py-6"><Loader2 size={16} className="animate-spin text-muted-foreground" /></div>
+            ) : receiptsRows.length === 0 && receiptsPage === 1 ? (
               <p className="text-sm text-muted-foreground">{t("Nenhum comprovante neste período")}</p>
             ) : (
-              <div className="space-y-2">
-                {periodData.receipts.map(tx => (
-                  <div key={tx.id} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-secondary/30 text-sm">
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{tx.description}</p>
-                      <p className="text-xs text-muted-foreground">{tx.date} · {tx.category}</p>
+              <>
+                <div className="space-y-2">
+                  {receiptsRows.map(tx => (
+                    <div key={tx.id} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-secondary/30 text-sm">
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{tx.description}</p>
+                        <p className="text-xs text-muted-foreground">{tx.date} · {tx.category}</p>
+                      </div>
+                      <a
+                        href={tx.receipt_url ?? "#"}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline flex-shrink-0"
+                      >
+                        <ExternalLink size={12} /> {t("Ver")}
+                      </a>
                     </div>
-                    <a
-                      href={tx.receipt_url ?? "#"}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline flex-shrink-0"
+                  ))}
+                </div>
+                {(receiptsPage > 1 || receiptsHasNextPage) && (
+                  <div className="flex items-center justify-between pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setReceiptsPage(p => Math.max(1, p - 1))}
+                      disabled={receiptsPage === 1 || receiptsLoading}
+                      className="px-2.5 py-1 text-xs font-medium rounded-lg bg-secondary hover:bg-secondary/80 disabled:opacity-40"
                     >
-                      <ExternalLink size={12} /> {t("Ver")}
-                    </a>
+                      {t("Anterior")}
+                    </button>
+                    <span className="text-[11px] text-muted-foreground">
+                      {t("Página")} {receiptsPage}{receiptsHasNextPage ? ` · ${t("há mais comprovantes")}` : ""}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setReceiptsPage(p => p + 1)}
+                      disabled={!receiptsHasNextPage || receiptsLoading}
+                      className="px-2.5 py-1 text-xs font-medium rounded-lg bg-secondary hover:bg-secondary/80 disabled:opacity-40"
+                    >
+                      {t("Próximo")}
+                    </button>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -487,7 +619,6 @@ export function FinanceAccountability({ transactions }: Props) {
         ) : (
           <div className="divide-y divide-border/40">
             {reports.map(report => {
-              const receipts = receiptsForPeriod(transactions, report);
               const approvals = approvalsByReport[report.id] ?? [];
               return (
                 <div
@@ -500,7 +631,7 @@ export function FinanceAccountability({ transactions }: Props) {
                       <p className="text-xs text-muted-foreground uppercase tracking-wide">{t(report.report_type)}</p>
                       <h4 className="font-semibold text-base group-hover:text-primary transition-colors">{report.period_label}</h4>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {receipts.length} {t("comprovantes")}
+                        {t("Ver comprovantes ao abrir")}
                       </p>
                     </div>
                     <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
@@ -511,7 +642,7 @@ export function FinanceAccountability({ transactions }: Props) {
                         align="end"
                         items={buildFinanceExportItems({
                           moduleTitle: `${t("Prestação de Contas")} — ${report.period_label}`,
-                          summary: `${receipts.length} comprovantes | Status: ${report.status}`,
+                          summary: `Status: ${report.status}`,
                           csvFilename: `prestacao_${report.period_label.replace(/\s+/g, "_")}.csv`,
                         })}
                       />
@@ -552,7 +683,7 @@ export function FinanceAccountability({ transactions }: Props) {
           <FileText size={18} className="text-primary" />
           <h3 className="font-serif text-lg font-semibold">{t("Relatórios Contábeis")}</h3>
         </div>
-        <FinanceReports transactions={transactions} />
+        <FinanceReports reloadToken={reloadToken} />
       </section>
 
       {/* ── Historical report detail modal ──────────────────────────── */}
@@ -564,7 +695,7 @@ export function FinanceAccountability({ transactions }: Props) {
         maxWidth="sm"
       >
         {selectedReport && (() => {
-          const receipts = receiptsForPeriod(transactions, selectedReport);
+          const receipts = selectedReportReceipts;
           const nextLabel = STATUS_NEXT_LABEL[selectedReport.status];
           return (
             <div className="space-y-4">
@@ -573,9 +704,38 @@ export function FinanceAccountability({ transactions }: Props) {
                   {t(selectedReport.status)}
                 </span>
                 <p className="text-sm text-muted-foreground">
-                  {receipts.length} {t("comprovantes")}
+                  {selectedReportReceiptsLoading ? (
+                    <Loader2 size={14} className="animate-spin inline" />
+                  ) : selectedReportReceiptsError ? (
+                    <span className="text-destructive">{selectedReportReceiptsError}</span>
+                  ) : (
+                    <>
+                      {receipts.length} {t("comprovantes")}{selectedReportReceiptsPage > 1 ? ` (${t("página")} ${selectedReportReceiptsPage})` : ""}
+                      {selectedReportReceiptsHasNextPage && ` · ${t("há mais")}`}
+                    </>
+                  )}
                 </p>
               </div>
+              {(selectedReportReceiptsPage > 1 || selectedReportReceiptsHasNextPage) && (
+                <div className="flex items-center justify-between -mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedReportReceiptsPage(p => Math.max(1, p - 1))}
+                    disabled={selectedReportReceiptsPage === 1 || selectedReportReceiptsLoading}
+                    className="px-2.5 py-1 text-xs font-medium rounded-lg bg-secondary hover:bg-secondary/80 disabled:opacity-40"
+                  >
+                    {t("Anterior")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedReportReceiptsPage(p => p + 1)}
+                    disabled={!selectedReportReceiptsHasNextPage || selectedReportReceiptsLoading}
+                    className="px-2.5 py-1 text-xs font-medium rounded-lg bg-secondary hover:bg-secondary/80 disabled:opacity-40"
+                  >
+                    {t("Próximo")}
+                  </button>
+                </div>
+              )}
 
               <div>
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-3">

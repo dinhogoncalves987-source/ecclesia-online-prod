@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Search, Plus, X, Loader2, Upload, Sparkles, Download, Trash2, Edit2, Lock, ChevronDown } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Search, Plus, X, Loader2, Upload, Sparkles, Download, Trash2, Edit2, Lock, ChevronDown, AlertTriangle } from "lucide-react";
 import { downloadCSVRaw } from "@/lib/docExport";
 import { AnimatePresence, motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { BulkImportModal } from "@/components/BulkImportModal";
 import { AIImportModal } from "@/components/AIImportModal";
 import { SpreadsheetImportModal } from "@/components/financeiro/SpreadsheetImportModal";
+import { FinanceImportHistory } from "@/components/financeiro/FinanceImportHistory";
 import { OperationalAssistant } from "@/components/OperationalAssistant";
 import { getOrganizationScopeIds, insertWithOrganizationScope, runScopedOrganizationQuery } from "@/lib/organizationScope";
 import {
@@ -22,6 +23,7 @@ import {
 } from "@/lib/financeManualPayload";
 import { buildFinanceCsv } from "@/lib/financeCsv";
 import { buildGenericFinanceImportPayload } from "@/lib/importers/financeImportPayload";
+import { buildFinanceTransactionRowView, type FinanceSecondaryField, type FinanceTransactionViewLookups } from "@/lib/financeTransactionView";
 import {
   DEFAULT_ACCOUNT_CATEGORIES,
   DEFAULT_COST_CENTERS,
@@ -60,14 +62,67 @@ const today = () => new Date().toISOString().split("T")[0];
 const getText = (value: unknown) => (typeof value === "string" ? value : "");
 type OrganizationOption = { id: string; name: string; organization_type: string | null };
 
-export function TransactionList({
-  transactions,
-  setTransactions,
-  loading,
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Renderiza os campos secundários (históricos da planilha CONFIADCS) abaixo
+ * da coluna principal, na tabela desktop e nos cartões mobile — a mesma
+ * hierarquia visual nos dois, nunca escondendo dados relevantes.
+ */
+function SecondaryFields({
+  fields,
+  t,
+  formatDate,
 }: {
-  transactions: TreasuryTransaction[];
-  setTransactions: (txs: TreasuryTransaction[]) => void;
-  loading: boolean;
+  fields: FinanceSecondaryField[];
+  t: (s: string) => string;
+  formatDate: (d: string) => string;
+}) {
+  if (fields.length === 0) return null;
+  return (
+    <div className="mt-0.5 space-y-0.5">
+      {fields.map(field => (
+        <p key={field.key} className="text-[10px] leading-tight text-muted-foreground">
+          <span className="opacity-70">{t(field.label)}:</span>{" "}
+          {ISO_DATE_RE.test(field.value) ? formatDate(field.value) : field.value}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+// FASE 1D-C3 — listagem server-side real (mesmo padrão de
+// src/pages/Membros.tsx + supabase/migrations/20260808170000_..., ver
+// docs/PERFORMANCE_CONTRACT.md). Página de 100 registros, ordenação estável
+// (data contábil, carimbo, id), busca com pageSize+1 para detectar próxima
+// página sem count:"exact", filtros/busca 100% no servidor, cache curto
+// (60s) por chave de filtros+página, cancelamento de requisições obsoletas.
+const TRANSACTIONS_PAGE_SIZE = 100;
+const TRANSACTIONS_CACHE_TTL_MS = 60_000;
+
+type TransactionsCacheEntry = { items: TreasuryTransaction[]; hasNextPage: boolean; ts: number };
+
+function saidaTypeVariants(filterType: "all" | "Entrada" | "Saida"): string[] | null {
+  if (filterType === "Saida") return ["Saida", "Saída"];
+  if (filterType === "Entrada") return ["Entrada"];
+  return null;
+}
+
+/** Remove caracteres que quebrariam a sintaxe de filtro `.or()` do PostgREST
+ * (`,`, `(`, `)`, `%`) — busca continua funcional para o texto normal do
+ * usuário, apenas sem esses símbolos literais. */
+function sanitizeSearchTerm(value: string): string {
+  return value.replace(/[,()%]/g, " ").trim();
+}
+
+export function TransactionList({
+  onDataChanged,
+}: {
+  /** Notifica o pai (Financeiro.tsx) após qualquer escrita bem-sucedida
+   * (criar/editar/excluir/mudar status/importar) para que os cards
+   * agregados (FinanceOverview) também revalidem — sem reintroduzir um
+   * fetch-all compartilhado. */
+  onDataChanged?: () => void;
 }) {
   const { user } = useAuth();
   const { church } = useChurch();
@@ -84,11 +139,15 @@ export function TransactionList({
   const [documentTypes, setDocumentTypes] = useState<FinanceDocumentType[]>([]);
   const [organizationOptions, setOrganizationOptions] = useState<OrganizationOption[]>([]);
   const [closings, setClosings] = useState<FinanceMonthlyClosing[]>([]);
+  const [periods, setPeriods] = useState<{ id: string; label: string }[]>([]);
   const [treasurySetupReady, setTreasurySetupReady] = useState(false);
   const [filterType, setFilterType] = useState<"all" | "Entrada" | "Saida">("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "Pendente" | "Confirmado" | "Pago">("all");
   const [filterCategory, setFilterCategory] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [filterFinancialAccountId, setFilterFinancialAccountId] = useState("all");
+  const [filterPeriodId, setFilterPeriodId] = useState("all");
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState(""); // valor após debounce — usado na consulta ao servidor
   const [showForm, setShowForm] = useState(false);
   const [showAccountingDetails, setShowAccountingDetails] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -99,8 +158,17 @@ export function TransactionList({
   const [showImport, setShowImport] = useState(false);
   const [showAIImport, setShowAIImport] = useState(false);
   const [showSpreadsheetImport, setShowSpreadsheetImport] = useState(false);
-  const [page, setPage] = useState(0);
-  const perPage = 25;
+
+  // ── Paginação server-side ────────────────────────────────────────────────
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageRows, setPageRows] = useState<TreasuryTransaction[]>([]);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [pageTransitioning, setPageTransitioning] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+  const cacheRef = useRef(new Map<string, TransactionsCacheEntry>());
 
   useEffect(() => {
     if (!church) return;
@@ -112,11 +180,12 @@ export function TransactionList({
     setDocumentTypes([]);
     setOrganizationOptions([]);
     setClosings([]);
+    setPeriods([]);
     setNewTx(createEmptyManualTransactionDraft({ category: DEFAULT_ACCOUNT_CATEGORIES[0].name }));
 
     const loadTreasurySetup = async () => {
       const scopeIds = await getOrganizationScopeIds(church.id);
-      const [categoryResult, centerResult, accountResult, closingResult, groupResult, documentResult, orgResult] = await Promise.all([
+      const [categoryResult, centerResult, accountResult, closingResult, groupResult, documentResult, orgResult, periodResult] = await Promise.all([
         runScopedOrganizationQuery<FinanceAccountCategory[]>("finance_account_categories", church.id, query =>
           query.select("*").eq("is_active", true).order("code"),
         ),
@@ -147,6 +216,9 @@ export function TransactionList({
           .in("id", scopeIds)
           .eq("active", true)
           .order("name"),
+        runScopedOrganizationQuery<{ id: string; label: string }[]>("finance_periods", church.id, query =>
+          query.select("id, label").eq("is_active", true).order("label"),
+        ),
       ]);
 
       if (
@@ -157,6 +229,7 @@ export function TransactionList({
         || groupResult.error
         || documentResult.error
         || orgResult.error
+        || periodResult.error
       ) {
         toast.error(t("Não foi possível carregar toda a estrutura financeira. Tente novamente."));
         return;
@@ -172,6 +245,7 @@ export function TransactionList({
       setAccountingGroups((groupResult.data ?? []) as unknown as FinanceAccountingGroup[]);
       setDocumentTypes((documentResult.data ?? []) as unknown as FinanceDocumentType[]);
       setOrganizationOptions((orgResult.data ?? []) as OrganizationOption[]);
+      setPeriods(periodResult.data ?? []);
       setNewTx(createEmptyManualTransactionDraft({
         category: loadedCategories[0]?.name || "Dizimos",
         accountCategoryId: loadedCategories[0]?.id || "",
@@ -219,16 +293,136 @@ export function TransactionList({
     { description: "Manutencao predial", amount: "800", type: "Saida", category: "Manutencao", date: "2026-03-05", payment_method: "Banco" },
   ];
 
-  const reloadTransactions = async () => {
+  // ── Listagem server-side (FASE 1D-C3) ───────────────────────────────────
+  // Substitui o antigo reloadTransactions (select("*") completo, sem
+  // .range()/.limit()) + filtro client-side sobre o array inteiro. Cada
+  // requisição busca no máximo TRANSACTIONS_PAGE_SIZE + 1 linhas — a linha
+  // 101 nunca é exibida, só prova que existe próxima página sem count:"exact"
+  // (mesma técnica de src/pages/Membros.tsx). Filtros, busca e ordenação
+  // (data contábil → carimbo → id, todos DESC, id como desempate final
+  // sempre único) executam inteiramente no Postgres.
+  const filtersKey = `${filterType}|${filterStatus}|${filterCategory}|${filterFinancialAccountId}|${filterPeriodId}`;
+
+  const fetchPage = useCallback(async (page: number, opts: { silent?: boolean } = {}) => {
     if (!church) return;
-    const { data, error } = await supabase
-      .from("transactions")
-      .select("*")
-      .eq("organization_id", church.id)
-      .order("date", { ascending: false });
-    if (error) { console.error("[TransactionList] reloadTransactions:", error); return; }
-    setTransactions((data as TreasuryTransaction[]) || []);
-  };
+    const trimmedSearch = sanitizeSearchTerm(searchQuery);
+    const cacheKey = `${church.id}|${filtersKey}|${trimmedSearch}|${page}`;
+
+    const requestId = ++requestIdRef.current;
+    abortRef.current?.abort(); // cancela qualquer requisição de página/filtro anterior ainda em voo
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    if (!opts.silent) setPageTransitioning(true);
+    try {
+      const from = (page - 1) * TRANSACTIONS_PAGE_SIZE;
+      const to = from + TRANSACTIONS_PAGE_SIZE; // pede PAGE_SIZE + 1 linhas — nunca count:"exact"
+
+      let query = supabase.from("transactions").select("*").eq("organization_id", church.id);
+      const typeVariants = saidaTypeVariants(filterType);
+      if (typeVariants) query = query.in("type", typeVariants);
+      if (filterStatus !== "all") query = query.eq("status", filterStatus);
+      if (filterCategory !== "all") query = query.eq("category", filterCategory);
+      if (filterFinancialAccountId !== "all") query = query.eq("financial_account_id", filterFinancialAccountId);
+      if (filterPeriodId !== "all") query = query.eq("period_id", filterPeriodId);
+      if (trimmedSearch) {
+        const term = `%${trimmedSearch}%`;
+        query = query.or([
+          `description.ilike.${term}`,
+          `document_number.ilike.${term}`,
+          `legacy_record_number.ilike.${term}`,
+          `supplier_beneficiary_name.ilike.${term}`,
+          `contributor_name.ilike.${term}`,
+        ].join(","));
+      }
+
+      const { data, error } = await query
+        .order("date", { ascending: false })
+        .order("raw_timestamp", { ascending: false, nullsFirst: false })
+        .order("id", { ascending: false })
+        .range(from, to)
+        .abortSignal(controller.signal);
+
+      if (requestId !== requestIdRef.current) return; // resposta obsoleta — outra página/filtro já foi solicitada
+
+      if (error) {
+        if ((error as { name?: string }).name === "AbortError") return;
+        console.error("[TransactionList] fetchPage:", error);
+        if (!opts.silent) {
+          // Erro visível: nunca deixa "Próxima" habilitada com base numa
+          // resposta anterior obsoleta — limpa o estado de paginação.
+          setHasNextPage(false);
+          setListError(error.message || t("Erro ao carregar transações"));
+        }
+        return;
+      }
+
+      const rows = (data as TreasuryTransaction[]) ?? [];
+      const pageHasNext = rows.length > TRANSACTIONS_PAGE_SIZE;
+      const items = pageHasNext ? rows.slice(0, TRANSACTIONS_PAGE_SIZE) : rows;
+      cacheRef.current.set(cacheKey, { items, hasNextPage: pageHasNext, ts: Date.now() });
+      setPageRows(items);
+      setHasNextPage(pageHasNext);
+      setListError(null);
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+        setPageTransitioning(false);
+      }
+    }
+  }, [church, filtersKey, filterType, filterStatus, filterCategory, filterFinancialAccountId, filterPeriodId, searchQuery, t]);
+
+  // Debounce curto (300ms) do campo de busca — evita 1 requisição por tecla.
+  useEffect(() => {
+    const handle = setTimeout(() => setSearchQuery(searchInput), 300);
+    return () => clearTimeout(handle);
+  }, [searchInput]);
+
+  // Reset para página 1 sempre que busca ou qualquer filtro muda.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filtersKey, searchQuery]);
+
+  // Busca a página atual — usa cache "morno" (< 60s) imediatamente (nunca
+  // zero falso, nenhum novo spinner) e revalida em segundo plano; cache
+  // "frio" ou ausente dispara busca visível.
+  useEffect(() => {
+    if (!church) { setPageRows([]); setHasNextPage(false); setLoading(false); return; }
+    const trimmedSearch = sanitizeSearchTerm(searchQuery);
+    const cacheKey = `${church.id}|${filtersKey}|${trimmedSearch}|${currentPage}`;
+    const cached = cacheRef.current.get(cacheKey);
+    if (cached) {
+      setPageRows(cached.items);
+      setHasNextPage(cached.hasNextPage);
+      setListError(null);
+      setLoading(false);
+      setPageTransitioning(false);
+      if (Date.now() - cached.ts > TRANSACTIONS_CACHE_TTL_MS) {
+        void fetchPage(currentPage, { silent: true });
+      }
+      return;
+    }
+    void fetchPage(currentPage);
+  }, [church, filtersKey, searchQuery, currentPage, fetchPage]);
+
+  // Spinner de página inteira somente na 1ª carga real (nenhuma linha ainda)
+  // — trocas de página/filtro subsequentes mantêm a tabela anterior visível.
+  useEffect(() => {
+    if (pageRows.length === 0 && pageTransitioning) setLoading(true);
+    else if (pageRows.length > 0) setLoading(false);
+  }, [pageRows.length, pageTransitioning]);
+
+  // Invalida o cache e recarrega — usado após qualquer escrita (criar/
+  // editar/excluir/mudar status/importar/zerar). Nunca reintroduz o
+  // fetch-all: repete apenas a mesma consulta paginada, e avisa o pai
+  // (Financeiro.tsx) para revalidar os cards agregados (FinanceOverview).
+  const refreshAfterMutation = useCallback(async (opts: { resetToFirstPage?: boolean } = {}) => {
+    cacheRef.current.clear();
+    const targetPage = opts.resetToFirstPage ? 1 : currentPage;
+    if (opts.resetToFirstPage && currentPage !== 1) setCurrentPage(1);
+    else await fetchPage(targetPage);
+    onDataChanged?.();
+  }, [currentPage, fetchPage, onDataChanged]);
 
   const handleBulkImport = async (rows: Record<string, string>[]) => {
     if (!user || !church || !canWriteFinance) return { success: 0, errors: rows.length };
@@ -267,28 +461,9 @@ export function TransactionList({
       errors += Number(result.failed ?? 0) + Number(result.skipped_closed_month ?? 0);
     }
 
-    if (success > 0) await reloadTransactions();
+    if (success > 0) await refreshAfterMutation({ resetToFirstPage: true });
     return { success, errors };
   };
-
-  const filtered = transactions.filter(tx => {
-    const normalizedType = isExpense(tx.type) ? "Saida" : "Entrada";
-    if (filterType !== "all" && normalizedType !== filterType) return false;
-    if (filterStatus !== "all" && tx.status !== filterStatus) return false;
-    if (filterCategory !== "all" && tx.category !== filterCategory) return false;
-    const searchable = [
-      tx.description,
-      tx.document_number,
-      tx.legacy_record_number,
-      tx.supplier_beneficiary_name,
-      tx.contributor_name,
-    ].filter(Boolean).join(" ").toLowerCase();
-    if (searchQuery && !searchable.includes(searchQuery.toLowerCase())) return false;
-    return true;
-  });
-
-  const paged = filtered.slice(page * perPage, (page + 1) * perPage);
-  const totalPages = Math.ceil(filtered.length / perPage);
 
   const addOrUpdateTransaction = async () => {
     if (!canWriteFinance) return;
@@ -321,7 +496,7 @@ export function TransactionList({
       if (error) {
         toast.error(t("Erro ao salvar"));
       } else {
-        setTransactions(transactions.map(tx => tx.id === editingId ? { ...tx, ...payload } : tx));
+        await refreshAfterMutation();
         toast.success(t("Lançamento atualizado!"));
         saved = true;
       }
@@ -335,7 +510,7 @@ export function TransactionList({
       if (error) {
         toast.error(t("Erro ao salvar"));
       } else if (data) {
-        setTransactions([data, ...transactions]);
+        await refreshAfterMutation({ resetToFirstPage: true });
         toast.success(t("Lançamento salvo!"));
         saved = true;
       }
@@ -409,7 +584,7 @@ export function TransactionList({
     const { error } = await supabase.from("transactions").delete().eq("id", tx.id).eq("organization_id", church.id);
     if (error) toast.error(t("Erro ao remover"));
     else {
-      setTransactions(transactions.filter(item => item.id !== tx.id));
+      await refreshAfterMutation();
       toast.success(t("Removido!"));
     }
   };
@@ -428,23 +603,32 @@ export function TransactionList({
       .eq("organization_id", church.id);
     if (error) toast.error(t("Erro ao atualizar"));
     else {
-      setTransactions(transactions.map(item => item.id === tx.id ? { ...item, status } : item));
+      // Atualização otimista da linha visível — evita um round-trip extra só
+      // para refletir a troca de status; o cache é invalidado mesmo assim
+      // para que outras páginas/filtros não fiquem com o valor antigo.
+      setPageRows(prev => prev.map(item => item.id === tx.id ? { ...item, status } : item));
+      cacheRef.current.clear();
+      onDataChanged?.();
       toast.success(t("Status atualizado!"));
     }
   };
 
+  // Exporta a página atualmente exibida (até 100 linhas, com os mesmos
+  // filtros/busca aplicados no servidor) — nunca um fetch-all adicional só
+  // para gerar o CSV. Para exportar outro recorte, o usuário ajusta os
+  // filtros/página antes de clicar em "Exportar CSV".
   const exportCSV = () => {
-    downloadCSVRaw(buildFinanceCsv(filtered, {
+    downloadCSVRaw(buildFinanceCsv(pageRows, {
       costCenters,
       financialAccounts,
       accountingGroups,
       documentTypes,
       organizations: organizationOptions,
-    }), `tesouraria_${today()}.csv`);
+    }), `tesouraria_pagina${currentPage}_${today()}.csv`);
     toast.success(t("Exportado!"));
   };
 
-  const categories = [...new Set(accountCategories.map(c => c.name).concat(transactions.map(tx => tx.category || "")).filter(Boolean))];
+  const categories = [...new Set(accountCategories.map(c => c.name).filter(Boolean))];
   const expectedCategoryType = newTx.type === "Entrada" ? "receita" : "despesa";
   const visibleAccountingGroups = accountingGroups.filter(group =>
     !group.type || group.type === expectedCategoryType,
@@ -461,6 +645,17 @@ export function TransactionList({
   const congregations = organizationOptions.filter(org =>
     ["congregacao", "congregação", "igreja_local"].includes((org.organization_type || "").toLowerCase()),
   );
+
+  // Lookups compartilhados por buildFinanceTransactionRowView — mesma fonte
+  // de verdade para a tabela desktop e os cartões mobile (item 6 dos testes
+  // obrigatórios: hierarquia visual idêntica nos dois).
+  const rowViewLookups: FinanceTransactionViewLookups = {
+    financialAccounts,
+    districts,
+    congregations,
+    documentTypes,
+    accountingGroups,
+  };
 
   const updateTransactionType = (type: "Entrada" | "Saida") => {
     const categoryType = type === "Entrada" ? "receita" : "despesa";
@@ -532,6 +727,14 @@ export function TransactionList({
         </div>
       </div>
 
+      {church && (
+        <FinanceImportHistory
+          churchId={church.id}
+          canWriteFinance={canWriteFinance}
+          onChanged={() => refreshAfterMutation({ resetToFirstPage: true })}
+        />
+      )}
+
       <AnimatePresence>
         {showForm && canWriteFinance && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
@@ -590,7 +793,7 @@ export function TransactionList({
                 aria-expanded={showAccountingDetails}
               >
                 <ChevronDown size={16} className={`transition-transform ${showAccountingDetails ? "rotate-180" : ""}`} />
-                {t("Dados contábeis complementares")}
+                {t("Mais detalhes contábeis")}
               </button>
               <AnimatePresence initial={false}>
                 {showAccountingDetails && (
@@ -713,32 +916,63 @@ export function TransactionList({
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[160px]">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input placeholder={t("Buscar...")} value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-              className="pl-8 pr-3 py-2 rounded-lg border border-input bg-background text-xs w-full focus:outline-none focus:ring-1 focus:ring-ring" />
+            <input
+              placeholder={t("Buscar...")}
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              aria-label={t("Buscar lançamentos")}
+              className="pl-8 pr-3 py-2 rounded-lg border border-input bg-background text-xs w-full focus:outline-none focus:ring-1 focus:ring-ring"
+            />
           </div>
           <div className="flex bg-secondary/50 rounded-lg p-0.5">
             {(["all", "Entrada", "Saida"] as const).map(f => (
-              <button key={f} onClick={() => { setFilterType(f); setPage(0); }}
+              <button key={f} onClick={() => setFilterType(f)}
                 className={`px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors ${filterType === f ? "bg-card shadow-sm" : "text-muted-foreground"}`}>
                 {f === "all" ? t("Todos") : f === "Entrada" ? t("Entradas") : t("Saídas")}
               </button>
             ))}
           </div>
-          <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value as "all" | "Pendente" | "Confirmado" | "Pago"); setPage(0); }}
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as "all" | "Pendente" | "Confirmado" | "Pago")}
             className="px-2.5 py-1.5 rounded-lg border border-input bg-background text-xs">
             <option value="all">{t("Status")}: {t("Todos")}</option>
             <option value="Pendente">{t("Pendente")}</option>
             <option value="Confirmado">{t("Confirmado")}</option>
             <option value="Pago">{t("Pago")}</option>
           </select>
-          <select value={filterCategory} onChange={e => { setFilterCategory(e.target.value); setPage(0); }}
+          <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
             className="px-2.5 py-1.5 rounded-lg border border-input bg-background text-xs max-w-[170px]">
             <option value="all">{t("Categoria")}: {t("Todos")}</option>
             {categories.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
-          <span className="text-[11px] text-muted-foreground">{filtered.length} {t("registros")}</span>
+          <select value={filterFinancialAccountId} onChange={e => setFilterFinancialAccountId(e.target.value)}
+            className="px-2.5 py-1.5 rounded-lg border border-input bg-background text-xs max-w-[170px]">
+            <option value="all">{t("Conta")}: {t("Todas")}</option>
+            {financialAccounts.filter(a => a.id).map(a => <option key={a.id} value={a.id as string}>{t(a.name)}</option>)}
+          </select>
+          <select value={filterPeriodId} onChange={e => setFilterPeriodId(e.target.value)}
+            className="px-2.5 py-1.5 rounded-lg border border-input bg-background text-xs max-w-[170px]">
+            <option value="all">{t("Período")}: {t("Todos")}</option>
+            {periods.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </select>
+          <span className="text-[11px] text-muted-foreground">
+            {hasNextPage ? `${t("mais de")} ${currentPage * TRANSACTIONS_PAGE_SIZE} ${t("registros")}` : `${(currentPage - 1) * TRANSACTIONS_PAGE_SIZE + pageRows.length} ${t("registros")}`}
+          </span>
         </div>
       </div>
+
+      {listError && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+          <AlertTriangle size={16} />
+          <span>{listError}</span>
+          <button
+            type="button"
+            onClick={() => fetchPage(currentPage)}
+            className="ml-auto px-2.5 py-1 rounded-md bg-destructive/10 hover:bg-destructive/20 text-xs font-medium"
+          >
+            {t("Tentar novamente")}
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-12"><Loader2 size={24} className="animate-spin text-muted-foreground" /></div>
@@ -759,24 +993,34 @@ export function TransactionList({
                 </tr>
               </thead>
               <tbody>
-                {paged.map(tx => {
-                  const expense = isExpense(tx.type);
+                {pageRows.map(tx => {
+                  const view = buildFinanceTransactionRowView(tx, rowViewLookups);
                   const closed = isClosed(tx.date);
-                  const account = financialAccounts.find(a => a.id === tx.financial_account_id)?.name || tx.payment_method || "-";
                   return (
-                    <tr key={tx.id} className="border-b border-border/30 hover:bg-secondary/30 transition-colors">
-                      <td className="px-4 py-3 text-muted-foreground tabular-nums text-xs">{formatDate(tx.date)}</td>
+                    <tr key={tx.id} className="border-b border-border/30 hover:bg-secondary/30 transition-colors align-top">
+                      <td className="px-4 py-3 text-muted-foreground tabular-nums text-xs">
+                        <p>{formatDate(view.date.primary)}</p>
+                        <SecondaryFields fields={view.date.secondary} t={t} formatDate={formatDate} />
+                      </td>
                       <td className="px-4 py-3">
-                        <p className="font-medium text-xs">{tx.description}</p>
+                        <p className="font-medium text-xs">{view.description.primary}</p>
                         {tx.receipt_url && <a href={tx.receipt_url} target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline">{t("Comprovante")}</a>}
+                        <SecondaryFields fields={view.description.secondary} t={t} formatDate={formatDate} />
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{tx.category}</td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{account}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        <p>{view.category.primary}</p>
+                        <SecondaryFields fields={view.category.secondary} t={t} formatDate={formatDate} />
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        <p>{view.account.primary}</p>
+                        <SecondaryFields fields={view.account.secondary} t={t} formatDate={formatDate} />
+                      </td>
                       <td className="px-4 py-3">
-                        <span className={`text-xs font-medium ${expense ? "text-destructive" : "text-success"}`}>{expense ? t("Saída") : t("Entrada")}</span>
+                        <span className={`text-xs font-medium ${view.type.isExpense ? "text-destructive" : "text-success"}`}>{t(view.type.label)}</span>
+                        <SecondaryFields fields={view.type.secondary} t={t} formatDate={formatDate} />
                       </td>
-                      <td className={`px-4 py-3 font-medium tabular-nums text-xs text-right ${expense ? "text-destructive" : "text-success"}`}>
-                        {expense ? "-" : "+"}{formatCurrency(Number(tx.amount))}
+                      <td className={`px-4 py-3 font-medium tabular-nums text-xs text-right ${view.type.isExpense ? "text-destructive" : "text-success"}`}>
+                        {view.type.isExpense ? "-" : "+"}{formatCurrency(Number(tx.amount))}
                       </td>
                       <td className="px-4 py-3">
                         <select value={tx.status} onChange={e => updateStatus(tx, e.target.value)} disabled={closed || !canWriteFinance}
@@ -788,6 +1032,7 @@ export function TransactionList({
                           <option value="Confirmado">{t("Confirmado")}</option>
                           <option value="Pago">{t("Pago")}</option>
                         </select>
+                        <SecondaryFields fields={view.status.secondary} t={t} formatDate={formatDate} />
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -807,7 +1052,7 @@ export function TransactionList({
                     </tr>
                   );
                 })}
-                {paged.length === 0 && (
+                {pageRows.length === 0 && (
                   <tr><td colSpan={8} className="text-center py-8 text-sm text-muted-foreground">{t("Nenhuma movimentação encontrada.")}</td></tr>
                 )}
               </tbody>
@@ -815,45 +1060,60 @@ export function TransactionList({
           </div>
 
           <div className="sm:hidden p-4 space-y-2">
-            {paged.map(tx => {
-              const expense = isExpense(tx.type);
+            {pageRows.map(tx => {
+              const view = buildFinanceTransactionRowView(tx, rowViewLookups);
               const closed = isClosed(tx.date);
+              const allSecondary = [
+                ...view.date.secondary,
+                ...view.description.secondary,
+                ...view.category.secondary,
+                ...view.account.secondary,
+                ...view.type.secondary,
+                ...view.status.secondary,
+              ];
               return (
                 <div key={tx.id} className="p-3 rounded-lg bg-secondary/30">
                   <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                    <span>{formatDate(tx.date)}</span>
-                    <span className={expense ? "text-destructive font-medium" : "text-success font-medium"}>{expense ? t("Saída") : t("Entrada")}</span>
+                    <span>{formatDate(view.date.primary)}</span>
+                    <span className={view.type.isExpense ? "text-destructive font-medium" : "text-success font-medium"}>{t(view.type.label)}</span>
                   </div>
-                  <p className="text-sm font-medium">{tx.description}</p>
-                  <p className="text-[11px] text-muted-foreground">{tx.category} | {tx.payment_method || "-"}</p>
+                  <p className="text-sm font-medium">{view.description.primary}</p>
+                  <p className="text-[11px] text-muted-foreground">{view.category.primary} | {view.account.primary}</p>
                   <div className="flex items-center justify-between mt-1">
-                    <span className={`text-sm font-medium tabular-nums ${expense ? "text-destructive" : "text-success"}`}>
-                      {expense ? "-" : "+"}{formatCurrency(Number(tx.amount))}
+                    <span className={`text-sm font-medium tabular-nums ${view.type.isExpense ? "text-destructive" : "text-success"}`}>
+                      {view.type.isExpense ? "-" : "+"}{formatCurrency(Number(tx.amount))}
                     </span>
-                    <div className="flex items-center gap-1">
-                      {closed && <Lock size={12} className="text-muted-foreground" />}
-                      {canWriteFinance && (
-                        <>
-                          <button onClick={() => editTransaction(tx)} disabled={closed} className="p-1 rounded hover:bg-secondary disabled:opacity-40"><Edit2 size={12} /></button>
-                          <button onClick={() => deleteTransaction(tx)} disabled={closed} className="p-1 rounded hover:bg-destructive/10 disabled:opacity-40"><Trash2 size={12} className="text-destructive" /></button>
-                        </>
-                      )}
-                    </div>
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                      view.status.operational === "Confirmado" ? "bg-success/10 text-success" :
+                      view.status.operational === "Pago" ? "bg-primary/10 text-primary" : "bg-accent/10 text-accent"
+                    }`}>
+                      {t(view.status.operational)}
+                    </span>
+                  </div>
+                  <SecondaryFields fields={allSecondary} t={t} formatDate={formatDate} />
+                  <div className="flex items-center justify-end gap-1 mt-1">
+                    {closed && <Lock size={12} className="text-muted-foreground" />}
+                    {canWriteFinance && (
+                      <>
+                        <button onClick={() => editTransaction(tx)} disabled={closed} className="p-1 rounded hover:bg-secondary disabled:opacity-40"><Edit2 size={12} /></button>
+                        <button onClick={() => deleteTransaction(tx)} disabled={closed} className="p-1 rounded hover:bg-destructive/10 disabled:opacity-40"><Trash2 size={12} className="text-destructive" /></button>
+                      </>
+                    )}
                   </div>
                 </div>
               );
             })}
-            {paged.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">{t("Nenhuma movimentação encontrada.")}</p>}
+            {pageRows.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">{t("Nenhuma movimentação encontrada.")}</p>}
           </div>
 
-          {totalPages > 1 && (
+          {(currentPage > 1 || hasNextPage) && (
             <div className="flex items-center justify-between p-4 border-t border-border/50">
-              <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0}
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1 || pageTransitioning}
                 className="px-3 py-1.5 text-xs font-medium rounded-lg bg-secondary hover:bg-secondary/80 disabled:opacity-40">
                 {t("Anterior")}
               </button>
-              <span className="text-xs text-muted-foreground">{page + 1} / {totalPages}</span>
-              <button onClick={() => setPage(Math.min(totalPages - 1, page + 1))} disabled={page >= totalPages - 1}
+              <span className="text-xs text-muted-foreground">{t("Página")} {currentPage}</span>
+              <button onClick={() => setCurrentPage(p => p + 1)} disabled={!hasNextPage || pageTransitioning}
                 className="px-3 py-1.5 text-xs font-medium rounded-lg bg-secondary hover:bg-secondary/80 disabled:opacity-40">
                 {t("Próximo")}
               </button>
@@ -868,7 +1128,7 @@ export function TransactionList({
           <SpreadsheetImportModal
             open={showSpreadsheetImport}
             onClose={() => setShowSpreadsheetImport(false)}
-            onImported={reloadTransactions}
+            onImported={() => refreshAfterMutation({ resetToFirstPage: true })}
           />
           {/* Importar com IA — fluxo genérico separado */}
           <AIImportModal open={showAIImport} onClose={() => setShowAIImport(false)} onImport={handleBulkImport} fields={financeFields} title={t("Importar Lançamentos com IA")} moduleName="Financeiro" />

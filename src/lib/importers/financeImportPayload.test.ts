@@ -27,6 +27,16 @@ describe("payload de importação financeira", () => {
       treasurer_name: "Tesoureiro",
       period_label: "JUL/26",
       legacy_record_number: "99",
+      raw_timestamp: "2026-07-28T14:05:00",
+      district_raw_label: "02 - SANTA FÉ",
+      congregation_raw_label: "MATRIZ",
+      financial_account_raw_label: "CAIXA MATRIZ",
+      accounting_group_raw_label: "10 - DESP. ADMINISTRATIVAS",
+      account_category_raw_label: "1102 SERVIÇOS ELETRICOS E HIDRÁULICOS",
+      document_type_raw_label: "CUP",
+      source_observation: "Conta de luz de julho",
+      pending_reconciliations: [],
+      import_source_row_number: 42,
       origin: "spreadsheet",
       status: "Confirmado",
     };
@@ -49,7 +59,37 @@ describe("payload de importação financeira", () => {
       legacy_record_number: "99",
       origin: "spreadsheet",
       source_module: "spreadsheet_import",
+      raw_timestamp: "2026-07-28T14:05:00",
+      district_raw_label: "02 - SANTA FÉ",
+      congregation_raw_label: "MATRIZ",
+      financial_account_raw_label: "CAIXA MATRIZ",
+      accounting_group_raw_label: "10 - DESP. ADMINISTRATIVAS",
+      account_category_raw_label: "1102 SERVIÇOS ELETRICOS E HIDRÁULICOS",
+      document_type_raw_label: "CUP",
+      source_observation: "Conta de luz de julho",
     });
+  });
+
+  it("nunca perde o rótulo raw mesmo quando o campo não foi resolvido para nenhum ID (pendência)", () => {
+    const tx: MappedTransaction = {
+      date: "2026-07-29",
+      amount: 50,
+      type: "Saida",
+      category: "Despesa",
+      description: "Lançamento de saída",
+      district_id: null,
+      district_raw_label: "24 - DALLAGNOL",
+      pending_reconciliations: [
+        { field: "district", catalogType: "district", rawValue: "24 - DALLAGNOL" },
+      ],
+      import_source_row_number: 7,
+      origin: "spreadsheet",
+      status: "Confirmado",
+    };
+
+    const payload = buildFinanceImportPayload(tx, "church-1", "user-1");
+    expect(payload.district_id).toBeNull();
+    expect(payload.district_raw_label).toBe("24 - DALLAGNOL");
   });
 
   it("mapeia a importação genérica completa sem aceitar IDs fora dos lookups", () => {

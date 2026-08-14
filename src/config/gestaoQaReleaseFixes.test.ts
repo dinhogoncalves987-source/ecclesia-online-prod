@@ -78,7 +78,9 @@ describe("fechamento da homologação da Gestão", () => {
     expect(prayers).toContain("Remover este pedido de oração?");
     expect(requests).toContain("Rejeitar esta solicitação?");
     expect(finance).toContain("Remover este lançamento financeiro?");
-    expect(finance).toContain("Dados contábeis complementares");
+    // Renomeado para "Mais detalhes contábeis" na FASE 1D-C1 (mesma seção
+    // expansível do formulário manual, wording alinhado ao pedido do usuário).
+    expect(finance).toContain("Mais detalhes contábeis");
   });
 
   it("protege a importação com IA com sessão real, sem usar a chave pública como usuário", () => {

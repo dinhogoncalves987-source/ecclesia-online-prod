@@ -196,8 +196,17 @@ export type FinanceExportOptions = {
   moduleTitle: string;
   /** Linha de resumo opcional anexada ao texto de share/WA/e-mail. */
   summary?: string;
-  /** Função que retorna o CSV como string (opcional). */
-  csvFn?: () => string;
+  /**
+   * Função que retorna o CSV como string (opcional). Pode ser assíncrona —
+   * usada quando a exportação precisa buscar o período completo no
+   * servidor antes de gerar o arquivo (ver
+   * src/lib/financeMonthlyLedger.ts::fetchDateRangeForExport). Se a
+   * função rejeitar/lançar (ex.: total buscado ≠ total esperado), o
+   * download NUNCA ocorre e o chamador (useDocExport) mostra um erro em
+   * vez do toast de sucesso — nunca um CSV parcial anunciado como
+   * completo.
+   */
+  csvFn?: () => string | Promise<string>;
   /** Nome do arquivo CSV (sem extensão ou com .csv). */
   csvFilename?: string;
 };
@@ -218,7 +227,9 @@ export function buildFinanceExportItems(opts: FinanceExportOptions): DocExportIt
     const filename =
       opts.csvFilename ??
       opts.moduleTitle.toLowerCase().replace(/\s+/g, "_") + ".csv";
-    items.push({ type: "csv", onAction: () => downloadCSVRaw(fn(), filename) });
+    // `await` funciona tanto para retorno síncrono quanto para Promise —
+    // se `fn()` lançar, esta função rejeita e `downloadCSVRaw` nunca roda.
+    items.push({ type: "csv", onAction: async () => downloadCSVRaw(await fn(), filename) });
   }
 
   items.push(

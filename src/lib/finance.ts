@@ -113,6 +113,38 @@ export type TreasuryTransaction = {
   /** FK → finance_import_batches. Lote de importação CONFIADCS. */
   import_batch_id?:              string | null;
 
+  // ── Campos CONFIADCS — reconciliação (migration 20260812180000) ──────────
+  /** Carimbo de data/hora original da planilha ("Carimbo de data/hora"), com
+   *  data E hora civis preservadas sem deslocamento de fuso horário. */
+  raw_timestamp?:                 string | null;
+  /** Rótulo bruto de DISTRITO - ORIGEM 1 como veio da planilha. Preservado
+   *  mesmo quando `district_id` resolve para um setor atual, e é o único
+   *  registro quando o nome é histórico e não existe setor correspondente
+   *  (resolution = 'historical_preserved'). */
+  district_raw_label?:            string | null;
+  /** Rótulo bruto de CONGREGAÇÃO - ORIGEM 2. "TODAS" é preservado aqui como
+   *  opção operacional, nunca como pendência. */
+  congregation_raw_label?:        string | null;
+  /** Rótulo bruto de PORTADOR ORIGEM. */
+  financial_account_raw_label?:   string | null;
+  /** Rótulo bruto de GRUPO CONTÁBIL. */
+  accounting_group_raw_label?:    string | null;
+  /** Rótulo bruto de CONTA CONTÁBIL. */
+  account_category_raw_label?:    string | null;
+  /** Rótulo bruto de TIPO DOC. */
+  document_type_raw_label?:       string | null;
+  /** Campo OBSERVAÇÃO da planilha, isolado — nunca concatenado com outros
+   *  fallbacks em `notes`. */
+  source_observation?:            string | null;
+  /** FK → finance_periods. Identidade própria do campo PERIODO (find-or-create
+   *  determinístico, nunca ambíguo com `period_label`). */
+  period_id?:                     string | null;
+  /** true quando a linha foi persistida com >=1 relacionamento de catálogo
+   *  ainda pendente de reconciliação (nunca é "sucesso parcial silencioso"). */
+  has_pending_reconciliation?:    boolean | null;
+  /** Número da linha de origem na planilha (1-based, após o cabeçalho). */
+  import_source_row_number?:      number | null;
+
   // ── Campos Asaas (preparação estrutural — sem uso ativo) ──────────────────
   asaas_payment_id?:             string | null;
   asaas_customer_id?:            string | null;

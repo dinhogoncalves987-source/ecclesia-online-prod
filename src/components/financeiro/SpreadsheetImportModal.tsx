@@ -5,7 +5,7 @@
  * Nunca exibe dados falsos/mock/demo.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { X, Upload, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle, ChevronDown } from "lucide-react";
+import { X, Upload, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle, AlertTriangle, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { useChurch } from "@/hooks/useChurchContext";
@@ -15,8 +15,16 @@ import { mapConfiadcsRows, type AuxLookup, type MappedTransaction } from "@/lib/
 import { buildFinanceImportPayload } from "@/lib/importers/financeImportPayload";
 import { buildColumnMap } from "@/lib/importers/headerNormalizer";
 import { getOrganizationScopeIds } from "@/lib/organizationScope";
+import {
+  CONFIADCS_IMPORT_CHUNK_SIZE,
+  runFinanceImportBatches,
+  type FinanceImportChunkResult,
+  type FinanceImportRunnerClient,
+  type FinanceImportRunResult,
+  type FinanceReconciliationReport,
+} from "@/lib/importers/financeImportRunner";
 
-const BATCH_SIZE = 200;
+const BATCH_SIZE = CONFIADCS_IMPORT_CHUNK_SIZE;
 const PREVIEW_ROWS = 20;
 
 type Step = "file" | "preview" | "importing" | "done";
@@ -107,7 +115,7 @@ export function SpreadsheetImportModal({ open, onClose, onImported }: Props) {
   const [invalidSample, setInvalidSample] = useState<{ rowIndex: number; reason: string }[]>([]);
   const [totalRows, setTotalRows] = useState(0);
   const [progress, setProgress] = useState(0);
-  const [doneResult, setDoneResult] = useState<{ success: number; failed: number } | null>(null);
+  const [runResult, setRunResult] = useState<FinanceImportRunResult | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [auxError, setAuxError] = useState<string | null>(null);
@@ -132,7 +140,7 @@ export function SpreadsheetImportModal({ open, onClose, onImported }: Props) {
     if (!open) {
       setStep("file"); setFile(null); setSheetNames([]); setSelectedSheet("");
       setRawRows([]); setHeaderRowIndex(0); setMapped([]); setInvalidSample([]);
-      setTotalRows(0); setProgress(0); setDoneResult(null);
+      setTotalRows(0); setProgress(0); setRunResult(null);
       setFileError(null); setImportError(null); setAuxError(null); setLoadingFile(false);
       setAuxData(null); setAuxOrganizationId(null);
     }
@@ -188,62 +196,136 @@ export function SpreadsheetImportModal({ open, onClose, onImported }: Props) {
   };
 
   // ── Import via RPC ──────────────────────────────────────────────────────────
+  // Uma importação inteira (até 29.957 linhas, em blocos de BATCH_SIZE) usa
+  // um ÚNICO finance_import_batches: o batch_id retornado pelo primeiro
+  // bloco é reaproveitado em todos os blocos seguintes (nunca um lote por
+  // bloco), e finalize_finance_import_batch só é chamado UMA vez, somente
+  // depois que TODOS os blocos foram persistidos com sucesso. Sucesso
+  // parcial nunca é declarado concluído — ver runFinanceImportBatches.
+
+  function parseRpcJson(data: unknown): Record<string, unknown> {
+    return (typeof data === "string" ? JSON.parse(data) : (data ?? {})) as Record<string, unknown>;
+  }
+
+  function buildSupabaseImportClient(): FinanceImportRunnerClient {
+    return {
+      importChunk: async (rows, batchId): Promise<FinanceImportChunkResult> => {
+        const { data, error } = await supabase.rpc("import_finance_transactions_bulk", {
+          p_rows: rows as Json,
+          p_import_batch_id: batchId ?? undefined,
+        });
+
+        if (error) {
+          const msg = [error.message, error.details, error.hint].filter(Boolean).join(" | ") || "Erro na RPC.";
+          return {
+            batchId: batchId ?? "",
+            inserted: 0, persistedReconciled: 0, persistedPending: 0,
+            duplicate: 0, excludedInvalid: 0, failed: rows.length,
+            errorMessage: msg,
+          };
+        }
+
+        const result = parseRpcJson(data);
+        if (typeof result.error === "string") {
+          return {
+            batchId: batchId ?? String(result.batch_id ?? ""),
+            inserted: 0, persistedReconciled: 0, persistedPending: 0,
+            duplicate: 0, excludedInvalid: 0, failed: rows.length,
+            errorMessage: result.error,
+          };
+        }
+
+        return {
+          batchId: String(result.batch_id ?? batchId ?? ""),
+          inserted: Number(result.inserted ?? 0),
+          persistedReconciled: Number(result.persisted_reconciled ?? 0),
+          persistedPending: Number(result.persisted_pending ?? 0),
+          duplicate: Number(result.duplicate ?? 0),
+          excludedInvalid: Number(result.excluded_invalid ?? 0),
+          failed: Number(result.failed ?? 0),
+          errors: result.errors,
+        };
+      },
+      finalizeBatch: async (batchId) => {
+        const { data, error } = await supabase.rpc("finalize_finance_import_batch", { p_batch_id: batchId });
+        if (error) {
+          throw new Error(
+            [error.message, error.details, error.hint].filter(Boolean).join(" | ") || "Erro ao finalizar a importação.",
+          );
+        }
+        const result = parseRpcJson(data);
+        return { ok: Boolean(result.ok), mismatches: Array.isArray(result.mismatches) ? result.mismatches : [] };
+      },
+      // Uma única leitura pontual do relatório já recalculado no servidor a
+      // partir do que está efetivamente persistido — nunca um fetch-all das
+      // transações no cliente.
+      fetchReconciliationReport: async (batchId): Promise<FinanceReconciliationReport | null> => {
+        const { data, error } = await supabase
+          .from("finance_import_batches")
+          .select("reconciled, reconciliation_report")
+          .eq("id", batchId)
+          .maybeSingle();
+        if (error || !data?.reconciliation_report) return null;
+        const report = data.reconciliation_report as Record<string, unknown>;
+        return {
+          ok: Boolean(report.ok),
+          mismatches: Array.isArray(report.mismatches) ? report.mismatches : [],
+          rowsRead: Number(report.rows_read ?? 0),
+          persistedReconciled: Number(report.persisted_reconciled ?? 0),
+          persistedPending: Number(report.persisted_pending ?? 0),
+          duplicate: Number(report.duplicate ?? 0),
+          excludedInvalid: Number(report.excluded_invalid ?? 0),
+          failed: Number(report.failed ?? 0),
+          distinctLegacyRecords: Number(report.distinct_legacy_records ?? 0),
+          entriesCount: Number(report.entries_count ?? 0),
+          exitsCount: Number(report.exits_count ?? 0),
+          entriesAmount: Number(report.entries_amount ?? 0),
+          exitsAmount: Number(report.exits_amount ?? 0),
+          minDate: (report.min_date as string) ?? null,
+          maxDate: (report.max_date as string) ?? null,
+        };
+      },
+    };
+  }
 
   const startImport = async () => {
     if (!mapped.length || !church || !user) return;
     setStep("importing");
     setProgress(0);
     setImportError(null);
+    setRunResult(null);
 
-    let success = 0;
-    let failed = 0;
+    const payloads = mapped.map(tx => buildFinanceImportPayload(tx, church.id, user.id));
+    const baseClient = buildSupabaseImportClient();
+    let processedRows = 0;
+    const trackingClient: FinanceImportRunnerClient = {
+      ...baseClient,
+      importChunk: async (rows, batchId) => {
+        const result = await baseClient.importChunk(rows, batchId);
+        processedRows += rows.length;
+        setProgress(Math.round((processedRows / payloads.length) * 100));
+        return result;
+      },
+    };
 
-    for (let i = 0; i < mapped.length; i += BATCH_SIZE) {
-      const chunk = mapped.slice(i, i + BATCH_SIZE);
-      const toInsert = chunk.map(tx => buildFinanceImportPayload(tx, church.id, user.id));
-
-      const { data, error } = await supabase.rpc(
-        "import_finance_transactions_bulk",
-        { p_rows: toInsert as Json }
-      );
-
-      if (error) {
-        const msg = [error.message, error.details, error.hint].filter(Boolean).join(" | ") || "Erro na RPC.";
-        setImportError(msg);
-        failed += chunk.length;
-        break;
+    try {
+      const result = await runFinanceImportBatches(payloads, trackingClient, BATCH_SIZE);
+      setRunResult(result);
+      if (result.aborted) {
+        setImportError(result.abortReason ?? "A importação foi interrompida antes de processar todas as linhas.");
+      } else if (result.finalizeOk === false) {
+        setImportError(
+          "A reconciliação final não confirmou os números do contrato oficial da planilha — a importação NÃO pode ser considerada concluída. Veja os detalhes abaixo.",
+        );
       }
-
-      const result = (typeof data === "string" ? JSON.parse(data) : (data ?? {})) as {
-        inserted?: number;
-        error?: string;
-      };
-
-      if (result.error) {
-        setImportError(result.error);
-        failed += chunk.length;
-        break;
+      setStep("done");
+      const persisted = result.totals.persistedReconciled + result.totals.persistedPending;
+      if (persisted > 0) {
+        await onImported?.();
       }
-
-      const inserted = Number(result?.inserted ?? 0);
-
-      if (inserted !== toInsert.length) {
-        const msg = `O banco confirmou apenas ${inserted} de ${toInsert.length} lançamentos neste lote.`;
-        setImportError(msg);
-        success += inserted;
-        failed += toInsert.length - inserted;
-        break;
-      }
-
-      success += inserted;
-      setProgress(Math.round(((i + chunk.length) / mapped.length) * 100));
-    }
-
-    const notProcessed = Math.max(0, mapped.length - success - failed);
-    setDoneResult({ success, failed: failed + notProcessed });
-    setStep("done");
-    if (success > 0) {
-      await onImported?.();
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : "Erro inesperado durante a importação.");
+      setStep("done");
     }
   };
 
@@ -423,38 +505,97 @@ export function SpreadsheetImportModal({ open, onClose, onImported }: Props) {
             </div>
           )}
 
-          {/* STEP: done */}
-          {step === "done" && doneResult && (
-            <div className="p-8 flex flex-col items-center gap-4 text-center">
-              {importError ? (
-                <>
-                  <AlertCircle size={40} className="text-destructive" />
-                  <p className="text-base font-semibold text-destructive">Erro na importação</p>
+          {/* STEP: done — resumo final da reconciliação (nunca declara sucesso
+              quando a importação foi abortada ou finalize não reconciliou) */}
+          {step === "done" && runResult && (() => {
+            const report = runResult.reconciliationReport;
+            const fullyReconciled = !runResult.aborted && runResult.finalized && runResult.finalizeOk === true && report?.ok === true;
+            const fmtInt = (n: number) => n.toLocaleString("pt-BR");
+            const fmtCurrency = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+            const fmtDate = (d: string | null) => d ? new Date(d + "T00:00:00").toLocaleDateString("pt-BR") : "—";
+
+            return (
+              <div className="p-6 sm:p-8 flex flex-col items-center gap-4 text-center">
+                {fullyReconciled ? (
+                  <>
+                    <CheckCircle2 size={40} className="text-green-500" />
+                    <p className="text-base font-semibold">Importação concluída e reconciliada</p>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle size={40} className="text-destructive" />
+                    <p className="text-base font-semibold text-destructive">
+                      {runResult.aborted ? "Importação interrompida — NÃO concluída" : "Reconciliação final não confirmada"}
+                    </p>
+                  </>
+                )}
+
+                {importError && (
                   <div className="w-full text-left p-4 rounded-xl bg-destructive/10 border border-destructive/30 text-sm text-destructive">
                     {importError}
                   </div>
-                  {doneResult.success > 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      {doneResult.success.toLocaleString("pt-BR")} lançamento(s) foram salvos antes do erro.
-                    </p>
-                  )}
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 size={40} className="text-green-500" />
-                  <p className="text-base font-semibold">Importação concluída</p>
-                  <div className="flex gap-4 text-sm">
-                    <span className="text-green-600 dark:text-green-400 font-medium">
-                      {doneResult.success.toLocaleString("pt-BR")} importados
+                )}
+
+                {/* Resumo — sempre a partir de números recalculados no servidor
+                    quando disponíveis (report), nunca inventados no cliente. */}
+                <div className="w-full text-left rounded-xl border border-border/50 divide-y divide-border/50 text-sm">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 p-4">
+                    <span className="text-muted-foreground">Linhas lidas</span>
+                    <span className="text-right font-medium tabular-nums">{fmtInt(report?.rowsRead ?? runResult.totalRowsSubmitted)}</span>
+
+                    <span className="text-muted-foreground">Persistidas e reconciliadas</span>
+                    <span className="text-right font-medium tabular-nums text-green-600 dark:text-green-400">
+                      {fmtInt(report?.persistedReconciled ?? runResult.totals.persistedReconciled)}
                     </span>
-                    {doneResult.failed > 0 && (
-                      <span className="text-destructive">{doneResult.failed.toLocaleString("pt-BR")} com erro</span>
-                    )}
+
+                    <span className="text-muted-foreground">Persistidas pendentes</span>
+                    <span className={`text-right font-medium tabular-nums ${(report?.persistedPending ?? runResult.totals.persistedPending) > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}>
+                      {fmtInt(report?.persistedPending ?? runResult.totals.persistedPending)}
+                    </span>
+
+                    <span className="text-muted-foreground">Duplicadas</span>
+                    <span className={`text-right font-medium tabular-nums ${(report?.duplicate ?? runResult.totals.duplicate) > 0 ? "text-destructive" : ""}`}>
+                      {fmtInt(report?.duplicate ?? runResult.totals.duplicate)}
+                    </span>
+
+                    <span className="text-muted-foreground">Inválidas</span>
+                    <span className={`text-right font-medium tabular-nums ${(report?.excludedInvalid ?? runResult.totals.excludedInvalid) > 0 ? "text-destructive" : ""}`}>
+                      {fmtInt(report?.excludedInvalid ?? runResult.totals.excludedInvalid)}
+                    </span>
+
+                    <span className="text-muted-foreground">Falhas</span>
+                    <span className={`text-right font-medium tabular-nums ${(report?.failed ?? runResult.totals.failed) > 0 ? "text-destructive" : ""}`}>
+                      {fmtInt(report?.failed ?? runResult.totals.failed)}
+                    </span>
                   </div>
-                </>
-              )}
-            </div>
-          )}
+
+                  {report && (
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 p-4">
+                      <span className="text-muted-foreground">Entradas</span>
+                      <span className="text-right font-medium tabular-nums">{fmtInt(report.entriesCount)} · {fmtCurrency(report.entriesAmount)}</span>
+
+                      <span className="text-muted-foreground">Saídas</span>
+                      <span className="text-right font-medium tabular-nums">{fmtInt(report.exitsCount)} · {fmtCurrency(report.exitsAmount)}</span>
+
+                      <span className="text-muted-foreground">Período</span>
+                      <span className="text-right font-medium tabular-nums">{fmtDate(report.minDate)} — {fmtDate(report.maxDate)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {!fullyReconciled && report && report.mismatches.length > 0 && (
+                  <div className="w-full text-left rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs space-y-1">
+                    <p className="font-medium text-amber-600 dark:text-amber-400 inline-flex items-center gap-1">
+                      <AlertTriangle size={12} /> Divergências encontradas na reconciliação final:
+                    </p>
+                    {report.mismatches.map((m, i) => (
+                      <p key={i} className="text-muted-foreground font-mono">{JSON.stringify(m)}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Footer */}

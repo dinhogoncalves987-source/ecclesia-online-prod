@@ -1,7 +1,6 @@
 import { useLanguage } from "@/hooks/useLanguage";
 import { formatFinanceCurrency } from "@/lib/financeDemo";
 import { useFinanceInsights, type FinanceInsightCategory } from "@/lib/financeInsights";
-import type { TreasuryTransaction } from "@/lib/finance";
 import { AlertCircle, AlertTriangle, ArrowRight, CheckCircle2, Info, Lightbulb, Sparkles, TrendingUp } from "lucide-react";
 import { DocExportMenu } from "@/components/shared/DocExportMenu";
 import { buildFinanceExportItems } from "@/lib/docExport";
@@ -11,9 +10,12 @@ import { buildFinanceExportItems } from "@/lib/docExport";
  * usava FINANCE_ALERTS/INTELLIGENCE_INSIGHTS/RECOMMENDED_ACTIONS fixos de
  * financeDemo.ts. Agora consome as mesmas regras determinísticas sobre
  * dados reais já usadas pelo Executivo (Fase G) — ver
- * src/lib/financeInsights.ts. Sem IA generativa: apenas comparação de
- * período/orçamento/status sobre transactions, campanhas, finance_budgets e
- * finance_accountability_reports reais.
+ * src/lib/financeInsights.ts.
+ *
+ * CORREÇÃO 2026-08-14 (CORREÇÃO C3.1 — eliminar fetch-all) — este componente
+ * recebia `transactions: TreasuryTransaction[]` (array completo) via prop.
+ * useFinanceInsights agora busca tudo via finance_dashboard_aggregates
+ * (server-side) — nenhum fetch-all de transactions ocorre mais nesta aba.
  */
 
 const CATEGORY_CONFIG: Record<FinanceInsightCategory, { Icon: typeof TrendingUp; labelKey: string; border: string; badge: string; dot: string }> = {
@@ -57,13 +59,13 @@ function buildInsightsCSV(insights: { message: string; category: string }[]): st
 
 type Props = {
   onTabChange?: (tab: string) => void;
-  transactions: TreasuryTransaction[];
+  reloadToken?: number;
 };
 
-export function FinanceIntelligence({ onTabChange, transactions }: Props) {
+export function FinanceIntelligence({ onTabChange, reloadToken }: Props) {
   const { t, lang } = useLanguage();
   const fmt = (v: number) => formatFinanceCurrency(v, lang);
-  const { alerts, insights, actions } = useFinanceInsights({ transactions, t, fmt });
+  const { alerts, insights, actions } = useFinanceInsights({ t, fmt, reloadToken });
 
   const alertIcon = (type: string) => {
     if (type === "warning") return <AlertTriangle size={14} className="text-amber-600 flex-shrink-0" />;
