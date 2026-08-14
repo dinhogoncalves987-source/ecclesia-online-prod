@@ -138,7 +138,14 @@
     "20260803200000_access_bootstrap_hotfix.sql",
     "20260804090000_management_access_reconciliation_audit.sql",
     "20260804100000_member_invite_whatsapp_only_split_delivery.sql",
-    "20260808170000_members_server_side_listing_performance.sql"
+    "20260808170000_members_server_side_listing_performance.sql",
+    "20260812180000_finance_confiadcs_reconciliation_schema.sql",
+    "20260812190000_finance_confiadcs_reconciliation_rpc.sql",
+    "20260812200000_finance_confiadcs_reconciliation_hardening.sql",
+    "20260812210000_finance_confiadcs_catalog_seed.sql",
+    "20260814120000_finance_import_batch_deletion.sql",
+    "20260814140000_finance_dashboard_aggregates.sql",
+    "20260814150000_finance_dashboard_aggregates_extended.sql"
   ],
   "staging_feature": [],
   "staging_only": [

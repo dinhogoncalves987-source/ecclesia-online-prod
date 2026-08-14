@@ -672,6 +672,22 @@ export type Database = {
           id: string
           imported_rows: number
           organization_id: string
+          persisted_entries_amount: number | null
+          persisted_exits_amount: number | null
+          reconciled: boolean | null
+          reconciliation_report: Json | null
+          rows_duplicate: number | null
+          rows_excluded_invalid: number | null
+          rows_failed: number | null
+          rows_pending_reconciliation: number | null
+          rows_persisted: number | null
+          rows_persisted_pending: number | null
+          rows_persisted_reconciled: number | null
+          rows_read: number | null
+          source_entries_amount: number | null
+          source_exits_amount: number | null
+          source_entries_count: number | null
+          source_exits_count: number | null
           source_file_name: string | null
           source_type: string
           status: string
@@ -686,6 +702,22 @@ export type Database = {
           id?: string
           imported_rows?: number
           organization_id: string
+          persisted_entries_amount?: number | null
+          persisted_exits_amount?: number | null
+          reconciled?: boolean | null
+          reconciliation_report?: Json | null
+          rows_duplicate?: number | null
+          rows_excluded_invalid?: number | null
+          rows_failed?: number | null
+          rows_pending_reconciliation?: number | null
+          rows_persisted?: number | null
+          rows_persisted_pending?: number | null
+          rows_persisted_reconciled?: number | null
+          rows_read?: number | null
+          source_entries_amount?: number | null
+          source_exits_amount?: number | null
+          source_entries_count?: number | null
+          source_exits_count?: number | null
           source_file_name?: string | null
           source_type?: string
           status?: string
@@ -700,6 +732,22 @@ export type Database = {
           id?: string
           imported_rows?: number
           organization_id?: string
+          persisted_entries_amount?: number | null
+          persisted_exits_amount?: number | null
+          reconciled?: boolean | null
+          reconciliation_report?: Json | null
+          rows_duplicate?: number | null
+          rows_excluded_invalid?: number | null
+          rows_failed?: number | null
+          rows_pending_reconciliation?: number | null
+          rows_persisted?: number | null
+          rows_persisted_pending?: number | null
+          rows_persisted_reconciled?: number | null
+          rows_read?: number | null
+          source_entries_amount?: number | null
+          source_exits_amount?: number | null
+          source_entries_count?: number | null
+          source_exits_count?: number | null
           source_file_name?: string | null
           source_type?: string
           status?: string
@@ -800,6 +848,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "finance_monthly_closings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_periods: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          label: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_periods_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -1304,8 +1387,10 @@ export type Database = {
       transactions: {
         Row: {
           account_category_id: string | null
+          account_category_raw_label: string | null
           accounting_date: string | null
           accounting_group_id: string | null
+          accounting_group_raw_label: string | null
           amount: number
           asaas_customer_id: string | null
           asaas_payment_id: string | null
@@ -1313,6 +1398,7 @@ export type Database = {
           category: string
           collector_name: string | null
           congregation_id: string | null
+          congregation_raw_label: string | null
           contributor_document: string | null
           contributor_name: string | null
           cost_center_id: string | null
@@ -1321,22 +1407,30 @@ export type Database = {
           date: string
           description: string
           district_id: string | null
+          district_raw_label: string | null
           document_number: string | null
           document_type_id: string | null
+          document_type_raw_label: string | null
           external_reference: string | null
           financial_account_id: string | null
+          financial_account_raw_label: string | null
+          has_pending_reconciliation: boolean
           id: string
           import_batch_id: string | null
+          import_source_row_number: number | null
           issue_date: string | null
           legacy_record_number: string | null
           notes: string | null
           organization_id: string
           origin: string
           payment_method: string | null
+          period_id: string | null
           period_label: string | null
+          raw_timestamp: string | null
           receipt_url: string | null
           responsible_id: string | null
           source_module: string | null
+          source_observation: string | null
           status: string
           supplier_beneficiary_document: string | null
           supplier_beneficiary_name: string | null
@@ -1348,8 +1442,10 @@ export type Database = {
         }
         Insert: {
           account_category_id?: string | null
+          account_category_raw_label?: string | null
           accounting_date?: string | null
           accounting_group_id?: string | null
+          accounting_group_raw_label?: string | null
           amount: number
           asaas_customer_id?: string | null
           asaas_payment_id?: string | null
@@ -1357,6 +1453,7 @@ export type Database = {
           category: string
           collector_name?: string | null
           congregation_id?: string | null
+          congregation_raw_label?: string | null
           contributor_document?: string | null
           contributor_name?: string | null
           cost_center_id?: string | null
@@ -1365,22 +1462,30 @@ export type Database = {
           date?: string
           description: string
           district_id?: string | null
+          district_raw_label?: string | null
           document_number?: string | null
           document_type_id?: string | null
+          document_type_raw_label?: string | null
           external_reference?: string | null
           financial_account_id?: string | null
+          financial_account_raw_label?: string | null
+          has_pending_reconciliation?: boolean
           id?: string
           import_batch_id?: string | null
+          import_source_row_number?: number | null
           issue_date?: string | null
           legacy_record_number?: string | null
           notes?: string | null
           organization_id: string
           origin?: string
           payment_method?: string | null
+          period_id?: string | null
           period_label?: string | null
+          raw_timestamp?: string | null
           receipt_url?: string | null
           responsible_id?: string | null
           source_module?: string | null
+          source_observation?: string | null
           status?: string
           supplier_beneficiary_document?: string | null
           supplier_beneficiary_name?: string | null
@@ -1392,8 +1497,10 @@ export type Database = {
         }
         Update: {
           account_category_id?: string | null
+          account_category_raw_label?: string | null
           accounting_date?: string | null
           accounting_group_id?: string | null
+          accounting_group_raw_label?: string | null
           amount?: number
           asaas_customer_id?: string | null
           asaas_payment_id?: string | null
@@ -1401,6 +1508,7 @@ export type Database = {
           category?: string
           collector_name?: string | null
           congregation_id?: string | null
+          congregation_raw_label?: string | null
           contributor_document?: string | null
           contributor_name?: string | null
           cost_center_id?: string | null
@@ -1409,22 +1517,30 @@ export type Database = {
           date?: string
           description?: string
           district_id?: string | null
+          district_raw_label?: string | null
           document_number?: string | null
           document_type_id?: string | null
+          document_type_raw_label?: string | null
           external_reference?: string | null
           financial_account_id?: string | null
+          financial_account_raw_label?: string | null
+          has_pending_reconciliation?: boolean
           id?: string
           import_batch_id?: string | null
+          import_source_row_number?: number | null
           issue_date?: string | null
           legacy_record_number?: string | null
           notes?: string | null
           organization_id?: string
           origin?: string
           payment_method?: string | null
+          period_id?: string | null
           period_label?: string | null
+          raw_timestamp?: string | null
           receipt_url?: string | null
           responsible_id?: string | null
           source_module?: string | null
+          source_observation?: string | null
           status?: string
           supplier_beneficiary_document?: string | null
           supplier_beneficiary_name?: string | null
@@ -6772,7 +6888,28 @@ export type Database = {
         }[]
       }
       import_finance_transactions_bulk: {
-        Args: { p_rows: Json }
+        Args: { p_import_batch_id?: string | null; p_rows: Json }
+        Returns: Json
+      }
+      finalize_finance_import_batch: {
+        Args: { p_batch_id: string }
+        Returns: Json
+      }
+      delete_finance_import_batch: {
+        Args: { p_batch_id: string }
+        Returns: Json
+      }
+      reset_organization_finance_imports: {
+        Args: { p_organization_id: string }
+        Returns: Json
+      }
+      finance_dashboard_aggregates: {
+        Args: {
+          p_date_from?: string | null
+          p_date_to?: string | null
+          p_hierarchy_organization_ids?: string[] | null
+          p_organization_id: string
+        }
         Returns: Json
       }
       send_internal_call_signal: {
